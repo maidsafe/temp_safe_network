@@ -1,4 +1,4 @@
-// Copyright 2020 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::subcommands::OutputFmt;
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
 use clap::Parser;
@@ -88,17 +89,17 @@ impl fmt::Display for NetworkInfo {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Local(path, genesis_key) => {
-                if let Some(gk) = genesis_key {
-                    write!(f, "{:?}, path: {:?}", gk, path)
+                if let Some(key) = genesis_key {
+                    write!(f, "{key:?}, path: {path:?}")
                 } else {
-                    write!(f, "{:?}", path)
+                    write!(f, "{path:?}")
                 }
             }
             Self::Remote(url, genesis_key) => {
-                if let Some(gk) = genesis_key {
-                    write!(f, "{:?}, url: {:?}", gk, url)
+                if let Some(key) = genesis_key {
+                    write!(f, "{key:?}, url: {url:?}")
                 } else {
-                    write!(f, "{}", url)
+                    write!(f, "{url}")
                 }
             }
         }
@@ -118,6 +119,14 @@ impl NetworkInfo {
             },
         }
     }
+}
+
+#[derive(Deserialize, Debug, Serialize, Clone)]
+struct NetworkPrinter {
+    current: bool,
+    name: String,
+    genesis_key: String,
+    network_info: String,
 }
 
 #[derive(Clone, Deserialize, Debug, Serialize, Default)]
@@ -219,7 +228,7 @@ impl Config {
             match net_info {
                 NetworkInfo::Local(path, ref mut genesis_key) => {
                     match genesis_key {
-                        Some(gk) => match dir_files_checklist.get_mut(format!("{:?}", gk).as_str())
+                        Some(key) => match dir_files_checklist.get_mut(format!("{key:?}").as_str())
                         {
                             Some(present) => *present = true,
                             None => {
@@ -255,7 +264,7 @@ impl Config {
                     }
                 }
                 NetworkInfo::Remote(url, ref mut genesis_key) => match genesis_key {
-                    Some(gk) => match dir_files_checklist.get_mut(format!("{:?}", gk).as_str()) {
+                    Some(key) => match dir_files_checklist.get_mut(format!("{key:?}").as_str()) {
                         Some(present) => *present = true,
                         None => {
                             let url = Url::parse(url)?;
@@ -302,7 +311,7 @@ impl Config {
                 if let Ok(network_contacts) = Self::retrieve_local_network_contacts(&path).await {
                     let genesis_key = *network_contacts.genesis_key();
                     self.settings.networks.insert(
-                        format!("{:?}", genesis_key),
+                        format!("{genesis_key:?}"),
                         NetworkInfo::Local(path, Some(genesis_key)),
                     );
                 }
@@ -385,8 +394,8 @@ impl Config {
         match self.settings.networks.remove(name) {
             Some(NetworkInfo::Local(_, genesis_key)) => {
                 self.write_settings_to_file().await?;
-                if let Some(gk) = genesis_key {
-                    let network_contacts_path = self.network_contacts_dir.join(format!("{:?}", gk));
+                if let Some(key) = genesis_key {
+                    let network_contacts_path = self.network_contacts_dir.join(format!("{key:?}"));
                     if fs::remove_file(&network_contacts_path).await.is_err() {
                         println!(
                             "Failed to remove network map from {}",
@@ -398,8 +407,8 @@ impl Config {
             }
             Some(NetworkInfo::Remote(_, genesis_key)) => {
                 self.write_settings_to_file().await?;
-                if let Some(gk) = genesis_key {
-                    let network_contacts_path = self.network_contacts_dir.join(format!("{:?}", gk));
+                if let Some(key) = genesis_key {
+                    let network_contacts_path = self.network_contacts_dir.join(format!("{key:?}"));
                     if fs::remove_file(&network_contacts_path).await.is_err() {
                         println!(
                             "Failed to remove network map from {}",
@@ -408,7 +417,7 @@ impl Config {
                     }
                 }
             }
-            None => println!("No network with name '{}' was found in config", name),
+            None => println!("No network with name '{name}' was found in config"),
         }
         if fs::remove_file(
             &self
@@ -421,7 +430,7 @@ impl Config {
             debug!("Cannot remove default SectionTree!");
         };
         debug!("Network '{}' removed from config", name);
-        println!("Network '{}' was removed from the config", name);
+        println!("Network '{name}' was removed from the config");
 
         Ok(())
     }
@@ -459,60 +468,84 @@ impl Config {
         Ok(())
     }
 
-    pub async fn print_networks(&self) {
-        let mut table = Table::new();
-        table.add_row(&vec!["Networks"]);
-        table.add_row(&vec![
-            "Current",
-            "Network name",
-            "Genesis Key",
-            "Network map info",
-        ]);
+    // Get the list of networks to display
+    async fn get_networks(&self) -> Vec<NetworkPrinter> {
+        let mut networks = Vec::new();
+
         let current_network_contacts = self.read_default_network_contacts().await;
         let mut current_network_is_present = false;
-
         for (network_name, net_info) in self.networks_iter() {
-            let mut current = "";
+            let mut current = false;
             if let Ok((network_contacts, _)) = &current_network_contacts {
                 if net_info.matches(network_contacts.genesis_key()) {
-                    current = "*";
+                    current = true;
                     current_network_is_present = true;
                 }
             }
             let (simplified_net_info, gk) = match net_info {
-                NetworkInfo::Local(path, gk) => (format!("Local: {:?}", path), gk),
-                NetworkInfo::Remote(url, gk) => (format!("Remote: {:?}", url), gk),
+                NetworkInfo::Local(path, gk) => (format!("Local: {path:?}"), gk),
+                NetworkInfo::Remote(url, gk) => (format!("Remote: {url:?}"), gk),
             };
             let genesis_key = if let Some(key) = gk {
-                format!("{:?}", key)
+                format!("{key:?}")
             } else {
                 "".to_string()
             };
-            table.add_row(&vec![
+            networks.push(NetworkPrinter {
                 current,
-                network_name,
-                &genesis_key,
-                simplified_net_info.as_str(),
-            ]);
+                name: network_name.clone(),
+                genesis_key: genesis_key.to_string(),
+                network_info: simplified_net_info,
+            });
         }
 
-        // If current_network_contacts is not present in the config file, display it
+        // If current_network_contacts is not present in the config file, add it
         if let (Ok((network_contacts, _)), false) =
             (&current_network_contacts, current_network_is_present)
         {
             let genesis_key = format!("{:?}", network_contacts.genesis_key());
-            table.add_row(&vec![
-                "*",
-                genesis_key.as_str(),
-                genesis_key.as_str(),
-                format!("Local: {:?}", self.network_contacts_dir.join("default")).as_str(),
-            ]);
+            networks.push(NetworkPrinter {
+                current: true,
+                name: genesis_key.clone(),
+                genesis_key,
+                network_info: format!("Local: {:?}", self.network_contacts_dir.join("default")),
+            });
         }
-        println!("{table}");
+        networks
+    }
+
+    // Print the list of networks
+    pub async fn print_network(&self, output_fmt: OutputFmt) -> Result<()> {
+        let networks = self.get_networks().await;
+        if output_fmt == OutputFmt::Json {
+            let json = serde_json::to_string(&networks)?;
+            println!("{json}");
+        } else {
+            let mut table = Table::new();
+            table.add_row(&vec!["Networks"]);
+            table.add_row(&vec![
+                "Current",
+                "Network name",
+                "Genesis Key",
+                "Network map info",
+            ]);
+
+            for network in networks {
+                let current = if network.current { "*" } else { "" };
+                table.add_row(&vec![
+                    current,
+                    network.name.as_str(),
+                    network.genesis_key.as_str(),
+                    network.network_info.as_str(),
+                ]);
+            }
+            println!("{table}");
+        }
+        Ok(())
     }
 
     pub async fn set_default_network_contacts(&self, genesis_key: &BlsPublicKey) -> Result<()> {
-        let network_contacts_file = self.network_contacts_dir.join(format!("{:?}", genesis_key));
+        let network_contacts_file = self.network_contacts_dir.join(format!("{genesis_key:?}"));
         let default_network_contacts = self
             .network_contacts_dir
             .join(DEFAULT_NETWORK_CONTACTS_FILE_NAME);
@@ -757,7 +790,7 @@ pub mod test_utils {
 
                 // same gk can be present if multiple network entries in settings points
                 // to the same network contacts file
-                let _ = network_contacts_checklist.insert(format!("{:?}", genesis_key), false);
+                let _ = network_contacts_checklist.insert(format!("{genesis_key:?}"), false);
             }
 
             // mark them as true if the same entries are found in the network_contacts_dir

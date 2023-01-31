@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -7,17 +7,16 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{
-    bootstrap::JoiningAsRelocated,
     flow_ctrl::cmds::Cmd,
     relocation::{find_nodes_to_relocate, ChurnId},
-    MyNode, Proposal, Result,
+    MyNode, Result,
 };
 
 use sn_interface::{
     elder_count,
     messaging::system::SectionSigned,
-    network_knowledge::{MembershipState, NodeState},
-    types::log_markers::LogMarker,
+    network_knowledge::{node_state::RelocationInfo, MembershipState, NodeState, RelocationProof},
+    types::{keys::ed25519, log_markers::LogMarker},
 };
 
 use std::collections::BTreeSet;
@@ -25,7 +24,7 @@ use xor_name::XorName;
 
 // Relocation
 impl MyNode {
-    pub(crate) fn relocate_peers(
+    pub(crate) fn try_relocate_peers(
         &mut self,
         churn_id: ChurnId,
         excluded: BTreeSet<XorName>,
@@ -35,85 +34,93 @@ impl MyNode {
         if self.network_knowledge.prefix().is_empty() {
             return Ok(vec![]);
         }
-
+        debug!("Try to find relocate peers, excluded {excluded:?}");
         // Do not carry out relocation when there is not enough elder nodes.
         if self.network_knowledge.section_auth().elder_count() < elder_count() {
+            debug!(
+                "Not enough elders current {:?} vs. expected {:?}",
+                self.network_knowledge.section_auth().elder_count(),
+                elder_count()
+            );
             return Ok(vec![]);
         }
 
         let mut cmds = vec![];
-        for (node_state, relocate_details) in
+        for (node_state, relocation_dst) in
             find_nodes_to_relocate(&self.network_knowledge, &churn_id, excluded)
         {
             debug!(
                 "Relocating {:?} to {} (on churn of {churn_id})",
                 node_state.peer(),
-                relocate_details.dst,
+                relocation_dst.name(),
             );
 
-            cmds.extend(self.propose(Proposal::VoteNodeOffline(
-                node_state.relocate(relocate_details),
-            ))?);
+            cmds.extend(self.propose_membership_change(node_state.relocate(relocation_dst)));
         }
 
         Ok(cmds)
     }
 
-    pub(crate) fn handle_relocate(
+    pub(crate) fn relocate(
         &mut self,
-        relocate_proof: SectionSigned<NodeState>,
+        signed_relocation: SectionSigned<NodeState>,
     ) -> Result<Option<Cmd>> {
-        let (dst_xorname, dst_section_key, new_age) =
-            if let MembershipState::Relocated(ref relocate_details) = relocate_proof.state() {
-                (
-                    relocate_details.dst,
-                    relocate_details.dst_section_key,
-                    relocate_details.age,
-                )
+        // should be unreachable, but a sanity check
+        let serialized = bincode::serialize(&signed_relocation.value)?;
+        if !signed_relocation.sig.verify(&serialized) {
+            warn!("Relocate: Could not verify section signature of our relocation");
+            return Err(super::Error::InvalidSignature);
+        }
+        if self.name() != signed_relocation.peer().name() {
+            // not for us, drop it
+            warn!("Relocate: The received section signed relocation is not for us.");
+            return Ok(None);
+        }
+
+        let dst_section =
+            if let MembershipState::Relocated(relocation_dst) = signed_relocation.state() {
+                *relocation_dst.name()
             } else {
                 debug!(
-                    "Ignoring Relocate msg containing invalid NodeState: {:?}",
-                    relocate_proof.state()
+                    "Relocate: Ignoring msg containing invalid NodeState: {:?}",
+                    signed_relocation.state()
                 );
                 return Ok(None);
             };
 
-        let node = self.info();
-        if dst_xorname != node.name() {
-            // This `Relocate` message is not for us - it's most likely a duplicate of a previous
-            // message that we already handled.
-            return Ok(None);
-        }
-
-        debug!("Received Relocate message to join the section at {dst_xorname}");
-
-        if self.relocate_state.is_some() {
-            trace!("Ignore Relocate - relocation already in progress");
-            return Ok(None);
-        }
-
-        trace!("Relocation has started. previous_name: {:?}", node.name());
         trace!("{}", LogMarker::RelocateStart);
+        debug!("Relocate: Received decision to relocate to other section at {dst_section}");
 
-        // Create a new instance of JoiningAsRelocated to start the relocation
-        // flow. This same instance will handle responses till relocation is complete.
-        let bootstrap_addrs =
-            if let Ok(sap) = self.network_knowledge.section_auth_by_name(&dst_xorname) {
-                sap.addresses()
-            } else {
-                self.network_knowledge.section_auth().addresses()
-            };
-        let (joining_as_relocated, cmd) = JoiningAsRelocated::start(
-            node,
-            relocate_proof,
-            bootstrap_addrs,
-            dst_xorname,
-            dst_section_key,
-            new_age,
-        )?;
+        let original_info = self.info();
 
-        self.relocate_state = Some(Box::new(joining_as_relocated));
+        let dst_sap = self
+            .network_knowledge
+            .closest_signed_sap(&dst_section)
+            .ok_or(super::Error::NoMatchingSection)?;
+        let new_keypair = ed25519::gen_keypair(
+            &dst_sap.prefix().range_inclusive(),
+            original_info.age().saturating_add(1),
+        );
+        let new_name = ed25519::name(&new_keypair.public);
 
-        Ok(Some(cmd))
+        let info = RelocationInfo::new(signed_relocation, new_name);
+        let serialized_info = bincode::serialize(&info)?;
+        // we verify that this new name was actually created by the old name
+        let node_sig = ed25519::sign(&serialized_info, &original_info.keypair);
+        let new_prefix = dst_sap.prefix();
+
+        // we switch to the new section
+        self.switch_section(dst_sap, new_keypair)?;
+
+        info!(
+            "Relocation of us as {}: switched section to {new_prefix:?} with new name {new_name}. Now trying to join..",
+            original_info.name(),
+        );
+
+        let proof = RelocationProof::new(info, node_sig, original_info.keypair.public);
+        // we cache the proof so that we can retry if the join times out
+        self.relocation_proof = Some(proof.clone());
+
+        Ok(MyNode::try_join_section(self.context(), Some(proof)))
     }
 }

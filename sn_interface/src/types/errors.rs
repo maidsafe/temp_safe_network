@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -26,7 +26,7 @@ pub type Result<T> = result::Result<T, Error>;
 pub enum Error {
     /// Access denied for user
     #[error("Access denied for user: {0:?}")]
-    AccessDenied(User),
+    AccessDenied(Box<User>),
     /// Serialization error
     #[error("Serialisation error: {0}")]
     Serialisation(String),
@@ -44,7 +44,7 @@ pub enum Error {
     NoSuchEntry(EntryHash),
     /// User entry could not be found on the data
     #[error("Requested user not found {0:?}")]
-    NoSuchUser(User),
+    NoSuchUser(Box<User>),
     /// Owner is not valid
     #[error("Owner is not a PublicKeySet")]
     InvalidOwnerNotPublicKeySet,
@@ -83,9 +83,9 @@ impl From<Error> for ErrorMsg {
     fn from(error: Error) -> ErrorMsg {
         match error {
             Error::NoSuchEntry(hash) => ErrorMsg::NoSuchEntry(hash),
-            Error::NoSuchUser(user) => ErrorMsg::NoSuchUser(user),
-            Error::AccessDenied(pk) => ErrorMsg::AccessDenied(pk),
-            other => ErrorMsg::InvalidOperation(format!("DtError: {:?}", other)),
+            Error::NoSuchUser(user) => ErrorMsg::NoSuchUser(*user),
+            Error::AccessDenied(pk) => ErrorMsg::AccessDenied(*pk),
+            other => ErrorMsg::InvalidOperation(format!("DtError: {other:?}")),
         }
     }
 }

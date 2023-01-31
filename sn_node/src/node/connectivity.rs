@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{flow_ctrl::cmds::Cmd, MyNode, Proposal, Result};
+use crate::node::{flow_ctrl::cmds::Cmd, MyNode, Result, SectionStateVote};
 use sn_fault_detection::IssueType;
 use std::{collections::BTreeSet, net::SocketAddr};
 use xor_name::XorName;
@@ -22,7 +22,7 @@ impl MyNode {
             return;
         };
 
-        self.log_node_issue(name, IssueType::Communication);
+        self.track_node_issue(name, IssueType::Communication);
     }
 
     pub(crate) fn cast_offline_proposals(&mut self, names: &BTreeSet<XorName>) -> Result<Vec<Cmd>> {
@@ -39,9 +39,10 @@ impl MyNode {
         for name in names.iter() {
             if let Some(info) = self.network_knowledge.get_section_member(name) {
                 let info = info.leave()?;
-                if let Ok(cmds) =
-                    self.send_proposal(elders.clone(), Proposal::VoteNodeOffline(info))
-                {
+                if let Ok(cmds) = self.send_section_state_proposal(
+                    elders.clone(),
+                    SectionStateVote::NodeIsOffline(info),
+                ) {
                     result.extend(cmds);
                 }
             }

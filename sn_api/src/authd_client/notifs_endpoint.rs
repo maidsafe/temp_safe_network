@@ -1,4 +1,4 @@
-// Copyright 2020 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -37,13 +37,13 @@ pub async fn jsonrpc_listen<P: AsRef<Path>>(
         .map_err(|_| "Invalid endpoint address".to_string())?[0];
 
     let qjsonrpc_endpoint = ServerEndpoint::new(cert_path, key_path, None)
-        .map_err(|err| format!("Failed to create endpoint: {}", err))?;
+        .map_err(|err| format!("Failed to create endpoint: {err}"))?;
 
     // We try to obtain current runtime or create a new one if there is none
     let runtime = match runtime::Handle::try_current() {
         Ok(r) => r,
         Err(_) => runtime::Runtime::new()
-            .map_err(|err| format!("Failed to create runtime: {}", err))?
+            .map_err(|err| format!("Failed to create runtime: {err}"))?
             .handle()
             .clone(),
     };
@@ -52,7 +52,7 @@ pub async fn jsonrpc_listen<P: AsRef<Path>>(
 
     let mut incoming_conn = qjsonrpc_endpoint
         .bind(&listen_socket_addr)
-        .map_err(|err| format!("Failed to bind endpoint: {}", err))?;
+        .map_err(|err| format!("Failed to bind endpoint: {err}"))?;
     loop {
         match incoming_conn.get_next().await {
             Ok(Some(conn)) => {
@@ -104,7 +104,7 @@ async fn handle_request(
     // Write the response
     send.respond(&resp)
         .await
-        .map_err(|e| format!("Failed to send response: {}", e))?;
+        .map_err(|e| format!("Failed to send response: {e}"))?;
 
     // Attempt to gracefully terminate the stream.
     // If this errors it does _not_ mean our message has not been sent
@@ -147,7 +147,7 @@ async fn process_jsonrpc_request(
     match decision_rx.await {
         Ok(decision) => JsonRpcResponse::result(json!(decision), jsonrpc_req.id),
         Err(err) => JsonRpcResponse::error(
-            format!("Failed to obtain decision made for auth req: {}", err),
+            format!("Failed to obtain decision made for auth req: {err}"),
             JSONRPC_NOTIF_ERROR,
             Some(jsonrpc_req.id),
         ),

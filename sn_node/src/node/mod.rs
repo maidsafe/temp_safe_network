@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -12,16 +12,13 @@
 pub mod cfg;
 
 mod api;
-mod bootstrap;
 mod connectivity;
-mod data;
 mod dkg;
 pub(crate) mod error;
 mod flow_ctrl;
 mod handover;
 mod logging;
 mod membership;
-mod messages;
 mod messaging;
 mod node_starter;
 mod node_test_api;
@@ -30,23 +27,21 @@ mod relocation;
 /// Standard channel size, to allow for large swings in throughput
 pub static STANDARD_CHANNEL_SIZE: usize = 100_000;
 
-use self::{
-    bootstrap::join_network, core::MyNode, data::MIN_LEVEL_WHEN_FULL, flow_ctrl::cmds::Cmd,
-    node_starter::CmdChannel,
-};
 pub use self::{
     cfg::config_handler::Config,
     error::{Error, Result},
-    node_starter::{new_test_api, start_node},
+    flow_ctrl::RejoinReason,
+    node_starter::{new_test_api, start_new_node},
     node_test_api::NodeTestApi,
 };
+use self::{core::MyNode, flow_ctrl::cmds::Cmd, node_starter::CmdChannel};
 pub use crate::storage::DataStorage;
 #[cfg(test)]
 pub(crate) use relocation::{check as relocation_check, ChurnId};
 
 pub use sn_interface::network_knowledge::MIN_ADULT_AGE;
 use sn_interface::{
-    messaging::system::{NodeMsg, Proposal},
+    messaging::system::{NodeMsg, SectionStateVote},
     types::Peer,
 };
 
@@ -55,30 +50,28 @@ pub use xor_name::{Prefix, XorName, XOR_NAME_LEN}; // TODO remove pub on API upd
 
 mod core {
     use crate::{
-        comm::Comm,
         node::{
-            bootstrap::JoiningAsRelocated,
-            data::Capacity,
             dkg::DkgVoter,
             flow_ctrl::{cmds::Cmd, fault_detection::FaultsCmd},
             handover::Handover,
             membership::{elder_candidates, try_split_dkg, Membership},
             messaging::Peers,
-            DataStorage, Error, Proposal, Result, XorName,
+            DataStorage, Error, Result, XorName,
         },
         UsedSpace,
     };
+    use sn_comms::Comm;
     use sn_consensus::Generation;
     use sn_fault_detection::IssueType;
     use sn_interface::{
         messaging::{
-            signature_aggregator::SignatureAggregator,
-            system::{DkgSessionId, SectionSigned},
+            signature_aggregator::{SignatureAggregator, TotalParticipationAggregator},
+            system::{DkgSessionId, SectionSigned, SectionStateVote},
             AuthorityProof, SectionSig,
         },
         network_knowledge::{
-            supermajority, MyNodeInfo, NetworkKnowledge, NodeState, SectionAuthorityProvider,
-            SectionKeyShare, SectionKeysProvider,
+            supermajority, MyNodeInfo, NetworkKnowledge, NodeState, RelocationProof,
+            SectionAuthorityProvider, SectionKeyShare, SectionKeysProvider,
         },
         types::{keys::ed25519::Digest256, log_markers::LogMarker},
     };
@@ -94,6 +87,7 @@ mod core {
 
     // File name where to cache this node's section tree (stored at this node's set root storage dir)
     const SECTION_TREE_FILE_NAME: &str = "section_tree";
+    const GOSSIP_SECTION_COUNT: usize = 3;
 
     #[derive(Debug, Clone)]
     pub(crate) struct DkgSessionInfo {
@@ -110,23 +104,24 @@ mod core {
         // Network resources
         pub(crate) section_keys_provider: SectionKeysProvider,
         pub(crate) network_knowledge: NetworkKnowledge,
-        // Proposal aggregators
-        pub(crate) proposal_aggregator: SignatureAggregator,
         // DKG/Split/Churn modules
         pub(crate) dkg_start_aggregator: SignatureAggregator,
         pub(crate) dkg_sessions_info: HashMap<Digest256, DkgSessionInfo>,
         pub(crate) dkg_voter: DkgVoter,
+        pub(crate) elder_promotion_aggregator: SignatureAggregator,
         pub(crate) pending_split_sections:
             BTreeMap<Generation, BTreeSet<SectionSigned<SectionAuthorityProvider>>>,
-        pub(crate) relocate_state: Option<Box<JoiningAsRelocated>>,
         // ======================== Elder only ========================
         pub(crate) membership: Option<Membership>,
         // Section handover consensus state (Some for Elders, None for others)
+        pub(crate) handover_request_aggregator: TotalParticipationAggregator,
         pub(crate) handover_voting: Option<Handover>,
         pub(crate) joins_allowed: bool,
-        // Trackers
-        pub(crate) capacity: Capacity,
+        pub(crate) joins_allowed_until_split: bool,
         pub(crate) fault_cmds_sender: mpsc::Sender<FaultsCmd>,
+        // Section administration
+        pub(crate) section_proposal_aggregator: SignatureAggregator,
+        pub(crate) relocation_proof: Option<RelocationProof>,
     }
 
     #[derive(custom_debug::Debug, Clone)]
@@ -142,8 +137,10 @@ mod core {
         #[debug(skip)]
         pub(crate) comm: Comm,
         pub(crate) joins_allowed: bool,
+        pub(crate) joins_allowed_until_split: bool,
         #[debug(skip)]
         pub(crate) fault_cmds_sender: mpsc::Sender<FaultsCmd>,
+        pub(crate) relocation_proof: Option<RelocationProof>,
     }
 
     impl NodeContext {
@@ -160,7 +157,7 @@ mod core {
         /// Log an issue in dysfunction
         /// Spawns a process to send this incase the channel may be full, we don't hold up
         /// processing around this (as this can be called during dkg eg)
-        pub(crate) fn log_node_issue(&self, name: XorName, issue: IssueType) {
+        pub(crate) fn track_node_issue(&self, name: XorName, issue: IssueType) {
             trace!("Logging issue {issue:?} in dysfunction for {name}");
             let dysf_sender = self.fault_cmds_sender.clone();
             // TODO: do we need to kill the node if we fail tracking dysf?
@@ -168,6 +165,23 @@ mod core {
                 if let Err(error) = dysf_sender.send(FaultsCmd::TrackIssue(name, issue)).await {
                     // Log the issue, and error. We need to be wary of actually hitting this.
                     warn!("Could not send FaultsCmd through dysfunctional_cmds_tx: {error}");
+                }
+            });
+        }
+
+        /// Sends `FaultsCmd::UntrackIssue` cmd
+        /// Spawns a process to send this incase the channel may be full, we don't hold up
+        /// processing around this (as this can be called during dkg eg)
+        pub(crate) fn untrack_node_issue(&self, name: XorName, issue: IssueType) {
+            trace!("UnTracking issue {issue:?} in fault detection for {name}");
+            let fault_sender = self.fault_cmds_sender.clone();
+            // TODO: do we need to kill the node if we fail tracking faults?
+            let _handle = tokio::spawn(async move {
+                if let Err(error) = fault_sender
+                    .send(FaultsCmd::UntrackIssue(name, issue))
+                    .await
+                {
+                    warn!("Could not send FaultsCmd through fault_cmds_tx: {error}");
                 }
             });
         }
@@ -187,16 +201,18 @@ mod core {
                 network_knowledge: self.network_knowledge().clone(),
                 section_keys_provider: self.section_keys_provider.clone(),
                 comm: self.comm.clone(),
-                joins_allowed: self.joins_allowed,
+                joins_allowed: self.joins_allowed || self.joins_allowed_until_split,
+                joins_allowed_until_split: self.joins_allowed_until_split,
                 data_storage: self.data_storage.clone(),
                 fault_cmds_sender: self.fault_cmds_sender.clone(),
+                relocation_proof: self.relocation_proof.clone(),
             }
         }
 
         #[allow(clippy::too_many_arguments)]
         pub(crate) async fn new(
             comm: Comm,
-            keypair: Arc<Keypair>,
+            keypair: Arc<Keypair>, //todo: Keypair, only test design blocks this
             network_knowledge: NetworkKnowledge,
             section_key_share: Option<SectionKeyShare>,
             used_space: UsedSpace,
@@ -204,6 +220,8 @@ mod core {
             fault_cmds_sender: mpsc::Sender<FaultsCmd>,
         ) -> Result<Self> {
             let addr = comm.socket_addr();
+            comm.set_comm_targets(network_knowledge.members());
+
             let membership = if let Some(key) = section_key_share.clone() {
                 let n_elders = network_knowledge.signed_sap().elder_count();
 
@@ -249,17 +267,19 @@ mod core {
                 section_keys_provider,
                 root_storage_dir,
                 dkg_sessions_info: HashMap::default(),
-                proposal_aggregator: SignatureAggregator::default(),
                 pending_split_sections: Default::default(),
                 dkg_start_aggregator: SignatureAggregator::default(),
                 dkg_voter: DkgVoter::default(),
-                relocate_state: None,
                 handover_voting: handover,
                 joins_allowed: true,
+                joins_allowed_until_split: false,
                 data_storage,
-                capacity: Capacity::default(),
                 fault_cmds_sender,
                 membership,
+                elder_promotion_aggregator: SignatureAggregator::default(),
+                handover_request_aggregator: TotalParticipationAggregator::default(),
+                section_proposal_aggregator: SignatureAggregator::default(),
+                relocation_proof: None,
             };
 
             let context = &node.context();
@@ -286,44 +306,71 @@ mod core {
 
         /// Generates a random AE probe for _anywhere_ on the network.
         pub(crate) fn generate_probe_msg(context: &NodeContext) -> Result<Cmd> {
-            // Generate a random address not belonging to our Prefix
-            let mut dst = xor_name::rand::random();
+            use rand::{rngs::OsRng, seq::SliceRandom};
 
-            // We don't probe ourselves
-            while context.network_knowledge.prefix().matches(&dst) {
-                dst = xor_name::rand::random();
+            // Get prefixes of other sections.
+            let our_prefix = context.network_knowledge.prefix();
+            let mut other_prefixes: Vec<_> = context
+                .network_knowledge
+                .prefixes()
+                .filter(|p| *p != &our_prefix)
+                .collect();
+
+            // take random three sections
+            other_prefixes.shuffle(&mut OsRng);
+            let target_prefixes = other_prefixes.into_iter().take(GOSSIP_SECTION_COUNT);
+
+            let mut recipients = BTreeSet::new();
+
+            for target in target_prefixes {
+                let matching_section = context.network_knowledge.section_auth_by_prefix(target)?;
+
+                // Take a random Elder.
+                // (We just need 1 Elder, since the ae probe will contain signed data.
+                // we keep calling a random elder out of a random section, so it's not a big deal if
+                // some times the call fails for what ever reason.)
+                let mut elders: Vec<_> = matching_section
+                    .elders()
+                    .filter(|p| p.name() != context.name)
+                    .collect();
+                elders.shuffle(&mut OsRng);
+
+                // Should always get one non-self elder to send probe to. If cannot,
+                // hopefully we'll eventually get updated on this section from somewhere else.
+                for elder in elders.iter() {
+                    if elder.name() != context.name {
+                        let _ = recipients.insert(**elder);
+                        break;
+                    }
+                }
             }
 
-            let matching_section = context.network_knowledge.section_auth_by_name(&dst)?;
-            let recipients = matching_section.elders_set();
-
             let probe = context.network_knowledge.anti_entropy_probe();
+            info!("ProbeMsg targets {:?}: {probe:?}", recipients);
 
-            info!("ProbeMsg target {:?}: {probe:?}", matching_section.prefix());
-
-            Ok(MyNode::send_system_msg(
+            Ok(Cmd::send_msg(
                 probe,
                 Peers::Multiple(recipients),
                 context.clone(),
             ))
         }
 
-        /// Generates a SectionProbeMsg with our current knowledge,
-        /// targetting our section elders.
-        /// Even if we're up to date, we expect a response.
-        pub(crate) fn generate_section_probe_msg(context: &NodeContext) -> Cmd {
-            let our_section = context.network_knowledge.section_auth();
-            let recipients = our_section.elders_set();
+        // /// Generates a SectionProbeMsg with our current knowledge,
+        // /// targetting our section elders.
+        // /// Even if we're up to date, we expect a response.
+        // pub(crate) fn generate_section_probe_msg(context: &NodeContext) -> Cmd {
+        //     let our_section = context.network_knowledge.section_auth();
+        //     let recipients = our_section.elders_set();
 
-            info!(
-                "ProbeMsg target our section {:?} recipients {:?}",
-                our_section.prefix(),
-                recipients,
-            );
+        //     info!(
+        //         "ProbeMsg target our section {:?} recipients {:?}",
+        //         our_section.prefix(),
+        //         recipients,
+        //     );
 
-            let probe = context.network_knowledge.anti_entropy_probe();
-            MyNode::send_system_msg(probe, Peers::Multiple(recipients), context.clone())
-        }
+        //     let probe = context.network_knowledge.anti_entropy_probe();
+        //     Cmd::send_msg(probe, Peers::Multiple(recipients), context.clone())
+        // }
 
         /// Generates section infos for the best elder candidate among the members at the given generation
         /// Returns a set of candidate `DkgSessionId`'s.
@@ -363,11 +410,11 @@ mod core {
                 // So, shall only track the side that we are in as well.
                 if zero_dkg_id.elders.contains_key(&self.info().name()) {
                     for candidate in zero_dkg_id.elders.keys() {
-                        self.log_node_issue(*candidate, IssueType::Dkg);
+                        self.track_node_issue(*candidate, IssueType::Dkg);
                     }
                 } else if one_dkg_id.elders.contains_key(&self.info().name()) {
                     for candidate in one_dkg_id.elders.keys() {
-                        self.log_node_issue(*candidate, IssueType::Dkg);
+                        self.track_node_issue(*candidate, IssueType::Dkg);
                     }
                 }
 
@@ -420,7 +467,7 @@ mod core {
                 };
                 // track init of DKG
                 for candidate in session_id.elders.keys() {
-                    self.log_node_issue(*candidate, IssueType::Dkg);
+                    self.track_node_issue(*candidate, IssueType::Dkg);
                 }
 
                 vec![session_id]
@@ -491,7 +538,7 @@ mod core {
         }
 
         /// Updates various state if elders changed.
-        pub(crate) async fn update_on_elder_change(
+        pub(crate) async fn update_on_section_change(
             &mut self,
             old: &NodeContext,
         ) -> Result<Vec<Cmd>> {
@@ -550,11 +597,11 @@ mod core {
                 if let Ok(key) = self.section_keys_provider.key_share(&sap.section_key()) {
                     // The section-key has changed, we are now able to function as an elder.
                     if self.initialize_elder_state(key) {
-                        cmds.extend(self.trigger_dkg()?);
-
                         // Whenever there is an elders change, casting a round of joins_allowed
                         // proposals to sync this particular state.
-                        cmds.extend(self.propose(Proposal::JoinsAllowed(self.joins_allowed))?);
+                        cmds.extend(self.propose_section_state(SectionStateVote::JoinsAllowed(
+                            self.joins_allowed || self.joins_allowed_until_split,
+                        ))?);
                     }
                 } else {
                     warn!("We're an elder but are missing our section key share, delaying elder state initialization until we receive it: sap={sap:?}");
@@ -607,9 +654,14 @@ mod core {
                 }
 
                 cmds.extend(self.send_updates_to_sibling_section(old)?);
-                self.liveness_retain_only(
+                self.fault_detection_retain_only(
                     self.network_knowledge
                         .adults()
+                        .iter()
+                        .map(|peer| peer.name())
+                        .collect(),
+                    self.network_knowledge
+                        .elders()
                         .iter()
                         .map(|peer| peer.name())
                         .collect(),
@@ -639,20 +691,13 @@ mod core {
                 );
             }
 
-            // update new elders if we were an elder (regardless if still or not)
-            if new_elders && old.is_elder {
-                cmds.push(
-                    self.send_metadata_updates(
-                        self.network_knowledge
-                            .section_auth()
-                            .elders()
-                            .filter(|peer| !old_elders.contains(&peer.name()))
-                            .cloned()
-                            .collect(),
-                        &self.network_knowledge.prefix(),
-                    ),
-                );
-            };
+            // When we split, we have brought in new nodes since the flag was set
+            // in order to bring down used space. It is therefore not needed anymore.
+            // (the default mechanism of adding nodes is used again)
+            if section_split && old.is_elder || new.is_elder {
+                // shouldn't be necessary for `new.is_elder`, but better unset it anyway
+                self.joins_allowed_until_split = false;
+            }
 
             Ok(cmds)
         }
@@ -660,8 +705,13 @@ mod core {
         /// Log an issue in fault tracker
         /// Spawns a process to send this incase the channel may be full, we don't hold up
         /// processing around this (as this can be called during dkg eg)
-        pub(crate) fn log_node_issue(&self, name: XorName, issue: IssueType) {
-            trace!("Logging issue {issue:?} in fault tracker for {name}");
+        pub(crate) fn track_node_issue(&self, name: XorName, issue: IssueType) {
+            trace!("Tracking issue {issue:?} in fault detection for {name}");
+            let our_name = self.name();
+            if our_name == name {
+                debug!("Not tracking issue against ourself");
+                return;
+            }
             let fault_sender = self.fault_cmds_sender.clone();
             // TODO: do we need to kill the node if we fail tracking faults?
             let _handle = tokio::spawn(async move {
@@ -676,6 +726,7 @@ mod core {
         /// Spawns a process to send this incase the channel may be full, we don't hold up
         /// processing around this (as this can be called during dkg eg)
         pub(crate) fn untrack_node_issue(&self, name: XorName, issue: IssueType) {
+            trace!("UnTracking issue {issue:?} in fault detection for {name}");
             let fault_sender = self.fault_cmds_sender.clone();
             // TODO: do we need to kill the node if we fail tracking faults?
             let _handle = tokio::spawn(async move {
@@ -746,7 +797,7 @@ mod core {
                 .clone()
                 .join(SECTION_TREE_FILE_NAME);
 
-            let _ = tokio::spawn(async move {
+            let _handle = tokio::spawn(async move {
                 if let Err(err) = section_tree.write_to_disk(&path).await {
                     error!(
                         "Error writing SectionTree to `{}` dir: {:?}",

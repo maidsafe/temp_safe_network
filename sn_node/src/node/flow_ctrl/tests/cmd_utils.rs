@@ -1,53 +1,58 @@
-use crate::{
-    comm::MsgFromPeer,
-    node::{
-        flow_ctrl::dispatcher::{into_msg_bytes, Dispatcher},
-        messaging::Peers,
-        Cmd,
-    },
+// Copyright 2023 MaidSafe.net limited.
+//
+// This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
+// Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
+// under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied. Please review the Licences for the specific language governing
+// permissions and limitations relating to use of the SAFE Network Software.
+
+use crate::node::{
+    flow_ctrl::dispatcher::Dispatcher,
+    messaging::{node_msgs::into_msg_bytes, Peers},
+    Cmd, MyNode,
 };
+
+use sn_comms::MsgFromPeer;
 use sn_interface::{
     messaging::{
         data::ClientMsg,
         serialisation::WireMsg,
-        system::{JoinResponse, NodeDataCmd, NodeMsg},
-        AuthorityProof, ClientAuth, MsgId,
+        system::{JoinResponse, NodeMsg},
+        AuthorityProof, ClientAuth, Dst, MsgId, MsgKind,
     },
-    network_knowledge::{test_utils::*, MembershipState, NodeState, RelocateDetails},
-    types::{Keypair, Peer, ReplicatedData},
+    network_knowledge::{test_utils::*, NodeState},
+    types::{Keypair, Peer},
 };
 
 use assert_matches::assert_matches;
+use bytes::Bytes;
 use eyre::{eyre, Result};
-use std::collections::BTreeSet;
-use tokio::sync::mpsc::{self, error::TryRecvError};
+use qp2p::{Config, Endpoint};
+use std::{
+    collections::{BTreeSet, VecDeque},
+    net::{Ipv4Addr, SocketAddr},
+};
+use tokio::sync::mpsc::{error::TryRecvError, Receiver};
 use xor_name::XorName;
 
-pub(crate) struct HandleOnlineStatus {
-    pub(crate) node_approval_sent: bool,
-    pub(crate) relocate_details: Option<RelocateDetails>,
-}
+pub(crate) struct JoinApprovalSent(pub(crate) bool);
 
 pub(crate) async fn handle_online_cmd(
     peer: &Peer,
     sk_set: &bls::SecretKeySet,
     dispatcher: &Dispatcher,
-) -> Result<HandleOnlineStatus> {
+) -> Result<JoinApprovalSent> {
     let node_state = NodeState::joined(*peer, None);
     let membership_decision = section_decision(sk_set, node_state);
 
-    let all_cmds = run_and_collect_cmds(
+    let mut all_cmds = ProcessAndInspectCmds::new(
         Cmd::HandleMembershipDecision(membership_decision),
         dispatcher,
-    )
-    .await?;
+    );
 
-    let mut status = HandleOnlineStatus {
-        node_approval_sent: false,
-        relocate_details: None,
-    };
+    let mut approval_sent = JoinApprovalSent(false);
 
-    for cmd in all_cmds {
+    while let Some(cmd) = all_cmds.next().await? {
         let (msg, recipients) = match cmd {
             Cmd::SendMsg {
                 recipients, msg, ..
@@ -58,105 +63,144 @@ pub(crate) async fn handle_online_cmd(
         match msg {
             NodeMsg::JoinResponse(JoinResponse::Approved { .. }) => {
                 assert_matches!(recipients, Peers::Multiple(peers) => {
-                    assert_eq!(peers, BTreeSet::from([*peer]));
+                    assert_eq!(peers, &BTreeSet::from([*peer]));
                 });
-                status.node_approval_sent = true;
-            }
-            NodeMsg::Propose {
-                proposal: sn_interface::messaging::system::Proposal::VoteNodeOffline(node_state),
-                ..
-            } => {
-                if let MembershipState::Relocated(details) = node_state.state() {
-                    if details.previous_name != peer.name() {
-                        continue;
-                    }
-                    status.relocate_details = Some(*details.clone());
-                }
+                approval_sent.0 = true;
             }
             _ => continue,
         }
     }
 
-    Ok(status)
+    Ok(approval_sent)
 }
 
-pub(crate) async fn run_and_collect_cmds(
-    cmd: Cmd,
-    dispatcher: &Dispatcher,
-) -> crate::node::error::Result<Vec<Cmd>> {
-    let mut all_cmds = vec![];
-
-    let mut cmds = dispatcher.process_cmd(cmd).await?;
-
-    while !cmds.is_empty() {
-        all_cmds.extend(cmds.clone());
-        let mut new_cmds = vec![];
-        for cmd in cmds {
-            if !matches!(cmd, Cmd::SendMsg { .. }) {
-                new_cmds.extend(dispatcher.process_cmd(cmd).await?);
-            }
-        }
-        cmds = new_cmds;
-    }
-
-    Ok(all_cmds)
+// Process commands, allowing the user to inspect each and all of the intermediate
+// commands that are being returned by the Cmd dispatcher.
+// All commands that are meant to send msgs over the wire are inspected but not processed further.
+pub(crate) struct ProcessAndInspectCmds<'a> {
+    pending_cmds: VecDeque<Cmd>,
+    index_inspected: usize,
+    dispatcher: &'a Dispatcher,
 }
 
-pub(crate) async fn run_node_handle_client_msg_and_collect_cmds(
-    _msg: ClientMsg,
-    _peer: Peer,
-    dispatcher: &Dispatcher,
-) -> crate::node::error::Result<Vec<Cmd>> {
-    let mut all_cmds = vec![];
-
-    let node = dispatcher.node();
-    let the_node = node.read().await;
-
-    // let (msg_id, msg, auth) = get_client_msg_parts_for_handling(msg)?;
-
-    // TODO: decide how to test this, w/r/t no client stream.
-    let mut cmds = vec![];
-    // let mut cmds = the_node
-    //     .handle_valid_client_msg(
-    //         msg_id,
-    //         msg,
-    //         auth,
-    //         peer,
-    //     )
-    //     .await?;
-
-    // drop any read locks on the node here
-    // we may have commands editing the node, requiring a write lock
-    // coming after
-    drop(the_node);
-
-    while !cmds.is_empty() {
-        all_cmds.extend(cmds.clone());
-        let mut new_cmds = vec![];
-        for cmd in cmds {
-            if !matches!(cmd, Cmd::SendMsg { .. }) {
-                new_cmds.extend(dispatcher.process_cmd(cmd).await?);
-            }
-        }
-
-        cmds = new_cmds;
+impl<'a> ProcessAndInspectCmds<'a> {
+    pub(crate) fn new(cmd: Cmd, dispatcher: &'a Dispatcher) -> Self {
+        Self::from(vec![cmd], dispatcher)
     }
 
-    Ok(all_cmds)
+    fn from(cmds: Vec<Cmd>, dispatcher: &'a Dispatcher) -> Self {
+        // We initialise `index_inspected` with MAX value, it will wraparound to 0 upon the first
+        // call to `next()` method, thus making sure the first cmd is inspected in first iteration.
+        let index_inspected = usize::MAX;
+
+        Self {
+            pending_cmds: VecDeque::from(cmds),
+            index_inspected,
+            dispatcher,
+        }
+    }
+
+    // This constructor invokes `MyNode::handle_valid_client_msg` using the
+    // provided ClientMsg, and it uses the outcome (commands) as the
+    // starting set of cmds to process by the ProcessAndInspectCmds instance herein created.
+    // TODO: the client recv-stream created could be returned for the caller to use if necessary,
+    // at this point it's useless since `Cmd::SendClientResponse` is not processed but only inspected.
+    pub(crate) async fn new_from_client_msg(
+        msg: ClientMsg,
+        dispatcher: &'a Dispatcher,
+        mut comm_rx: Receiver<MsgFromPeer>,
+    ) -> crate::node::error::Result<ProcessAndInspectCmds> {
+        let context = dispatcher.node().read().await.context();
+        let (msg_id, serialised_payload, msg_kind, auth) = get_client_msg_parts_for_handling(&msg)?;
+
+        let client_addr: SocketAddr = (Ipv4Addr::LOCALHOST, 0).into();
+        let client_endpoint = Endpoint::new_client(client_addr, Config::default())
+            .expect("failed to create new client endpoint");
+
+        let peer = context.info.peer();
+        let node_addr = peer.addr();
+        let (client_conn, _) = client_endpoint
+            .connect_to(&node_addr)
+            .await
+            .unwrap_or_else(|err| panic!("failed to connect to node at {node_addr:?}: {err:?}"));
+        let (mut send_stream, _recv_stream) = client_conn
+            .open_bi()
+            .await
+            .expect("failed to open bi-stream from new client endpoint");
+
+        let dst = Dst {
+            name: peer.name(),
+            section_key: context.network_knowledge.section_key(),
+        };
+        let user_msg = WireMsg::new_msg(msg_id, serialised_payload, msg_kind, dst).serialize()?;
+        send_stream.send_user_msg(user_msg).await?;
+
+        match comm_rx.recv().await {
+            Some(MsgFromPeer {
+                send_stream: Some(send_stream),
+                ..
+            }) => {
+                let cmds =
+                    MyNode::handle_valid_client_msg(context, msg_id, msg, auth, peer, send_stream)
+                        .await?;
+                Ok(Self::from(cmds, dispatcher))
+            }
+            _ => Err(crate::node::error::Error::NoClientResponseStream),
+        }
+    }
+
+    pub(crate) async fn next(&mut self) -> crate::node::error::Result<Option<&Cmd>> {
+        let mut next_index = self.index_inspected + 1;
+        if next_index < self.pending_cmds.len() {
+            let cmd = self.pending_cmds.get(next_index);
+            assert!(cmd.is_some());
+            self.index_inspected = next_index;
+            return Ok(cmd);
+        }
+
+        while let Some(cmd) = self.pending_cmds.pop_front() {
+            next_index -= 1;
+            if !matches!(
+                cmd,
+                Cmd::SendMsg { .. }
+                    | Cmd::SendMsgAwaitResponseAndRespondToClient { .. }
+                    | Cmd::SendClientResponse { .. }
+                    | Cmd::SendNodeDataResponse { .. }
+                    | Cmd::SendNodeMsgResponse { .. }
+            ) {
+                let new_cmds = self.dispatcher.process_cmd(cmd).await?;
+                self.pending_cmds.extend(new_cmds);
+
+                if next_index < self.pending_cmds.len() {
+                    let cmd = self.pending_cmds.get(next_index);
+                    assert!(cmd.is_some());
+                    self.index_inspected = next_index;
+                    return Ok(cmd);
+                }
+            }
+        }
+        Ok(None)
+    }
+
+    pub(crate) async fn process_all(&mut self) -> crate::node::error::Result<()> {
+        while self.next().await?.is_some() { /* we just process all cmds */ }
+        Ok(())
+    }
 }
 
 pub(crate) fn get_client_msg_parts_for_handling(
-    msg: ClientMsg,
-) -> crate::node::error::Result<(MsgId, ClientMsg, AuthorityProof<ClientAuth>)> {
-    let payload = WireMsg::serialize_msg_payload(&msg)?;
+    msg: &ClientMsg,
+) -> crate::node::error::Result<(MsgId, Bytes, MsgKind, AuthorityProof<ClientAuth>)> {
+    let payload = WireMsg::serialize_msg_payload(msg)?;
     let src_client_keypair = Keypair::new_ed25519();
     let auth = ClientAuth {
         public_key: src_client_keypair.public_key(),
         signature: src_client_keypair.sign(&payload),
     };
-    let auth_proof = AuthorityProof::verify(auth, &payload)?;
+    let auth_proof = AuthorityProof::verify(auth.clone(), &payload)?;
+    let msg_kind = MsgKind::Client(auth);
 
-    Ok((MsgId::new(), msg, auth_proof))
+    Ok((MsgId::new(), payload, msg_kind, auth_proof))
 }
 
 /// Extend the `Cmd` enum with some utilities for testing.
@@ -168,63 +212,12 @@ impl Cmd {
     pub(crate) fn recipients(&self) -> Result<BTreeSet<Peer>> {
         match self {
             Cmd::SendMsg { recipients, .. } => match recipients {
-                Peers::Single(peer) => {
-                    let mut set = BTreeSet::new();
-                    let _ = set.insert(*peer);
-                    Ok(set)
-                }
+                Peers::Single(peer) => Ok(BTreeSet::from([*peer])),
                 Peers::Multiple(peers) => Ok(peers.clone()),
             },
             _ => Err(eyre!("A Cmd::SendMsg variant was expected")),
         }
     }
-
-    /// Get the replicated data from a `NodeCmd` message.
-    pub(crate) fn get_replicated_data(&self) -> Result<ReplicatedData> {
-        match self {
-            Cmd::SendMsg { msg, .. } => match msg {
-                NodeMsg::NodeDataCmd(node_cmd) => match node_cmd {
-                    NodeDataCmd::ReplicateDataBatch(data) => {
-                        if data.len() != 1 {
-                            return Err(eyre!("Only 1 replicated data instance is expected"));
-                        }
-                        Ok(data[0].clone())
-                    }
-                    _ => Err(eyre!("A NodeCmd::ReplicateData variant was expected")),
-                },
-                _ => Err(eyre!("An NodeMsg::NodeCmd variant was expected")),
-            },
-            _ => Err(eyre!("A Cmd::SendMsg variant was expected")),
-        }
-    }
-
-    // /// Get a `ClientDataResponse` from a `Cmd::SendMsg` enum variant.
-    // pub(crate) fn get_client_msg_resp(&self) -> Result<ClientDataResponse> {
-    //     match self {
-    //         Cmd::SendMsg { msg, .. } => match msg {
-    //             OutgoingMsg::Client(client_msg) => Ok(client_msg.clone()),
-    //             _ => Err(eyre!("A OutgoingMsg::Client variant was expected")),
-    //         },
-    //         _ => Err(eyre!("A Cmd::SendMsg variant was expected")),
-    //     }
-    // }
-
-    // /// Get a `sn_interface::messaging::data::Error` from a `Cmd::SendMsg` enum variant.
-    // pub(crate) fn get_error(&self) -> Result<MessagingDataError> {
-    //     match self {
-    //         Cmd::SendMsg { msg, .. } => match msg {
-    //             OutgoingMsg::Client(client_msg) => match client_msg {
-    //                 ClientDataResponse::CmdResponse { response, .. } => match response.result() {
-    //                     Ok(_) => Err(eyre!("A CmdResponse error was expected")),
-    //                     Err(error) => Ok(error.clone()),
-    //                 },
-    //                 _ => Err(eyre!("A ClientDataResponse::CmdResponse variant was expected")),
-    //             },
-    //             _ => Err(eyre!("A OutgoingMsg::Client variant was expected")),
-    //         },
-    //         _ => Err(eyre!("A Cmd::SendMsg variant was expected")),
-    //     }
-    // }
 }
 
 impl Dispatcher {
@@ -235,21 +228,17 @@ impl Dispatcher {
             msg,
             msg_id,
             recipients,
-            send_stream,
             context,
         } = cmd
         {
-            let _ = send_stream;
-            let peer_msgs = {
-                into_msg_bytes(
-                    &context.network_knowledge,
-                    context.name,
-                    msg.clone(),
-                    msg_id,
-                    recipients,
-                )
-                .expect("cannot convert msg into bytes")
-            };
+            let peer_msgs = into_msg_bytes(
+                &context.network_knowledge,
+                context.name,
+                msg.clone(),
+                msg_id,
+                recipients,
+            )
+            .expect("cannot convert msg into bytes");
 
             for (peer, msg_bytes) in peer_msgs {
                 if let Some(filter) = &filter_recp {
@@ -257,11 +246,10 @@ impl Dispatcher {
                         continue;
                     }
                 }
-                context
-                    .comm
-                    .send_out_bytes_sync(peer, msg_id, msg_bytes)
-                    .await;
-                info!("Sent {msg} to {}", peer.name());
+
+                if let Err(err) = context.comm.send_out_bytes(peer, msg_id, msg_bytes).await {
+                    info!("Failed to send {msg} to {}: {err:?}", peer.name());
+                }
             }
         } else {
             panic!("mock_send_msg expects Cmd::SendMsg, got {cmd:?}");
@@ -270,7 +258,7 @@ impl Dispatcher {
 }
 
 // Receive the next `MsgFromPeer` if the buffer is not empty. Returns None if the buffer is currently empty
-pub(crate) fn get_next_msg(comm_rx: &mut mpsc::Receiver<MsgFromPeer>) -> Option<MsgFromPeer> {
+pub(crate) fn get_next_msg(comm_rx: &mut Receiver<MsgFromPeer>) -> Option<MsgFromPeer> {
     match comm_rx.try_recv() {
         Ok(msg) => Some(msg),
         Err(TryRecvError::Empty) => None,

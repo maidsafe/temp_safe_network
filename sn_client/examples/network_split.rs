@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -173,7 +173,7 @@ pub async fn run_split() -> Result<()> {
     let client = Client::builder().build().await?;
 
     for (address, hash) in all_data_put {
-        println!("...reading bytes at address {:?} ...", address);
+        println!("...reading bytes at address {address:?} ...");
         let mut bytes = client.read_bytes(address).await;
 
         let mut attempts = 0;
@@ -185,7 +185,7 @@ pub async fn run_split() -> Result<()> {
         }
 
         let bytes = bytes?;
-        println!("Bytes read from {:?}:", address);
+        println!("Bytes read from {address:?}:");
 
         let mut hasher = Sha3::v256();
         let mut output = [0; 32];
@@ -210,13 +210,13 @@ async fn upload_data() -> Result<(XorName, [u8; 32])> {
     hasher.update(&bytes);
     hasher.finalize(&mut output);
 
-    println!("Storing bytes w/ hash {:?}", output);
+    println!("Storing bytes w/ hash {output:?}");
 
     let address = client.upload(bytes).await?;
-    println!("Bytes stored at address: {:?}", address);
+    println!("Bytes stored at address: {address:?}");
 
     let delay = 2;
-    println!("Reading bytes from the network in {} secs...", delay);
+    println!("Reading bytes from the network in {delay} secs...");
     sleep(Duration::from_secs(delay)).await;
 
     println!("...reading bytes from the network now...");
@@ -232,7 +232,7 @@ async fn upload_data() -> Result<(XorName, [u8; 32])> {
 
     let _bytes = bytes?;
 
-    println!("Bytes successfully read from {:?}:", address);
+    println!("Bytes successfully read from {address:?}:");
 
     Ok((address, output))
 }

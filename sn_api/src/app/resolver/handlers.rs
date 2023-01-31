@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -24,13 +24,13 @@ impl Safe {
             .await
             .map_err(|e| {
                 warn!("NRS failed to resolve {}: {}", input_url, e);
-                Error::ContentNotFound(format!("Content not found at {}", input_url))
+                Error::ContentNotFound(format!("Content not found at {input_url}"))
             })?;
         if let Some(mut target_url) = target_url {
             debug!("NRS Resolved {} => {}", input_url, target_url);
             let url_path = input_url.path_decoded()?;
             let target_path = target_url.path_decoded()?;
-            target_url.set_path(&format!("{}{}", target_path, url_path));
+            target_url.set_path(&format!("{target_path}{url_path}"));
             let version = input_url.content_version().map(|v| v.entry_hash());
             let safe_data = SafeData::NrsEntry {
                 xorurl: target_url.to_xorurl_string(),
@@ -169,8 +169,7 @@ impl Safe {
                 .await
             }
             other => Err(Error::ContentError(format!(
-                "Data type '{:?}' not supported yet",
-                other
+                "Data type '{other:?}' not supported yet"
             ))),
         }
     }
@@ -219,8 +218,7 @@ impl Safe {
             let (link, metadata) = files::get_file_link_and_metadata(&files_map_for_path, &path)
                 .map_err(|err| {
                     Error::ContentError(format!(
-                        "Failed to obtain file link or info on FileContainer at: {}: {}",
-                        input_url, err,
+                        "Failed to obtain file link or info on FileContainer at: {input_url}: {err}"
                     ))
                 })?;
 
@@ -286,10 +284,8 @@ impl Safe {
 // private helper to ensure the SafeUrl contains no subnames
 fn ensure_no_subnames(url: &SafeUrl, data_type: &str) -> Result<()> {
     if !url.sub_names_vec().is_empty() {
-        let msg = format!(
-            "Cannot resolve URL targetting {} as it contains subnames: {}",
-            data_type, url
-        );
+        let msg =
+            format!("Cannot resolve URL targetting {data_type} as it contains subnames: {url}",);
         debug!("{}", msg);
         return Err(Error::InvalidXorUrl(msg));
     }

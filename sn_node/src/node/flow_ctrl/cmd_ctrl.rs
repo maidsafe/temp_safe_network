@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{
-    flow_ctrl::{cmds::Cmd, dispatcher::Dispatcher, RejoinNetwork},
+    flow_ctrl::{cmds::Cmd, dispatcher::Dispatcher, RejoinReason},
     Error,
 };
 
@@ -49,14 +49,14 @@ impl CmdCtrl {
         mut id: Vec<usize>,
         node_identifier: XorName,
         cmd_process_api: mpsc::Sender<(Cmd, Vec<usize>)>,
-        rejoin_network_sender: mpsc::Sender<RejoinNetwork>,
+        rejoin_network_sender: mpsc::Sender<RejoinReason>,
     ) {
         if id.is_empty() {
             id.push(self.id_counter.fetch_add(1, Ordering::SeqCst));
         }
 
         let dispatcher = self.dispatcher.clone();
-        let _ = tokio::task::spawn(async move {
+        let _handle = tokio::task::spawn(async move {
             trace!("Spawned process for cmd {cmd:?}, id: {id:?}");
 
             #[cfg(feature = "statemap")]
@@ -80,9 +80,9 @@ impl CmdCtrl {
                 }
                 Err(error) => {
                     debug!("Error when processing cmd: {:?}", error);
-                    if let Error::RemovedFromSection = error {
-                        if rejoin_network_sender.send(RejoinNetwork).await.is_err() {
-                            error!("Could not send RejoinNetwork through channel");
+                    if let Error::RejoinRequired(reason) = error {
+                        if rejoin_network_sender.send(reason).await.is_err() {
+                            error!("Could not send rejoin reason through channel.");
                         }
                     }
                 }

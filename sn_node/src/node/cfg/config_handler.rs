@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -21,9 +21,11 @@ use tokio::{
 };
 use tracing::{debug, error, warn, Level};
 
+pub(crate) const DEFAULT_MIN_CAPACITY: usize = 1024 * 1024 * 1024; // 1gb
+pub(crate) const DEFAULT_MAX_CAPACITY: usize = 2 * DEFAULT_MIN_CAPACITY;
+
 const CONFIG_FILE: &str = "node.config";
 const DEFAULT_ROOT_DIR_NAME: &str = "root_dir";
-const DEFAULT_MAX_CAPACITY: usize = 1024 * 1024 * 1024; // 1gb
 
 // In the absence of any (QUIC) keep-alive messages, connections will be closed
 // if they remain idle for at least this duration.
@@ -273,6 +275,11 @@ impl Config {
         self.network_contacts_file.clone()
     }
 
+    /// The minimum capacity in bytes required by the network, to avoid the risk of being kicked out.
+    pub fn min_capacity(&self) -> usize {
+        DEFAULT_MIN_CAPACITY
+    }
+
     /// Upper limit in bytes for allowed network storage on this node.
     pub fn max_capacity(&self) -> usize {
         DEFAULT_MAX_CAPACITY
@@ -429,7 +436,7 @@ impl Config {
 }
 
 fn parse_public_addr(public_addr: &str) -> Result<SocketAddr, String> {
-    let public_addr: SocketAddr = public_addr.parse().map_err(|err| format!("{}", err))?;
+    let public_addr: SocketAddr = public_addr.parse().map_err(|err| format!("{err}"))?;
 
     if public_addr.ip().is_unspecified() {
         return Err("Cannot use unspecified IP for public address. \

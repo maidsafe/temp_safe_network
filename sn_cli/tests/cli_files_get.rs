@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -397,7 +397,7 @@ fn files_get_src_is_nrs_and_dst_is_unspecified() -> Result<()> {
         .duration_since(UNIX_EPOCH)
         .map_err(|e| eyre!(e.to_string()))?
         .as_micros();
-    nrs_name.push_str(&str_to_sha3_256(&format!("{}", now)));
+    nrs_name.push_str(&str_to_sha3_256(&format!("{now}")));
 
     safe_cmd(
         &config_dir,
@@ -405,7 +405,7 @@ fn files_get_src_is_nrs_and_dst_is_unspecified() -> Result<()> {
         Some(0),
     )?;
 
-    let src = format!("safe://{}", &nrs_name);
+    let src = format!("safe://{nrs_name}");
     let dst = assert_fs::TempDir::new()?;
     let dst = dst.path().display().to_string();
 
@@ -475,7 +475,7 @@ fn files_get_src_is_nrs_with_path_and_dst_is_unspecified() -> Result<()> {
         .duration_since(UNIX_EPOCH)
         .map_err(|e| eyre!(e.to_string()))?
         .as_micros();
-    nrs_name.push_str(&str_to_sha3_256(&format!("{}", now)));
+    nrs_name.push_str(&str_to_sha3_256(&format!("{now}")));
 
     safe_cmd(
         &config_dir,
@@ -503,7 +503,7 @@ fn files_get_src_is_nrs_with_path_and_dst_is_unspecified() -> Result<()> {
 
     // Assert
     assert_eq!(
-        std::fs::read_to_string(Path::new(&format!("{}/sub2.md", dst)))?,
+        std::fs::read_to_string(Path::new(&format!("{dst}/sub2.md")))?,
         std::fs::read_to_string(Path::new("testdata/subfolder/sub2.md"))?
     );
 
@@ -567,7 +567,7 @@ fn files_get_src_is_nrs_recursive_and_dst_not_existing() -> Result<()> {
         .content_version()
         .ok_or_else(|| eyre!("failed to read content version from xorurl"))?;
 
-    let src = format!("safe://{}/subfolder?v={}", tmp_data_nrs, version);
+    let src = format!("safe://{tmp_data_nrs}/subfolder?v={version}");
     let dst = assert_fs::TempDir::new()?;
     let dst = dst.path().display().to_string();
 
@@ -588,7 +588,7 @@ fn files_get_src_is_nrs_recursive_and_dst_not_existing() -> Result<()> {
     // Assert
     assert_eq!(
         sum_tree("testdata/subfolder")?,
-        sum_tree(&format!("{}/subfolder", dst))?
+        sum_tree(&format!("{dst}/subfolder"))?
     );
 
     Ok(())
@@ -851,7 +851,7 @@ fn files_get_exists_overwrite() -> Result<()> {
     assert_eq!(sum_tree(TEST_FOLDER)?, sum_tree(&dst)?);
     assert!(Path::new(&dst).join("another.md").is_file());
     assert_eq!(
-        std::fs::read_to_string(Path::new(&format!("{}/test.md", dst)))?,
+        std::fs::read_to_string(Path::new(&format!("{dst}/test.md")))?,
         "hello tests!"
     );
 
@@ -1410,7 +1410,7 @@ fn files_get_src_is_file_and_dst_exists_as_dir() -> Result<()> {
     // Assert
     assert_eq!(
         digest_file("../resources/testdata/noextension")?,
-        digest_file(&format!("{}/noextension", dst))?
+        digest_file(&format!("{dst}/noextension"))?
     );
 
     Ok(())
@@ -1545,7 +1545,7 @@ fn files_get_src_is_file_and_dst_not_existing() -> Result<()> {
     // Assert
     assert_eq!(
         digest_file("../resources/testdata/noextension")?,
-        digest_file(&format!("{}/noextension", dst))?
+        digest_file(&format!("{dst}/noextension"))?
     );
 
     Ok(())
@@ -1613,7 +1613,7 @@ fn files_get_src_is_file_and_dst_exists_as_newname_dir() -> Result<()> {
     // Assert
     assert_eq!(
         digest_file("../resources/testdata/noextension")?,
-        digest_file(&format!("{}/noextension", dst))?
+        digest_file(&format!("{dst}/noextension"))?
     );
 
     Ok(())

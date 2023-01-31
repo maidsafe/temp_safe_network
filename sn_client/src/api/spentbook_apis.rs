@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -8,7 +8,7 @@
 
 use super::Client;
 
-use crate::Error;
+use crate::{Error, Result};
 
 use sn_dbc::{KeyImage, RingCtTransaction, SpentProof, SpentProofShare};
 use sn_interface::{
@@ -47,7 +47,7 @@ impl Client {
         tx: RingCtTransaction,
         spent_proofs: BTreeSet<SpentProof>,
         spent_transactions: BTreeSet<RingCtTransaction>,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         let mut network_knowledge = None;
         let mut attempts = 1;
 
@@ -106,10 +106,7 @@ impl Client {
 
     /// Return the set of spent proof shares if the provided DBC's key image is spent
     #[instrument(skip(self), level = "debug")]
-    pub async fn spent_proof_shares(
-        &self,
-        key_image: KeyImage,
-    ) -> Result<Vec<SpentProofShare>, Error> {
+    pub async fn spent_proof_shares(&self, key_image: KeyImage) -> Result<Vec<SpentProofShare>> {
         let address = SpentbookAddress::new(XorName::from_content(&key_image.to_bytes()));
         let query = DataQueryVariant::Spentbook(SpentbookQuery::SpentProofShares(address));
         let query_result = self.send_query(query.clone()).await?;

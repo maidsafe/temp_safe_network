@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -16,9 +16,13 @@ mod register_apis;
 mod spentbook_apis;
 
 pub use client_builder::ClientBuilder;
+pub use file_apis::QueriedDataReplicas;
 pub use register_apis::RegisterWriteAheadLog;
 
-use crate::{errors::Error, sessions::Session};
+use crate::{
+    errors::{Error, Result},
+    sessions::Session,
+};
 
 use sn_dbc::Owner;
 use sn_interface::{
@@ -69,7 +73,7 @@ impl Client {
     /// In case of an existing SecretKey the client will attempt to retrieve the history
     /// of the key's balance in order to be ready for any token operations.
     #[instrument(skip_all, level = "debug")]
-    pub async fn connect(&self) -> Result<(), Error> {
+    pub async fn connect(&self) -> Result<()> {
         // TODO: The message being sent below is a temporary solution to fetch network info for
         // the client. Ideally the client should be able to send proper AE-Probe messages to
         // trigger the AE flows.

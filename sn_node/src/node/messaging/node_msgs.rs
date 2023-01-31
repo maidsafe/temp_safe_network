@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -8,45 +8,102 @@
 
 use crate::{
     node::{
-        core::NodeContext, flow_ctrl::cmds::Cmd, messaging::Peers, MyNode, Result,
-        MIN_LEVEL_WHEN_FULL,
+        core::NodeContext, flow_ctrl::cmds::Cmd, messaging::Peers, MyNode, RejoinReason, Result,
     },
-    storage::Error as StorageError,
+    storage::{Error as StorageError, StorageLevel},
 };
-use qp2p::SendStream;
-use sn_fault_detection::IssueType;
+
+use sn_comms::Error as CommsError;
 use sn_interface::{
     messaging::{
-        data::{CmdResponse, StorageLevel},
+        data::CmdResponse,
         system::{JoinResponse, NodeDataCmd, NodeDataQuery, NodeDataResponse, NodeEvent, NodeMsg},
-        MsgId,
+        Dst, MsgId, WireMsg,
     },
+    network_knowledge::{MembershipState, NetworkKnowledge},
     types::{log_markers::LogMarker, Keypair, Peer, PublicKey, ReplicatedData},
 };
-use std::collections::BTreeSet;
-use std::sync::Arc;
-use tokio::sync::{Mutex, RwLock};
+
+use qp2p::{SendStream, UsrMsgBytes};
+use sn_fault_detection::IssueType;
 use xor_name::XorName;
 
+use std::collections::BTreeSet;
+use std::sync::Arc;
+use tokio::sync::RwLock;
+
 impl MyNode {
+    /// Send a (`NodeMsg`) message to peers
+    pub(crate) async fn send_msg(
+        msg: NodeMsg,
+        msg_id: MsgId,
+        recipients: Peers,
+        context: NodeContext,
+    ) -> Result<Vec<Cmd>> {
+        trace!("Sending msg: {msg_id:?}");
+        let peer_msgs = into_msg_bytes(
+            &context.network_knowledge,
+            context.name,
+            msg,
+            msg_id,
+            recipients,
+        )?;
+
+        let comm = context.comm.clone();
+        let tasks = peer_msgs
+            .into_iter()
+            .map(|(peer, msg)| comm.send_out_bytes(peer, msg_id, msg));
+        let results = futures::future::join_all(tasks).await;
+
+        // Any failed sends are tracked via Cmd::HandlePeerFailedSend, which will track issues for any peers
+        // in the section (otherwise ignoring failed send to out of section nodes or clients)
+        let cmds = results
+            .into_iter()
+            .filter_map(|result| match result {
+                Err(CommsError::FailedSend(peer)) => {
+                    Some(Cmd::HandleFailedSendToNode { peer, msg_id })
+                }
+                Err(error) => {
+                    error!("Error in comms for {msg_id:?}: {error:?}");
+                    None
+                }
+                Ok(_) => {
+                    // nothing need be done
+                    None
+                }
+            })
+            .collect();
+
+        Ok(cmds)
+    }
+
     /// Send a (`NodeMsg`) message to all Elders in our section
     pub(crate) fn send_msg_to_our_elders(context: &NodeContext, msg: NodeMsg) -> Cmd {
         let sap = context.network_knowledge.section_auth();
         let recipients = sap.elders_set();
-        MyNode::send_system_msg(msg, Peers::Multiple(recipients), context.clone())
+        Cmd::send_msg(msg, Peers::Multiple(recipients), context.clone())
     }
 
-    /// Send a (`NodeMsg`) message to a node
-    /// Context is consumed and passed into the SendMsg command
-    pub(crate) fn send_system_msg(msg: NodeMsg, recipients: Peers, context: NodeContext) -> Cmd {
-        trace!("{}: {:?}", LogMarker::SendToNodes, msg);
-        Cmd::send_msg(msg, recipients, context)
+    /// Send a (`NodeMsg`) message to all Elders in our section, await all responses & enqueue
+    pub(crate) fn send_msg_to_our_elders_await_responses(
+        context: NodeContext,
+        msg: NodeMsg,
+    ) -> Cmd {
+        let sap = context.network_knowledge.section_auth();
+        let recipients = sap.elders_set();
+
+        Cmd::SendMsgEnqueueAnyResponse {
+            msg,
+            msg_id: MsgId::new(),
+            recipients,
+            context,
+        }
     }
 
-    pub(crate) async fn store_data_as_adult_and_respond(
+    pub(crate) async fn store_data_and_respond(
         context: &NodeContext,
         data: ReplicatedData,
-        response_stream: Option<Arc<Mutex<SendStream>>>,
+        response_stream: Option<SendStream>,
         target: Peer,
         original_msg_id: MsgId,
     ) -> Result<Vec<Cmd>> {
@@ -54,22 +111,27 @@ impl MyNode {
         let section_pk = PublicKey::Bls(context.network_knowledge.section_key());
         let node_keypair = Keypair::Ed25519(context.keypair.clone());
         let data_addr = data.address();
-        let our_node_name = context.name;
 
         trace!("About to store data from {original_msg_id:?}: {data_addr:?}");
 
-        // We are an adult here, so just store away!
-        // This may return a NotEnoughSpace error... but we should have reported storage increase
-        // well before this
+        // This may return a DatabaseFull error... but we should have
+        // reported StorageError::NotEnoughSpace well before this
         let response = match context
             .data_storage
             .store(&data, section_pk, node_keypair.clone())
             .await
         {
-            Ok(level_report) => {
+            Ok(storage_level) => {
                 trace!("Data has been stored: {data_addr:?}");
-                info!("Storage level report: {:?}", level_report);
-                cmds.extend(MyNode::record_storage_level_if_any(context, level_report)?);
+                if matches!(storage_level, StorageLevel::Updated(_level)) {
+                    // we add a new node for every level increase of used space
+                    cmds.push(Cmd::SetJoinsAllowed(true));
+                } else if context.data_storage.has_reached_min_capacity()
+                    && !context.joins_allowed_until_split
+                {
+                    // we accept new nodes until split, since we have reached the min capacity (i.e. storage limit)
+                    cmds.push(Cmd::SetJoinsAllowedUntilSplit(true));
+                }
                 CmdResponse::ok(data)?
             }
             Err(StorageError::NotEnoughSpace) => {
@@ -80,6 +142,11 @@ impl MyNode {
                     data_address: data.address(),
                     full: true,
                 });
+
+                if context.is_elder && !context.joins_allowed {
+                    // we accept new nodes until split, since we ran out of space
+                    cmds.push(Cmd::SetJoinsAllowedUntilSplit(true));
+                }
 
                 cmds.push(MyNode::send_msg_to_our_elders(context, msg));
                 CmdResponse::err(data, StorageError::NotEnoughSpace.into())?
@@ -92,22 +159,18 @@ impl MyNode {
             }
         };
 
-        if let Some(stream) = response_stream {
+        if let Some(send_stream) = response_stream {
             let msg = NodeDataResponse::CmdResponse {
                 response,
                 correlation_id: original_msg_id,
             };
-            let (kind, payload) = MyNode::serialize_node_msg_response(our_node_name, msg)?;
-
-            MyNode::send_msg_on_stream(
-                context.network_knowledge.section_key(),
-                payload,
-                kind,
-                stream,
-                Some(target),
-                original_msg_id,
-            )
-            .await?;
+            cmds.push(Cmd::SendNodeDataResponse {
+                msg,
+                correlation_id: original_msg_id,
+                send_stream,
+                context: context.clone(),
+                requesting_peer: target,
+            });
         } else {
             error!("Cannot respond over stream, none exists after storing! {data_addr:?}");
         }
@@ -123,36 +186,22 @@ impl MyNode {
         msg_id: MsgId,
         msg: NodeMsg,
         sender: Peer,
-        send_stream: Option<Arc<Mutex<SendStream>>>,
+        send_stream: Option<SendStream>,
     ) -> Result<Vec<Cmd>> {
         trace!("{:?}: {msg_id:?}", LogMarker::NodeMsgToBeHandled);
 
         match msg {
-            NodeMsg::Relocate(node_state) => {
+            NodeMsg::TryJoin(relocation) => {
+                trace!("Handling msg {:?}: TryJoin from {}", msg_id, sender);
+                MyNode::handle_join(node, &context, sender, relocation)
+                    .await
+                    .map(|c| c.into_iter().collect())
+            }
+            NodeMsg::Relocate(signed_relocation) => {
                 let mut node = node.write().await;
                 debug!("[NODE WRITE]: Relocated write gottt...");
-
-                trace!("Handling msg: Relocate from {}: {:?}", sender, msg_id);
-                Ok(node.handle_relocate(node_state)?.into_iter().collect())
-            }
-            NodeMsg::JoinAsRelocatedResponse(join_response) => {
-                let mut node = node.write().await;
-                debug!("[NODE WRITE]: joinasreloac write gottt...");
-                trace!("Handling msg: JoinAsRelocatedResponse from {}", sender);
-                if let Some(ref mut joining_as_relocated) = node.relocate_state {
-                    if let Some(cmd) =
-                        joining_as_relocated.handle_join_response(*join_response, sender.addr())?
-                    {
-                        return Ok(vec![cmd]);
-                    }
-                } else {
-                    error!(
-                        "No relocation in progress upon receiving {:?}",
-                        join_response
-                    );
-                }
-
-                Ok(vec![])
+                trace!("Handling relocate msg from {}: {:?}", sender, msg_id);
+                Ok(node.relocate(signed_relocation)?.into_iter().collect())
             }
             NodeMsg::AntiEntropy {
                 section_tree_update,
@@ -179,51 +228,57 @@ impl MyNode {
                 }
 
                 trace!("Received Probe message from {}: {:?}", sender, msg_id);
-                let recipients = BTreeSet::from_iter([sender]);
                 cmds.push(MyNode::send_ae_update_to_nodes(
                     &context,
-                    recipients,
+                    Peers::Single(sender),
                     section_key,
                 ));
                 Ok(cmds)
             }
-            // The AcceptedOnlineShare for relocation will be received here.
+            // The approval or rejection of a join (approval both for new network joiner as well as
+            // existing node relocated to the section) will be received here.
             NodeMsg::JoinResponse(join_response) => {
-                let mut node = node.write().await;
-
                 match join_response {
-                    JoinResponse::Approved { .. } => {
-                        info!(
-                            "Relocation: Aggregating received ApprovalShare from {:?}",
-                            sender
-                        );
-                        info!("Relocation: Successfully aggregated ApprovalShares for joining the network");
-                        if let Some(ref mut joining_as_relocated) = node.relocate_state {
-                            let new_node = joining_as_relocated.node.clone();
-                            let new_name = new_node.name();
-                            let previous_name = context.name;
-                            let new_keypair = new_node.keypair;
+                    JoinResponse::Rejected(reason) => Err(super::Error::RejoinRequired(
+                        RejoinReason::from_reject_reason(reason),
+                    )),
+                    JoinResponse::Approved(decision) => {
+                        info!("{}", LogMarker::ReceivedJoinApproval);
+                        let target_sap = context.network_knowledge.signed_sap();
 
-                            info!(
-                                "Relocation: switching from {:?} to {:?} with keypair {:?}",
-                                previous_name, new_name, new_keypair
-                            );
-
-                            // TODO: confirm whether carry out the switch immediately here
-                            //       or still using the cmd pattern.
-                            //       As the sending of the JoinRequest as notification
-                            //       may require the `node` to be switched to new already.
-                            node.relocate(new_keypair, new_name)?;
-
-                            trace!("{}", LogMarker::RelocateEnd);
-                        } else {
-                            warn!("Relocation:  node.relocate_state is not in Progress");
+                        if let Err(e) = decision.validate(&target_sap.public_key_set()) {
+                            error!("Failed to validate with {target_sap:?}, dropping invalid join decision: {e:?}");
+                            return Ok(vec![]);
                         }
 
-                        Ok(vec![])
-                    }
-                    _ => {
-                        debug!("Relocation: Ignoring unexpected join response message: {join_response:?}");
+                        // Ensure this decision includes us as a joining node
+                        if decision
+                            .proposals
+                            .keys()
+                            .filter(|n| n.state() == MembershipState::Joined)
+                            .all(|n| n.name() != context.name)
+                        {
+                            trace!("MyNode named: {:?} Ignore join approval decision not for us: {decision:?}", context.name);
+                            return Ok(vec![]);
+                        }
+
+                        trace!(
+                            "=========>> This node has been approved to join the section at {:?}!",
+                            target_sap.prefix(),
+                        );
+
+                        if decision
+                            .proposals
+                            .keys()
+                            .filter(|n| n.state() == MembershipState::Joined)
+                            .filter(|n| n.name() == context.name)
+                            .any(|n| n.previous_name().is_some())
+                        {
+                            // We could clear the cached relocation proof here,
+                            // but we have the periodic check doing it, so no need to duplicate the logic.
+                            trace!("{}", LogMarker::RelocateEnd);
+                        }
+
                         Ok(vec![])
                     }
                 }
@@ -242,29 +297,6 @@ impl MyNode {
                     .handle_handover_anti_entropy(sender, gen)
                     .into_iter()
                     .collect())
-            }
-            NodeMsg::JoinRequest(join_request) => {
-                trace!("Handling msg {:?}: JoinRequest from {}", msg_id, sender);
-
-                MyNode::handle_join_request(node, &context, sender, join_request)
-                    .await
-                    .map(|c| c.into_iter().collect())
-            }
-            NodeMsg::JoinAsRelocatedRequest(join_request) => {
-                trace!("Handling msg: JoinAsRelocatedRequest from {}", sender);
-
-                if !context.is_elder
-                    && join_request.section_key == context.network_knowledge.section_key()
-                {
-                    return Ok(vec![]);
-                }
-
-                Ok(
-                    MyNode::handle_join_as_relocated_request(node, &context, sender, *join_request)
-                        .await
-                        .into_iter()
-                        .collect(),
-                )
             }
             NodeMsg::MembershipVotes(votes) => {
                 let mut node = node.write().await;
@@ -290,24 +322,27 @@ impl MyNode {
                 .into_iter()
                 .collect())
             }
-            NodeMsg::Propose {
+            NodeMsg::ProposeSectionState {
                 proposal,
                 sig_share,
-                optional_sig_share,
             } => {
                 let mut node = node.write().await;
-                debug!("[NODE WRITE]: PROPOSE write gottt...");
+                debug!("[NODE WRITE]: ProposeSectionState write.");
                 if node.is_not_elder() {
-                    trace!("Adult handling a Propose msg from {}: {:?}", sender, msg_id);
+                    trace!(
+                        "Adult handling a ProposeSectionState msg from {}: {:?}",
+                        sender,
+                        msg_id
+                    );
                 }
 
                 trace!(
-                    "Handling proposal msg: {proposal:?} from {}: {:?}",
+                    "Handling ProposeSectionState msg: {proposal:?} from {}: {:?}",
                     sender,
                     msg_id
                 );
-
-                node.handle_proposal(msg_id, proposal, sig_share, optional_sig_share, sender)
+                node.untrack_node_issue(sender.name(), IssueType::ElderVoting);
+                node.handle_section_state_proposal(msg_id, proposal, sig_share, sender)
             }
             NodeMsg::DkgStart(session_id, elder_sig) => {
                 trace!(
@@ -366,68 +401,50 @@ impl MyNode {
                 trace!("Handling msg: DkgAE s{} from {}", session_id.sh(), sender);
                 node.handle_dkg_anti_entropy(session_id, sender)
             }
-            NodeMsg::NodeDataCmd(NodeDataCmd::RecordStorageLevel { node_id, level, .. }) => {
-                let mut node = node.write().await;
-                debug!("[NODE WRITE]: RecordStorage write gottt...");
-                let changed = node.set_storage_level(&node_id, level);
-                if changed && level.value() == MIN_LEVEL_WHEN_FULL {
-                    // ..then we accept a new node in place of the full node
-                    node.joins_allowed = true;
-                }
-                Ok(vec![])
-            }
-            NodeMsg::NodeDataCmd(NodeDataCmd::ReceiveMetadata { metadata }) => {
-                let mut node = node.write().await;
-                debug!("[NODE WRITE]: ReceveMeta write gottt...");
-                info!("Processing received MetadataExchange packet: {:?}", msg_id);
-                node.set_adult_levels(metadata);
-                Ok(vec![])
-            }
             NodeMsg::NodeEvent(NodeEvent::CouldNotStoreData {
                 node_id,
                 data_address,
                 full,
             }) => {
-                info!("Processing CouldNotStoreData event with {msg_id:?} at : {data_address:?}");
+                info!("Processing CouldNotStoreData event with {msg_id:?} at: {data_address:?}, (node reporting full: {full})");
 
                 if !context.is_elder {
                     error!("Received unexpected message while Adult");
                     return Ok(vec![]);
                 }
 
-                if full && !context.joins_allowed {
-                    let mut write_locked_node = node.write().await;
-                    debug!("[NODE WRITE]: CouldNotStore write gottt...");
-                    let changed = write_locked_node
-                        .set_storage_level(&node_id, StorageLevel::from(StorageLevel::MAX)?);
-                    if changed {
-                        // ..then we accept a new node in place of the full node
-                        write_locked_node.joins_allowed = true;
+                let mut cmds = vec![];
 
-                        context.log_node_issue(node_id.into(), IssueType::Communication);
-                    }
+                if !context.joins_allowed {
+                    cmds.push(Cmd::SetJoinsAllowed(true));
+                    // NB: we do not also set allowed until split, since we
+                    // do not expect another node to run out of space before we ourselves
+                    // have reached the storage limit (i.e. the `min_capacity` variable, which
+                    // should be set by the node operator to be a little bit lower than the actual space).
                 }
 
-                Ok(vec![])
+                // only when the node is severely out of sync with the rest, do we vote it off straight away
+                // othwerwise we report it as an issue (see further down)
+                if full && context.data_storage.is_below_half_limit() {
+                    debug!("Node {node_id} prematurely reported full. Voting it off..");
+                    let nodes = BTreeSet::from([node_id.into()]);
+                    cmds.push(Cmd::ProposeVoteNodesOffline(nodes));
+                    return Ok(cmds);
+                }
+
+                // we report it as an issue, to give it some slack
+                context.track_node_issue(node_id.into(), IssueType::Communication);
+
+                Ok(cmds)
             }
-            NodeMsg::NodeDataCmd(NodeDataCmd::ReplicateOneData(data)) => {
-                debug!("Replicate one data");
-
-                if context.is_elder {
-                    error!("Received unexpected message while Elder");
-                    return Ok(vec![]);
-                }
-                debug!(
-                    "Attempting to store data locally as adult: {:?}",
-                    data.address()
-                );
+            NodeMsg::NodeDataCmd(NodeDataCmd::StoreData(data)) => {
+                debug!("Attempting to store data locally: {:?}", data.address());
 
                 // store data and respond w/ack on the response stream
-                MyNode::store_data_as_adult_and_respond(&context, data, send_stream, sender, msg_id)
-                    .await
+                MyNode::store_data_and_respond(&context, data, send_stream, sender, msg_id).await
             }
             NodeMsg::NodeDataCmd(NodeDataCmd::ReplicateDataBatch(data_collection)) => {
-                info!("ReplicateData collection MsgId: {:?}", msg_id);
+                info!("ReplicateDataBatch MsgId: {:?}", msg_id);
                 MyNode::replicate_data_batch(&context, sender, data_collection).await
             }
             NodeMsg::NodeDataCmd(NodeDataCmd::SendAnyMissingRelevantData(known_data_addresses)) => {
@@ -449,14 +466,14 @@ impl MyNode {
                 auth,
                 operation_id,
             }) => {
-                // A request from EndUser - via elders - for locally stored data
+                // A request from EndUser - via Elders - for locally stored data
                 debug!(
                     "Handle NodeQuery with msg_id {:?}, operation_id {}",
                     msg_id, operation_id
                 );
 
-                MyNode::handle_data_query_at_adult(
-                    &context,
+                let cmds = MyNode::handle_data_query_where_stored(
+                    context,
                     operation_id,
                     &query,
                     auth,
@@ -464,39 +481,78 @@ impl MyNode {
                     msg_id,
                     send_stream,
                 )
-                .await?;
-                Ok(vec![])
+                .await;
+                Ok(cmds)
+            }
+            NodeMsg::RequestHandover { sap, sig_share } => {
+                info!("RequestHandover with msg_id {msg_id:?}");
+                let mut node = node.write().await;
+
+                debug!("[NODE WRITE]: RequestHandover write gottt...");
+                node.handle_handover_request(msg_id, sap, sig_share, sender)
+            }
+            NodeMsg::SectionHandoverPromotion { sap, sig_share } => {
+                info!("SectionHandoverPromotion with msg_id {msg_id:?}");
+                let mut node = node.write().await;
+
+                debug!("[NODE WRITE]: SectionHandoverPromotion write gottt...");
+                node.handle_handover_promotion(msg_id, sap, sig_share, sender)
+            }
+            NodeMsg::SectionSplitPromotion {
+                sap0,
+                sig_share0,
+                sap1,
+                sig_share1,
+            } => {
+                info!("SectionSplitPromotion with msg_id {msg_id:?}");
+                let mut node = node.write().await;
+
+                debug!("[NODE WRITE]: SectionSplitPromotion write gottt...");
+                node.handle_section_split_promotion(
+                    msg_id, sap0, sig_share0, sap1, sig_share1, sender,
+                )
+            }
+        }
+    }
+}
+
+// Serializes the msg, producing one [`WireMsg`] instance
+// per recipient - the last step before passing it over to comms module.
+pub(crate) fn into_msg_bytes(
+    network_knowledge: &NetworkKnowledge,
+    our_node_name: XorName,
+    msg: NodeMsg,
+    msg_id: MsgId,
+    recipients: Peers,
+) -> Result<Vec<(Peer, UsrMsgBytes)>> {
+    let (kind, payload) = MyNode::serialize_node_msg(our_node_name, &msg)?;
+    let recipients = match recipients {
+        Peers::Single(peer) => vec![peer],
+        Peers::Multiple(peers) => peers.into_iter().collect(),
+    };
+
+    // we first generate the XorName
+    let dst = Dst {
+        name: xor_name::rand::random(),
+        section_key: bls::SecretKey::random().public_key(),
+    };
+
+    let mut initial_wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
+    let _bytes = initial_wire_msg.serialize_and_cache_bytes()?;
+
+    let mut msgs = vec![];
+    for peer in recipients {
+        match network_knowledge.generate_dst(&peer.name()) {
+            Ok(dst) => {
+                // TODO log error here isntead of throwing
+                let all_the_bytes = initial_wire_msg.serialize_with_new_dst(&dst)?;
+                msgs.push((peer, all_the_bytes));
+            }
+            Err(error) => {
+                error!("Could not get route for {peer:?}: {error}");
             }
         }
     }
 
-    /// Sets Cmd to locally record the storage level and send msgs to Elders
-    /// Advising the same
-    pub(crate) fn record_storage_level_if_any(
-        context: &NodeContext,
-        level: Option<StorageLevel>,
-    ) -> Result<Vec<Cmd>> {
-        let mut cmds = vec![];
-        if let Some(level) = level {
-            info!("Storage has now passed {} % used.", 10 * level.value());
-
-            // Run a SetStorageLevel Cmd to actually update the DataStorage instance
-            cmds.push(Cmd::SetStorageLevel(level));
-            let node_id = PublicKey::from(context.keypair.public);
-            let node_xorname = XorName::from(node_id);
-
-            // we ask the section to record the new level reached
-            let msg = NodeMsg::NodeDataCmd(NodeDataCmd::RecordStorageLevel {
-                section: node_xorname,
-                node_id,
-                level,
-            });
-
-            let dst = Peers::Multiple(context.network_knowledge.elders());
-
-            cmds.push(Cmd::send_msg(msg, dst, context.clone()));
-        }
-
-        Ok(cmds)
-    }
+    Ok(msgs)
 }

@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -11,13 +11,13 @@ use crate::node::{
     dkg::{check_ephemeral_dkg_key, DkgPubKeys},
     flow_ctrl::cmds::Cmd,
     messaging::Peers,
-    Error, MyNode, Proposal, Result,
+    Error, MyNode, Result,
 };
 
 use sn_interface::{
     messaging::{
         system::{DkgSessionId, NodeMsg, SectionSigShare},
-        AuthorityProof, SectionSig,
+        AuthorityProof, MsgId, SectionSig,
     },
     network_knowledge::{SectionAuthorityProvider, SectionKeyShare},
     types::{self, log_markers::LogMarker, Peer},
@@ -102,7 +102,7 @@ impl MyNode {
 
         // send it to the other participants
         if !others.is_empty() {
-            cmds.push(MyNode::send_system_msg(
+            cmds.push(Cmd::send_msg(
                 node_msg,
                 Peers::Multiple(others),
                 self.context(),
@@ -160,12 +160,12 @@ impl MyNode {
             pub_keys,
             votes,
         };
-        MyNode::send_system_msg(node_msg, Peers::Multiple(recipients), self.context())
+        Cmd::send_msg(node_msg, Peers::Multiple(recipients), self.context())
     }
 
     fn request_dkg_ae(&self, session_id: &DkgSessionId, sender: Peer) -> Cmd {
         let node_msg = NodeMsg::DkgAE(session_id.clone());
-        MyNode::send_system_msg(node_msg, Peers::Single(sender), self.context())
+        Cmd::send_msg(node_msg, Peers::Single(sender), self.context())
     }
 
     fn aggregate_dkg_start(
@@ -291,7 +291,7 @@ impl MyNode {
             sig,
         };
 
-        let cmd = MyNode::send_system_msg(node_msg, Peers::Multiple(peers), self.context());
+        let cmd = Cmd::send_msg(node_msg, Peers::Multiple(peers), self.context());
         Ok(vec![cmd])
     }
 
@@ -480,10 +480,11 @@ impl MyNode {
         let mut is_old_gossip = true;
         let their_votes_len = votes.len();
         for v in votes {
-            match self.dkg_voter.handle_dkg_vote(session_id, v.clone()) {
+            let v_string = format!("{v:?}");
+            match self.dkg_voter.handle_dkg_vote(session_id, v) {
                 Ok(vote_responses) => {
                     debug!(
-                        "Dkg s{}: {:?} after: {v:?}",
+                        "Dkg s{}: {:?} after: {v_string}",
                         session_id.sh(),
                         vote_responses,
                     );
@@ -505,7 +506,7 @@ impl MyNode {
                 }
                 Err(err) => {
                     error!(
-                        "Error processing DKG vote s{} id:{our_id:?} {v:?} from {sender:?}: {err:?}",
+                        "Error processing DKG vote s{} id:{our_id:?} {v_string} from {sender:?}: {err:?}",
                         session_id.sh()
                     );
                 }
@@ -558,7 +559,7 @@ impl MyNode {
                 pub_keys,
                 votes: our_votes,
             };
-            let cmd = MyNode::send_system_msg(node_msg, Peers::Single(sender), self.context());
+            let cmd = Cmd::send_msg(node_msg, Peers::Single(sender), self.context());
             Ok(vec![cmd])
         } else {
             Ok(vec![])
@@ -582,7 +583,7 @@ impl MyNode {
             pub_keys,
             votes,
         };
-        let cmd = MyNode::send_system_msg(node_msg, Peers::Single(sender), self.context());
+        let cmd = Cmd::send_msg(node_msg, Peers::Single(sender), self.context());
         Ok(vec![cmd])
     }
 
@@ -668,7 +669,7 @@ impl MyNode {
             pub_key: *pub_key,
             sig: *sig,
         };
-        let cmd = MyNode::send_system_msg(node_msg, Peers::Multiple(peers), self.context());
+        let cmd = Cmd::send_msg(node_msg, Peers::Multiple(peers), self.context());
         vec![cmd]
     }
 
@@ -771,14 +772,28 @@ impl MyNode {
         // it to sign any msg that needs section agreement.
         self.section_keys_provider.insert(key_share.clone());
 
-        let mut cmds = self.update_on_elder_change(&self.context()).await?;
+        let mut cmds = self.update_on_section_change(&self.context()).await?;
 
         if !self.network_knowledge.has_chain_key(&sap.section_key()) {
-            // This proposal is sent to the current set of elders to be aggregated
-            // and section signed.
-            let proposal = Proposal::RequestHandover(sap);
-            let recipients: Vec<_> = self.network_knowledge.section_auth().elders_vec();
-            cmds.extend(self.send_proposal_with(recipients, proposal, &key_share)?);
+            // This request is sent to the current set of elders to be aggregated
+            let serialized_sap = bincode::serialize(&sap)?;
+            let sig_share = MyNode::sign_with_key_share(serialized_sap, &key_share);
+            let msg = NodeMsg::RequestHandover {
+                sap: sap.clone(),
+                sig_share: sig_share.clone(),
+            };
+            let current_elders: Vec<_> = self.network_knowledge.section_auth().elders_vec();
+            let (other_elders, myself) = self.split_peers_and_self(current_elders);
+            let peers = Peers::Multiple(other_elders);
+            cmds.push(Cmd::send_msg(msg, peers, self.context()));
+
+            // Handle it if we are an elder
+            if let Some(elder) = myself {
+                match self.handle_handover_request(MsgId::new(), sap, sig_share, elder) {
+                    Ok(c) => cmds.extend(c),
+                    Err(e) => error!("Failed to handle our own handover request: {e:?}"),
+                };
+            }
         }
 
         Ok(cmds)
@@ -788,19 +803,18 @@ impl MyNode {
 #[cfg(test)]
 mod tests {
     use super::MyNode;
-    use crate::{
-        comm::MsgFromPeer,
-        node::flow_ctrl::{
-            cmds::Cmd,
-            dispatcher::Dispatcher,
-            tests::{cmd_utils::get_next_msg, network_builder::TestNetworkBuilder},
-        },
+    use crate::node::flow_ctrl::{
+        cmds::Cmd,
+        dispatcher::Dispatcher,
+        tests::{cmd_utils::get_next_msg, network_builder::TestNetworkBuilder},
     };
+
+    use sn_comms::MsgFromPeer;
     use sn_interface::{
         init_logger,
         messaging::{
             signature_aggregator::SignatureAggregator,
-            system::{DkgSessionId, NodeMsg, Proposal},
+            system::{DkgSessionId, NodeMsg, SectionStateVote},
             MsgType, SectionSigShare,
         },
         network_knowledge::{supermajority, NodeState, SectionKeyShare, SectionsDAG},
@@ -865,7 +879,7 @@ mod tests {
                             let dkg_cmds = dispatcher.process_cmd(cmd).await?;
                             verify_dkg_outcome_cmds(dkg_cmds);
                         } else {
-                            panic!("got a different cmd {:?}", cmd);
+                            panic!("got a different cmd {cmd:?}");
                         }
                     }
                 }
@@ -943,7 +957,7 @@ mod tests {
                                     &initial_sk_set.secret_key(),
                                     &new_sap.section_key(),
                                 );
-                                dag.insert(&parent, new_sap.section_key(), sig)?;
+                                dag.verify_and_insert(&parent, new_sap.section_key(), sig)?;
                                 dag
                             };
                             TestSectionTree::get_section_tree_update(
@@ -1005,8 +1019,8 @@ mod tests {
                                     let msg = assert_matches!(cmd, Cmd::SendMsg { msg, .. } => msg);
 
                                     match msg {
-                                        NodeMsg::Propose {
-                                            proposal: Proposal::JoinsAllowed(..),
+                                        NodeMsg::ProposeSectionState {
+                                            proposal: SectionStateVote::JoinsAllowed(..),
                                             ..
                                         } => (),
                                         NodeMsg::AntiEntropy { .. } => (),
@@ -1015,7 +1029,7 @@ mod tests {
                                 }
                             }
                         } else {
-                            panic!("got a different cmd {:?}", cmd);
+                            panic!("got a different cmd {cmd:?}");
                         }
                     }
                 }
@@ -1073,7 +1087,7 @@ mod tests {
                             let filter = BTreeSet::from([dead_node]);
                             dispatcher.mock_send_msg(cmd, Some(filter)).await;
                         } else {
-                            panic!("got a different cmd {:?}", cmd);
+                            panic!("got a different cmd {cmd:?}");
                         }
                     }
                 }
@@ -1147,7 +1161,7 @@ mod tests {
                             let dkg_cmds = dispatcher.process_cmd(cmd).await?;
                             verify_dkg_outcome_cmds(dkg_cmds);
                         } else {
-                            panic!("got a different cmd {:?}", cmd);
+                            panic!("got a different cmd {cmd:?}");
                         }
                     }
                 }
@@ -1312,10 +1326,7 @@ mod tests {
             let msg = assert_matches!(cmd, Cmd::SendMsg { msg, .. } => msg);
 
             match msg {
-                NodeMsg::Propose {
-                    proposal: Proposal::RequestHandover(_),
-                    ..
-                } => (),
+                NodeMsg::RequestHandover { .. } => (),
                 NodeMsg::AntiEntropy { .. } => (),
                 msg => panic!("Unexpected msg {msg}"),
             }
@@ -1329,7 +1340,7 @@ mod tests {
             let origin = msg.sender;
             let (msg_id, msg) = assert_matches!(
                 msg.wire_msg.into_msg().expect("Failed to deserialize wire_msg"),
-                MsgType::Node { msg_id, dst: _, msg } => (msg_id, msg)
+                MsgType::Node { msg_id, msg, .. } => (msg_id, msg)
             );
             MyNode::handle_valid_node_msg(self.node(), context, msg_id, msg, origin, None)
                 .await

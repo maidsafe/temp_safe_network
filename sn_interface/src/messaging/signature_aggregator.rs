@@ -1,4 +1,4 @@
-// Copyright 2021 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -95,13 +95,73 @@ impl SignatureAggregator {
     }
 }
 
+/// Aggregator for signature shares for arbitrary payloads.
+/// Like the SignatureAggregator, but requires total participation.
+#[derive(Debug, Default)]
+pub struct TotalParticipationAggregator {
+    map: BTreeMap<Digest256, BTreeSet<SectionSigShare>>,
+}
+
+impl TotalParticipationAggregator {
+    /// Add new share into the aggregator. If `total_participants` valid signature shares were collected, returns
+    /// the aggregated signature: `Some(SectionSig)` else returns None.
+    /// Checks if the signature are valid
+    /// Resets current shares upon completion of a signature so we don't accumulate finished aggregations endlessly
+    pub fn try_aggregate(
+        &mut self,
+        payload: &[u8],
+        sig_share: SectionSigShare,
+        total_participants: usize,
+    ) -> Result<Option<SectionSig>, AggregatorError> {
+        if !sig_share.verify(payload) {
+            return Err(AggregatorError::InvalidSigShare);
+        }
+
+        // Use the hash of the payload + the public key as the key in the map to avoid mixing
+        // entries that have the same payload but are signed using different keys.
+        let public_key = sig_share.public_key_set.public_key();
+
+        let mut hasher = Sha3::v256();
+        let mut hash = Digest256::default();
+        hasher.update(payload);
+        hasher.update(&public_key.to_bytes());
+        hasher.finalize(&mut hash);
+
+        // save the sig share
+        let current_shares = self.map.entry(hash).or_default();
+        let _ = current_shares.insert(sig_share.clone());
+
+        // try aggregate if we have all the shares
+        if current_shares.len() == total_participants {
+            let signature = sig_share
+                .public_key_set
+                .combine_signatures(
+                    current_shares
+                        .iter()
+                        .map(|s| (s.index, s.signature_share.clone())),
+                )
+                .map_err(AggregatorError::FailedToCombineSigShares)?;
+            let section_sig = SectionSig {
+                public_key,
+                signature,
+            };
+
+            // reset current shares upon completion
+            self.map.remove(&hash);
+            Ok(Some(section_sig))
+        } else {
+            Ok(None)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use rand::thread_rng;
 
     #[test]
-    fn smoke() -> Result<(), AggregatorError> {
+    fn test_signature_aggregator() -> Result<(), AggregatorError> {
         let mut rng = thread_rng();
         let threshold = 3;
         let sk_set = bls::SecretKeySet::random(threshold, &mut rng);
@@ -116,7 +176,7 @@ mod tests {
 
             match result {
                 Ok(None) => (),
-                _ => panic!("unexpected result: {:?}", result),
+                _ => panic!("unexpected result: {result:?}"),
             }
         }
 
@@ -132,7 +192,44 @@ mod tests {
 
         match result {
             Ok(None) => Ok(()),
-            _ => panic!("unexpected result: {:?}", result),
+            _ => panic!("unexpected result: {result:?}"),
+        }
+    }
+
+    #[test]
+    fn test_total_participation_aggregator() -> Result<(), AggregatorError> {
+        let mut rng = thread_rng();
+        let threshold = 3;
+        let total_participation = 5;
+        let sk_set = bls::SecretKeySet::random(threshold, &mut rng);
+
+        let mut aggregator = TotalParticipationAggregator::default();
+        let payload = b"hello";
+
+        // Not enough shares yet
+        for index in 0..total_participation - 1 {
+            let sig_share = create_sig_share(&sk_set, index, payload);
+            let result = aggregator.try_aggregate(payload, sig_share, total_participation);
+
+            match result {
+                Ok(None) => (),
+                _ => panic!("unexpected result: {result:?}"),
+            }
+        }
+
+        // Enough shares now
+        let sig_share = create_sig_share(&sk_set, total_participation, payload);
+        let sig = aggregator.try_aggregate(payload, sig_share, total_participation)?;
+
+        assert!(sig.expect("some key").verify(payload));
+
+        // Extra shares start another round
+        let sig_share = create_sig_share(&sk_set, total_participation + 1, payload);
+        let result = aggregator.try_aggregate(payload, sig_share, total_participation);
+
+        match result {
+            Ok(None) => Ok(()),
+            _ => panic!("unexpected result: {result:?}"),
         }
     }
 
@@ -157,7 +254,7 @@ mod tests {
 
         match result {
             Err(AggregatorError::InvalidSigShare) => (),
-            _ => panic!("unexpected result: {:?}", result),
+            _ => panic!("unexpected result: {result:?}"),
         }
 
         // The invalid share doesn't spoil the aggregation - we can still aggregate once enough

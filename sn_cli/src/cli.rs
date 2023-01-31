@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -117,7 +117,7 @@ async fn process_commands(mut safe: &mut Safe, args: CmdArgs, config: &mut Confi
 
     match args.cmd {
         SubCommands::Config { cmd } => config_commander(cmd, config).await,
-        SubCommands::Networks { cmd } => networks_commander(cmd, config).await,
+        SubCommands::Networks { cmd } => networks_commander(cmd, output_fmt, config).await,
         SubCommands::Update { no_confirm } => {
             // We run this command in a separate thread to overcome a conflict with
             // the self_update crate as it seems to be creating its own runtime.

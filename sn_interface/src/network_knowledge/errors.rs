@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -45,10 +45,10 @@ pub enum Error {
     UntrustedSectionAuthProvider(String),
     #[error("The genesis key of the provided SectionTree is invalid: {0:?}")]
     InvalidGenesisKey(bls::PublicKey),
+    #[error("A relocating node provided invalid relocation proof.")]
+    InvalidRelocationProof,
     #[error("A signature share is invalid.")]
     InvalidSignatureShare,
-    #[error("A node has invalid relocation details")]
-    InvalidRelocationDetails,
     #[error("The secret key share is missing for public key {0:?}")]
     MissingSecretKeyShare(bls::PublicKey),
     #[error("Invalid payload")]

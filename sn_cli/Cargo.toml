@@ -1,6 +1,6 @@
 [package]
 name = "sn_cli"
-version = "0.68.4"
+version = "0.68.7"
 description = "Safe CLI"
 authors = [
   "bochaco <gabrielviganotti@gmail.com>",
@@ -36,7 +36,7 @@ rcgen = "~0.9"
 relative-path = "1.3.2"
 reqwest = { version = "~0.11", default-features = false, features = ["rustls-tls"] }
 rmp-serde = "1.0.0"
-sn_api = { path = "../sn_api", version = "^0.75.3", default-features = false, features = ["app"] }
+sn_api = { path = "../sn_api", version = "^0.75.5", default-features = false, features = ["app"] }
 sn_dbc = { version = "8.1.2", features = ["serdes"] }
 sn_launch_tool = "0.12"
 serde = "1.0.123"
@@ -65,6 +65,9 @@ features = [
 [features]
 default = [ "self-update", "limit-client-upload-size" ]
 check-replicas = [ "sn_api/check-replicas" ]
+cmd-happy-path = [ "sn_api/cmd-happy-path" ]
+query-happy-path = [ "sn_api/query-happy-path" ]
+msg-happy-path = [ "sn_api/msg-happy-path" ]
 limit-client-upload-size = ["sn_api/limit-client-upload-size"]
 self-update = []
 
@@ -79,7 +82,7 @@ walkdir = "2.3.1"
 multibase = "~0.9.1"
 xor_name = "~5.0.0"
 futures = "0.3.21"
-sn_api = { path = "../sn_api", version = "^0.75.3", features = ["app", "test-utils"] }
+sn_api = { path = "../sn_api", version = "^0.75.5", features = ["app", "test-utils"] }
 httpmock = "~0.6.6"
 
 [dev-dependencies.sn_cmd_test_utilities]

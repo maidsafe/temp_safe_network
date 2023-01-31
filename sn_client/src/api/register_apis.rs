@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -8,7 +8,7 @@
 
 use super::Client;
 
-use crate::Error;
+use crate::{Error, Result};
 
 use sn_interface::{
     messaging::data::{
@@ -41,7 +41,7 @@ impl Client {
     /// Incrementing the WAL index as successful writes are sent out. Stops at the first error.
     /// Starts publishing from the index when called again with the same WAL.
     #[instrument(skip(self), level = "debug")]
-    pub async fn publish_register_ops(&self, wal: RegisterWriteAheadLog) -> Result<(), Error> {
+    pub async fn publish_register_ops(&self, wal: RegisterWriteAheadLog) -> Result<()> {
         for cmd in &wal {
             self.send_cmd(cmd.clone()).await?;
         }
@@ -61,7 +61,7 @@ impl Client {
         name: XorName,
         tag: u64,
         policy: Policy,
-    ) -> Result<(Address, RegisterWriteAheadLog), Error> {
+    ) -> Result<(Address, RegisterWriteAheadLog)> {
         let address = Address { name, tag };
 
         let op = CreateRegister { name, tag, policy };
@@ -93,7 +93,7 @@ impl Client {
         address: Address,
         entry: Entry,
         children: BTreeSet<EntryHash>,
-    ) -> Result<(EntryHash, RegisterWriteAheadLog), Error> {
+    ) -> Result<(EntryHash, RegisterWriteAheadLog)> {
         // First we fetch it so we can get the causality info,
         // either from local CRDT replica or from the network if not found
         debug!("Writing to register at {:?}", address);
@@ -130,7 +130,7 @@ impl Client {
 
     /// Get the entire Register from the Network
     #[instrument(skip(self), level = "debug")]
-    pub async fn get_register(&self, address: Address) -> Result<Register, Error> {
+    pub async fn get_register(&self, address: Address) -> Result<Register> {
         // Let's fetch the Register from the network
         let query = DataQueryVariant::Register(RegisterQuery::Get(address));
         let query_result = self.send_query(query.clone()).await?;
@@ -147,10 +147,7 @@ impl Client {
 
     /// Get the latest entry (or entries if branching)
     #[instrument(skip(self), level = "debug")]
-    pub async fn read_register(
-        &self,
-        address: Address,
-    ) -> Result<BTreeSet<(EntryHash, Entry)>, Error> {
+    pub async fn read_register(&self, address: Address) -> Result<BTreeSet<(EntryHash, Entry)>> {
         let query = DataQueryVariant::Register(RegisterQuery::Read(address));
         let query_result = self.send_query(query.clone()).await?;
         match query_result.response {
@@ -164,11 +161,7 @@ impl Client {
 
     /// Get an entry from a Register on the Network by its hash
     #[instrument(skip(self), level = "debug")]
-    pub async fn get_register_entry(
-        &self,
-        address: Address,
-        hash: EntryHash,
-    ) -> Result<Entry, Error> {
+    pub async fn get_register_entry(&self, address: Address, hash: EntryHash) -> Result<Entry> {
         let query = DataQueryVariant::Register(RegisterQuery::GetEntry { address, hash });
         let query_result = self.send_query(query.clone()).await?;
         match query_result.response {
@@ -188,7 +181,7 @@ impl Client {
 
     /// Get the owner of a Register.
     #[instrument(skip(self), level = "debug")]
-    pub async fn get_register_owner(&self, address: Address) -> Result<User, Error> {
+    pub async fn get_register_owner(&self, address: Address) -> Result<User> {
         let query = DataQueryVariant::Register(RegisterQuery::GetOwner(address));
         let query_result = self.send_query(query.clone()).await?;
         match query_result.response {
@@ -212,7 +205,7 @@ impl Client {
         &self,
         address: Address,
         user: User,
-    ) -> Result<Permissions, Error> {
+    ) -> Result<Permissions> {
         let query = DataQueryVariant::Register(RegisterQuery::GetUserPermissions { address, user });
         let query_result = self.send_query(query.clone()).await?;
         match query_result.response {
@@ -228,7 +221,7 @@ impl Client {
 
     /// Get the Policy of a Register.
     #[instrument(skip(self), level = "debug")]
-    pub async fn get_register_policy(&self, address: Address) -> Result<Policy, Error> {
+    pub async fn get_register_policy(&self, address: Address) -> Result<Policy> {
         let query = DataQueryVariant::Register(RegisterQuery::GetPolicy(address));
         let query_result = self.send_query(query.clone()).await?;
         match query_result.response {

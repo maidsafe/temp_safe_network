@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -109,7 +109,7 @@ impl NodeTestApi {
         self.cmd_channel
             .send((cmd, vec![]))
             .await
-            .map_err(|_| Error::CmdSendError)?;
+            .map_err(|_| Error::CmdChannelSendError)?;
 
         Ok(())
     }

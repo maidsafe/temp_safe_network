@@ -1,4 +1,4 @@
-// Copyright 2020 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -27,10 +27,7 @@ pub fn pk_from_hex(hex_str: &str) -> Result<PublicKey> {
     PublicKey::ed25519_from_hex(hex_str)
         .or_else(|_| PublicKey::bls_from_hex(hex_str))
         .map_err(|_| {
-            Error::InvalidInput(format!(
-                "Invalid (Ed25519/BLS) public key bytes: {}",
-                hex_str
-            ))
+            Error::InvalidInput(format!("Invalid (Ed25519/BLS) public key bytes: {hex_str}",))
         })
 }
 
@@ -38,16 +35,16 @@ pub fn parse_tokens_amount(amount_str: &str) -> Result<Token> {
     Token::from_str(amount_str).map_err(|err| {
         match err {
             DbcError::ExcessiveTokenValue => Error::InvalidAmount(format!(
-                "Invalid tokens amount '{}', it exceeds the maximum possible value '{}'",
-                amount_str, Token::from_nano(MAX_TOKENS_VALUE)
+                "Invalid tokens amount '{amount_str}', it exceeds the maximum possible value '{}'",
+                Token::from_nano(MAX_TOKENS_VALUE)
             )),
             DbcError::LossOfTokenPrecision => {
-                Error::InvalidAmount(format!("Invalid tokens amount '{}', the minimum possible amount is one nano token (0.000000001)", amount_str))
+                Error::InvalidAmount(format!("Invalid tokens amount '{amount_str}', the minimum possible amount is one nano token (0.000000001)"))
             }
             DbcError::FailedToParseToken(msg) => {
-                Error::InvalidAmount(format!("Invalid tokens amount '{}': {}", amount_str, msg))
+                Error::InvalidAmount(format!("Invalid tokens amount '{amount_str}': {msg}"))
             },
-            other_err => Error::InvalidAmount(format!("Invalid tokens amount '{}': {:?}", amount_str, other_err)),
+            other_err => Error::InvalidAmount(format!("Invalid tokens amount '{amount_str}': {other_err:?}")),
         }
     })
 }

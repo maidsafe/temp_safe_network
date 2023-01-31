@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -6,27 +6,25 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{get_mean_of, std_deviation, FaultDetection, OperationId};
+use crate::{get_mean_of, std_deviation, FaultDetection, NodeIdentifier};
 
+use itertools::Itertools;
 use std::collections::{BTreeMap, BTreeSet};
 use xor_name::XorName;
 
 use std::time::Duration;
 static RECENT_ISSUE_DURATION: Duration = Duration::from_secs(60 * 10); // 10 minutes
 
-#[cfg(test)]
-static OUTDATED_PENDING_REQUEST_DURATION: Duration = Duration::from_secs(0);
-#[cfg(not(test))]
-static OUTDATED_PENDING_REQUEST_DURATION: Duration = Duration::from_secs(10);
+/// How many standard devs before we consider a node faulty
+/// https://en.wikipedia.org/wiki/68%E2%80%9395%E2%80%9399.7_rule
+static STD_DEVS_AWAY: usize = 3;
 
-static CONN_WEIGHTING: f32 = 20.0;
+static CONN_WEIGHTING: f32 = 1.5;
 static OP_WEIGHTING: f32 = 1.0;
-static KNOWLEDGE_WEIGHTING: f32 = 30.0;
-static DKG_WEIGHTING: f32 = 10.0; // there are quite a lot of DKG msgs that go out atm, so can't weight this too heavily
-static AE_PROBE_WEIGHTING: f32 = 150.0;
-
-/// Weighted score value relative to std_deviation, above which we're calling a node faulty
-static FAULT_SCORE_THRESHOLD: usize = 500;
+static KNOWLEDGE_WEIGHTING: f32 = 2.0;
+static DKG_WEIGHTING: f32 = 2.0; // there are quite a lot of DKG msgs that go out atm, so can't weight this too heavily
+static ELDER_VOTE_WEIGHTING: f32 = 2.5; // Not as severe as DKG votes missing, as these are not always required
+static AE_PROBE_WEIGHTING: f32 = 2.5;
 
 #[derive(Clone, Debug)]
 /// Represents the different type of issues that can be recorded by the Fault Detection
@@ -37,18 +35,22 @@ pub enum IssueType {
     AeProbeMsg,
     /// Represents a Dkg issue to be tracked by Fault Detection.
     Dkg,
+    /// Tracks when we are expecting votes from Elders (ie, adds to this when we have voted).
+    /// Less severe than Dkg as we don't always require a vote in each and every round.
+    ElderVoting,
     /// Represents a communication issue to be tracked by Fault Detection.
     Communication,
     /// Represents a knowledge issue to be tracked by Fault Detection.
-    Knowledge,
+    NetworkKnowledge,
     /// Represents a pending request operation issue to be tracked by Fault Detection.
-    RequestOperation(OperationId),
+    RequestOperation,
 }
 
 #[derive(Debug)]
 pub struct ScoreResults {
     pub communication_scores: BTreeMap<XorName, f32>,
     pub dkg_scores: BTreeMap<XorName, f32>,
+    pub elder_voting_scores: BTreeMap<XorName, f32>,
     pub knowledge_scores: BTreeMap<XorName, f32>,
     pub op_scores: BTreeMap<XorName, f32>,
     pub probe_scores: BTreeMap<XorName, f32>,
@@ -63,17 +65,22 @@ impl FaultDetection {
     ///
     /// These scores can then be used to highlight nodes that have a higher score than some
     /// particular ratio.
-    pub fn calculate_scores(&self) -> ScoreResults {
+    pub fn calculate_scores(&self, nodes_in_question: &BTreeSet<NodeIdentifier>) -> ScoreResults {
         let mut communication_scores = BTreeMap::new();
         let mut knowledge_scores = BTreeMap::new();
         let mut op_scores = BTreeMap::new();
         let mut dkg_scores = BTreeMap::new();
+        let mut elder_voting_scores = BTreeMap::new();
         let mut probe_scores = BTreeMap::new();
 
-        for node in &self.nodes {
+        for node in nodes_in_question {
             let _ = dkg_scores.insert(
                 *node,
                 self.calculate_node_score_for_type(node, &IssueType::Dkg),
+            );
+            let _ = elder_voting_scores.insert(
+                *node,
+                self.calculate_node_score_for_type(node, &IssueType::ElderVoting),
             );
             let _ = probe_scores.insert(
                 *node,
@@ -85,20 +92,18 @@ impl FaultDetection {
             );
             let _ = knowledge_scores.insert(
                 *node,
-                self.calculate_node_score_for_type(node, &IssueType::Knowledge),
+                self.calculate_node_score_for_type(node, &IssueType::NetworkKnowledge),
             );
             let _ = op_scores.insert(
                 *node,
-                self.calculate_node_score_for_type(
-                    node,
-                    &IssueType::RequestOperation(OperationId::random()),
-                ),
+                self.calculate_node_score_for_type(node, &IssueType::RequestOperation),
             );
         }
 
         ScoreResults {
             communication_scores,
             dkg_scores,
+            elder_voting_scores,
             knowledge_scores,
             op_scores,
             probe_scores,
@@ -116,7 +121,7 @@ impl FaultDetection {
 
         debug!("node {node} {issue_type:?} count: {:?}", node_issue_count);
         let mut other_node_counts = Vec::new();
-        for itr in &self.nodes {
+        for itr in &self.non_elder_nodes {
             if itr == node {
                 continue;
             }
@@ -150,24 +155,23 @@ impl FaultDetection {
                     0
                 }
             }
-            IssueType::Knowledge => {
-                if let Some(issues) = self.knowledge_issues.get(node) {
+            IssueType::NetworkKnowledge => {
+                if let Some(issues) = self.network_knowledge_issues.get(node) {
                     issues.len()
                 } else {
                     0
                 }
             }
-            IssueType::RequestOperation(_) => {
+            IssueType::ElderVoting => {
+                if let Some(issues) = self.elder_voting_issues.get(node) {
+                    issues.len()
+                } else {
+                    0
+                }
+            }
+            IssueType::RequestOperation => {
                 if let Some(issues) = self.unfulfilled_ops.get(node) {
-                    // To avoid the case that the check get carried out just after
-                    // burst of messages get inserted, only those issues has sat a
-                    // while will be considered as outdated.
-                    let count = issues
-                        .iter()
-                        .filter(|(_, time)| time.elapsed() > OUTDATED_PENDING_REQUEST_DURATION)
-                        .count();
-
-                    count
+                    issues.len()
                 } else {
                     0
                 }
@@ -176,12 +180,16 @@ impl FaultDetection {
     }
 
     /// get scores mapped by name, to score and z-score, which is std dev's from the mean
-    fn get_weighted_scores(&self) -> BTreeMap<XorName, usize> {
-        trace!("Getting weighted scores");
-        let scores = self.calculate_scores();
+    fn get_weighted_scores(
+        &self,
+        nodes_in_question: &BTreeSet<NodeIdentifier>,
+    ) -> BTreeMap<XorName, usize> {
+        trace!("Getting weighted scores for {nodes_in_question:?}");
+        let scores = self.calculate_scores(nodes_in_question);
         let ops_scores = scores.op_scores;
         let conn_scores = scores.communication_scores;
         let dkg_scores = scores.dkg_scores;
+        let elder_voting_scores = scores.elder_voting_scores;
         let knowledge_scores = scores.knowledge_scores;
         let probe_scores = scores.probe_scores;
 
@@ -197,6 +205,9 @@ impl FaultDetection {
             let node_dkg_score = *dkg_scores.get(&name).unwrap_or(&1.0);
             let node_dkg_score = node_dkg_score * DKG_WEIGHTING;
 
+            let node_elder_voting_score = *elder_voting_scores.get(&name).unwrap_or(&1.0);
+            let node_elder_voting_score = node_elder_voting_score * ELDER_VOTE_WEIGHTING;
+
             let node_knowledge_score = *knowledge_scores.get(&name).unwrap_or(&1.0);
             let node_knowledge_score = node_knowledge_score * KNOWLEDGE_WEIGHTING;
 
@@ -206,20 +217,20 @@ impl FaultDetection {
             let final_score = ops_score
                 + node_conn_score
                 + node_knowledge_score
+                + node_elder_voting_score
                 + node_dkg_score
                 + node_probe_score;
             debug!(
-                "Node {name} has a final score of {final_score} |
-                (Conns score({node_conn_score}), Dkg score({node_dkg_score}), |
-                Knowledge score({node_knowledge_score}), Ops score({score})), AeProbe score ({node_probe_score})"
+                "Node {name} has a final score of {final_score} :: ElderVoting score({node_elder_voting_score}) Conns score({node_conn_score}), Dkg score({node_dkg_score}), Knowledge score({node_knowledge_score}), Ops score({score}), AeProbe score ({node_probe_score})"
             );
 
             scores_only.push(final_score);
             let _prev = pre_standardised_scores.insert(name, final_score as usize);
         }
 
-        let mean = get_mean_of(&scores_only);
-        let std_dev = std_deviation(&scores_only).unwrap_or(0.0);
+        let mean = get_mean_of(&scores_only).unwrap_or(1.0);
+
+        let std_dev = std_deviation(&scores_only).unwrap_or(1.0);
 
         trace!("avg weighted score across all nodes: {mean:?}");
         trace!("std dev: {std_dev:?}");
@@ -227,12 +238,21 @@ impl FaultDetection {
         // now we store the z-score
         let mut final_scores = BTreeMap::default();
 
+        // threshold needs to always be at least 1, and with the std dev always at least one
+        // that should be fine.
+        let at_least_1_as_std_dev = if std_dev < 1.0 { 1.0 } else { std_dev.ceil() };
+        let threshold = STD_DEVS_AWAY * at_least_1_as_std_dev as usize + mean as usize;
+        debug!(
+            "____Threshold is {STD_DEVS_AWAY:?} std devs away + mean, which is {:?}",
+            threshold
+        );
+
         for (name, score) in pre_standardised_scores {
-            let zscore = score.saturating_sub(std_dev as usize);
+            trace!("Score for {name:?} is {score:?}");
 
-            debug!("Final Z-score for {name} is {zscore:?}");
-
-            let _existed = final_scores.insert(name, zscore);
+            if score >= threshold && threshold > 1 {
+                let _existed = final_scores.insert(name, score);
+            }
         }
 
         final_scores
@@ -247,32 +267,49 @@ impl FaultDetection {
             issues.retain(|time| time.elapsed() < RECENT_ISSUE_DURATION);
         }
 
-        for issues in &mut self.knowledge_issues.values_mut() {
+        for issues in &mut self.network_knowledge_issues.values_mut() {
             issues.retain(|time| time.elapsed() < RECENT_ISSUE_DURATION);
         }
 
         for issues in &mut self.dkg_issues.values_mut() {
             issues.retain(|time| time.elapsed() < RECENT_ISSUE_DURATION);
         }
+        for issues in &mut self.unfulfilled_ops.values_mut() {
+            issues.retain(|time| time.elapsed() < RECENT_ISSUE_DURATION);
+        }
     }
 
-    /// Get a list of nodes whose score is  FAULT_SCORE_THRESHOLD
-    /// TODO: order these to act upon _most_ faulty first
+    /// Get a list of nodes that are faulty
     /// (the nodes must all `ProposeOffline` over a faulty node and then _immediately_ vote it off. So any other membershipn changes in flight could block this.
     /// thus, we need to be callling this function often until nodes are removed.)
-    pub fn get_faulty_nodes(&mut self) -> BTreeSet<XorName> {
+    ///
+    /// The vec is ordered from fauliest to least faulty (returning faulty elders first)
+    pub fn get_faulty_nodes(&mut self) -> Vec<XorName> {
         self.cleanup_time_sensistive_checks();
 
-        let mut faulty_nodes = BTreeSet::new();
+        info!("Non-elder fault calculations...");
+        let final_non_elder_scores = self.get_weighted_scores(&self.non_elder_nodes);
+        info!("Elder fault calculations...");
+        let final_elder_scores = self.get_weighted_scores(&self.elders);
 
-        let final_scores = self.get_weighted_scores();
+        // sort into vec of highest scores first
+        let mut faulty_nodes = final_elder_scores
+            .iter()
+            .sorted_by(|a, b| Ord::cmp(&b.1, &a.1))
+            .map(|(name, _score)| {
+                info!("FaultDetection: Adding elder {name} as faulty node");
+                *name
+            })
+            .collect_vec();
 
-        for (name, node_score) in final_scores {
-            // if our weighted score is higher than this, then we're having a bad time
-            if node_score > FAULT_SCORE_THRESHOLD {
-                info!("FaultDetection: Adding {name} as faulty node");
-                let _existed = faulty_nodes.insert(name);
-            }
+        for name in final_non_elder_scores
+            .iter()
+            .sorted_by(|a, b| Ord::cmp(&b.1, &a.1))
+            .map(|(name, _score)| *name)
+            .collect_vec()
+        {
+            info!("FaultDetection: Adding non-elder {name} as faulty node");
+            faulty_nodes.push(name)
         }
 
         faulty_nodes
@@ -284,24 +321,24 @@ mod tests {
     use itertools::Itertools;
 
     use crate::{detection::IssueType, tests::init_test_logger, FaultDetection};
-    use sn_interface::messaging::system::OperationId;
 
     use eyre::bail;
     use proptest::prelude::*;
+    use std::collections::BTreeSet;
     use tokio::runtime::Runtime;
     use xor_name::{rand::random as random_xorname, XorName};
 
     #[derive(Debug, Clone)]
-    enum NodeQualityScored {
-        Bad(f32),
-        Good(f32),
+    enum NodeQuality {
+        Bad,
+        Good,
     }
 
-    impl NodeQualityScored {
-        fn get_failure_rate(&self) -> &f32 {
+    impl NodeQuality {
+        fn get_failure_rate(&self) -> f32 {
             match self {
-                Self::Good(r) => r,
-                Self::Bad(r) => r,
+                Self::Good => 0.05, // fails 5% of the time
+                Self::Bad => 0.5,   // fails 50% of the time
             }
         }
     }
@@ -309,66 +346,27 @@ mod tests {
     /// In a standard network startup (as of 24/06/22)
     /// we see:
     /// 0 op requests
-    /// 2407 `DkgBroadcastVote` DKG (each are tracked as an eror until a respnose comes in...) this is total across all nodes...
-    ///
     /// This includes:
-    /// 510 "tracker: Dkg..." (the initial black mark)
-    /// ~2394 "Logging Dkg session as responded to in faults." (aka removing a black mark) < -- we're not simulating this,
-    /// only the stains that stick... So in reality, over time we' see 0 DKG issues in a normal startup
-    /// ~469 "tracker: Know"
-    /// ~230 "tracker: Communication""
+    /// 510 "tracker: Dkg..." (the initial black mark), 1258 cleared...
+    /// ~252 "tracker: NetworkKnowledge"
+    /// 592 elderVoting + 592 cleard
+    /// 0 "tracker: Communication""
     /// 0 "tracker: `PendingOp`..." (equally a lot of these are being responded to...)
     fn generate_network_startup_msg_issues() -> impl Strategy<Value = IssueType> {
         // higher numbers here are more frequent
         prop_oneof![
-        230 => Just(IssueType::Communication),
-        500 => Just(IssueType::Dkg),
-        30 => Just(IssueType::AeProbeMsg),
-        450 => Just(IssueType::Knowledge),
+        120 => Just(IssueType::Communication),
+        300 => Just(IssueType::Dkg),
+        200 => Just(IssueType::ElderVoting), //
+        0 => Just(IssueType::AeProbeMsg),
+        180 => Just(IssueType::NetworkKnowledge),
         ]
-    }
-
-    /// In a standard network startup (as of 24/06/22)
-    /// these values are on top of the above...
-    /// after we then we run the client test suite (once),
-    /// (and yes, some of them have not changed)
-    /// 510 "tracker: Dkg..."
-    /// ~2394 "Attempting to remove logged dkg"
-    /// ~469 "tracker: Know"
-    /// ~1588 "tracker: Communication""
-    /// ~3376 "tracker: `PendingOp`..." (equally a lot of these are being responded to...)
-    fn generate_no_churn_normal_use_msg_issues() -> impl Strategy<Value = IssueType> {
-        // higher numbers here are more frequent
-        prop_oneof![
-            1200 => Just(IssueType::Communication),
-            0 => Just(IssueType::Dkg),
-            50 => Just(IssueType::AeProbeMsg),
-            0 => Just(IssueType::Knowledge),
-            3400 => (any::<[u8; 32]>())
-                .prop_map(|x| IssueType::RequestOperation(OperationId(x)))
-        ]
-    }
-
-    /// Generate proptest issues, in a range from 1000 `to...max_uantity`
-    fn generate_msg_issues(
-        min: usize,
-        max: usize,
-    ) -> impl Strategy<Value = Vec<(IssueType, XorName, f32)>> {
-        let issue_name_for_direction = generate_xorname();
-        prop::collection::vec(
-            (
-                generate_no_churn_normal_use_msg_issues(),
-                issue_name_for_direction,
-                0.0..1.0f32,
-            ),
-            min..max + 1,
-        )
     }
 
     /// Generate proptest issues, in a range from 1000 `to...max_quantity`
     /// issues had a name for reliably routing
     /// issues come with a random f32 0-1 to use as our test against `NodeQuality`
-    fn generate_startup_issues(
+    fn generate_msg_issues(
         min: usize,
         max: usize,
     ) -> impl Strategy<Value = Vec<(IssueType, XorName, f32)>> {
@@ -394,16 +392,16 @@ mod tests {
     fn generate_nodes_and_quality(
         min: usize,
         max: usize,
-    ) -> impl Strategy<Value = Vec<(XorName, NodeQualityScored)>> {
+    ) -> impl Strategy<Value = Vec<(XorName, NodeQuality)>> {
         prop::collection::vec(
             (
                 generate_xorname(),
                 prop_oneof![
                     // 3 x as likely to have good nodes vs bad
-                    // good nodes fail only 2.5% of the time
-                    3 => Just(NodeQualityScored::Good(0.025)),
+                    // good nodes fail only 20% of the time
+                    3 => Just(NodeQuality::Good),
                     // bad nodes fail 80% of the time
-                    1 => Just(NodeQualityScored::Bad(0.80)),
+                    1 => Just(NodeQuality::Bad),
 
                 ],
             ),
@@ -417,8 +415,8 @@ mod tests {
 
                 for (_name, quality) in nodes {
                     match quality {
-                        NodeQualityScored::Good(_) => good_len += 1.0,
-                        NodeQualityScored::Bad(_) => bad_len += 1.0,
+                        NodeQuality::Good => good_len += 1.0,
+                        NodeQuality::Bad => bad_len += 1.0,
                     }
                 }
 
@@ -436,56 +434,64 @@ mod tests {
         )
     }
 
-    /// for a given issue and a "Root address" to base elder selection off, this returns
-    /// the nodes we should target for this specific issue:
-    /// eg if DKG, it's the closest to the `root_addr`
-    /// if anything else, we base it off issue name closeness
-    fn get_target_nodes_for_issue(
+    /// For a given issue this returns
+    /// the node targetted.
+    ///
+    /// If it's an elder specific issue, we target only elders
+    fn get_node_suffering_issue(
         issue: IssueType,
         issue_location: XorName,
-        root: XorName,
-        nodes: &[(XorName, NodeQualityScored)],
-        elders_count: usize,
-    ) -> Vec<(XorName, NodeQualityScored)> {
-        if matches!(issue, IssueType::Dkg) || matches!(issue, IssueType::AeProbeMsg) {
-            nodes
+        nodes: &[(XorName, NodeQuality)],
+        elders: &BTreeSet<XorName>,
+    ) -> (XorName, NodeQuality) {
+        let node = match issue {
+            IssueType::Dkg | IssueType::ElderVoting | IssueType::AeProbeMsg => nodes
                 .iter()
-                .sorted_by(|lhs, rhs| root.clone().cmp_distance(&lhs.0, &rhs.0))
-                .take(elders_count)
-                .cloned()
-                .collect::<Vec<_>>()
-        } else {
-            // we use the "issue location" to determine which four nodes to send to
-            // this should therefore be reproducible amongst proptest retries/shrinking etc
-            nodes
-                .iter()
+                .filter(|(e, _q)| elders.contains(e))
                 .sorted_by(|lhs, rhs| issue_location.cmp_distance(&lhs.0, &rhs.0))
-                // and we simul-send it to 4 nodes
-                .take(4)
                 .cloned()
-                .collect::<Vec<_>>()
-        }
+                .collect_vec()
+                .pop(),
+            _ => {
+                // we use the "issue location" to determine which nodes to send to
+                // this should therefore be reproducible amongst proptest retries/shrinking etc
+                nodes
+                    .iter()
+                    .sorted_by(|lhs, rhs| issue_location.cmp_distance(&lhs.0, &rhs.0))
+                    .cloned()
+                    .collect_vec()
+                    .pop()
+            }
+        };
+
+        // unwrapping here should always pass.
+        node.expect("We did not find a node for our issue")
     }
 
     proptest! {
         #[test]
         #[allow(clippy::unwrap_used)]
         fn pt_calculate_scores_should_include_all_nodes_in_score_map(
-            node_count in 4..50usize, issue_type in generate_no_churn_normal_use_msg_issues())
+            node_count in 4..50usize, issue_type in generate_network_startup_msg_issues())
         {
             Runtime::new().unwrap().block_on(async {
-                let nodes = (0..node_count).map(|_| random_xorname()).collect::<Vec<XorName>>();
-                let mut fault_detection = FaultDetection::new(nodes.clone());
+                let nodes = (0..node_count).map(|_| random_xorname()).collect::<BTreeSet<XorName>>();
+                let nodes_vec = nodes.iter().cloned().collect::<Vec<XorName>>();
+
+                let mut fault_detection = FaultDetection::new(nodes.clone(), BTreeSet::new());
                 for _ in 0..5 {
                     fault_detection.track_issue(
-                        nodes[0], issue_type.clone());
+                        nodes_vec[0], issue_type.clone());
                 }
 
                 let score_results = fault_detection
-                    .calculate_scores();
+                    .calculate_scores(&nodes);
                 match issue_type {
                     IssueType::Dkg => {
                         assert_eq!(score_results.dkg_scores.len(), node_count);
+                    },
+                    IssueType::ElderVoting => {
+                        assert_eq!(score_results.elder_voting_scores.len(), node_count);
                     },
                     IssueType::AeProbeMsg => {
                         assert_eq!(score_results.probe_scores.len(), node_count);
@@ -493,10 +499,10 @@ mod tests {
                     IssueType::Communication => {
                         assert_eq!(score_results.communication_scores.len(), node_count);
                     },
-                    IssueType::Knowledge => {
+                    IssueType::NetworkKnowledge => {
                         assert_eq!(score_results.knowledge_scores.len(), node_count);
                     },
-                    IssueType::RequestOperation(_) => {
+                    IssueType::RequestOperation => {
                         assert_eq!(score_results.op_scores.len(), node_count);
                     },
                 }
@@ -506,7 +512,7 @@ mod tests {
         #[test]
         #[allow(clippy::unwrap_used)]
         fn pt_calculate_scores_one_node_with_issues_should_have_higher_score_and_others_should_have_zero(
-            node_count in 4..50usize, issue_count in 1..50, issue_type in generate_no_churn_normal_use_msg_issues())
+            node_count in 4..50usize, issue_count in 1..50, issue_type in generate_network_startup_msg_issues())
         {
 
             init_test_logger();
@@ -514,21 +520,24 @@ mod tests {
 
             Runtime::new().unwrap().block_on(async {
 
-                let nodes = (0..node_count).map(|_| random_xorname()).collect::<Vec<XorName>>();
-                let mut fault_detection = FaultDetection::new(nodes.clone());
-
+                let nodes = (0..node_count).map(|_| random_xorname()).collect::<BTreeSet<XorName>>();
+                let mut fault_detection = FaultDetection::new(nodes.clone(), BTreeSet::new());
+                let nodes_vec = nodes.iter().cloned().collect::<Vec<XorName>>();
                 // one node keeps getting the issues applied to it
                 for _ in 0..issue_count {
                     fault_detection.track_issue(
-                        nodes[0], issue_type.clone());
+                        nodes_vec[0], issue_type.clone());
                 }
 
                 let score_results = fault_detection
-                    .calculate_scores();
+                    .calculate_scores(&nodes);
 
                     let scores = match issue_type {
                     IssueType::Dkg => {
                         score_results.dkg_scores
+                    },
+                    IssueType::ElderVoting => {
+                        score_results.elder_voting_scores
                     },
                     IssueType::AeProbeMsg => {
                         score_results.probe_scores
@@ -536,17 +545,17 @@ mod tests {
                     IssueType::Communication => {
                         score_results.communication_scores
                     },
-                    IssueType::Knowledge => {
+                    IssueType::NetworkKnowledge => {
                         score_results.knowledge_scores
                     },
-                    IssueType::RequestOperation(_) => {
+                    IssueType::RequestOperation => {
                         score_results.op_scores
                     },
                 };
 
 
-                debug!("Actual node score: {:?}", scores.get(&nodes[0]).unwrap());
-                assert!(*scores.get(&nodes[0]).unwrap() > 0 as f32);
+                debug!("Actual node score: {:?}", scores.get(&nodes_vec[0]).unwrap());
+                assert!(*scores.get(&nodes_vec[0]).unwrap() > 0 as f32);
                 for node in nodes.iter().take(node_count).skip(1) {
                     assert_eq!(*scores.get(node).unwrap(), 0.0);
                 }
@@ -567,10 +576,10 @@ mod tests {
         /// "Nodes" are just random xornames,
         /// each issue has a random xorname attached to it to, and is sent to 4 nodes... each of which will fail a % of the time, depending on the
         /// NodeQuality (Good or Bad)
-        fn pt_detect_correct_or_less_amount_of_faulty_nodes(
-            elders_in_dkg in 2..7usize,
-            nodes in generate_nodes_and_quality(3,30), issues in generate_msg_issues(500,1500))
+        fn pt_detect_correct_or_less_amount_of_faulty_nodes_with_full_elder_set(
+            nodes in generate_nodes_and_quality(3,30), issues in generate_msg_issues(2500,3000))
             {
+                let elders_count = 7;
                 init_test_logger();
                 let _outer_span = tracing::info_span!("pt_correct_less").entered();
 
@@ -579,40 +588,36 @@ mod tests {
 
                 for (_node, quality) in &nodes {
                     match quality {
-                        NodeQualityScored::Good(_) => good_len += 1,
-                        NodeQualityScored::Bad(_) => bad_len += 1,
+                        NodeQuality::Good => good_len += 1,
+                        NodeQuality::Bad => bad_len += 1,
                     }
                 }
 
                 debug!("Good {good_len}");
                 debug!("Bad {bad_len}");
 
-                // random xorname to pick 7 nodes as "elders" for DKG
-                let random_xorname_root = nodes[0].0;
-
-
                 let _res = Runtime::new().unwrap().block_on(async {
-                    // track faults of all_nodes
-                    let all_node_names = nodes.clone().iter().map(|(name, _)| *name).collect::<Vec<XorName>>();
 
-                    let mut fault_detection = FaultDetection::new(all_node_names);
+                    // add fault detection of our all_nodes
+                    let elders = nodes.clone().iter().take(elders_count).map(|(name, _)| *name).collect::<BTreeSet<XorName>>();
+
+                    let all_non_elder_nodes = nodes.clone().iter().filter(|(e, _)| !elders.contains(e)).map(|(name, _)| *name).collect::<BTreeSet<XorName>>();
+
+                    let mut fault_detection = FaultDetection::new(all_non_elder_nodes, elders.clone());
 
                     // Now we loop through each issue/msg
                     for (issue, issue_location, fail_test ) in issues {
-                        let target_nodes = get_target_nodes_for_issue(issue.clone(), issue_location, random_xorname_root, &nodes, elders_in_dkg);
+                        let (node, quality) = get_node_suffering_issue(issue.clone(), issue_location, &nodes, &elders);
 
-                        // now we track our issue, but only if that node fails to passes muster...
-                        for (node, quality) in target_nodes {
-                            // if our random fail test is less than the failure rate.
-                            let failure_chance = quality.get_failure_rate();
-                            let msg_failed = &fail_test < failure_chance;
+                        // is our random fail test is less than the failure rate.
+                        let failure_chance = quality.get_failure_rate();
+                        let msg_failed = fail_test < failure_chance;
 
-                            if msg_failed {
-                                fault_detection.track_issue(
-                                    node, issue.clone());
-                            }
-
+                        if msg_failed {
+                            fault_detection.track_issue(
+                                node, issue.clone());
                         }
+
                     }
                     // now we can see what we have...
                     let faulty_nodes_found = fault_detection.get_faulty_nodes();
@@ -629,8 +634,8 @@ mod tests {
                     for bad_node in faulty_nodes_found {
                         if let Some((_, quality)) = nodes.iter().find(|(name, _)| {name == &bad_node }) {
                             match quality {
-                                NodeQualityScored::Good(_) => bail!("identified a good node as bad"),
-                                NodeQualityScored::Bad(_) => {
+                                NodeQuality::Good => bail!("identified a good node as bad"),
+                                NodeQuality::Bad => {
                                     // everything is fine
                                 }
                             }
@@ -648,7 +653,7 @@ mod tests {
 
         #[test]
         #[allow(clippy::unwrap_used)]
-        /// Test to check if we have more DKG messages, that bad nodes are found, within our expected issue count
+        /// Test to check that when we have normal startup msgs, bad nodes have the expected issue count, and we can reliably detect those nodes.
         /// we then check that we can reliably detect those nodes
         ///
         /// We do not want false positives, We do want -- over longer timeframes -- to find all bad nodes... there's a tough balance to strike here.
@@ -660,20 +665,20 @@ mod tests {
         /// each issue has a random xorname attached to it to, and is sent to 4 nodes... each of which will fail a % of the time, depending on the
         /// NodeQuality (Good or Bad)
         fn pt_detect_dkg_bad_nodes(
-            elders_in_dkg in 2..7usize,
-            // ~1500 msgs total should get us ~500 dkg which would be representative
-            nodes in generate_nodes_and_quality(3,30), issues in generate_startup_issues(500,2500))
+            nodes in generate_nodes_and_quality(3,30), issues in generate_msg_issues(2500,3000))
             {
                 init_test_logger();
+                info!("pt start --------------------");
+                init_test_logger();
+                let elders_count = 7;
                 let _outer_span = tracing::info_span!("pt_dkg").entered();
                 let mut good_len = 0;
                 let mut bad_len = 0;
-                let random_xorname_root = nodes[0].0;
 
                 for (_, quality) in &nodes {
                     match quality {
-                        NodeQualityScored::Good(_) => good_len += 1,
-                        NodeQualityScored::Bad(_) => bad_len += 1,
+                        NodeQuality::Good => good_len += 1,
+                        NodeQuality::Bad => bad_len += 1,
                     }
                 }
 
@@ -682,31 +687,29 @@ mod tests {
 
                 let _res = Runtime::new().unwrap().block_on(async {
                 // add fault detection of our all_nodes
-                let all_node_names = nodes.clone().iter().map(|(name, _)| *name).collect::<Vec<XorName>>();
+                let elders = nodes.clone().iter().take(elders_count).map(|(name, _)| *name).collect::<BTreeSet<XorName>>();
 
-                let mut fault_detection = FaultDetection::new(all_node_names);
+                let all_non_elder_nodes = nodes.clone().iter().filter(|(e, _)| !elders.contains(e)).map(|(name, _)| *name).collect::<BTreeSet<XorName>>();
 
-                // Now we loop through each issue/msg
-                for (issue, issue_location, fail_test ) in issues {
 
-                    let target_nodes = get_target_nodes_for_issue(issue.clone(), issue_location, random_xorname_root, &nodes, elders_in_dkg);
+                let mut fault_detection = FaultDetection::new(all_non_elder_nodes, elders.clone());
 
-                    // we send each message to all nodes in this situation where we're looking at elder comms alone over dkg
-                    // now we track our issue, but only if that node fails to passes muster...
-                    for (node, quality) in target_nodes.clone() {
-                        // if our random fail test is less than the quality failure rate.
-                        let failure_chance = quality.get_failure_rate();
-                        let msg_failed = &fail_test < failure_chance;
+               // Now we loop through each issue/msg
+               for (issue, issue_location, fail_test ) in issues {
+                let (node, quality) = get_node_suffering_issue(issue.clone(), issue_location, &nodes, &elders);
 
-                        if msg_failed {
-                            fault_detection.track_issue(
-                                node, issue.clone());
-                        }
+                // is our random fail test is less than the failure rate.
+                let failure_chance = quality.get_failure_rate();
+                let msg_failed = fail_test < failure_chance;
 
-                    }
+                if msg_failed {
+                    fault_detection.track_issue(
+                        node, issue.clone());
                 }
+
+            }
                 // now we can see what we have...
-                    let faulty_nodes_found = fault_detection.get_faulty_nodes();
+                let faulty_nodes_found = fault_detection.get_faulty_nodes();
 
                 info!("======================");
                 info!("faulty nodes found len {:?}:, expected {:}?", faulty_nodes_found.len(), bad_len );
@@ -720,8 +723,8 @@ mod tests {
                 for bad_node in faulty_nodes_found {
                     if let Some((_, quality)) = nodes.iter().find(|(name, _)| {name == &bad_node }) {
                         match quality {
-                            NodeQualityScored::Good(_) => bail!("identified a good node as bad"),
-                            NodeQualityScored::Bad(_) => {
+                            NodeQuality::Good => bail!("identified a good node as bad"),
+                            NodeQuality::Bad => {
                                 // everything is fine
                             }
                         }
@@ -744,18 +747,17 @@ mod tests {
         /// NodeQuality (Good or Bad)
         fn pt_detect_unresponsive_elders(
             // ~1500 msgs total should get us ~500 dkg which would be representative
-            nodes in generate_nodes_and_quality(2,7), issues in generate_startup_issues(500,2500))
+            nodes in generate_nodes_and_quality(2,7), issues in generate_msg_issues(2500,3000))
             {
                 init_test_logger();
                 let _outer_span = tracing::info_span!("detect unresponsive elders").entered();
                 let mut good_len = 0;
                 let mut bad_len = 0;
-                let random_xorname_root = nodes[0].0;
 
                 for (_, quality) in &nodes {
                     match quality {
-                        NodeQualityScored::Good(_) => good_len += 1,
-                        NodeQualityScored::Bad(_) => bad_len += 1,
+                        NodeQuality::Good => good_len += 1,
+                        NodeQuality::Bad => bad_len += 1,
                     }
                 }
 
@@ -763,30 +765,26 @@ mod tests {
                 debug!("Bad {bad_len}");
 
                 let _res = Runtime::new().unwrap().block_on(async {
-                    // track faults of all_nodes
-                    let all_node_names = nodes.clone().iter().map(|(name, _)| *name).collect::<Vec<XorName>>();
 
-                    let mut fault_detection = FaultDetection::new(all_node_names);
+                    // track faults of all_nodes as all are elders in this situation
+                    let elders = nodes.clone().iter().map(|(name, _)| *name).collect::<BTreeSet<XorName>>();
 
-                    // Now we loop through each issue/msg
-                    for (issue, issue_location, fail_test ) in issues {
-                        // this will be all ndoes in this test as we have up to 7 elders
-                        let target_nodes = get_target_nodes_for_issue(issue.clone(), issue_location, random_xorname_root, &nodes, nodes.len());
+                    let mut fault_detection = FaultDetection::new(BTreeSet::new(), elders.clone());
 
-                        // we send each message to all nodes in this situation where we're looking at elder comms alone over dkg
-                        // now we track our issue, but only if that node fails to passes muster...
-                        for (node, quality) in target_nodes.clone() {
-                            // if our random fail test is less than the quality failure rate.
-                            let failure_chance = quality.get_failure_rate();
-                            let msg_failed = &fail_test < failure_chance;
+                   // Now we loop through each issue/msg
+                   for (issue, issue_location, fail_test ) in issues {
+                    let (node, quality) = get_node_suffering_issue(issue.clone(), issue_location, &nodes, &elders);
 
-                            if msg_failed {
-                                fault_detection.track_issue(
-                                    node, issue.clone());
-                            }
+                    // is our random fail test is less than the failure rate.
+                    let failure_chance = quality.get_failure_rate();
+                    let msg_failed = fail_test < failure_chance;
 
-                        }
+                    if msg_failed {
+                        fault_detection.track_issue(
+                            node, issue.clone());
                     }
+
+                }
                     // now we can see what we have...
                     let faulty_nodes_found = fault_detection.get_faulty_nodes();
 
@@ -802,8 +800,8 @@ mod tests {
                     for bad_node in faulty_nodes_found {
                         if let Some((_, quality)) = nodes.iter().find(|(name, _)| {name == &bad_node }) {
                             match quality {
-                                NodeQualityScored::Good(_) => bail!("identified a good node as bad"),
-                                NodeQualityScored::Bad(_) => {
+                                NodeQuality::Good => bail!("identified a good node as bad"),
+                                NodeQuality::Bad => {
                                     // everything is fine
                                 }
                             }
@@ -820,11 +818,11 @@ mod tests {
         #[test]
         #[allow(clippy::unwrap_used)]
         fn pt_calculate_scores_when_all_nodes_have_the_same_number_of_issues_scores_should_all_be_zero(
-            node_count in 4..50, issue_count in 0..50, issue_type in generate_no_churn_normal_use_msg_issues())
+            node_count in 4..50, issue_count in 0..50, issue_type in generate_network_startup_msg_issues())
         {
             Runtime::new().unwrap().block_on(async {
-                let nodes = (0..node_count).map(|_| random_xorname()).collect::<Vec<XorName>>();
-                let mut fault_detection = FaultDetection::new(nodes.clone());
+                let nodes = (0..node_count).map(|_| random_xorname()).collect::<BTreeSet<XorName>>();
+                let mut fault_detection = FaultDetection::new(nodes.clone(), BTreeSet::new());
                 for node in &nodes {
                     for _ in 0..issue_count {
                         fault_detection.track_issue(
@@ -833,7 +831,7 @@ mod tests {
                 }
 
                 let score_results = fault_detection
-                    .calculate_scores();
+                    .calculate_scores(&nodes);
                 let scores = match issue_type {
                     IssueType::Communication => {
                         score_results.communication_scores
@@ -844,10 +842,13 @@ mod tests {
                     IssueType::Dkg => {
                         score_results.dkg_scores
                     },
-                    IssueType::Knowledge => {
+                    IssueType::ElderVoting => {
+                        score_results.elder_voting_scores
+                    },
+                    IssueType::NetworkKnowledge => {
                         score_results.knowledge_scores
                     },
-                    IssueType::RequestOperation(_) => {
+                    IssueType::RequestOperation => {
                         score_results.op_scores
                     },
                 };
@@ -861,47 +862,37 @@ mod tests {
 
 #[cfg(test)]
 mod ops_tests {
-    use super::*;
-
     use crate::{tests::init_test_logger, FaultDetection, IssueType};
+    use std::collections::BTreeSet;
     use xor_name::{rand::random as random_xorname, XorName};
-
-    // some example numbers as guidance
-    // we can see 500 pending issues under load
-    pub(crate) const NORMAL_OPERATIONS_ISSUES: usize = 500;
 
     #[tokio::test]
     async fn unfulfilled_ops_leads_to_node_classified_as_faulty() {
         init_test_logger();
-        let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
-        let mut fault_detection = FaultDetection::new(nodes.clone());
-        let mut pending_operations = Vec::new();
-        for node in &nodes {
-            for _ in 0..NORMAL_OPERATIONS_ISSUES {
-                let op_id = OperationId::random();
-                pending_operations.push((node, op_id));
-                fault_detection.track_issue(*node, IssueType::RequestOperation(op_id));
-            }
-        }
+        let nodes = (0..10)
+            .map(|_| random_xorname())
+            .collect::<BTreeSet<XorName>>();
+        let mut fault_detection = FaultDetection::new(nodes.clone(), BTreeSet::new());
+        let nodes_vec = nodes.iter().cloned().collect::<Vec<XorName>>();
 
-        assert_eq!(fault_detection.get_faulty_nodes().len(), 0);
-
-        // We now fulfill all operations except those for the nodes[0]
-        // to create a deviation
-        for op in pending_operations.iter().skip(NORMAL_OPERATIONS_ISSUES) {
-            assert!(fault_detection.request_operation_fulfilled(op.0, op.1));
-        }
         // as this is normal, we should not detect anything off
-        assert_eq!(fault_detection.get_faulty_nodes().len(), 0);
+        assert_eq!(
+            fault_detection.get_faulty_nodes().len(),
+            0,
+            "Node should not yet be faulty"
+        );
 
         // adding more issues though, and we should see this node as faulty
-        for _ in 0..300 {
-            let op_id = OperationId::random();
-            fault_detection.track_issue(nodes[0], IssueType::RequestOperation(op_id));
+        for _ in 0..90 {
+            fault_detection.track_issue(nodes_vec[0], IssueType::RequestOperation);
         }
 
         // Now we should start detecting...
-        assert_eq!(fault_detection.get_faulty_nodes().len(), 1);
+        assert_eq!(
+            fault_detection.get_faulty_nodes().len(),
+            1,
+            "node should be found as faulty"
+        );
     }
 }
 
@@ -910,6 +901,7 @@ mod comm_tests {
     use crate::{FaultDetection, IssueType};
 
     use eyre::Error;
+    use std::collections::BTreeSet;
     use xor_name::{rand::random as random_xorname, XorName};
 
     type Result<T, E = Error> = std::result::Result<T, E>;
@@ -920,9 +912,11 @@ mod comm_tests {
 
     #[tokio::test]
     async fn conn_fault_is_tolerant_of_norms() -> Result<()> {
-        let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
+        let nodes = (0..10)
+            .map(|_| random_xorname())
+            .collect::<BTreeSet<XorName>>();
 
-        let mut fault_detection = FaultDetection::new(nodes.clone());
+        let mut fault_detection = FaultDetection::new(nodes.clone(), nodes.clone());
 
         for node in &nodes {
             for _ in 0..NORMAL_CONNECTION_PROBLEM_COUNT {
@@ -946,6 +940,7 @@ mod knowledge_tests {
     use crate::{FaultDetection, IssueType};
 
     use eyre::Error;
+    use std::collections::BTreeSet;
     use xor_name::{rand::random as random_xorname, XorName};
 
     type Result<T, E = Error> = std::result::Result<T, E>;
@@ -956,14 +951,16 @@ mod knowledge_tests {
 
     #[tokio::test]
     async fn knowledge_fault_is_tolerant_of_norms() -> Result<()> {
-        let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
+        let nodes = (0..10)
+            .map(|_| random_xorname())
+            .collect::<BTreeSet<XorName>>();
 
-        let mut fault_detection = FaultDetection::new(nodes.clone());
+        let mut fault_detection = FaultDetection::new(nodes.clone(), nodes.clone());
 
         // Write data NORMAL_KNOWLEDGE_ISSUES times to the 10 nodes
         for node in &nodes {
             for _ in 0..NORMAL_KNOWLEDGE_ISSUES {
-                fault_detection.track_issue(*node, IssueType::Knowledge);
+                fault_detection.track_issue(*node, IssueType::NetworkKnowledge);
             }
         }
 
@@ -982,9 +979,11 @@ mod knowledge_tests {
     async fn knowledge_fault_is_not_too_sharp() -> Result<()> {
         init_test_logger();
 
-        let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
+        let nodes = (0..10)
+            .map(|_| random_xorname())
+            .collect::<BTreeSet<XorName>>();
 
-        let mut fault_detection = FaultDetection::new(nodes.clone());
+        let mut fault_detection = FaultDetection::new(nodes.clone(), BTreeSet::new());
 
         // Add a new nodes
         let new_node = random_xorname();
@@ -992,12 +991,12 @@ mod knowledge_tests {
 
         // Add just one issue to all, this gets us a baseline avg to not overly skew results
         for node in nodes {
-            fault_detection.track_issue(node, IssueType::Knowledge);
+            fault_detection.track_issue(node, IssueType::NetworkKnowledge);
         }
 
         // Add just one knowledge issue...
         for _ in 0..1 {
-            fault_detection.track_issue(new_node, IssueType::Knowledge);
+            fault_detection.track_issue(new_node, IssueType::NetworkKnowledge);
         }
 
         let faulty_nodes = fault_detection.get_faulty_nodes();
@@ -1008,64 +1007,6 @@ mod knowledge_tests {
             "our node should not be faulty"
         );
         assert_eq!(faulty_nodes.len(), 0, "no node is faulty node");
-
-        Ok(())
-    }
-    #[tokio::test]
-    async fn ae_probe_fault_is_not_too_sharp() -> Result<()> {
-        init_test_logger();
-
-        let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
-
-        let mut fault_detection = FaultDetection::new(nodes.clone());
-
-        // Add a new nodes
-        let new_node = random_xorname();
-        fault_detection.add_new_node(new_node);
-
-        // Add just one issue to all, this gets us a baseline avg to not overly skew results
-        for node in nodes {
-            fault_detection.track_issue(node, IssueType::AeProbeMsg);
-        }
-
-        // and add one for our "bad" node, too
-        fault_detection.track_issue(new_node, IssueType::AeProbeMsg);
-
-        let faulty_nodes = fault_detection.get_faulty_nodes();
-
-        // Assert that the new node is not faulty
-        assert!(
-            !faulty_nodes.contains(&new_node),
-            "our node should not be faulty"
-        );
-        assert_eq!(faulty_nodes.len(), 0, "no node is faulty node");
-
-        // and add another for our "bad" node, two AeProbes should not be sufficient reason
-        // to label this as faulty
-        fault_detection.track_issue(new_node, IssueType::AeProbeMsg);
-
-        let faulty_nodes = fault_detection.get_faulty_nodes();
-
-        // Assert that the new node is not faulty
-        assert!(
-            !faulty_nodes.contains(&new_node),
-            "our node should not be faulty"
-        );
-        assert_eq!(faulty_nodes.len(), 0, "no node is faulty node");
-
-        // and some more issues for our "bad" node
-        for _ in 0..4 {
-            fault_detection.track_issue(new_node, IssueType::AeProbeMsg);
-        }
-
-        let faulty_nodes = fault_detection.get_faulty_nodes();
-
-        // Assert that the new node is now faulty
-        assert!(
-            faulty_nodes.contains(&new_node),
-            "our node should be faulty"
-        );
-        assert_eq!(faulty_nodes.len(), 1, "one node should be faulty");
 
         Ok(())
     }

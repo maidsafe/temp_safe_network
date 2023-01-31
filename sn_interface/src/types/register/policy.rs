@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -75,8 +75,8 @@ impl Policy {
                 .or_else(|| self.is_action_allowed_by_user(&User::Anyone, action))
             {
                 Some(true) => Ok(()),
-                Some(false) => Err(Error::AccessDenied(requester)),
-                None => Err(Error::AccessDenied(requester)),
+                Some(false) => Err(Error::AccessDenied(Box::new(requester))),
+                None => Err(Error::AccessDenied(Box::new(requester))),
             }
         }
     }

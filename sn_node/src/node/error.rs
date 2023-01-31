@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -6,16 +6,14 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::Prefix;
+use super::{flow_ctrl::RejoinReason, Prefix};
 
 use crate::node::handover::Error as HandoverError;
 
 use sn_dbc::Error as DbcError;
 use sn_interface::{
     dbcs::Error as GenesisError,
-    messaging::data::{DataQuery, Error as ErrorMsg},
-    messaging::system::DkgSessionId,
-    types::{DataAddress, Peer},
+    messaging::{data::Error as ErrorMsg, system::DkgSessionId},
 };
 
 use ed25519::Signature;
@@ -35,9 +33,6 @@ pub enum Error {
     NoClientResponseStream,
     #[error("The bootstrap connection unexpectedly closed")]
     BootstrapConnectionClosed,
-    /// This Peer SendJob could not be sent. We should remove this peer
-    #[error("Peer channel errored")]
-    PeerSessionChannel,
     /// SendChannel error for the data replication flow. This is a critical error and the node no longer functions.
     #[error("Data replication channel could not be sent to. This means the receiver has been dropped, the node can no longer replicate data and must shut down.")]
     DataReplicationChannel,
@@ -63,12 +58,6 @@ pub enum Error {
     ChaoticStartupCrash,
     #[error("Section authority provider cannot be trusted: {0}")]
     UntrustedSectionAuthProvider(String),
-    #[error("Could not connect to any bootstrap contact")]
-    BootstrapFailed,
-    #[error("Cannot connect to the endpoint: {0}")]
-    CannotConnectEndpoint(#[from] qp2p::EndpointError),
-    #[error("Address not reachable: {0}")]
-    AddressNotReachable(#[from] qp2p::RpcError),
     #[error("Invalid dkg participant; not part of our section.")]
     InvalidDkgParticipant,
     #[error("Content of a received message is inconsistent.")]
@@ -77,37 +66,38 @@ pub enum Error {
     InvalidSignatureShare,
     #[error("The secret key share is missing for public key {0:?}")]
     MissingSecretKeyShare(bls::PublicKey),
-    #[error("Failed to send a message to {0}")]
-    FailedSend(Peer),
     #[error("Messaging protocol error: {0}")]
     Messaging(#[from] sn_interface::messaging::Error),
     #[error("Membership error: {0}")]
     Membership(#[from] crate::node::membership::Error),
-    #[error("The section is currently set to not allow taking any new node")]
-    TryJoinLater,
     #[error("No matching Section")]
     NoMatchingSection,
     #[error("Node cannot join the network since it is not externally reachable: {0}")]
     NodeNotReachable(SocketAddr),
+    #[error("A node has invalid relocation details")]
+    InvalidRelocationDetails,
     /// Timeout when trying to join the network
     #[error("Timeout when trying to join the network")]
     JoinTimeout,
-    /// Join occured during section churn and new elders missed it, need to re-join the network
-    #[error("Node was removed from the section")]
-    RemovedFromSection,
+    /// Need to re-join the network
+    #[error("Node needs to rejoin the network due to {0:?}")]
+    RejoinRequired(RejoinReason),
+    /// Comms error.
+    #[error("Comms error: {0}")]
+    Comms(#[from] sn_comms::Error),
     /// Database error.
     #[error("Database error:: {0}")]
     Database(#[from] crate::storage::Error),
-    /// Insufficient number of Adults found to perform data operation
+    /// Insufficient number of Nodes found to perform data operation
     #[error(
-        "Not enough Adults available at section {prefix:?}. Expected {expected}, found {found}."
+        "Not enough Nodes available at section {prefix:?}. Expected {expected}, found {found}."
     )]
-    InsufficientAdults {
+    InsufficientNodeCount {
         /// The prefix of the section.
         prefix: Prefix,
-        /// Expected number of Adults for minimum replication.
+        /// Expected number of Nodes for minimum replication.
         expected: u8,
-        /// Actual number of Adults found to hold the data.
+        /// Actual number of Nodes found to hold the data.
         found: u8,
     },
     /// Received a dkg message from an invalid Xorname
@@ -127,9 +117,9 @@ pub enum Error {
     DoubleKeyAttackDetected(
         XorName,
         Box<bls::PublicKey>,
-        Signature,
+        Box<Signature>,
         Box<bls::PublicKey>,
-        Signature,
+        Box<Signature>,
     ),
     /// Dkg error
     #[error("DKG error: {0}")]
@@ -137,9 +127,6 @@ pub enum Error {
     /// We don't have a dkg state for this dkg session id
     #[error("No dkg state for session: {0:?}")]
     NoDkgStateForSession(DkgSessionId),
-    /// Chunk already exists for this node
-    #[error("Data already exists at this node: {0:?}")]
-    DataExists(DataAddress),
     /// I/O error.
     #[error("I/O error: {0}")]
     Io(#[from] io::Error),
@@ -151,16 +138,13 @@ pub enum Error {
     Bincode(#[from] bincode::Error),
     /// Network client message error.
     #[error("Network client message error:: {0}")]
-    ClientMsg(#[from] sn_interface::messaging::data::Error),
+    ClientMsg(#[from] Box<sn_interface::messaging::data::Error>),
     /// Network data error.
     #[error("Network data error:: {0}")]
     NetworkData(#[from] sn_interface::types::Error),
     /// Error Sending Cmd in to node for processing
-    #[error("Error Sending Cmd in to node for processing.")]
-    CmdSendError,
-    /// Error Sending Cmd in to node for processing
-    #[error("Error Sending Cmd to adult {0:?} for processing.")]
-    AdultCmdSendError(Peer),
+    #[error("Error sending Cmd on node channel for processing.")]
+    CmdChannelSendError,
     /// Network Knowledge error.
     #[error("Network knowledge error:: {0}")]
     NetworkKnowledge(#[from] sn_interface::network_knowledge::Error),
@@ -216,9 +200,6 @@ pub enum Error {
     /// Error thrown by DBC public API
     #[error("DbcError: {0}")]
     DbcError(#[from] DbcError),
-    /// Cannot handle more queries at this point
-    #[error("Cannot handle more queries at this point: {0:?}")]
-    CannotHandleQuery(DataQuery),
     #[error("BLS error: {0}")]
     BlsError(#[from] bls::Error),
     #[cfg(feature = "otlp")]
@@ -226,21 +207,11 @@ pub enum Error {
     OpenTelemetryTracing(#[from] opentelemetry::trace::TraceError),
 }
 
-impl From<qp2p::ClientEndpointError> for Error {
-    fn from(error: qp2p::ClientEndpointError) -> Self {
-        let endpoint_err = match error {
-            qp2p::ClientEndpointError::Config(error) => qp2p::EndpointError::Config(error),
-            qp2p::ClientEndpointError::Socket(error) => qp2p::EndpointError::Socket(error),
-            qp2p::ClientEndpointError::Io(error) => qp2p::EndpointError::IoError(error),
-        };
-
-        Self::CannotConnectEndpoint(endpoint_err)
-    }
-}
-
 impl From<qp2p::SendError> for Error {
     fn from(error: qp2p::SendError) -> Self {
-        Self::AddressNotReachable(qp2p::RpcError::Send(error))
+        Self::Comms(sn_comms::Error::AddressNotReachable(qp2p::RpcError::Send(
+            error,
+        )))
     }
 }
 
@@ -248,23 +219,26 @@ impl From<qp2p::SendError> for Error {
 impl From<Error> for ErrorMsg {
     fn from(error: Error) -> ErrorMsg {
         match error {
-            Error::InsufficientAdults {
+            Error::InsufficientNodeCount {
                 prefix,
                 expected,
                 found,
-            } => ErrorMsg::InsufficientAdults {
+            } => ErrorMsg::InsufficientNodeCount {
                 prefix,
                 expected,
                 found,
             },
-            Error::DataExists(address) => ErrorMsg::DataExists(address),
             Error::SpentProofUnknownSectionKey(unknown_section_key) => {
                 ErrorMsg::SpentProofUnknownSectionKey(unknown_section_key)
             }
             Error::NetworkData(error) => error.into(),
-            other => {
-                ErrorMsg::InvalidOperation(format!("Failed to perform operation: {:?}", other))
-            }
+            other => ErrorMsg::InvalidOperation(format!("Failed to perform operation: {other:?}")),
         }
+    }
+}
+
+impl From<sn_interface::messaging::data::Error> for Error {
+    fn from(error: sn_interface::messaging::data::Error) -> Error {
+        Error::ClientMsg(Box::new(error))
     }
 }

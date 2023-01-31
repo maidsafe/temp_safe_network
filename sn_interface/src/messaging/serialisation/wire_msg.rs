@@ -1,4 +1,4 @@
-// Copyright 2021 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -7,16 +7,18 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::wire_msg_header::WireMsgHeader;
+
 use crate::messaging::{
     data::{ClientDataResponse, ClientMsg},
     system::{NodeDataResponse, NodeMsg},
-    AuthorityProof, ClientAuth, Dst, Error, MsgId, MsgKind, MsgType, Result,
+    AuthorityProof, Dst, Error, MsgId, MsgKind, MsgType, Result,
 };
 
 use bytes::{BufMut, Bytes, BytesMut};
 use custom_debug::Debug;
 use qp2p::UsrMsgBytes;
 use serde::Serialize;
+use xor_name::XorName;
 
 /// In order to send a message over the wire, it needs to be serialized
 /// along with a header (`WireMsgHeader`) which contains the information needed
@@ -54,8 +56,7 @@ impl WireMsg {
         let mut bytes = BytesMut::new().writer();
         rmp_serde::encode::write(&mut bytes, &msg).map_err(|err| {
             Error::Serialisation(format!(
-                "could not serialize message payload with Msgpack: {}",
-                err
+                "could not serialize message payload with Msgpack: {err}",
             ))
         })?;
 
@@ -67,8 +68,7 @@ impl WireMsg {
 
         rmp_serde::encode::write(&mut bytes, dst).map_err(|err| {
             Error::Serialisation(format!(
-                "could not serialize dst payload with Msgpack: {}",
-                err
+                "could not serialize dst payload with Msgpack: {err}",
             ))
         })?;
 
@@ -77,6 +77,24 @@ impl WireMsg {
     /// Serializes the dst on the WireMsg
     pub fn serialize_msg_dst(&self) -> Result<Bytes> {
         Self::serialize_dst_payload(&self.dst)
+    }
+
+    /// Serialize into a WireMsg for Node Join
+    pub fn single_src_node(name: XorName, dst: Dst, msg: NodeMsg) -> Result<WireMsg> {
+        let msg_payload = WireMsg::serialize_msg_payload(&msg)
+            .map_err(|_| Error::Serialisation("Could not serialise node msg".to_string()))?;
+
+        let wire_msg = WireMsg::new_msg(
+            MsgId::new(),
+            msg_payload,
+            MsgKind::Node {
+                name,
+                is_join: msg.is_join(),
+            },
+            dst,
+        );
+
+        Ok(wire_msg)
     }
 
     /// Creates a new `WireMsg` with the provided serialized payload and `MsgKind`.
@@ -98,8 +116,7 @@ impl WireMsg {
         let header = WireMsgHeader::from(header_bytes.clone())?;
         let dst: Dst = rmp_serde::from_slice(&dst_bytes).map_err(|err| {
             Error::FailedToParse(format!(
-                "Message dst couldn't be deserialized from the dst bytes: {}",
-                err
+                "Message dst couldn't be deserialized from the dst bytes: {err}",
             ))
         })?;
 
@@ -177,7 +194,7 @@ impl WireMsg {
         match self.header.msg_envelope.kind.clone() {
             MsgKind::Client(auth) => {
                 let msg: ClientMsg = rmp_serde::from_slice(&self.payload).map_err(|err| {
-                    Error::FailedToParse(format!("Data message payload as Msgpack: {}", err))
+                    Error::FailedToParse(format!("Data message payload as Msgpack: {err}"))
                 })?;
 
                 let auth = AuthorityProof::verify(auth, &self.payload)?;
@@ -192,7 +209,7 @@ impl WireMsg {
             MsgKind::ClientDataResponse(_) => {
                 let msg: ClientDataResponse =
                     rmp_serde::from_slice(&self.payload).map_err(|err| {
-                        Error::FailedToParse(format!("Data message payload as Msgpack: {}", err))
+                        Error::FailedToParse(format!("Data message payload as Msgpack: {err}"))
                     })?;
 
                 Ok(MsgType::ClientDataResponse {
@@ -200,9 +217,9 @@ impl WireMsg {
                     msg,
                 })
             }
-            MsgKind::Node(_) => {
+            MsgKind::Node { .. } => {
                 let msg: NodeMsg = rmp_serde::from_slice(&self.payload).map_err(|err| {
-                    Error::FailedToParse(format!("Node signed message payload as Msgpack: {}", err))
+                    Error::FailedToParse(format!("Node signed message payload as Msgpack: {err}"))
                 })?;
 
                 Ok(MsgType::Node {
@@ -214,7 +231,7 @@ impl WireMsg {
             MsgKind::NodeDataResponse(_) => {
                 let msg: NodeDataResponse =
                     rmp_serde::from_slice(&self.payload).map_err(|err| {
-                        Error::FailedToParse(format!("Data message payload as Msgpack: {}", err))
+                        Error::FailedToParse(format!("Data message payload as Msgpack: {err}"))
                     })?;
 
                 Ok(MsgType::NodeDataResponse {
@@ -250,11 +267,6 @@ impl WireMsg {
     pub fn deserialize(bytes: UsrMsgBytes) -> Result<MsgType> {
         Self::from(bytes)?.into_msg()
     }
-
-    /// Convenience function which validates the signature on a `ClientMsg`.
-    pub fn verify_sig(auth: ClientAuth, msg: ClientMsg) -> Result<AuthorityProof<ClientAuth>> {
-        Self::serialize_msg_payload(&msg).and_then(|payload| AuthorityProof::verify(auth, &payload))
-    }
 }
 
 #[cfg(test)]
@@ -262,8 +274,8 @@ mod tests {
     use super::*;
     use crate::{
         messaging::{
-            data::{ClientMsg, DataQuery, DataQueryVariant, StorageLevel},
-            system::{NodeDataCmd, NodeMsg},
+            data::{ClientMsg, DataQuery, DataQueryVariant},
+            system::NodeMsg,
             AuthorityProof, ClientAuth, MsgId,
         },
         types::{ChunkAddress, Keypair},
@@ -279,16 +291,14 @@ mod tests {
         };
 
         let msg_id = MsgId::new();
-        let pk = crate::types::PublicKey::Bls(dst.section_key);
 
-        let msg = NodeMsg::NodeDataCmd(NodeDataCmd::RecordStorageLevel {
-            node_id: pk,
-            section: pk.into(),
-            level: StorageLevel::zero(),
-        });
+        let msg = NodeMsg::HandoverAE(100);
 
         let payload = WireMsg::serialize_msg_payload(&msg)?;
-        let kind = MsgKind::Node(Default::default());
+        let kind = MsgKind::Node {
+            name: Default::default(),
+            is_join: true,
+        };
         let wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
         let serialized = wire_msg.serialize()?;
 
@@ -324,7 +334,7 @@ mod tests {
         let msg_id = MsgId::new();
 
         let client_msg = ClientMsg::Query(DataQuery {
-            adult_index: 0,
+            node_index: 0,
             variant: DataQueryVariant::GetChunk(ChunkAddress(xor_name::rand::random())),
         });
 

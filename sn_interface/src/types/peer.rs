@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -41,6 +41,13 @@ impl Peer {
 
     pub fn id(&self) -> (XorName, SocketAddr) {
         (self.name, self.addr)
+    }
+
+    pub fn from(addr: SocketAddr, public_key: ed25519_dalek::PublicKey) -> Peer {
+        Peer {
+            addr,
+            name: XorName::from(super::PublicKey::from(public_key)),
+        }
     }
 }
 

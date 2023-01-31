@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -15,6 +15,7 @@ mod used_space;
 pub use used_space::UsedSpace;
 
 pub(crate) use errors::{Error, Result};
+pub(crate) use used_space::StorageLevel;
 
 use chunks::ChunkStorage;
 use registers::RegisterStorage;
@@ -22,7 +23,7 @@ use registers::RegisterStorage;
 use sn_dbc::SpentProofShare;
 use sn_interface::{
     messaging::{
-        data::{DataQueryVariant, Error as MessagingError, RegisterQuery, StorageLevel},
+        data::{DataQueryVariant, Error as MessagingError, RegisterQuery},
         system::NodeQueryResponse,
     },
     types::{
@@ -46,7 +47,6 @@ pub struct DataStorage {
     chunks: ChunkStorage,
     registers: RegisterStorage,
     used_space: UsedSpace,
-    last_recorded_level: StorageLevel,
 }
 
 impl DataStorage {
@@ -56,14 +56,41 @@ impl DataStorage {
             chunks: ChunkStorage::new(path, used_space.clone())?,
             registers: RegisterStorage::new(path, used_space.clone())?,
             used_space,
-            last_recorded_level: StorageLevel::zero(),
         })
     }
 
-    /// Update the storage level on data storage
-    /// (To avoid needing a write lock for general storage ops, we separate out this state operation)
-    pub fn set_storage_level(&mut self, new_level: StorageLevel) {
-        self.last_recorded_level = new_level;
+    /// Returns whether the storage min capacity has been reached or not.
+    pub(crate) fn has_reached_min_capacity(&self) -> bool {
+        self.used_space.has_reached_min_capacity()
+    }
+
+    /// Returns whether the we have less than half capacity used.
+    pub(crate) fn is_below_half_limit(&self) -> bool {
+        0.5 > self.used_space.ratio()
+    }
+
+    /// Tries to get rid of stored data that we are no longer responsible for.
+    /// We only do the actual cleanup if min capacity has been reached.
+    ///
+    /// We do the check on every net increase in node count, but it is a cheap
+    /// check and any actual cleanup won't happen back to back, due to the requirement
+    /// of `has_reached_min_capacity() == true` before doing it.
+    pub(crate) fn try_retain_data_of(&self, prefix: xor_name::Prefix) {
+        if self.has_reached_min_capacity() {
+            let chunk_storage = self.chunks.clone();
+            // run this on another thread, since it can be a bit heavy
+            let _handle = tokio::task::spawn(async move {
+                let chunk_addr_to_remove = chunk_storage
+                    .addrs()
+                    .into_iter()
+                    .filter(|addr| !prefix.matches(addr.name()));
+                for addr in chunk_addr_to_remove {
+                    if let Err(err) = chunk_storage.remove_chunk(&addr).await {
+                        warn!("Could not remove chunk {addr:?} due to {err}.");
+                    }
+                }
+            });
+        }
     }
 
     /// Store data in the local store
@@ -73,40 +100,24 @@ impl DataStorage {
         data: &ReplicatedData,
         section_pk: PublicKey,
         node_keypair: Keypair,
-    ) -> Result<Option<StorageLevel>> {
+    ) -> Result<StorageLevel> {
         debug!("Replicating {data:?}");
         match data {
-            ReplicatedData::Chunk(chunk) => self.chunks.store(chunk).await?,
+            ReplicatedData::Chunk(chunk) => self.chunks.store(chunk).await,
             ReplicatedData::RegisterLog(data) => {
                 info!("Updating register: {:?}", data.address);
-                self.registers.update(data).await?
+                self.registers.update(data).await
             }
-            ReplicatedData::RegisterWrite(cmd) => self.registers.write(cmd).await?,
+            ReplicatedData::RegisterWrite(cmd) => self.registers.write(cmd).await,
             ReplicatedData::SpentbookWrite(cmd) => {
                 // FIMXE: this is temporary logic to have spentbooks as Registers.
                 // Spentbooks shall always exist, and the section nodes shall create them by default.
                 self.registers
                     .write_spentbook_register(cmd, section_pk, node_keypair)
-                    .await?;
+                    .await
             }
-            ReplicatedData::SpentbookLog(data) => self.registers.update(data).await?,
-        };
-
-        // check if we've filled another approx. 10%-points of our storage
-        // if so, update the recorded level
-        let last_recorded_level = self.last_recorded_level;
-        if let Ok(next_level) = last_recorded_level.next() {
-            // used_space_ratio is a heavy task that's why we don't do it all the time
-            let used_space_ratio = self.used_space.ratio();
-            let used_space_level = 10.0 * used_space_ratio;
-            // every level represents 10 percentage points
-            if used_space_level as u8 >= next_level.value() {
-                debug!("Next level for storage has been reached");
-                return Ok(Some(next_level));
-            }
+            ReplicatedData::SpentbookLog(data) => self.registers.update(data).await,
         }
-
-        Ok(None)
     }
 
     // Query the local store and return NodeQueryResponse
@@ -226,7 +237,7 @@ impl DataStorage {
 // - and a BIT_TREE_DEPTH of `6`
 // returns the path `ROOT_PATH/0/1/0/0/0/1`
 fn prefix_tree_path(root: &Path, xorname: XorName) -> PathBuf {
-    let bin = format!("{:b}", xorname);
+    let bin = format!("{xorname:b}");
     let prefix_dir_path: PathBuf = bin.chars().take(BIT_TREE_DEPTH).map(String::from).collect();
     root.join(prefix_dir_path)
 }
@@ -289,7 +300,7 @@ mod tests {
         // Cleaned up automatically after test completes
         let tmp_dir = tempdir()?;
         let path = tmp_dir.path();
-        let used_space = UsedSpace::new(usize::MAX);
+        let used_space = UsedSpace::default();
 
         // Create instance
         let mut storage = DataStorage::new(path, used_space)?;
@@ -341,7 +352,7 @@ mod tests {
         // Cleaned up automatically after test completes
         let tmp_dir = tempdir()?;
         let path = tmp_dir.path();
-        let used_space = UsedSpace::new(usize::MAX);
+        let used_space = UsedSpace::default();
 
         // Create instance
         let storage = DataStorage::new(path, used_space)?;
@@ -380,7 +391,7 @@ mod tests {
         // Cleaned up automatically after test completes
         let tmp_dir = tempdir()?;
         let path = tmp_dir.path();
-        let used_space = UsedSpace::new(usize::MAX);
+        let used_space = UsedSpace::default();
 
         // Create instance
         let storage = DataStorage::new(path, used_space)?;
@@ -413,8 +424,6 @@ mod tests {
             },
             section_sig: section_auth.clone(), // obtained after presenting a valid payment to the network
         };
-
-        // ReplicatedData::RegisterWrite(reg_cmd)
 
         let replicated_register = ReplicatedData::RegisterWrite(cmd);
 
@@ -477,7 +486,7 @@ mod tests {
         let mut model: BTreeMap<XorName, ReplicatedData> = BTreeMap::new();
         let temp_dir = tempdir()?;
         let path = temp_dir.path();
-        let used_space = UsedSpace::new(usize::MAX);
+        let used_space = UsedSpace::default();
         let runtime = Runtime::new()?;
         let mut storage = DataStorage::new(path, used_space)?;
         let owner_pk = PublicKey::Bls(bls::SecretKey::random().public_key());
@@ -510,10 +519,6 @@ mod tests {
                                 // do nothing
                                 Ok(())
                             }
-                            Err(Error::DataExists(_)) => {
-                                // also do nothing
-                                Ok(())
-                            }
                             Err(other_error) => Err(other_error),
                         }
                     })?;
@@ -533,21 +538,13 @@ mod tests {
                     let user = User::Anyone;
                     let stored_res = runtime.block_on(storage.query(&query, user));
                     let model_res = model.get(&key);
-
-                    match model_res {
-                        Some(m_res) => {
-                            if let NodeQueryResponse::GetChunk(Ok(s_chunk)) = stored_res {
-                                if let ReplicatedData::Chunk(m_chunk) = m_res {
-                                    assert_eq!(*m_chunk, s_chunk);
-                                }
-                            } else {
-                                return Err(Error::ChunkNotFound(key));
+                    if let Some(m_res) = model_res {
+                        if let NodeQueryResponse::GetChunk(Ok(s_chunk)) = stored_res {
+                            if let ReplicatedData::Chunk(m_chunk) = m_res {
+                                assert_eq!(*m_chunk, s_chunk);
                             }
-                        }
-                        None => {
-                            if let NodeQueryResponse::GetChunk(Ok(_)) = stored_res {
-                                return Err(Error::DataExists(DataAddress::Bytes(addr)));
-                            }
+                        } else {
+                            return Err(Error::ChunkNotFound(key));
                         }
                     }
                 }
@@ -556,34 +553,20 @@ mod tests {
                     let addr = DataAddress::Bytes(ChunkAddress(key));
                     let stored_data = runtime.block_on(storage.get_from_local_store(&addr));
                     let model_data = model.get(&key);
-
-                    match model_data {
-                        Some(m_data) => {
-                            if let Ok(s_data) = stored_data {
-                                assert_eq!(*m_data, s_data);
-                            } else {
-                                return Err(Error::ChunkNotFound(key));
-                            }
-                        }
-                        None => {
-                            if stored_data.is_ok() {
-                                return Err(Error::DataExists(addr));
-                            }
+                    if let Some(m_data) = model_data {
+                        if let Ok(s_data) = stored_data {
+                            assert_eq!(*m_data, s_data);
+                        } else {
+                            return Err(Error::ChunkNotFound(key));
                         }
                     }
                 }
                 Op::Remove(idx) => {
                     let key = get_xor_name(&model, idx % (model.len() + 1));
                     let addr = DataAddress::Bytes(ChunkAddress(key));
-
                     let storage_res = runtime.block_on(storage.remove(&addr));
-                    match model.remove(&key) {
-                        Some(_) => storage_res?,
-                        None => {
-                            if storage_res.is_ok() {
-                                return Err(Error::DataExists(addr));
-                            }
-                        }
+                    if model.remove(&key).is_some() {
+                        storage_res?
                     }
                 }
             }

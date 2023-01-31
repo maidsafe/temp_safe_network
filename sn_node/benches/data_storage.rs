@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -366,9 +366,8 @@ fn get_new_data_store() -> Result<DataStorage> {
     let storage_dir = Path::new(root_dir.path()).join(random_filename);
 
     let config = Config::default();
-    let max_capacity = config.max_capacity();
 
-    let used_space = UsedSpace::new(max_capacity);
+    let used_space = UsedSpace::new(config.min_capacity(), config.max_capacity());
     let store = DataStorage::new(&storage_dir, used_space)?;
 
     Ok(store)

@@ -86,7 +86,7 @@ Sometimes a node will receive a bunch of votes from another node (either from AE
 
 ## Going to Handover
 
-When DKG finishes, nodes generate their key shares and send out a signed (with that new key share) `Proposal::RequestHandover(SectionAuthorityProvider)` to the elders. Once the elders receive super-majority of those, they know they can propose those in a `Handover` consensus round.
+When DKG finishes, nodes generate their key shares and send out the new SAP signed (with that new key share) `NodeMsg::RequestHandover` to the elders. Once the elders receive super-majority of those, they know they can propose those in a `Handover` consensus round.
 
 ## Links
 

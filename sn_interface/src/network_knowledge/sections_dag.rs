@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -38,7 +38,7 @@ impl Debug for SectionInfo {
             .collect();
         let hex = hex::encode(bytes);
         let hex: String = hex.chars().into_iter().take(10).collect();
-        write!(formatter, "SectionInfo({})", hex)
+        write!(formatter, "SectionInfo({hex})")
     }
 }
 
@@ -112,7 +112,7 @@ impl<'de> Deserialize<'de> for SectionsDAG {
         let inter: Intermediate = Deserialize::deserialize(deserializer)?;
         let mut dag = SectionsDAG::new(inter.genesis_key);
         for (parent, info) in inter.sections {
-            dag.insert(&parent, info.key, info.sig)
+            dag.verify_and_insert(&parent, info.key, info.sig)
                 .map_err(D::Error::custom)?;
         }
         Ok(dag)
@@ -160,7 +160,7 @@ impl SectionsDAG {
 
     /// Insert new key into the DAG. `parent_key` must exist in the DAG and must validate
     /// `signature`, otherwise error is returned.
-    pub fn insert(
+    pub fn verify_and_insert(
         &mut self,
         parent_key: &bls::PublicKey,
         key: bls::PublicKey,
@@ -170,6 +170,17 @@ impl SectionsDAG {
             return Err(Error::InvalidSignature);
         }
 
+        self.insert_trusted_key(parent_key, key, signature)
+    }
+
+    /// Insert new key into the DAG. Does not verify the keys in the dag. This is expected to be called
+    /// for partial dag creation only (where the source is already verified + trusted)
+    fn insert_trusted_key(
+        &mut self,
+        parent_key: &bls::PublicKey,
+        key: bls::PublicKey,
+        signature: bls::Signature,
+    ) -> Result<()> {
         let parent = if *parent_key == self.genesis_key {
             self.dag_root.insert(key);
             BTreeSet::new()
@@ -196,7 +207,7 @@ impl SectionsDAG {
     /// Insert new key into the DAG. `parent_key` must exist in the DAG and must validate
     /// `signature`, otherwise error is returned.
     fn insert_node(&mut self, parent_key: &bls::PublicKey, node: Node<SectionInfo>) -> Result<()> {
-        self.insert(parent_key, node.value.key, node.value.sig)
+        self.verify_and_insert(parent_key, node.value.key, node.value.sig)
     }
 
     /// Get a partial `SectionsDAG` from the `from` key to the `to` key
@@ -243,7 +254,7 @@ impl SectionsDAG {
         let mut parent = *from;
         for node in crdt_ops.into_iter().rev() {
             let key = node.value.key;
-            dag.insert_node(&parent, node)?;
+            dag.insert_trusted_key(&parent, node.value.key, node.value.sig)?;
             parent = key;
         }
         Ok(dag)
@@ -273,7 +284,7 @@ impl SectionsDAG {
             // TODO: allow to select which branch ??
             .get(0)
         {
-            partial_dag.insert(
+            partial_dag.verify_and_insert(
                 &last_key,
                 child_node.value.key,
                 child_node.value.sig.clone(),
@@ -290,7 +301,9 @@ impl SectionsDAG {
     /// other
     pub fn merge(&mut self, mut other: Self) -> Result<()> {
         if !other.self_verify() {
-            return Err(Error::InvalidSignature);
+            return Err(Error::UntrustedProofChain(format!(
+                "Proof chain failed self verification: {other:?}",
+            )));
         }
         // find which DAG is the parent
         if !self.has_key(other.genesis_key()) {
@@ -542,7 +555,7 @@ pub(crate) mod tests {
             let last_pk = &expected_keys[expected_keys.len() - 1];
             let (sk, info) = gen_signed_keypair(&last_sk);
 
-            dag.insert(last_pk, info.key, info.sig)?;
+            dag.verify_and_insert(last_pk, info.key, info.sig)?;
 
             expected_keys.push(info.key);
             last_sk = sk;
@@ -564,9 +577,9 @@ pub(crate) mod tests {
         let (_, info_b) = gen_signed_keypair(&sk_gen);
 
         let mut dag = SectionsDAG::new(pk_gen);
-        dag.insert(&pk_gen, info_a1.key, info_a1.sig)?;
-        dag.insert(&info_a1.key, info_a2.key, info_a2.sig)?;
-        dag.insert(&pk_gen, info_b.key, info_b.sig)?;
+        dag.verify_and_insert(&pk_gen, info_a1.key, info_a1.sig)?;
+        dag.verify_and_insert(&info_a1.key, info_a2.key, info_a2.sig)?;
+        dag.verify_and_insert(&pk_gen, info_b.key, info_b.sig)?;
 
         assert_lists(dag.keys(), [pk_gen, info_a1.key, info_a2.key, info_b.key]);
 
@@ -612,7 +625,7 @@ pub(crate) mod tests {
         assert_lists(partial_gen.keys(), [pk_gen]);
 
         // let's insert only a1 into the DAG for now
-        dag.insert(&pk_gen, info_a1.key, info_a1.sig)?;
+        dag.verify_and_insert(&pk_gen, info_a1.key, info_a1.sig)?;
 
         // branch from genesis or a1 is a partial DAG with [genesis key, a1]
         let (partial_gen, last_key_gen) = dag.single_branch_dag_for_key(&pk_gen)?;
@@ -625,7 +638,7 @@ pub(crate) mod tests {
         assert_lists(partial_a1.keys(), partial_gen.keys());
 
         // let's now insert a2 into the DAG
-        dag.insert(&info_a1.key, info_a2.key, info_a2.sig)?;
+        dag.verify_and_insert(&info_a1.key, info_a2.key, info_a2.sig)?;
 
         // branch from genesis, a1 or a2 is a partial DAG with [genesis key, a1, a2]
         let (partial_gen, last_key_gen) = dag.single_branch_dag_for_key(&pk_gen)?;
@@ -642,10 +655,10 @@ pub(crate) mod tests {
         assert_lists(partial_a2.keys(), partial_gen.keys());
 
         // let's now insert the other two branches (b and c) into the DAG
-        dag.insert(&pk_gen, info_b1.key, info_b1.sig)?;
-        dag.insert(&info_b1.key, info_b2.key, info_b2.sig)?;
-        dag.insert(&info_b2.key, info_b3.key, info_b3.sig)?;
-        dag.insert(&info_b2.key, info_c.key, info_c.sig)?;
+        dag.verify_and_insert(&pk_gen, info_b1.key, info_b1.sig)?;
+        dag.verify_and_insert(&info_b1.key, info_b2.key, info_b2.sig)?;
+        dag.verify_and_insert(&info_b2.key, info_b3.key, info_b3.sig)?;
+        dag.verify_and_insert(&info_b2.key, info_c.key, info_c.sig)?;
         assert!(dag.self_verify());
         assert_lists(
             dag.keys(),
@@ -762,8 +775,12 @@ pub(crate) mod tests {
         let (_, info_a) = gen_signed_keypair(&sk_gen);
 
         let mut dag = SectionsDAG::new(pk_gen);
-        assert!(dag.insert(&pk_gen, info_a.key, info_a.sig.clone()).is_ok());
-        assert!(dag.insert(&pk_gen, info_a.key, info_a.sig).is_ok());
+        assert!(dag
+            .verify_and_insert(&pk_gen, info_a.key, info_a.sig.clone())
+            .is_ok());
+        assert!(dag
+            .verify_and_insert(&pk_gen, info_a.key, info_a.sig)
+            .is_ok());
         assert_lists(dag.keys(), [info_a.key, pk_gen]);
 
         Ok(())
@@ -776,7 +793,9 @@ pub(crate) mod tests {
         let (_, info_a) = gen_signed_keypair(&bad_sk_gen);
 
         let mut dag = SectionsDAG::new(pk_gen);
-        assert!(dag.insert(&pk_gen, info_a.key, info_a.sig).is_err());
+        assert!(dag
+            .verify_and_insert(&pk_gen, info_a.key, info_a.sig)
+            .is_err());
     }
 
     #[test]
@@ -788,12 +807,12 @@ pub(crate) mod tests {
         let mut dag = SectionsDAG::new(pk_gen);
         // inserting child before parent
         assert!(dag
-            .insert(&info_a1.key, info_a2.key, info_a2.sig.clone())
+            .verify_and_insert(&info_a1.key, info_a2.key, info_a2.sig.clone())
             .is_err());
         assert_lists(dag.keys(), [pk_gen]);
 
-        dag.insert(&pk_gen, info_a1.key, info_a1.sig)?;
-        dag.insert(&info_a1.key, info_a2.key, info_a2.sig)?;
+        dag.verify_and_insert(&pk_gen, info_a1.key, info_a1.sig)?;
+        dag.verify_and_insert(&info_a1.key, info_a2.key, info_a2.sig)?;
         assert_lists(dag.keys(), [pk_gen, info_a1.key, info_a2.key]);
 
         Ok(())
@@ -808,12 +827,12 @@ pub(crate) mod tests {
 
         // main_dag: 0->1->2->3
         let mut main_dag = SectionsDAG::new(pk_gen);
-        main_dag.insert(&pk_gen, info_a1.key, info_a1.sig)?;
+        main_dag.verify_and_insert(&pk_gen, info_a1.key, info_a1.sig)?;
         let mut dag_01 = main_dag.clone();
         let mut dag_01_err = main_dag.clone();
-        main_dag.insert(&info_a1.key, info_a2.key, info_a2.sig)?;
+        main_dag.verify_and_insert(&info_a1.key, info_a2.key, info_a2.sig)?;
         let mut dag_012 = main_dag.clone();
-        main_dag.insert(&info_a2.key, info_a3.key, info_a3.sig)?;
+        main_dag.verify_and_insert(&info_a2.key, info_a3.key, info_a3.sig)?;
         let mut dag_0123 = main_dag.clone();
 
         // main_dag: 0->1->2->3
@@ -877,13 +896,13 @@ pub(crate) mod tests {
 
         let mut main_dag = SectionsDAG::new(pk_gen);
         // gen->pk_a1->pk_a2
-        main_dag.insert(&pk_gen, info_a1.key, info_a1.sig)?;
-        main_dag.insert(&info_a1.key, info_a2.key, info_a2.sig)?;
+        main_dag.verify_and_insert(&pk_gen, info_a1.key, info_a1.sig)?;
+        main_dag.verify_and_insert(&info_a1.key, info_a2.key, info_a2.sig)?;
         // gen->pk_b1->pk_b2
-        main_dag.insert(&pk_gen, info_b1.key, info_b1.sig)?;
-        main_dag.insert(&info_b1.key, info_b2.key, info_b2.sig)?;
+        main_dag.verify_and_insert(&pk_gen, info_b1.key, info_b1.sig)?;
+        main_dag.verify_and_insert(&info_b1.key, info_b2.key, info_b2.sig)?;
         // pk_b1->pk_c
-        main_dag.insert(&info_b1.key, info_c.key, info_c.sig)?;
+        main_dag.verify_and_insert(&info_b1.key, info_c.key, info_c.sig)?;
 
         let mut dag = SectionsDAG::new(pk_gen);
         // merge from gen till pk_c
@@ -914,9 +933,9 @@ pub(crate) mod tests {
         //                   |
         //                   +-> pk_b
         let mut dag_a = SectionsDAG::new(pk_gen);
-        dag_a.insert(&pk_gen, info_a.key, info_a.sig)?;
+        dag_a.verify_and_insert(&pk_gen, info_a.key, info_a.sig)?;
         let mut dag_b = SectionsDAG::new(pk_gen);
-        dag_b.insert(&pk_gen, info_b.key, info_b.sig)?;
+        dag_b.verify_and_insert(&pk_gen, info_b.key, info_b.sig)?;
 
         let dag_from_a = dag_a.partial_dag(&pk_gen, &info_a.key)?;
         let dag_from_b = dag_b.partial_dag(&pk_gen, &info_b.key)?;
@@ -943,8 +962,8 @@ pub(crate) mod tests {
         //    |
         //    +->3->4
         let mut dag = SectionsDAG::new(pk_gen);
-        dag.insert(&pk_gen, info1.key, info1.sig.clone())?;
-        dag.insert(&info1.key, info2.key, info2.sig)?;
+        dag.verify_and_insert(&pk_gen, info1.key, info1.sig.clone())?;
+        dag.verify_and_insert(&info1.key, info2.key, info2.sig)?;
         // insert section3 manually with corrupted sig
         info3.sig = info1.sig; // use a random section's sig
         let hash1 = dag.get_hash(&info1.key)?;
@@ -953,7 +972,7 @@ pub(crate) mod tests {
         dag.hashes.insert(info3.key, node3.hash());
         dag.dag.apply(node3);
         // continue inserting section 4
-        dag.insert(&info3.key, info4.key, info4.sig)?;
+        dag.verify_and_insert(&info3.key, info4.key, info4.sig)?;
 
         assert!(!dag.self_verify());
         Ok(())
@@ -966,8 +985,8 @@ pub(crate) mod tests {
         let (_, info_b) = gen_signed_keypair(&sk_gen);
 
         let mut dag = SectionsDAG::new(pk_gen);
-        dag.insert(&pk_gen, info_a.key, info_a.sig)?;
-        dag.insert(&pk_gen, info_b.key, info_b.sig)?;
+        dag.verify_and_insert(&pk_gen, info_a.key, info_a.sig)?;
+        dag.verify_and_insert(&pk_gen, info_b.key, info_b.sig)?;
 
         assert_eq!(
             dag.get_parent_key(&info_a.key)?,
@@ -984,8 +1003,8 @@ pub(crate) mod tests {
         let (_, info_a2) = gen_signed_keypair(&sk_a1);
 
         let mut dag = SectionsDAG::new(pk_gen);
-        dag.insert(&pk_gen, info_a1.key, info_a1.sig)?;
-        dag.insert(&info_a1.key, info_a2.key, info_a2.sig)?;
+        dag.verify_and_insert(&pk_gen, info_a1.key, info_a1.sig)?;
+        dag.verify_and_insert(&info_a1.key, info_a2.key, info_a2.sig)?;
 
         assert!(matches!(dag.get_parent_key(&info_a2.key)?, Some(key) if key == info_a1.key));
         assert!(matches!(dag.get_parent_key(&info_a1.key)?, Some(key) if key == pk_gen));
@@ -1001,9 +1020,9 @@ pub(crate) mod tests {
         let (_, info_b2) = gen_signed_keypair(&sk_b1);
 
         let mut dag = SectionsDAG::new(pk_gen);
-        dag.insert(&pk_gen, info_a.key, info_a.sig)?;
-        dag.insert(&pk_gen, info_b1.key, info_b1.sig)?;
-        dag.insert(&info_b1.key, info_b2.key, info_b2.sig)?;
+        dag.verify_and_insert(&pk_gen, info_a.key, info_a.sig)?;
+        dag.verify_and_insert(&pk_gen, info_b1.key, info_b1.sig)?;
+        dag.verify_and_insert(&info_b1.key, info_b2.key, info_b2.sig)?;
 
         assert_lists(dag.get_child_keys(&pk_gen)?, [info_a.key, info_b1.key]);
         assert_lists(dag.get_child_keys(&info_b1.key)?, [info_b2.key]);
@@ -1019,9 +1038,9 @@ pub(crate) mod tests {
         let (_, info_b2) = gen_signed_keypair(&sk_b1);
 
         let mut sections_dag = SectionsDAG::new(pk_gen);
-        sections_dag.insert(&pk_gen, info_a.key, info_a.sig)?;
-        sections_dag.insert(&pk_gen, info_b1.key, info_b1.sig)?;
-        sections_dag.insert(&info_b1.key, info_b2.key, info_b2.sig)?;
+        sections_dag.verify_and_insert(&pk_gen, info_a.key, info_a.sig)?;
+        sections_dag.verify_and_insert(&pk_gen, info_b1.key, info_b1.sig)?;
+        sections_dag.verify_and_insert(&info_b1.key, info_b2.key, info_b2.sig)?;
 
         assert_lists(sections_dag.leaf_keys(), [info_a.key, info_b2.key]);
         Ok(())
@@ -1036,9 +1055,9 @@ pub(crate) mod tests {
         let (_, info_a3) = gen_signed_keypair(&sk_a2);
 
         let mut dag = SectionsDAG::new(pk_gen);
-        dag.insert(&pk_gen, info_a1.key, info_a1.sig)?;
-        dag.insert(&info_a1.key, info_a2.key, info_a2.sig)?;
-        dag.insert(&info_a2.key, info_a3.key, info_a3.sig)?;
+        dag.verify_and_insert(&pk_gen, info_a1.key, info_a1.sig)?;
+        dag.verify_and_insert(&info_a1.key, info_a2.key, info_a2.sig)?;
+        dag.verify_and_insert(&info_a2.key, info_a3.key, info_a3.sig)?;
 
         assert_lists(
             dag.get_ancestors(&info_a3.key)?,
@@ -1083,11 +1102,11 @@ pub(crate) mod tests {
         let (_, info_c) = gen_signed_keypair(&sk_b1);
 
         let mut dag = SectionsDAG::new(pk_gen);
-        dag.insert(&pk_gen, info_a1.key, info_a1.sig)?;
-        dag.insert(&info_a1.key, info_a2.key, info_a2.sig)?;
-        dag.insert(&pk_gen, info_b1.key, info_b1.sig)?;
-        dag.insert(&info_b1.key, info_b2.key, info_b2.sig)?;
-        dag.insert(&info_b1.key, info_c.key, info_c.sig)?;
+        dag.verify_and_insert(&pk_gen, info_a1.key, info_a1.sig)?;
+        dag.verify_and_insert(&info_a1.key, info_a2.key, info_a2.sig)?;
+        dag.verify_and_insert(&pk_gen, info_b1.key, info_b1.sig)?;
+        dag.verify_and_insert(&info_b1.key, info_b2.key, info_b2.sig)?;
+        dag.verify_and_insert(&info_b1.key, info_c.key, info_c.sig)?;
 
         let dag_string = serde_json::to_string(&dag)?;
         let dag_from_string = serde_json::from_str::<SectionsDAG>(dag_string.as_str())?;
@@ -1238,7 +1257,7 @@ pub(crate) mod tests {
             let sap = TestKeys::get_section_signed(&sk_set.secret_key(), sap);
             let key = sap.public_key_set().public_key();
             let sig = TestKeys::sign(parent_sk, &key);
-            dag.insert(&parent_sk.public_key(), sap.section_key(), sig)?;
+            dag.verify_and_insert(&parent_sk.public_key(), sap.section_key(), sig)?;
             sections_map.insert(sap.section_key(), (sk_set.secret_key(), sap));
             Ok(())
         }

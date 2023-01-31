@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -32,15 +32,12 @@ pub enum Error {
     /// Chunk not found.
     #[error("Chunk not found: {0:?}")]
     ChunkNotFound(XorName),
-    /// Data already exists for this node
-    #[error("Data already exists at this node: {0:?}")]
-    DataExists(DataAddress),
     /// Storage not supported for type of data address
     #[error("Storage not supported for type of data address: {0:?}")]
     UnsupportedDataType(DataAddress),
     /// Data owner provided is invalid.
     #[error("Provided PublicKey could not validate signature {0:?}")]
-    InvalidSignature(PublicKey),
+    InvalidSignature(Box<PublicKey>),
     /// I/O error.
     #[error("I/O error: {0}")]
     Io(#[from] io::Error),
@@ -55,7 +52,7 @@ pub enum Error {
     NetworkData(#[from] sn_interface::types::Error),
     /// Messaging error.
     #[error("Messaging error:: {0}")]
-    Messaging(#[from] sn_interface::messaging::data::Error),
+    Messaging(#[from] Box<sn_interface::messaging::data::Error>),
     /// No filename found
     #[error("Path contains no file name: {0}")]
     NoFilename(PathBuf),
@@ -83,11 +80,14 @@ impl From<Error> for ErrorMsg {
             Error::ChunkNotFound(xorname) => {
                 ErrorMsg::DataNotFound(DataAddress::Bytes(ChunkAddress(xorname)))
             }
-            Error::DataExists(address) => ErrorMsg::DataExists(address),
             Error::NetworkData(error) => error.into(),
-            other => {
-                ErrorMsg::InvalidOperation(format!("Failed to perform operation: {:?}", other))
-            }
+            other => ErrorMsg::InvalidOperation(format!("Failed to perform operation: {other:?}")),
         }
+    }
+}
+
+impl From<sn_interface::messaging::data::Error> for Error {
+    fn from(error: sn_interface::messaging::data::Error) -> Error {
+        Error::Messaging(Box::new(error))
     }
 }

@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -155,7 +155,7 @@ async fn main() -> Result<()> {
                         .ok_or_else(|| eyre!("Command exited with error"))
                 })
                 .wrap_err_with(|| {
-                    format!("Failed to run build command with args: {:?}", build_args)
+                    format!("Failed to run build command with args: {build_args:?}")
                 })?;
             info!("sn_node built successfully");
         }

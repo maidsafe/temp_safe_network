@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -62,15 +62,13 @@ impl Safe {
             Ok(other) => {
                 info!("Unexpected messages received: {:?}", other);
                 Err(Error::AuthError(format!(
-                    "Application was not authorised, unexpected response was received: {:?}",
-                    other
+                    "Application was not authorised, unexpected response was received: {other:?}",
                 )))
             }
             Err(e) => {
                 info!("Application '{}' was not authorised", app_id);
                 Err(Error::AuthError(format!(
-                    "Application '{}' was not authorised: {:?}",
-                    app_id, e
+                    "Application '{app_id}' was not authorised: {e:?}",
                 )))
             }
         }
@@ -85,7 +83,7 @@ async fn send_app_auth_req(
     authd_cert_path: &Path,
 ) -> Result<String> {
     let authd_service_url = match endpoint {
-        None => format!("{}:{}", SN_AUTHD_ENDPOINT_HOST, SN_AUTHD_ENDPOINT_PORT,),
+        None => format!("{SN_AUTHD_ENDPOINT_HOST}:{SN_AUTHD_ENDPOINT_PORT}"),
         Some(endpoint) => endpoint.to_string(),
     };
 

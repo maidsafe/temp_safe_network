@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -8,6 +8,7 @@
 
 use super::{
     register_store::{RegisterStore, StoredRegister},
+    used_space::StorageLevel,
     Error, Result,
 };
 
@@ -22,8 +23,7 @@ use sn_interface::{
     },
     types::{
         register::{Action, EntryHash, Permissions, Policy, Register, User},
-        DataAddress, Keypair, PublicKey, RegisterAddress, ReplicatedRegisterLog,
-        SPENTBOOK_TYPE_TAG,
+        Keypair, PublicKey, RegisterAddress, ReplicatedRegisterLog, SPENTBOOK_TYPE_TAG,
     },
 };
 
@@ -77,7 +77,7 @@ impl RegisterStorage {
     }
 
     /// Update our Register's replica on receiving data from other nodes.
-    pub(super) async fn update(&self, data: &ReplicatedRegisterLog) -> Result<()> {
+    pub(super) async fn update(&self, data: &ReplicatedRegisterLog) -> Result<StorageLevel> {
         debug!("Updating Register store: {:?}", data.address);
         let mut stored_reg = self.try_load_stored_register(&data.address).await?;
 
@@ -104,7 +104,7 @@ impl RegisterStorage {
 
     /// --- Writing ---
 
-    pub(super) async fn write(&self, cmd: &RegisterCmd) -> Result<()> {
+    pub(super) async fn write(&self, cmd: &RegisterCmd) -> Result<StorageLevel> {
         info!("Writing register cmd: {:?}", cmd);
         // Let's first try to load and reconstruct the replica of targetted Register
         // we have in local storage, to then try to apply the new command onto it.
@@ -246,7 +246,7 @@ impl RegisterStorage {
         cmd: &RegisterCmd,
         section_pk: PublicKey,
         node_keypair: Keypair,
-    ) -> Result<()> {
+    ) -> Result<StorageLevel> {
         let address = cmd.dst_address();
         trace!("Creating new spentbook register: {:?}", address);
 
@@ -280,7 +280,8 @@ impl RegisterStorage {
         // cmd let's verify it's valid before accepting it, however 'Edits cmds' cannot be
         // verified untill we have the `Register create` cmd.
         match (stored_reg.state.as_mut(), cmd) {
-            (Some(ref mut register), cmd) => self.apply(cmd, register).await?,
+            (Some(_), RegisterCmd::Create { .. }) => return Ok(()), // no op, since already created
+            (Some(ref mut register), RegisterCmd::Edit(_)) => self.apply(cmd, register).await?,
             (None, RegisterCmd::Create { cmd, .. }) => {
                 // the target Register is not in our store or we don't have the 'Register create',
                 // let's verify the create cmd we received is valid and try to apply stored cmds we may have.
@@ -289,7 +290,7 @@ impl RegisterStorage {
                 let _ = auth
                     .clone()
                     .verify_authority(serialize(op)?)
-                    .or(Err(Error::InvalidSignature(public_key)))?;
+                    .or(Err(Error::InvalidSignature(Box::new(public_key))))?;
 
                 trace!("Creating new register: {:?}", cmd.dst_address());
                 // let's do a final check, let's try to apply all cmds to it,
@@ -321,13 +322,13 @@ impl RegisterStorage {
         }
 
         match cmd {
-            RegisterCmd::Create { .. } => Err(Error::DataExists(DataAddress::Register(addr))),
+            RegisterCmd::Create { .. } => Ok(()),
             RegisterCmd::Edit(SignedRegisterEdit { op, auth }) => {
                 let public_key = auth.public_key;
                 let _ = auth
                     .clone()
                     .verify_authority(serialize(op)?)
-                    .or(Err(Error::InvalidSignature(public_key)))?;
+                    .or(Err(Error::InvalidSignature(Box::new(public_key))))?;
 
                 info!("Editing Register: {:?}", addr);
                 register.check_permissions(Action::Write, Some(User::Key(public_key)))?;
@@ -411,7 +412,9 @@ fn section_sig() -> SectionSig {
 
 #[cfg(test)]
 mod test {
-    use super::{create_reg_w_policy, Error, RegisterStorage, UsedSpace};
+    use crate::storage::StorageLevel;
+
+    use super::{create_reg_w_policy, RegisterStorage, UsedSpace};
     use sn_interface::{
         messaging::{
             data::{EditRegister, RegisterCmd, RegisterQuery, SignedRegisterEdit},
@@ -420,12 +423,12 @@ mod test {
         },
         types::{
             register::{EntryHash, Policy, Register, User},
-            DataAddress, Keypair,
+            Keypair,
         },
     };
 
     use bincode::serialize;
-    use eyre::{bail, eyre, Result};
+    use eyre::{bail, Result};
     use rand::{distributions::Alphanumeric, Rng};
     use std::collections::BTreeSet;
     use tempfile::tempdir;
@@ -446,7 +449,7 @@ mod test {
         assert!(stored_reg.op_log.is_empty());
         assert_eq!(stored_reg.op_log_path, log_path);
 
-        store.write(&cmd_create).await?;
+        let _ = store.write(&cmd_create).await?;
         let stored_reg = store.try_load_stored_register(&addr).await?;
         // it should contain the create cmd
         assert_eq!(stored_reg.state.as_ref(), Some(&register));
@@ -456,7 +459,7 @@ mod test {
 
         // let's now edit the register
         let cmd_edit = edit_register(&mut register, &keypair)?;
-        store.write(&cmd_edit).await?;
+        let _ = store.write(&cmd_edit).await?;
 
         let stored_reg = store.try_load_stored_register(&addr).await?;
         // it should contain the create and edit cmds
@@ -486,7 +489,7 @@ mod test {
 
         // let's first store an edit cmd for the register
         let cmd_edit = edit_register(&mut register, &keypair)?;
-        store.write(&cmd_edit).await?;
+        let _ = store.write(&cmd_edit).await?;
 
         let stored_reg = store.try_load_stored_register(&addr).await?;
         // it should contain the edit cmd only
@@ -495,7 +498,7 @@ mod test {
         assert_eq!(stored_reg.op_log_path, log_path);
 
         // and now store the create cmd for the register
-        store.write(&cmd_create).await?;
+        let _ = store.write(&cmd_create).await?;
 
         let stored_reg = store.try_load_stored_register(&addr).await?;
         // it should contain the create and edit cmds
@@ -534,16 +537,16 @@ mod test {
         assert_eq!(stored_reg.op_log_path, log_path);
         assert_eq!(stored_reg.state.as_ref().map(|reg| reg.size()), Some(0));
 
-        // apply the create cmd again should fail with DataExists
+        // apply the create cmd again should change nothing
         match store
             .try_to_apply_cmd_against_register_state(&cmd_create, &mut stored_reg)
             .await
         {
-            Ok(()) => bail!("An error should occur for this test case"),
-            Err(Error::DataExists(DataAddress::Register(reported_addr))) => {
-                assert_eq!(addr, reported_addr)
-            }
-            Err(err) => bail!("A Error::DataExists variant was expected: {:?}", err),
+            Ok(()) => (),
+            Err(err) => bail!(
+                "An error should not occur when applying create cmd again: {:?}",
+                err
+            ),
         }
 
         // let's now apply an edit cmd
@@ -634,16 +637,16 @@ mod test {
         assert_eq!(stored_reg.op_log_path, log_path);
         assert_eq!(stored_reg.state.as_ref().map(|reg| reg.size()), Some(1));
 
-        // apply the create cmd again should fail with DataExists
+        // apply the create cmd again should change nothing
         match store
             .try_to_apply_cmd_against_register_state(&cmd_create, &mut stored_reg)
             .await
         {
-            Ok(()) => bail!("An error should occur for this test case"),
-            Err(Error::DataExists(DataAddress::Register(reported_addr))) => {
-                assert_eq!(addr, reported_addr)
-            }
-            Err(err) => bail!("A Error::DataExists variant was expected: {:?}", err),
+            Ok(()) => (),
+            Err(err) => bail!(
+                "An error should not occur when applying create cmd again: {:?}",
+                err
+            ),
         }
 
         Ok(())
@@ -656,7 +659,7 @@ mod test {
 
         // create register
         let (cmd, authority, _, _, _) = create_register()?;
-        store.write(&cmd).await?;
+        let _ = store.write(&cmd).await?;
 
         // get register
         let address = cmd.dst_address();
@@ -668,19 +671,16 @@ mod test {
             e => bail!("Could not read register! {:?}", e),
         }
 
+        // apply the create cmd again should change nothing
         match store.write(&cmd).await {
-            Ok(()) => Err(eyre!("An error should occur for this test case")),
-            Err(error @ Error::DataExists(_)) => {
-                assert_eq!(
-                    error.to_string(),
-                    format!(
-                        "Data already exists at this node: {:?}",
-                        DataAddress::Register(address)
-                    )
-                );
-                Ok(())
+            Ok(StorageLevel::NoChange) => Ok(()),
+            Ok(StorageLevel::Updated(_)) => {
+                bail!("Storage level should not change when applying create cmd again.")
             }
-            Err(err) => Err(eyre!("A Error::DataExists variant was expected: {:?}", err)),
+            Err(err) => bail!(
+                "An error should not occur when applying create cmd again: {:?}",
+                err
+            ),
         }
     }
 
@@ -694,23 +694,22 @@ mod test {
         let mut register = Register::new(*policy.owner(), name, 0, policy);
 
         // store the register along with a few edit ops
-        store.write(&cmd_create).await?;
+        let _ = store.write(&cmd_create).await?;
         for _ in 0..10 {
             let cmd_edit = edit_register(&mut register, &keypair)?;
-            store.write(&cmd_edit).await?;
+            let _ = store.write(&cmd_edit).await?;
         }
 
-        // should fail to write same register again
+        // create cmd should be idempotent
         match store.write(&cmd_create).await {
-            Ok(()) => bail!("An error should occur for this test case"),
-            Err(error @ Error::DataExists(_)) => assert_eq!(
-                error.to_string(),
-                format!(
-                    "Data already exists at this node: {:?}",
-                    DataAddress::Register(addr)
-                )
+            Ok(StorageLevel::NoChange) => (),
+            Ok(StorageLevel::Updated(_)) => {
+                bail!("Storage level should not change when applying create cmd again.")
+            }
+            Err(err) => bail!(
+                "An error should not occur when applying create cmd again: {:?}",
+                err
             ),
-            Err(err) => bail!("A Error::DataExists variant was expected: {:?}", err),
         }
 
         // export Registers, get all data we held in storage
@@ -720,21 +719,20 @@ mod test {
         let new_store = new_store()?;
         for addr in all_addrs {
             let replica = store.get_register_replica(&addr).await?;
-            new_store.update(&replica).await?;
+            let _ = new_store.update(&replica).await?;
         }
 
         // assert the same tests hold as for the first store
-        // should fail to write same register again, also on this new store
+        // create cmd should be idempotent, also on this new store
         match new_store.write(&cmd_create).await {
-            Ok(()) => bail!("An error should occur for this test case"),
-            Err(error @ Error::DataExists(_)) => assert_eq!(
-                error.to_string(),
-                format!(
-                    "Data already exists at this node: {:?}",
-                    DataAddress::Register(addr)
-                )
+            Ok(StorageLevel::NoChange) => (),
+            Ok(StorageLevel::Updated(_)) => {
+                bail!("Storage level should not change when applying create cmd again.")
+            }
+            Err(err) => bail!(
+                "An error should not occur when applying create cmd again: {:?}",
+                err
             ),
-            Err(err) => bail!("A Error::DataExists variant was expected: {:?}", err),
         }
 
         // should be able to read the same value from this new store also
@@ -745,7 +743,7 @@ mod test {
                 assert_eq!(reg.address(), &addr, "Should have same address!");
                 assert_eq!(reg.owner(), authority, "Should have same owner!");
             }
-            e => panic!("Could not read! {:?}", e),
+            e => panic!("Could not read! {e:?}"),
         }
 
         Ok(())
@@ -758,7 +756,7 @@ mod test {
 
         // create register
         let (cmd_create, authority, _, _, _) = create_register()?;
-        store.write(&cmd_create).await?;
+        let _ = store.write(&cmd_create).await?;
 
         let hash = EntryHash(rand::thread_rng().gen::<[u8; 32]>());
 
@@ -772,9 +770,9 @@ mod test {
                 assert_eq!(e, sn_interface::messaging::data::Error::NoSuchEntry(hash))
             }
             NodeQueryResponse::GetRegisterEntry(Ok(entry)) => {
-                panic!("Should not exist any entry for random hash! {:?}", entry)
+                panic!("Should not exist any entry for random hash! {entry:?}")
             }
-            e => panic!("Could not read! {:?}", e),
+            e => panic!("Could not read! {e:?}"),
         }
 
         Ok(())
@@ -787,7 +785,7 @@ mod test {
 
         // create register
         let (cmd_create, authority, _, _, _) = create_register()?;
-        store.write(&cmd_create).await?;
+        let _ = store.write(&cmd_create).await?;
 
         let (user, _) = random_user();
 
@@ -803,11 +801,10 @@ mod test {
             NodeQueryResponse::GetRegisterUserPermissions(Err(e)) => {
                 assert_eq!(e, sn_interface::messaging::data::Error::NoSuchUser(user))
             }
-            NodeQueryResponse::GetRegisterUserPermissions(Ok(perms)) => panic!(
-                "Should not exist any permissions for random user! {:?}",
-                perms
-            ),
-            e => panic!("Could not read! {:?}", e),
+            NodeQueryResponse::GetRegisterUserPermissions(Ok(perms)) => {
+                panic!("Should not exist any permissions for random user! {perms:?}",)
+            }
+            e => panic!("Could not read! {e:?}"),
         }
 
         Ok(())
@@ -816,7 +813,7 @@ mod test {
     fn new_store() -> Result<RegisterStorage> {
         let tmp_dir = tempdir()?;
         let path = tmp_dir.path();
-        let used_space = UsedSpace::new(usize::MAX);
+        let used_space = UsedSpace::default();
         let store = RegisterStorage::new(path, used_space)?;
         Ok(store)
     }

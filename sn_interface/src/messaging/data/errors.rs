@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -33,7 +33,7 @@ pub enum Error {
     FailedToWriteFile,
     /// Insufficient Adults found to store data
     #[error("Failed to store data. Insufficient replication count at section {prefix:?}. Expected {expected}, found {found}.")]
-    InsufficientAdults {
+    InsufficientNodeCount {
         /// The prefix of the section.
         prefix: Prefix,
         /// Expected number of Adults for minimum replication.
@@ -41,9 +41,6 @@ pub enum Error {
         /// Actual number of Adults found to hold the data.
         found: u8,
     },
-    /// Provided data already exists on the network
-    #[error("Data provided already exists: {0:?}")]
-    DataExists(DataAddress),
     /// Entry could not be found on the data
     #[error("Requested entry not found {0}")]
     NoSuchEntry(EntryHash),

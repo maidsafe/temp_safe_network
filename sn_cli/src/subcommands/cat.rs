@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -41,7 +41,7 @@ pub async fn cat_commander(cmd: CatCommands, output_fmt: OutputFmt, safe: &Safe)
             if OutputFmt::Pretty == output_fmt {
                 println!(
                     "Files of FilesContainer ({}) at \"{}\":",
-                    version.map_or("empty".to_string(), |v| format!("version {}", v)),
+                    version.map_or("empty".to_string(), |v| format!("version {v}")),
                     url
                 );
                 let mut table = Table::new();
@@ -77,7 +77,7 @@ pub async fn cat_commander(cmd: CatCommands, output_fmt: OutputFmt, safe: &Safe)
         }
         SafeData::NrsMapContainer { nrs_map, .. } => {
             if OutputFmt::Pretty == output_fmt {
-                println!("NRS Map Container at {}", url);
+                println!("NRS Map Container at {url}");
                 print_nrs_map(&nrs_map);
             } else {
                 println!(
@@ -93,7 +93,7 @@ pub async fn cat_commander(cmd: CatCommands, output_fmt: OutputFmt, safe: &Safe)
             let safeurl = SafeUrl::from_xorurl(&xorurl)?;
             if safeurl.content_type() == ContentType::Wallet {
                 if OutputFmt::Pretty == output_fmt {
-                    println!("Spendable balances of wallet at \"{}\":", xorurl);
+                    println!("Spendable balances of wallet at \"{xorurl}\":");
                     let table = gen_wallet_table(safe, &data).await?;
                     println!("{table}");
                 } else {

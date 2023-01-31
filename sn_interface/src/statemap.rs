@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -48,7 +48,6 @@ pub enum State {
     HandleMsg,
     Comms,
     FaultDetection,
-    BackPressure,
     ClientMsg,
     Dkg,
     Agreement,
@@ -60,6 +59,7 @@ pub enum State {
     Join,
     Propose,
     Node,
+    Data,
 }
 
 impl State {
@@ -70,7 +70,7 @@ impl State {
             "HandleMsg": { "value": Self::HandleMsg as usize, "color": "#7f0000" },
             "Comms": { "value": Self::Comms as usize, "color": "#808000" },
             "FaultDetection": { "value": Self::FaultDetection as usize, "color": "#000080" },
-            "BackPressure": { "value": Self::BackPressure as usize, "color": "#ff0000" },
+            "Data": { "value": Self::Data as usize, "color": "#ff0000" },
             "ClientMsg": { "value": Self::ClientMsg as usize, "color": "#00ced1" },
             "Dkg": { "value": Self::Dkg as usize, "color": "#ffa500" },
             "Agreement": { "value": Self::Agreement as usize, "color": "#7fff00" },

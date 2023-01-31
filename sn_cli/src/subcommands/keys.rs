@@ -1,4 +1,4 @@
-// Copyright 2020 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -40,9 +40,9 @@ pub fn key_commander(cmd: KeysSubCommands, output_fmt: OutputFmt, config: &Confi
                     let (pk_hex, sk_hex) = keypair.to_hex()?;
                     if output_fmt == OutputFmt::Pretty {
                         println!("CLI credentials located at {}", file_path.display());
-                        println!("Public Key: {}", pk_hex);
+                        println!("Public Key: {pk_hex}");
                         if show_sk {
-                            println!("Secret Key: {}", sk_hex);
+                            println!("Secret Key: {sk_hex}");
                         }
                     } else {
                         println!("{}", serialise_output(&(pk_hex, sk_hex), output_fmt));
@@ -72,8 +72,8 @@ pub fn print_new_key_output(output_fmt: OutputFmt, secret_key: &SecretKey) {
     let sk_hex = secret_key.to_hex();
     let pk_hex = secret_key.public_key().to_hex();
     if OutputFmt::Pretty == output_fmt {
-        println!("Public Key: {}", pk_hex);
-        println!("Secret Key: {}", sk_hex);
+        println!("Public Key: {pk_hex}");
+        println!("Secret Key: {sk_hex}");
     } else {
         println!("{}", serialise_output(&(pk_hex, sk_hex), output_fmt));
     }

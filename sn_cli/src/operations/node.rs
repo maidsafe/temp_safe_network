@@ -1,4 +1,4 @@
-// Copyright 2020 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -30,10 +30,7 @@ pub fn node_version(node_path: Option<PathBuf>) -> Result<()> {
     let path_str = bin_path.display().to_string();
 
     if !bin_path.as_path().is_file() {
-        return Err(eyre!(format!(
-            "node executable not found at '{}'.",
-            path_str
-        )));
+        return Err(eyre!("node executable not found at '{}'.", path_str));
     }
 
     let output = Command::new(&path_str)
@@ -41,17 +38,12 @@ pub fn node_version(node_path: Option<PathBuf>) -> Result<()> {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .output()
-        .map_err(|err| {
-            eyre!(format!(
-                "Failed to execute node from '{}': {}",
-                path_str, err
-            ))
-        })?;
+        .map_err(|err| eyre!("Failed to execute node from '{}': {}", path_str, err))?;
 
     if output.status.success() {
         io::stdout()
             .write_all(&output.stdout)
-            .map_err(|err| eyre!(format!("failed to write to stdout: {}", err)))
+            .map_err(|err| eyre!(format!("failed to write to stdout: {err}")))
     } else {
         Err(eyre!(
             "Failed to get node version nodes when invoking executable from '{}': {}",
@@ -127,7 +119,7 @@ pub fn node_join(
     let mut verbosity_arg = String::from("-");
     if verbosity > 0 {
         let v = "y".repeat(verbosity as usize);
-        println!("V: {}", v);
+        println!("V: {v}");
         verbosity_arg.push_str(&v);
         sn_launch_tool_args.push(verbosity_arg);
     }
@@ -182,7 +174,7 @@ fn get_initial_sn_launch_args(
             .wrap_err("Couldn't create target path to store nodes' generated data")?;
     }
     let arg_nodes_dir = node_data_dir_path.display().to_string();
-    println!("Storing nodes' generated data at {}", arg_nodes_dir);
+    println!("Storing nodes' generated data at {arg_nodes_dir}");
 
     // This first positional "sn_launch_tool" argument is required to get the tool to run
     // correctly, even though it doesn't appear to actually do anything. It seems you can't just
@@ -216,18 +208,12 @@ fn kill_nodes(exec_name: &str) -> Result<()> {
     let output = Command::new("killall")
         .arg(exec_name)
         .output()
-        .wrap_err_with(|| {
-            format!(
-                "Error when atempting to stop nodes ({}) processes",
-                exec_name
-            )
-        })?;
+        .wrap_err_with(
+            || format!("Error when attempting to stop nodes ({exec_name}) processes",),
+        )?;
 
     if output.status.success() {
-        println!(
-            "Success, all processes instances of {} were stopped!",
-            exec_name
-        );
+        println!("Success, all processes instances of {exec_name} were stopped!",);
         Ok(())
     } else {
         Err(eyre!(
@@ -243,18 +229,10 @@ fn kill_nodes(exec_name: &str) -> Result<()> {
     let output = Command::new("taskkill")
         .args(["/F", "/IM", exec_name])
         .output()
-        .wrap_err_with(|| {
-            format!(
-                "Error when atempting to stop nodes ({}) processes",
-                exec_name
-            )
-        })?;
+        .wrap_err_with(|| format!("Error when attempting to stop nodes ({exec_name}) processes"))?;
 
     if output.status.success() {
-        println!(
-            "Success, all processes instances of {} were stopped!",
-            exec_name
-        );
+        println!("Success, all processes instances of {exec_name} were stopped!");
         Ok(())
     } else {
         Err(eyre!(
@@ -274,11 +252,11 @@ pub fn node_update(node_path: Option<PathBuf>) -> Result<()> {
     let child = Command::new(&arg_node_path)
         .args(vec!["--update-only"])
         .spawn()
-        .wrap_err_with(|| format!("Failed to update node at '{}'", arg_node_path))?;
+        .wrap_err_with(|| format!("Failed to update node at '{arg_node_path}'"))?;
 
     let output = child
         .wait_with_output()
-        .wrap_err_with(|| format!("Failed to update node at '{}'", arg_node_path))?;
+        .wrap_err_with(|| format!("Failed to update node at '{arg_node_path}'"))?;
 
     if output.status.success() {
         io::stdout()

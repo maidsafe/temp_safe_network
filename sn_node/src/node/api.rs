@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -6,7 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::comm::Comm;
 use crate::{
     node::{
         flow_ctrl::{cmds::Cmd, fault_detection::FaultsCmd},
@@ -15,44 +14,40 @@ use crate::{
     UsedSpace,
 };
 
+use sn_comms::Comm;
 use sn_interface::{
     dbcs::gen_genesis_dbc,
-    network_knowledge::{
-        MyNodeInfo, NetworkKnowledge, SectionKeyShare, SectionsDAG, GENESIS_DBC_SK,
-    },
-    types::log_markers::LogMarker,
+    messaging::system::SectionSigned,
+    network_knowledge::{NetworkKnowledge, SectionKeyShare, SectionsDAG, GENESIS_DBC_SK},
+    types::{log_markers::LogMarker, Peer},
+    SectionAuthorityProvider,
 };
 
 use ed25519_dalek::Keypair;
 use sn_dbc::Dbc;
 use std::{path::PathBuf, sync::Arc};
 use tokio::sync::mpsc;
-use xor_name::XorName;
 
 impl MyNode {
     pub(crate) async fn first_node(
         comm: Comm,
-        keypair: Arc<Keypair>,
+        keypair: Keypair,
         used_space: UsedSpace,
         root_storage_dir: PathBuf,
         genesis_sk_set: bls::SecretKeySet,
         fault_cmds_sender: mpsc::Sender<FaultsCmd>,
     ) -> Result<(Self, Dbc)> {
-        let our_addr = comm.socket_addr();
-        let info = MyNodeInfo {
-            keypair: keypair.clone(),
-            addr: our_addr,
-        };
+        let peer = Peer::from(comm.socket_addr(), keypair.public);
 
         let genesis_dbc =
             gen_genesis_dbc(&genesis_sk_set, &bls::SecretKey::from_hex(GENESIS_DBC_SK)?)?;
 
         let (network_knowledge, section_key_share) =
-            NetworkKnowledge::first_node(info.peer(), genesis_sk_set)?;
+            NetworkKnowledge::first_node(peer, genesis_sk_set)?;
 
         let node = Self::new(
             comm,
-            keypair.clone(),
+            Arc::new(keypair),
             network_knowledge,
             Some(section_key_share),
             used_space,
@@ -64,12 +59,14 @@ impl MyNode {
         Ok((node, genesis_dbc))
     }
 
-    pub(crate) fn relocate(&mut self, new_keypair: Arc<Keypair>, new_name: XorName) -> Result<()> {
+    pub(crate) fn switch_section(
+        &mut self,
+        dst_sap: SectionSigned<SectionAuthorityProvider>,
+        new_keypair: Keypair,
+    ) -> Result<()> {
         // try to relocate to the section that matches our current name
-        self.network_knowledge.relocate_to(new_name)?;
-
-        self.keypair = new_keypair;
-
+        self.network_knowledge.switch_section(dst_sap)?;
+        self.keypair = Arc::new(new_keypair);
         Ok(())
     }
 

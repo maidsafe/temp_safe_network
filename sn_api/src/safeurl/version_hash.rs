@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -36,7 +36,7 @@ pub struct VersionHash {
 impl Display for VersionHash {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let base32z = multibase::encode(Base::Base32Z, self.entry_hash.0);
-        write!(f, "{}", base32z)
+        write!(f, "{base32z}")
     }
 }
 

@@ -5,13 +5,174 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.15.0 (2022-12-09)
+## v0.15.1 (2023-01-27)
+
+### Chore
+
+ - <csr-id-3cf38457737bd6dd27ce3037ee5b2a2329df3f78/> update test msg quantities
+ - <csr-id-03d9c561c7259351310ede6e4cfb6e78822d728a/> add mean to std dev to get threshold
+ - <csr-id-783d62461a65eb7c06b0d4f399b97216b6c75519/> sn_interface-0.16.14/sn_client-0.77.8/sn_node-0.72.25/sn_api-0.75.4/sn_cli-0.68.5
+ - <csr-id-8d2ef1a0f298ef010f478fcd59c5b6c437b7b62f/> clarify comments and ensure sorted output of faulty nodes
+   other misc cleanup
+ - <csr-id-87cb70eefdc63f80942a2c87ecc3790f76105b91/> clarify naming of elders/non elders
+ - <csr-id-dc16323849e425e2ca2511f095caee5b0a4af1ab/> store elders in fault detection
+ - <csr-id-38d85b391a72a3ee71f705d9b89d6dbc74c041e1/> rename Knowledge -> NetworkKnowledge for clarity
+ - <csr-id-7674b9f5609384a35072043a777ac07b18c12bb3/> sort faulty nodes by fault level
+ - <csr-id-b13f1d7e5e84e42ed076654a159418563a9a1a35/> remove OpId for failed request tracking
+   We use bidi now, so we can report after any failure, no need for
+   double accounting
+ - <csr-id-21af053a5be2317be356e760c2b581c0f870a396/> happy new year 2023
+
+### New Features
+
+ - <csr-id-74b5e7794a213b70db7231c31b68cee340976119/> check elder scores against elders only, non elders against non elders
+ - <csr-id-f072aae9155cf833ce3a0f304496f43f6862dff4/> add ElderVoting issue type and track on section proposal votes outgoing
+ - <csr-id-addd2f806e81be1f04599fa556216b61ee5b8138/> enable removing knowledge issues
+   This should allow us to track voted proposals more easily
+   and weed out nodes that consistently dont vote
+ - <csr-id-2862f1cb9a60dcf4b4d22349c90d303bbb1e8305/> update values based on latest network
+   remove threshold concepts and use std_dev only
+   remove bogus tests where we rely on unreal network assumptions
+   (ie, we wont have only one AE probe msg failing... and if we do, then we should start consider
+   ing it a failure...
+
+### Bug Fixes
+
+ - <csr-id-3d0a359004de49d95378929903aeb71fa12d83c0/> ensure std dev cannot be rounded down
+
+### Test
+
+ - <csr-id-6144129d5cae1edf8850e41890044acf7804b299/> simplify failure check, make msgs target only one node
+   Previously we had messages mapping to several nodes depending on the issue type...
+   But actually, the msg counts are for _all_ nodes, so this was unuecessarily
+   levelling the field regardless of node quality.
+   
+   Now one message goes to one node, and it's one failure test.
+   Which means we see more realisitic variance in scores and the stats will
+   not be quite as arbitrary
+ - <csr-id-852716257efac7453f01e7404e254dd5481a40e4/> increase msg counts and rate of good failure
+ - <csr-id-2b6c4a8fcd2cd7b22e6a4b20f1218c859110be62/> add ElderVoting to the startup msg count
+   Adds ElderVoting as a msg that can fail to aid detection of bad elders.
+ - <csr-id-c503d722b9d3bf3325d564bd28d7df695dd70e95/> update to take only one node per fault
+   4 was an assumption of data msgs, but many of those even are not going to
+   data_copy_count, so we can relax this and just pass more messages for non
+   probe/dkg test msgs
+   
+   This also removes invalid portion of tests w/ less than 7 elders in DKG, as
+   that's a startup case where all nodes should be trusted, and only serves to
+   complicate the tests
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 27 commits contributed to the release over the course of 30 calendar days.
+ - 19 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - update test msg quantities ([`3cf3845`](https://github.com/maidsafe/safe_network/commit/3cf38457737bd6dd27ce3037ee5b2a2329df3f78))
+    - add mean to std dev to get threshold ([`03d9c56`](https://github.com/maidsafe/safe_network/commit/03d9c561c7259351310ede6e4cfb6e78822d728a))
+    - simplify failure check, make msgs target only one node ([`6144129`](https://github.com/maidsafe/safe_network/commit/6144129d5cae1edf8850e41890044acf7804b299))
+    - sn_interface-0.16.14/sn_client-0.77.8/sn_node-0.72.25/sn_api-0.75.4/sn_cli-0.68.5 ([`783d624`](https://github.com/maidsafe/safe_network/commit/783d62461a65eb7c06b0d4f399b97216b6c75519))
+    - Merge #1987 ([`1bf3c65`](https://github.com/maidsafe/safe_network/commit/1bf3c65dda02489297e98fb27ce3cf4a241ebf48))
+    - increase msg counts and rate of good failure ([`8527162`](https://github.com/maidsafe/safe_network/commit/852716257efac7453f01e7404e254dd5481a40e4))
+    - clarify comments and ensure sorted output of faulty nodes ([`8d2ef1a`](https://github.com/maidsafe/safe_network/commit/8d2ef1a0f298ef010f478fcd59c5b6c437b7b62f))
+    - check elder scores against elders only, non elders against non elders ([`74b5e77`](https://github.com/maidsafe/safe_network/commit/74b5e7794a213b70db7231c31b68cee340976119))
+    - clarify naming of elders/non elders ([`87cb70e`](https://github.com/maidsafe/safe_network/commit/87cb70eefdc63f80942a2c87ecc3790f76105b91))
+    - store elders in fault detection ([`dc16323`](https://github.com/maidsafe/safe_network/commit/dc16323849e425e2ca2511f095caee5b0a4af1ab))
+    - ensure std dev cannot be rounded down ([`3d0a359`](https://github.com/maidsafe/safe_network/commit/3d0a359004de49d95378929903aeb71fa12d83c0))
+    - Merge #1984 ([`dd07ad0`](https://github.com/maidsafe/safe_network/commit/dd07ad03a6112504c65c52a39aba0379b19c886c))
+    - add ElderVoting to the startup msg count ([`2b6c4a8`](https://github.com/maidsafe/safe_network/commit/2b6c4a8fcd2cd7b22e6a4b20f1218c859110be62))
+    - add ElderVoting issue type and track on section proposal votes outgoing ([`f072aae`](https://github.com/maidsafe/safe_network/commit/f072aae9155cf833ce3a0f304496f43f6862dff4))
+    - rename Knowledge -> NetworkKnowledge for clarity ([`38d85b3`](https://github.com/maidsafe/safe_network/commit/38d85b391a72a3ee71f705d9b89d6dbc74c041e1))
+    - enable removing knowledge issues ([`addd2f8`](https://github.com/maidsafe/safe_network/commit/addd2f806e81be1f04599fa556216b61ee5b8138))
+    - Merge #1961 ([`7da114b`](https://github.com/maidsafe/safe_network/commit/7da114b75cdb2a919506b0800ece860cb3e6df3e))
+    - update to take only one node per fault ([`c503d72`](https://github.com/maidsafe/safe_network/commit/c503d722b9d3bf3325d564bd28d7df695dd70e95))
+    - update values based on latest network ([`2862f1c`](https://github.com/maidsafe/safe_network/commit/2862f1cb9a60dcf4b4d22349c90d303bbb1e8305))
+    - sort faulty nodes by fault level ([`7674b9f`](https://github.com/maidsafe/safe_network/commit/7674b9f5609384a35072043a777ac07b18c12bb3))
+    - Merge #1958 ([`d3355bc`](https://github.com/maidsafe/safe_network/commit/d3355bc3c47e3f68517dfc62c01f647571bd1f73))
+    - remove OpId for failed request tracking ([`b13f1d7`](https://github.com/maidsafe/safe_network/commit/b13f1d7e5e84e42ed076654a159418563a9a1a35))
+    - Merge #1951 ([`24ca31f`](https://github.com/maidsafe/safe_network/commit/24ca31fd53c570c7c97849b74ded850c05273353))
+    - happy new year 2023 ([`21af053`](https://github.com/maidsafe/safe_network/commit/21af053a5be2317be356e760c2b581c0f870a396))
+    - Merge branch 'main' into proposal_refactor ([`0bc7f94`](https://github.com/maidsafe/safe_network/commit/0bc7f94c72c374d667a9b455c4f4f1830366e4a4))
+    - Merge #1873 ([`8be1563`](https://github.com/maidsafe/safe_network/commit/8be1563fcddde2323ae2f892687dc76f253f3fb2))
+    - chore(naming): rename dysfunction - Uses the more common vocabulary in fault tolerance area. ([`f68073f`](https://github.com/maidsafe/safe_network/commit/f68073f2897894375f5a09b870e2bfe4e03c3b10))
+</details>
+
+## v0.15.0 (2023-01-20)
+
+<csr-id-5e81ac4fb8a2312eb546a4b86e71be05df7c4e26/>
+<csr-id-6cf816f4e3ce1e81af614ba84de83ccf13e8e402/>
+<csr-id-5cbae9c10e9f1d4302d041a864bfee83d47834e0/>
+<csr-id-b6474691ea6af5ee441b02f6cb9c3cf2b8f97459/>
+<csr-id-a973b62a8ef48acc92af8735e7e7bcac94e0092f/>
+<csr-id-852716257efac7453f01e7404e254dd5481a40e4/>
+<csr-id-2b6c4a8fcd2cd7b22e6a4b20f1218c859110be62/>
+<csr-id-c503d722b9d3bf3325d564bd28d7df695dd70e95/>
+<csr-id-8d2ef1a0f298ef010f478fcd59c5b6c437b7b62f/>
+<csr-id-87cb70eefdc63f80942a2c87ecc3790f76105b91/>
+<csr-id-dc16323849e425e2ca2511f095caee5b0a4af1ab/>
+<csr-id-38d85b391a72a3ee71f705d9b89d6dbc74c041e1/>
+<csr-id-7674b9f5609384a35072043a777ac07b18c12bb3/>
+<csr-id-b13f1d7e5e84e42ed076654a159418563a9a1a35/>
+<csr-id-21af053a5be2317be356e760c2b581c0f870a396/>
 
 ### Chore
 
  - <csr-id-5e81ac4fb8a2312eb546a4b86e71be05df7c4e26/> remove unusued `Error` module
  - <csr-id-6cf816f4e3ce1e81af614ba84de83ccf13e8e402/> remove unusued `Result` from methods
  - <csr-id-5cbae9c10e9f1d4302d041a864bfee83d47834e0/> remove dashmap dep in sn_{dysfunction, interface}
+
+### Test
+
+ - <csr-id-852716257efac7453f01e7404e254dd5481a40e4/> increase msg counts and rate of good failure
+ - <csr-id-2b6c4a8fcd2cd7b22e6a4b20f1218c859110be62/> add ElderVoting to the startup msg count
+   Adds ElderVoting as a msg that can fail to aid detection of bad elders.
+ - <csr-id-c503d722b9d3bf3325d564bd28d7df695dd70e95/> update to take only one node per fault
+   4 was an assumption of data msgs, but many of those even are not going to
+   data_copy_count, so we can relax this and just pass more messages for non
+   probe/dkg test msgs
+   
+   This also removes invalid portion of tests w/ less than 7 elders in DKG, as
+   that's a startup case where all nodes should be trusted, and only serves to
+   complicate the tests
+
+### Bug Fixes
+
+ - <csr-id-3d0a359004de49d95378929903aeb71fa12d83c0/> ensure std dev cannot be rounded down
+
+### New Features
+
+ - <csr-id-74b5e7794a213b70db7231c31b68cee340976119/> check elder scores against elders only, non elders against non elders
+ - <csr-id-f072aae9155cf833ce3a0f304496f43f6862dff4/> add ElderVoting issue type and track on section proposal votes outgoing
+ - <csr-id-addd2f806e81be1f04599fa556216b61ee5b8138/> enable removing knowledge issues
+   This should allow us to track voted proposals more easily
+   and weed out nodes that consistently dont vote
+ - <csr-id-2862f1cb9a60dcf4b4d22349c90d303bbb1e8305/> update values based on latest network
+   remove threshold concepts and use std_dev only
+   remove bogus tests where we rely on unreal network assumptions
+   (ie, we wont have only one AE probe msg failing... and if we do, then we should start consider
+   ing it a failure...
+
+### Chore
+
+ - <csr-id-8d2ef1a0f298ef010f478fcd59c5b6c437b7b62f/> clarify comments and ensure sorted output of faulty nodes
+   other misc cleanup
+ - <csr-id-87cb70eefdc63f80942a2c87ecc3790f76105b91/> clarify naming of elders/non elders
+ - <csr-id-dc16323849e425e2ca2511f095caee5b0a4af1ab/> store elders in fault detection
+ - <csr-id-38d85b391a72a3ee71f705d9b89d6dbc74c041e1/> rename Knowledge -> NetworkKnowledge for clarity
+ - <csr-id-7674b9f5609384a35072043a777ac07b18c12bb3/> sort faulty nodes by fault level
+ - <csr-id-b13f1d7e5e84e42ed076654a159418563a9a1a35/> remove OpId for failed request tracking
+   We use bidi now, so we can report after any failure, no need for
+   double accounting
+ - <csr-id-21af053a5be2317be356e760c2b581c0f870a396/> happy new year 2023
 
 ### Other
 
@@ -25,56 +186,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    - Removing correlation id from SystemMsg node query/response
    - Redefine system::NodeQueryResponse type just as an alias to data::QueryResponse
 
-### Commit Statistics
-
-<csr-read-only-do-not-edit/>
-
- - 8 commits contributed to the release over the course of 71 calendar days.
- - 80 days passed between releases.
- - 5 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' were seen in commit messages
-
-### Commit Details
-
-<csr-read-only-do-not-edit/>
-
-<details><summary>view details</summary>
-
- * **Uncategorized**
-    - Merge #1777 ([`f24e622`](https://github.com/maidsafe/safe_network/commit/f24e622dcb53362623300bdc02d70779590964a5))
-    - refactor(sn_dysfunction): rename `IssueType` variants The `IssueType` is now used to track as well as untrack dysfunctional nodes. Hence modify the names to be more generic. ([`489deb5`](https://github.com/maidsafe/safe_network/commit/489deb59bd53337d889aac2c73b49fa51440f148))
-    - remove unusued `Error` module ([`5e81ac4`](https://github.com/maidsafe/safe_network/commit/5e81ac4fb8a2312eb546a4b86e71be05df7c4e26))
-    - remove unusued `Result` from methods ([`6cf816f`](https://github.com/maidsafe/safe_network/commit/6cf816f4e3ce1e81af614ba84de83ccf13e8e402))
-    - removing op id from query response ([`a973b62`](https://github.com/maidsafe/safe_network/commit/a973b62a8ef48acc92af8735e7e7bcac94e0092f))
-    - remove dashmap dep in sn_{dysfunction, interface} ([`5cbae9c`](https://github.com/maidsafe/safe_network/commit/5cbae9c10e9f1d4302d041a864bfee83d47834e0))
-    - Merge #1550 ([`c6f2e2f`](https://github.com/maidsafe/safe_network/commit/c6f2e2fb98e29911336f86f54c1d9b9605037b57))
-    - sn_dkg integration ([`b647469`](https://github.com/maidsafe/safe_network/commit/b6474691ea6af5ee441b02f6cb9c3cf2b8f97459))
-</details>
-
 ## v0.14.0 (2022-09-19)
+
+<csr-id-a8a9fb90791b29496e8559090dca4161e04054da/>
 
 ### Chore
 
  - <csr-id-a8a9fb90791b29496e8559090dca4161e04054da/> sn_interface-0.15.0/sn_dysfunction-0.14.0/sn_client-0.76.0/sn_node-0.71.0/sn_api-0.74.0/sn_cli-0.67.0
-
-### Commit Statistics
-
-<csr-read-only-do-not-edit/>
-
- - 1 commit contributed to the release.
- - 9 days passed between releases.
- - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' were seen in commit messages
-
-### Commit Details
-
-<csr-read-only-do-not-edit/>
-
-<details><summary>view details</summary>
-
- * **Uncategorized**
-    - sn_interface-0.15.0/sn_dysfunction-0.14.0/sn_client-0.76.0/sn_node-0.71.0/sn_api-0.74.0/sn_cli-0.67.0 ([`a8a9fb9`](https://github.com/maidsafe/safe_network/commit/a8a9fb90791b29496e8559090dca4161e04054da))
-</details>
 
 ## v0.13.0 (2022-09-09)
 
@@ -84,26 +202,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  - <csr-id-448694176dd3b40a12bd8ecc16d9bb66fd171a37/> sn_interface-0.14.0/sn_dysfunction-0.13.0/sn_client-0.75.0/sn_node-0.70.0/sn_api-0.73.0/sn_cli-0.66.0
 
-### Commit Statistics
-
-<csr-read-only-do-not-edit/>
-
- - 2 commits contributed to the release over the course of 1 calendar day.
- - 1 day passed between releases.
- - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' were seen in commit messages
-
-### Commit Details
-
-<csr-read-only-do-not-edit/>
-
-<details><summary>view details</summary>
-
- * **Uncategorized**
-    - sn_interface-0.14.0/sn_dysfunction-0.13.0/sn_client-0.75.0/sn_node-0.70.0/sn_api-0.73.0/sn_cli-0.66.0 ([`4486941`](https://github.com/maidsafe/safe_network/commit/448694176dd3b40a12bd8ecc16d9bb66fd171a37))
-    - Merge branch 'main' into Chore-ClientRetriesOnDataNotFound ([`bbca976`](https://github.com/maidsafe/safe_network/commit/bbca97680840e1069c88278fe14ddee153b97dbb))
-</details>
-
 ## v0.12.0 (2022-09-07)
 
 <csr-id-fe659c5685289fe0071b54298dcac394e83c0dce/>
@@ -111,24 +209,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Chore
 
  - <csr-id-fe659c5685289fe0071b54298dcac394e83c0dce/> sn_interface-0.13.0/sn_dysfunction-0.12.0/sn_client-0.74.0/sn_node-0.69.0/sn_api-0.72.0/sn_cli-0.65.0
-
-### Commit Statistics
-
-<csr-read-only-do-not-edit/>
-
- - 1 commit contributed to the release.
- - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' were seen in commit messages
-
-### Commit Details
-
-<csr-read-only-do-not-edit/>
-
-<details><summary>view details</summary>
-
- * **Uncategorized**
-    - sn_interface-0.13.0/sn_dysfunction-0.12.0/sn_client-0.74.0/sn_node-0.69.0/sn_api-0.72.0/sn_cli-0.65.0 ([`fe659c5`](https://github.com/maidsafe/safe_network/commit/fe659c5685289fe0071b54298dcac394e83c0dce))
-</details>
 
 ## v0.11.0 (2022-09-06)
 
@@ -151,31 +231,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Chore
 
  - <csr-id-1b9e0a6564e9564201ef3a3e04adb0bfbef6ac14/> sn_interface-0.12.0/sn_dysfunction-0.11.0/sn_client-0.73.0/sn_node-0.68.0/sn_api-0.71.0/sn_cli-0.64.0
-
-### Commit Statistics
-
-<csr-read-only-do-not-edit/>
-
- - 7 commits contributed to the release over the course of 8 calendar days.
- - 13 days passed between releases.
- - 6 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' were seen in commit messages
-
-### Commit Details
-
-<csr-read-only-do-not-edit/>
-
-<details><summary>view details</summary>
-
- * **Uncategorized**
-    - sn_interface-0.12.0/sn_dysfunction-0.11.0/sn_client-0.73.0/sn_node-0.68.0/sn_api-0.71.0/sn_cli-0.64.0 ([`1b9e0a6`](https://github.com/maidsafe/safe_network/commit/1b9e0a6564e9564201ef3a3e04adb0bfbef6ac14))
-    - sn_interface-0.11.0/sn_dysfunction-0.10.0/sn_client-0.72.0/sn_node-0.67.0/sn_api-0.70.0/sn_cli-0.63.0 ([`d28fdf3`](https://github.com/maidsafe/safe_network/commit/d28fdf3ddd0a39f7bbc6426e1e71d990319b0ec7))
-    - replace implicit clones with clone ([`dd89cac`](https://github.com/maidsafe/safe_network/commit/dd89cac97da96ffe26ae78c4b7b62aa952ec53fc))
-    - unneeded iter methods removal ([`9214386`](https://github.com/maidsafe/safe_network/commit/921438659ccaf65b2ea8cc00efb61d8146ef71ef))
-    - applied use_self lint ([`f5d436f`](https://github.com/maidsafe/safe_network/commit/f5d436fba99e0e9c258c7ab3c3a256be3be58f84))
-    - Merge branch 'main' into avoid_testing_data_collision ([`60c368b`](https://github.com/maidsafe/safe_network/commit/60c368b8494eaeb219572c2304bf787a168cfee0))
-    - switch on clippy::unwrap_used as a warning ([`3a718d8`](https://github.com/maidsafe/safe_network/commit/3a718d8c0957957a75250b044c9d1ad1b5874ab0))
-</details>
 
 ## v0.10.0 (2022-09-04)
 
@@ -204,27 +259,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Chore
 
  - <csr-id-43fcc7c517f95eab0e27ddc79cd9c6de3631c7c6/> sn_interface-0.10.0/sn_dysfunction-0.9.0/sn_client-0.70.0/sn_node-0.66.0/sn_api-0.68.0/sn_cli-0.61.0
-
-### Commit Statistics
-
-<csr-read-only-do-not-edit/>
-
- - 3 commits contributed to the release over the course of 8 calendar days.
- - 9 days passed between releases.
- - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' were seen in commit messages
-
-### Commit Details
-
-<csr-read-only-do-not-edit/>
-
-<details><summary>view details</summary>
-
- * **Uncategorized**
-    - sn_interface-0.10.0/sn_dysfunction-0.9.0/sn_client-0.70.0/sn_node-0.66.0/sn_api-0.68.0/sn_cli-0.61.0 ([`43fcc7c`](https://github.com/maidsafe/safe_network/commit/43fcc7c517f95eab0e27ddc79cd9c6de3631c7c6))
-    - chore: run periodic checks on time Instead of running when connection arrives. ([`93a13d8`](https://github.com/maidsafe/safe_network/commit/93a13d896343f746718be228c46a37b03d6618bb))
-    - feat(node) add elder health checks ([`93cc084`](https://github.com/maidsafe/safe_network/commit/93cc08468278995598938a8ed3dcdff33a23d066))
-</details>
 
 ## v0.8.0 (2022-08-14)
 
@@ -286,42 +320,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  - <csr-id-9fde534277f359dfa0a1d91d917864776edb5138/> reissuing DBCs for all sn_cli tests only once as a setup stage
 
-### Commit Statistics
-
-<csr-read-only-do-not-edit/>
-
- - 18 commits contributed to the release over the course of 37 calendar days.
- - 37 days passed between releases.
- - 15 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' were seen in commit messages
-
-### Commit Details
-
-<csr-read-only-do-not-edit/>
-
-<details><summary>view details</summary>
-
- * **Uncategorized**
-    - sn_interface-0.9.0/sn_dysfunction-0.8.0/sn_client-0.69.0/sn_node-0.65.0/sn_api-0.67.0/sn_cli-0.60.0 ([`53f60c2`](https://github.com/maidsafe/safe_network/commit/53f60c2327f8a69f0b2ef6d1a4e96644c10aa358))
-    - further tweak dysf, reduce score by std dev for better avg. ([`a4a39b4`](https://github.com/maidsafe/safe_network/commit/a4a39b421103af7c143280ad3860b3cbd3016386))
-    - remove unused severity; refactor weighted score ([`3cf9033`](https://github.com/maidsafe/safe_network/commit/3cf903367bfcd805ceff2f2508cd2b12eddc3ca5))
-    - add AeProbe dysfunction. Refactor score calculation ([`b2c6b21`](https://github.com/maidsafe/safe_network/commit/b2c6b2164fbf6679edea0157217dc946d5f9d318))
-    - serialize NetworkPrefixMap into JSON ([`29de67f`](https://github.com/maidsafe/safe_network/commit/29de67f1e3583eab867d517cb50ed2e404bd63fd))
-    - chore: cleanup unnecessary options and results These were remaining in places where there was no path for None or Error. Cleaning these up removes accidental complexity. ([`db22c6c`](https://github.com/maidsafe/safe_network/commit/db22c6c8c1aedb347bea52199a5673695eff86f8))
-    - make the diff proportional to mean to be reported ([`4a17a1d`](https://github.com/maidsafe/safe_network/commit/4a17a1dcf858b5daf96e5b9f69ac33c10a988c27))
-    - rename DysfunctionDetection::adults to nodes ([`7c109a0`](https://github.com/maidsafe/safe_network/commit/7c109a0e22b2032ad5ad3b10f828f855091bec67))
-    - newly inserted operation shall not count towards issue ([`3befae3`](https://github.com/maidsafe/safe_network/commit/3befae39e3dbc93c4187092e7abe3c6e21893184))
-    - reissuing DBCs for all sn_cli tests only once as a setup stage ([`9fde534`](https://github.com/maidsafe/safe_network/commit/9fde534277f359dfa0a1d91d917864776edb5138))
-    - relax knowledge penalty. ([`2f38be7`](https://github.com/maidsafe/safe_network/commit/2f38be726cf493c89d452b6faa50ab8284048798))
-    - relax knowledge penalty. ([`bbb77f0`](https://github.com/maidsafe/safe_network/commit/bbb77f0c34e9d4c263be1c5362f1115ecee1da57))
-    - removed unused async at dysfunction ([`4773e18`](https://github.com/maidsafe/safe_network/commit/4773e185302ada27cd08c8dfd04582e7fdaf42aa))
-    - remove awaits from tests as well ([`31d9f9f`](https://github.com/maidsafe/safe_network/commit/31d9f9f99b4e166986b8e51c3d41e0eac55621a4))
-    - remove unused async ([`dedec48`](https://github.com/maidsafe/safe_network/commit/dedec486f85c1cf6cf2d538238f32e826e08da0a))
-    - Tweak dysf interval, reducing to report on issues more rapidly ([`e39917d`](https://github.com/maidsafe/safe_network/commit/e39917d0635a071625f7961ce6d40cb44cc65da0))
-    - Merge branch 'main' into feat-dbc-spent-proof-validations ([`45309c4`](https://github.com/maidsafe/safe_network/commit/45309c4c0463dd9198a49537187417bf4bfdb847))
-    - Merge branch 'main' into feat-cli-wallet-show-deposited-amount ([`6268fe7`](https://github.com/maidsafe/safe_network/commit/6268fe76e9dd81d291492b4611094273f8d1e223))
-</details>
-
 ## v0.7.1 (2022-07-07)
 
 <csr-id-46262268fc167c05963e5b7bd6261310496e2379/>
@@ -344,32 +342,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  - <csr-id-2b00cec961561281f6b927e13e501342843f6a0f/> sn_interface-0.8.1/sn_dysfunction-0.7.1/sn_client-0.68.1/sn_node-0.64.1/sn_api-0.66.1/sn_cli-0.59.1
 
-### Commit Statistics
-
-<csr-read-only-do-not-edit/>
-
- - 8 commits contributed to the release over the course of 1 calendar day.
- - 2 days passed between releases.
- - 4 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' were seen in commit messages
-
-### Commit Details
-
-<csr-read-only-do-not-edit/>
-
-<details><summary>view details</summary>
-
- * **Uncategorized**
-    - sn_interface-0.8.1/sn_dysfunction-0.7.1/sn_client-0.68.1/sn_node-0.64.1/sn_api-0.66.1/sn_cli-0.59.1 ([`2b00cec`](https://github.com/maidsafe/safe_network/commit/2b00cec961561281f6b927e13e501342843f6a0f))
-    - Merge branch 'main' into feat-cli-wallet-show-deposited-amount ([`39bd5b4`](https://github.com/maidsafe/safe_network/commit/39bd5b471b6b3acb6ebe90489335c995b0aca82f))
-    - Merge branch 'main' into cargo-husky-tweaks ([`6881855`](https://github.com/maidsafe/safe_network/commit/688185573bb71cc44a7103df17f3fbeea6740247))
-    - Merge #1309 ([`f9fa4f7`](https://github.com/maidsafe/safe_network/commit/f9fa4f7857d8161e8c036cca06006bf187a6c6c3))
-    - `try!` macro is deprecated ([`4626226`](https://github.com/maidsafe/safe_network/commit/46262268fc167c05963e5b7bd6261310496e2379))
-    - Merge #1304 ([`6af41dc`](https://github.com/maidsafe/safe_network/commit/6af41dcbad76903cb5526b270100e650aa483191))
-    - Remove registerStorage cache ([`6b574bd`](https://github.com/maidsafe/safe_network/commit/6b574bd53f7e51839380b7be914dbab015726d1e))
-    - remove dysfunction arc/rwlock ([`2f6fff2`](https://github.com/maidsafe/safe_network/commit/2f6fff23a29cc4f04415a9a606fec88167551268))
-</details>
-
 ## v0.7.0 (2022-07-04)
 
 <csr-id-9314a2db5dc1ae91bc4d80a65c1a8825492fc7c7/>
@@ -385,27 +357,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  - <csr-id-e4e2eb56611a328806c59ed8bc80ca2567206bbb/> sn_interface-0.8.0/sn_dysfunction-0.7.0/sn_client-0.68.0/sn_node-0.64.0/sn_api-0.66.0/sn_cli-0.59.0
 
-### Commit Statistics
-
-<csr-read-only-do-not-edit/>
-
- - 3 commits contributed to the release over the course of 3 calendar days.
- - 6 days passed between releases.
- - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' were seen in commit messages
-
-### Commit Details
-
-<csr-read-only-do-not-edit/>
-
-<details><summary>view details</summary>
-
- * **Uncategorized**
-    - sn_interface-0.8.0/sn_dysfunction-0.7.0/sn_client-0.68.0/sn_node-0.64.0/sn_api-0.66.0/sn_cli-0.59.0 ([`e4e2eb5`](https://github.com/maidsafe/safe_network/commit/e4e2eb56611a328806c59ed8bc80ca2567206bbb))
-    - Docs - put symbols in backticks ([`9314a2d`](https://github.com/maidsafe/safe_network/commit/9314a2db5dc1ae91bc4d80a65c1a8825492fc7c7))
-    - remove let bindings for unit returns ([`ddb7798`](https://github.com/maidsafe/safe_network/commit/ddb7798a7b0c5e60960e123414277d58f3da27eb))
-</details>
-
 ## v0.6.1 (2022-06-28)
 
 <csr-id-eebbc30f5dd449b786115c37813a4554309875e0/>
@@ -419,26 +370,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  - <csr-id-58890e5c919ada30f27d4e80c6b5e7291b99ed5c/> sn_interface-0.7.1/sn_dysfunction-0.6.1/sn_client-0.67.1/sn_node-0.63.1
 
-### Commit Statistics
-
-<csr-read-only-do-not-edit/>
-
- - 2 commits contributed to the release.
- - 2 days passed between releases.
- - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' were seen in commit messages
-
-### Commit Details
-
-<csr-read-only-do-not-edit/>
-
-<details><summary>view details</summary>
-
- * **Uncategorized**
-    - sn_interface-0.7.1/sn_dysfunction-0.6.1/sn_client-0.67.1/sn_node-0.63.1 ([`58890e5`](https://github.com/maidsafe/safe_network/commit/58890e5c919ada30f27d4e80c6b5e7291b99ed5c))
-    - adding new dysf test for DKG rounds ([`eebbc30`](https://github.com/maidsafe/safe_network/commit/eebbc30f5dd449b786115c37813a4554309875e0))
-</details>
-
 ## v0.6.0 (2022-06-26)
 
 <csr-id-243cfc48a7f4a9b60b5b7f1fdd609c02197aba5e/>
@@ -446,25 +377,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Chore
 
  - <csr-id-243cfc48a7f4a9b60b5b7f1fdd609c02197aba5e/> sn_interface-0.7.0/sn_dysfunction-0.6.0/sn_client-0.67.0/sn_node-0.63.0/sn_api-0.65.0/sn_cli-0.58.0
-
-### Commit Statistics
-
-<csr-read-only-do-not-edit/>
-
- - 1 commit contributed to the release.
- - 2 days passed between releases.
- - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' were seen in commit messages
-
-### Commit Details
-
-<csr-read-only-do-not-edit/>
-
-<details><summary>view details</summary>
-
- * **Uncategorized**
-    - sn_interface-0.7.0/sn_dysfunction-0.6.0/sn_client-0.67.0/sn_node-0.63.0/sn_api-0.65.0/sn_cli-0.58.0 ([`243cfc4`](https://github.com/maidsafe/safe_network/commit/243cfc48a7f4a9b60b5b7f1fdd609c02197aba5e))
-</details>
 
 ## v0.5.3 (2022-06-24)
 
@@ -485,28 +397,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  - <csr-id-dc69a62eec590b2d621ab2cbc3009cb052955e66/> sn_interface-0.6.5/sn_dysfunction-0.5.3/sn_client-0.66.5/sn_node-0.62.8/sn_cli-0.57.6
 
-### Commit Statistics
-
-<csr-read-only-do-not-edit/>
-
- - 4 commits contributed to the release over the course of 3 calendar days.
- - 3 days passed between releases.
- - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' were seen in commit messages
-
-### Commit Details
-
-<csr-read-only-do-not-edit/>
-
-<details><summary>view details</summary>
-
- * **Uncategorized**
-    - sn_interface-0.6.5/sn_dysfunction-0.5.3/sn_client-0.66.5/sn_node-0.62.8/sn_cli-0.57.6 ([`dc69a62`](https://github.com/maidsafe/safe_network/commit/dc69a62eec590b2d621ab2cbc3009cb052955e66))
-    - Merge #1264 ([`7f4f4cb`](https://github.com/maidsafe/safe_network/commit/7f4f4cb0b1664c2d6f30962de25d5fdcbc5074de))
-    - improving dysf test, reproducible issues ([`b433a23`](https://github.com/maidsafe/safe_network/commit/b433a23b2f661ad3ac0ebc290f457f1c64e04471))
-    - Merge branch 'main' into refactor-event-channel ([`024883e`](https://github.com/maidsafe/safe_network/commit/024883e9a1b853c02c29daa5c447b03570af2473))
-</details>
-
 ## v0.5.2 (2022-06-21)
 
 <csr-id-c038635cf88d32c52da89d11a8532e6c91c8bf38/>
@@ -519,26 +409,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Chore
 
  - <csr-id-d526e0a32d3f09a788899d82db4fe6f13258568c/> sn_interface-0.6.4/sn_dysfunction-0.5.2/sn_client-0.66.4/sn_node-0.62.7/sn_api-0.64.4
-
-### Commit Statistics
-
-<csr-read-only-do-not-edit/>
-
- - 2 commits contributed to the release.
- - 5 days passed between releases.
- - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' were seen in commit messages
-
-### Commit Details
-
-<csr-read-only-do-not-edit/>
-
-<details><summary>view details</summary>
-
- * **Uncategorized**
-    - sn_interface-0.6.4/sn_dysfunction-0.5.2/sn_client-0.66.4/sn_node-0.62.7/sn_api-0.64.4 ([`d526e0a`](https://github.com/maidsafe/safe_network/commit/d526e0a32d3f09a788899d82db4fe6f13258568c))
-    - chore: misc cleanup - Organise usings - Add missing license headers - Update license years As it would take too long to go through all files, a partial cleanup of the code base is made here. It is based on where the using of `sn_interface` has been introduced, as it was a low hanging fruit to cover many occurrences of duplication in many files. ([`c038635`](https://github.com/maidsafe/safe_network/commit/c038635cf88d32c52da89d11a8532e6c91c8bf38))
-</details>
 
 ## v0.5.1 (2022-06-15)
 
@@ -559,29 +429,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  - <csr-id-7ccb02a7ded7579bb8645c918b9a6108b1b585af/> enable tracking of Dkg issues
 
-### Commit Statistics
-
-<csr-read-only-do-not-edit/>
-
- - 5 commits contributed to the release.
- - 10 days passed between releases.
- - 4 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' were seen in commit messages
-
-### Commit Details
-
-<csr-read-only-do-not-edit/>
-
-<details><summary>view details</summary>
-
- * **Uncategorized**
-    - sn_interface-0.6.3/sn_dysfunction-0.5.1/sn_client-0.66.3/sn_api-0.64.3/sn_cli-0.57.4 ([`f599c59`](https://github.com/maidsafe/safe_network/commit/f599c5973d50324aad1720166156666d5db1ed3d))
-    - Merge #1234 ([`05b9b75`](https://github.com/maidsafe/safe_network/commit/05b9b755165304c282cc415419030eee8b6a3636))
-    - adjust some dysfunction weighting. decreas dkg ([`26e35cc`](https://github.com/maidsafe/safe_network/commit/26e35cc2d1c5aab81c3479dd7948f7a7e586f817))
-    - reduce comm error weighting ([`537b6c0`](https://github.com/maidsafe/safe_network/commit/537b6c08447c15a056d8c79c8592106d9a40b672))
-    - enable tracking of Dkg issues ([`7ccb02a`](https://github.com/maidsafe/safe_network/commit/7ccb02a7ded7579bb8645c918b9a6108b1b585af))
-</details>
-
 ## v0.5.0 (2022-06-05)
 
 <csr-id-1bf7dfb3ce8b14cbed7a4a8ed98c8310653a2da9/>
@@ -589,25 +436,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Chore
 
  - <csr-id-1bf7dfb3ce8b14cbed7a4a8ed98c8310653a2da9/> sn_interface-0.6.0/sn_dysfunction-0.5.0/sn_client-0.66.0/sn_node-0.62.0/sn_api-0.64.0/sn_cli-0.57.0
-
-### Commit Statistics
-
-<csr-read-only-do-not-edit/>
-
- - 1 commit contributed to the release.
- - 8 days passed between releases.
- - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' were seen in commit messages
-
-### Commit Details
-
-<csr-read-only-do-not-edit/>
-
-<details><summary>view details</summary>
-
- * **Uncategorized**
-    - sn_interface-0.6.0/sn_dysfunction-0.5.0/sn_client-0.66.0/sn_node-0.62.0/sn_api-0.64.0/sn_cli-0.57.0 ([`1bf7dfb`](https://github.com/maidsafe/safe_network/commit/1bf7dfb3ce8b14cbed7a4a8ed98c8310653a2da9))
-</details>
 
 ## v0.4.0 (2022-05-27)
 
@@ -617,26 +445,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  - <csr-id-e5fcd032e1dd904e05bc23e119af1d06e3b85a06/> sn_interface-0.5.0/sn_dysfunction-0.4.0/sn_client-0.65.0/sn_node-0.61.0/sn_api-0.63.0/sn_cli-0.56.0
 
-### Commit Statistics
-
-<csr-read-only-do-not-edit/>
-
- - 2 commits contributed to the release over the course of 2 calendar days.
- - 2 days passed between releases.
- - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' were seen in commit messages
-
-### Commit Details
-
-<csr-read-only-do-not-edit/>
-
-<details><summary>view details</summary>
-
- * **Uncategorized**
-    - sn_interface-0.5.0/sn_dysfunction-0.4.0/sn_client-0.65.0/sn_node-0.61.0/sn_api-0.63.0/sn_cli-0.56.0 ([`e5fcd03`](https://github.com/maidsafe/safe_network/commit/e5fcd032e1dd904e05bc23e119af1d06e3b85a06))
-    - Merge branch 'main' into bump-consensus-2.0.0 ([`a1c592a`](https://github.com/maidsafe/safe_network/commit/a1c592a71247660e7372e019e5f9a6ea23299e0f))
-</details>
-
 ## v0.3.0 (2022-05-25)
 
 <csr-id-ef56cf9cf8de45a9f13c2510c63de245b12aeae8/>
@@ -644,25 +452,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Chore
 
  - <csr-id-ef56cf9cf8de45a9f13c2510c63de245b12aeae8/> sn_interface-0.4.0/sn_dysfunction-0.3.0/sn_client-0.64.0/sn_node-0.60.0/sn_api-0.62.0/sn_cli-0.55.0
-
-### Commit Statistics
-
-<csr-read-only-do-not-edit/>
-
- - 1 commit contributed to the release.
- - 3 days passed between releases.
- - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' were seen in commit messages
-
-### Commit Details
-
-<csr-read-only-do-not-edit/>
-
-<details><summary>view details</summary>
-
- * **Uncategorized**
-    - sn_interface-0.4.0/sn_dysfunction-0.3.0/sn_client-0.64.0/sn_node-0.60.0/sn_api-0.62.0/sn_cli-0.55.0 ([`ef56cf9`](https://github.com/maidsafe/safe_network/commit/ef56cf9cf8de45a9f13c2510c63de245b12aeae8))
-</details>
 
 ## v0.2.0 (2022-05-21)
 
@@ -682,30 +471,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-ef798150deb88efac1dcfe9a3cd0f2cebe1e4682/> add Display for OperationId
 
 
-### Commit Statistics
-
-<csr-read-only-do-not-edit/>
-
- - 6 commits contributed to the release over the course of 3 calendar days.
- - 10 days passed between releases.
- - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' were seen in commit messages
-
-### Commit Details
-
-<csr-read-only-do-not-edit/>
-
-<details><summary>view details</summary>
-
- * **Uncategorized**
-    - sn_dysfunction-0.2.0/sn_client-0.63.0/sn_node-0.59.0/sn_api-0.61.0/sn_cli-0.54.0 ([`cf21d66`](https://github.com/maidsafe/safe_network/commit/cf21d66b9b726123e0a4320cd68481b67f7af03d))
-    - Merge #1196 ([`1d1689f`](https://github.com/maidsafe/safe_network/commit/1d1689f91d0bc450257d1a279561ea7b0c1b71a7))
-    - add Display for OperationId ([`ef79815`](https://github.com/maidsafe/safe_network/commit/ef798150deb88efac1dcfe9a3cd0f2cebe1e4682))
-    - Merge branch 'main' into move-membership-history-to-network-knowledge ([`57de06b`](https://github.com/maidsafe/safe_network/commit/57de06b828191e093de06750f94fe6f500890112))
-    - Merge #1193 ([`c5b0f1b`](https://github.com/maidsafe/safe_network/commit/c5b0f1b6d4f288737bc1f4fbda162386149ec402))
-    - ensure op writes use mut ([`24125eb`](https://github.com/maidsafe/safe_network/commit/24125eb3603a14c22e208964cbecac16915161ae))
-</details>
-
 ## v0.1.3 (2022-05-11)
 
 <csr-id-66638f508ad4df12b757672df589ba8ad09fbdfc/>
@@ -719,27 +484,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-ddb939d5831b2f0d66fa2e0954b62e5e22a3ee69/> relax dysfunction for knowledge and conn issues
    Increases 10x the amount of conn or knowledge issues. We've been voting
    off nodes far too quickly, even on droplet testnets
-
-### Commit Statistics
-
-<csr-read-only-do-not-edit/>
-
- - 3 commits contributed to the release over the course of 1 calendar day.
- - 18 days passed between releases.
- - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' were seen in commit messages
-
-### Commit Details
-
-<csr-read-only-do-not-edit/>
-
-<details><summary>view details</summary>
-
- * **Uncategorized**
-    - sn_dysfunction-0.1.3/sn_node-0.58.17 ([`66638f5`](https://github.com/maidsafe/safe_network/commit/66638f508ad4df12b757672df589ba8ad09fbdfc))
-    - Merge branch 'main' into sap_sig_checks ([`f8ec2e5`](https://github.com/maidsafe/safe_network/commit/f8ec2e54943eaa18b50bd9d7562d41f57d5d3248))
-    - relax dysfunction for knowledge and conn issues ([`ddb939d`](https://github.com/maidsafe/safe_network/commit/ddb939d5831b2f0d66fa2e0954b62e5e22a3ee69))
-</details>
 
 ## v0.1.2 (2022-04-23)
 
@@ -839,31 +583,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    `PendingRequestOperation(None)`. That's a lot better than using some placeholder value for the
    operation ID. This also tidies up `track_issue` to remove the optional `op_id` argument.
 
-### Commit Statistics
-
-<csr-read-only-do-not-edit/>
-
- - 7 commits contributed to the release over the course of 2 calendar days.
- - 27 days passed between releases.
- - 7 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' were seen in commit messages
-
-### Commit Details
-
-<csr-read-only-do-not-edit/>
-
-<details><summary>view details</summary>
-
- * **Uncategorized**
-    - sn_interface-0.2.0/sn_dysfunction-0.1.2/sn_api-0.59.0/sn_cli-0.52.0 ([`2f4e7e6`](https://github.com/maidsafe/safe_network/commit/2f4e7e6305ba387f2e28945aee71df650ac1d3eb))
-    - tidy references in cargo manifests ([`318ee1d`](https://github.com/maidsafe/safe_network/commit/318ee1d22970b5f06e93a99b6e8fff6da638c589))
-    - remove modules that only contained tests ([`6452690`](https://github.com/maidsafe/safe_network/commit/6452690c1b75bb8804c1f9de19c394a83f178acb))
-    - move request_operation_fulfilled ([`08385f4`](https://github.com/maidsafe/safe_network/commit/08385f4e03cd43b94f15523597f90f1cc9977a87))
-    - remove op_id arg from track_issue ([`1f3af46`](https://github.com/maidsafe/safe_network/commit/1f3af46aea59ebeb1b6a4b736e80e86ce2f724d8))
-    - remove unused dep ([`66901bc`](https://github.com/maidsafe/safe_network/commit/66901bcb3b68d3fbe84bfde915bb80ae1b562347))
-    - compare against all nodes in section ([`5df610c`](https://github.com/maidsafe/safe_network/commit/5df610c93b76cfc3a6f09734476240313b16bee6))
-</details>
-
 ## v0.1.1 (2022-03-26)
 
 <csr-id-df66875627aa41d06b7613085f05a97187c7175d/>
@@ -907,33 +626,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Bug Fixes
 
  - <csr-id-52aaf595293f2f0d3dd234907134bc624703a3ca/> ensure we have at least 1 when calculating each score
-
-### Commit Statistics
-
-<csr-read-only-do-not-edit/>
-
- - 10 commits contributed to the release over the course of 1 calendar day.
- - 10 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' were seen in commit messages
-
-### Commit Details
-
-<csr-read-only-do-not-edit/>
-
-<details><summary>view details</summary>
-
- * **Uncategorized**
-    - sn_dysfunction-/safe_network-0.58.9 ([`b471b5c`](https://github.com/maidsafe/safe_network/commit/b471b5c9f539933dd12de7af3473d2b0f61d7f28))
-    - sn_dysfunction-0.1.0/safe_network-0.58.8/sn_api-0.58.0/sn_cli-0.51.0 ([`1aa331d`](https://github.com/maidsafe/safe_network/commit/1aa331daa42ef306728fc99e612fbddeed1501d7))
-    - sn_dysfunction-0.1.0/safe_network-0.58.8/sn_api-0.58.0/sn_cli-0.51.0 ([`52c2188`](https://github.com/maidsafe/safe_network/commit/52c218861044a46bf4e1666188dc58de232bde60))
-    - add sn_dysfunction to release process ([`df66875`](https://github.com/maidsafe/safe_network/commit/df66875627aa41d06b7613085f05a97187c7175d))
-    - use time::Instant in place of SystemTime ([`c9f2764`](https://github.com/maidsafe/safe_network/commit/c9f27640d3b1c62bdf88ec954a395e09e799a181))
-    - safe_network-0.58.8/sn_api-0.58.0/sn_cli-0.51.0 ([`907c7d3`](https://github.com/maidsafe/safe_network/commit/907c7d3ef4f65df5566627938154dfca1e2fdc05))
-    - ensure we have at least 1 when calculating each score ([`52aaf59`](https://github.com/maidsafe/safe_network/commit/52aaf595293f2f0d3dd234907134bc624703a3ca))
-    - update readme ([`15a0d35`](https://github.com/maidsafe/safe_network/commit/15a0d354fd804f8f44735b09c22f9e456211c067))
-    - add dysfunction tests to ci ([`2e6d78c`](https://github.com/maidsafe/safe_network/commit/2e6d78c13c137e422d3714e8c113aeb4c0b597a3))
-    - rename dysfunction -> sn_dysfunction ([`aafb6d2`](https://github.com/maidsafe/safe_network/commit/aafb6d2a458fc4e2dc94ea3a08cb519fe52bc131))
-</details>
 
 ## v0.1.0 (2022-03-25)
 

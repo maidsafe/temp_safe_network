@@ -4,21 +4,17 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
-## v0.68.3 (2022-12-20)
+## v0.68.7 (2023-01-27)
 
-### Bug Fixes
+### Chore
 
- - <csr-id-22402ca6acb0215ecfe9b1fdbf306c0f9cb87d95/> genesis_sap is required to create the `SectionTree`
-   - The fields of the tree are assumed to be in sync. But it is not the
-     case for a newly created tree.
-   - This can be fixed by accepting the genesis sap while creating the tree.
+ - <csr-id-846b1080944a229000b152513c0e2ed840bc9033/> fix additional issues from updated clippy
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
  - 2 commits contributed to the release.
- - 3 days passed between releases.
  - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
@@ -29,11 +25,172 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #2037 ([`6e11b79`](https://github.com/maidsafe/safe_network/commit/6e11b793c1c311cf1c57f40c89825abb78b8baa4))
+    - fix additional issues from updated clippy ([`846b108`](https://github.com/maidsafe/safe_network/commit/846b1080944a229000b152513c0e2ed840bc9033))
+</details>
+
+## v0.68.6 (2023-01-27)
+
+<csr-id-6b923515f0f0cd1b0d1a4ed51d3ca418e41d9916/>
+
+### Chore
+
+ - <csr-id-6b923515f0f0cd1b0d1a4ed51d3ca418e41d9916/> fix issues reported by new clippy
+
+### Chore
+
+ - <csr-id-01ff2ccf45dfc9d45c5ad540144d7a4a640830fc/> sn_interface-0.16.18/sn_comms-0.1.4/sn_client-0.77.9/sn_node-0.72.34/sn_api-0.75.5/sn_cli-0.68.6
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 4 commits contributed to the release.
+ - 6 days passed between releases.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.16.18/sn_comms-0.1.4/sn_client-0.77.9/sn_node-0.72.34/sn_api-0.75.5/sn_cli-0.68.6 ([`01ff2cc`](https://github.com/maidsafe/safe_network/commit/01ff2ccf45dfc9d45c5ad540144d7a4a640830fc))
+    - Merge branch 'main' into chore-comms-remove-unused-async ([`e92dd49`](https://github.com/maidsafe/safe_network/commit/e92dd49f38f9b56c7276e86ba79f7fd8f816af76))
+    - Merge branch 'main' into RevertDkgCache ([`24ff625`](https://github.com/maidsafe/safe_network/commit/24ff6257f85922090cfaa5fa83044082d3ef8dab))
+    - fix issues reported by new clippy ([`6b92351`](https://github.com/maidsafe/safe_network/commit/6b923515f0f0cd1b0d1a4ed51d3ca418e41d9916))
+</details>
+
+## v0.68.5 (2023-01-20)
+
+<csr-id-21af053a5be2317be356e760c2b581c0f870a396/>
+<csr-id-783d62461a65eb7c06b0d4f399b97216b6c75519/>
+
+### Chore
+
+ - <csr-id-21af053a5be2317be356e760c2b581c0f870a396/> happy new year 2023
+
+### Chore
+
+ - <csr-id-783d62461a65eb7c06b0d4f399b97216b6c75519/> sn_interface-0.16.14/sn_client-0.77.8/sn_node-0.72.25/sn_api-0.75.4/sn_cli-0.68.5
+
+### New Features
+
+<csr-id-cf6daa778c1d4278b444f1a61da3513506c14ea9/>
+<csr-id-af19e546e3f4443ffb31c8630ae0eb43396a4bac/>
+
+ - <csr-id-a8b4af0eaf8295b8506086c24bca05fe3d0f0320/> support non-pretty printing output for '--replicas' dog command arg
+   - Also adding a test to CLI '--replicas' dog cmd argument verifying success and
+   failures are correctly reported after they are returned by the network.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 15 commits contributed to the release over the course of 23 calendar days.
+ - 28 days passed between releases.
+ - 5 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.16.14/sn_client-0.77.8/sn_node-0.72.25/sn_api-0.75.4/sn_cli-0.68.5 ([`783d624`](https://github.com/maidsafe/safe_network/commit/783d62461a65eb7c06b0d4f399b97216b6c75519))
+    - Merge #1964 ([`6f08edb`](https://github.com/maidsafe/safe_network/commit/6f08edb32a0e93c879ddd13cda1abc6e6b098889))
+    - support non-pretty printing output for '--replicas' dog command arg ([`a8b4af0`](https://github.com/maidsafe/safe_network/commit/a8b4af0eaf8295b8506086c24bca05fe3d0f0320))
+    - expose a public API to query chunks to specific data replicas ([`cf6daa7`](https://github.com/maidsafe/safe_network/commit/cf6daa778c1d4278b444f1a61da3513506c14ea9))
+    - Merge #1909 ([`6abce1d`](https://github.com/maidsafe/safe_network/commit/6abce1d20744fa02daa7076ec386cf54eb6ee147))
+    - print networks as json ([`af19e54`](https://github.com/maidsafe/safe_network/commit/af19e546e3f4443ffb31c8630ae0eb43396a4bac))
+    - Merge #1951 ([`24ca31f`](https://github.com/maidsafe/safe_network/commit/24ca31fd53c570c7c97849b74ded850c05273353))
+    - happy new year 2023 ([`21af053`](https://github.com/maidsafe/safe_network/commit/21af053a5be2317be356e760c2b581c0f870a396))
+    - Merge branch 'main' into proposal_refactor ([`c9cf412`](https://github.com/maidsafe/safe_network/commit/c9cf4124bc88d4d739ba6e443b1c429c3f3855e0))
+    - Merge #1834 ([`982bdfc`](https://github.com/maidsafe/safe_network/commit/982bdfcb3ab275252895a9887a3d8eabaa99cf4c))
+    - Merge branch 'main' into proposal_refactor ([`0bc7f94`](https://github.com/maidsafe/safe_network/commit/0bc7f94c72c374d667a9b455c4f4f1830366e4a4))
+    - feat(queries): add happy path feature - This allows clients to default to a lower impact interaction with elders (todo: only expanding the impact on failures). - Adds combined feat for both cmd and query happy path. ([`a77d95b`](https://github.com/maidsafe/safe_network/commit/a77d95b57ff179d1f8fedc00529c69204a8f89e0))
+    - feat(cmds): add happy path feature - This allows clients to default to a lower impact interaction with elders, only expanding the impact on failures. ([`21b4167`](https://github.com/maidsafe/safe_network/commit/21b4167f68b7bd145d02dcdf1b5d8f9acb7971a8))
+    - Merge #1873 ([`8be1563`](https://github.com/maidsafe/safe_network/commit/8be1563fcddde2323ae2f892687dc76f253f3fb2))
+    - chore(naming): rename dysfunction - Uses the more common vocabulary in fault tolerance area. ([`f68073f`](https://github.com/maidsafe/safe_network/commit/f68073f2897894375f5a09b870e2bfe4e03c3b10))
+</details>
+
+<csr-unknown>
+Exposing also an sn_api public API to fetch a file from a specified set ofdata replicas indexes and a SafeUrl.Adding --replicas arg to CLI dog command which allows the user to performa check on several data replicas for the content being targeted by specifying their indexes.<csr-unknown/>
+
+## v0.68.4 (2022-12-22)
+
+<csr-id-4ddc75277726d5d752ff5340c5d885622d76b990/>
+<csr-id-046224649bbbbd2f160cc69b8320a1b127284600/>
+
+### Chore
+
+ - <csr-id-4ddc75277726d5d752ff5340c5d885622d76b990/> sn_node-0.72.22/sn_cli-0.68.4
+ - <csr-id-046224649bbbbd2f160cc69b8320a1b127284600/> remove references to IGD
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release over the course of 1 calendar day.
+ - 2 days passed between releases.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_node-0.72.22/sn_cli-0.68.4 ([`4ddc752`](https://github.com/maidsafe/safe_network/commit/4ddc75277726d5d752ff5340c5d885622d76b990))
+    - Merge #1915 ([`a41a2bc`](https://github.com/maidsafe/safe_network/commit/a41a2bcd7d0be64d20efc913d643091718ce743e))
+    - remove references to IGD ([`0462246`](https://github.com/maidsafe/safe_network/commit/046224649bbbbd2f160cc69b8320a1b127284600))
+</details>
+
+## v0.68.3 (2022-12-20)
+
+<csr-id-a6addd1dde96833d6629e75b418ac2a244ab31f3/>
+
+### Chore
+
+ - <csr-id-a6addd1dde96833d6629e75b418ac2a244ab31f3/> sn_interface-0.16.7/sn_client-0.77.3/sn_node-0.72.11/sn_api-0.75.3/sn_cli-0.68.3
+
+### Bug Fixes
+
+ - <csr-id-22402ca6acb0215ecfe9b1fdbf306c0f9cb87d95/> genesis_sap is required to create the `SectionTree`
+   - The fields of the tree are assumed to be in sync. But it is not the
+   case for a newly created tree.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 3 days passed between releases.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.16.7/sn_client-0.77.3/sn_node-0.72.11/sn_api-0.75.3/sn_cli-0.68.3 ([`a6addd1`](https://github.com/maidsafe/safe_network/commit/a6addd1dde96833d6629e75b418ac2a244ab31f3))
     - Merge #1848 ([`ddaf857`](https://github.com/maidsafe/safe_network/commit/ddaf8571749c142e9960407cfd9cfa94231a36ad))
     - genesis_sap is required to create the `SectionTree` ([`22402ca`](https://github.com/maidsafe/safe_network/commit/22402ca6acb0215ecfe9b1fdbf306c0f9cb87d95))
 </details>
 
 ## v0.68.2 (2022-12-16)
+
+<csr-id-4ce57cc7c349c209d2fa60d876706ad15dd07a04/>
+<csr-id-029b4edf99515569dbc6b4d694e514478ae82db8/>
 
 ### Chore
 
@@ -63,6 +220,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## v0.68.1 (2022-12-16)
 
 <csr-id-01dc60676d5740dc7dd6250edb130b46a33cc168/>
+<csr-id-119ae2d7661d162371749b8466cfd2e9b85d910f/>
 
 ### Chore
 

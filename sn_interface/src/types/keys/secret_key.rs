@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -38,14 +38,12 @@ impl SecretKey {
     pub fn ed25519_from_hex(hex: &str) -> Result<Self> {
         let bytes = hex::decode(hex).map_err(|err| {
             Error::FailedToParse(format!(
-                "Couldn't parse edd25519 secret key bytes from hex: {}",
-                err
+                "Couldn't parse edd25519 secret key bytes from hex: {err}"
             ))
         })?;
         let ed25519_sk = ed25519_dalek::SecretKey::from_bytes(bytes.as_ref()).map_err(|err| {
             Error::FailedToParse(format!(
-                "Couldn't parse ed25519 secret key from bytes: {}",
-                err
+                "Couldn't parse ed25519 secret key from bytes: {err}",
             ))
         })?;
         Ok(Self::Ed25519(ed25519_sk))

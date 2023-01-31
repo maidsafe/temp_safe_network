@@ -32,6 +32,7 @@ jobs:
   #     run: wget https://raw.githubusercontent.com/maidsafe/QA/master/misc-scripts/deny.toml
 
   #   - uses: EmbarkStudios/cargo-deny-action@v1
+
   cargo-udeps:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
     name: Unused dependency check
@@ -45,11 +46,10 @@ jobs:
           toolchain: nightly
           override: true
 
+      - name: Install cargo-udeps
+        run: cargo install cargo-udeps --locked
       - name: Run cargo-udeps
-        uses: aig787/cargo-udeps-action@v1
-        with:
-          version: "latest"
-          args: "--all-targets"
+        run: cargo +nightly udeps --all-targets
 
   checks:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
@@ -119,7 +119,11 @@ jobs:
 
       - name: Run sn_fault_detection tests
         timeout-minutes: 15
-        run: cd sn_fault_detection && cargo test --release
+        run: cd sn_fault_detection && RUST_LOG=sn_fault_detection cargo test --release
+
+      - name: Run sn_comms tests
+        timeout-minutes: 10
+        run: cargo test --release -p sn_comms
 
       - name: Build sn_node tests before running
         run: cd sn_node && cargo test --no-run --release
@@ -197,12 +201,16 @@ jobs:
       - name: Start the network
         run: ./artifacts/testnet --interval 30000
         env:
-          RUST_LOG: "sn_node,sn_consensus,sn_fault_detection=trace,sn_interface=trace"
+          RUST_LOG: "sn_node,sn_comms,sn_consensus,sn_fault_detection=trace,sn_interface=trace"
 
       - name: Wait for all nodes to join
         shell: bash
         run: ./resources/scripts/wait_for_nodes_to_join.sh
         timeout-minutes: 5
+
+      - name: Check we have expected elders
+        shell: bash
+        run: rg "7 Elders, " ~/.safe/node/local-test-network -u
 
       - name: Build all tests before running non ubuntu
         run: cargo test --no-run --release --features check-replicas --package sn_client
@@ -224,6 +232,120 @@ jobs:
         timeout-minutes: 10
         shell: bash
         run: cargo run --release --example client_files --package sn_client
+
+      - name: Ensure no nodes have left during test runs
+        timeout-minutes: 1
+        shell: bash
+        # we just want to print out the info. If there is none, an exit code of 1 is returned, so here we return true
+        run: rg "Membership - decided" $HOME/.safe/node/local-test-network | rg Left || true
+
+      - name: Are nodes still running...?
+        shell: bash
+        timeout-minutes: 1
+        continue-on-error: true
+        run: |
+          echo "$(pgrep sn_node | wc -l) nodes still running"
+          ls $HOME/.safe/node/local-test-network
+
+      - name: Kill all nodes
+        shell: bash
+        timeout-minutes: 1
+        if: failure()
+        continue-on-error: true
+        run: |
+          pkill sn_node
+          echo "$(pgrep sn_node | wc -l) nodes still running"
+
+      - name: Generate StateMap
+        shell: bash
+        continue-on-error: true
+        run: |
+          cargo install --git https://github.com/TritonDataCenter/statemap.git
+          ./resources/scripts/statemap-preprocess.sh --run-statemap > safe_statemap.svg
+
+      - name: Upload StateMap
+        uses: actions/upload-artifact@main
+        with:
+          name: statemap_e2e_${{matrix.os}}.svg
+          path: safe_statemap.svg
+        continue-on-error: true
+
+      - name: Tar log files
+        shell: bash
+        continue-on-error: true
+        run: find ~/.safe/node/local-test-network -iname '*.log*' | tar -zcvf log_files.tar.gz --files-from -
+        if: failure()
+
+      - name: Upload Node Logs
+        uses: actions/upload-artifact@main
+        with:
+          name: sn_node_logs_e2e_${{matrix.os}}
+          path: log_files.tar.gz
+        if: failure()
+        continue-on-error: true
+
+  e2e-msg-happy-path:
+    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    name: E2E tests (msg happy path)
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install Rust
+        id: toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - uses: Swatinem/rust-cache@v1
+        continue-on-error: true
+        with:
+          cache-on-failure: true
+          sharedKey: ${{github.run_id}}
+
+      - name: install ripgrep
+        run: sudo apt-get install ripgrep
+
+      - name: download and unpack artifacts
+        run: |
+          curl -O $BUILD_ARTIFACTS_URL/artifacts-$GITHUB_RUN_ID.tar.gz
+          mkdir -p artifacts ~/.safe/node
+          tar -xvf artifacts-$GITHUB_RUN_ID.tar.gz -C artifacts/ .
+          chmod +x artifacts/sn_node
+          chmod +x artifacts/testnet
+          cp artifacts/sn_node ~/.safe/node
+
+      - name: Start the network
+        run: ./artifacts/testnet --interval 30000
+        env:
+          RUST_LOG: "sn_node,sn_comms,sn_consensus,sn_dysfunction=trace,sn_interface=trace"
+
+      - name: Wait for all nodes to join
+        shell: bash
+        run: ./resources/scripts/wait_for_nodes_to_join.sh
+        timeout-minutes: 5
+
+      - name: Check we have expected elders
+        shell: bash
+        run: rg "7 Elders, " ~/.safe/node/local-test-network -u
+
+      - name: Build all tests before running non ubuntu
+        run: cargo test --no-run --release --features msg-happy-path --package sn_client
+        timeout-minutes: 50
+
+      - name: Run client tests
+        env:
+          RUST_LOG: "sn_client,sn_interface"
+        run: cargo test --release --features msg-happy-path --package sn_client -- --test-threads=1
+        timeout-minutes: 50
+
+      - name: Run example app for file API against local network
+        timeout-minutes: 10
+        shell: bash
+        run: cargo run --release --example client_files --features msg-happy-path --package sn_client
 
       - name: Ensure no nodes have left during test runs
         timeout-minutes: 1
@@ -385,7 +507,7 @@ jobs:
       - name: Start the network
         run: ./artifacts/testnet --interval 30000
         env:
-          RUST_LOG: "sn_node,sn_consensus,sn_fault_detection=trace,sn_interface=trace"
+          RUST_LOG: "sn_node,sn_comms,sn_consensus,sn_fault_detection=trace,sn_interface=trace"
 
       - name: Wait for all nodes to join
         shell: bash
@@ -490,7 +612,7 @@ jobs:
       - name: Start the network
         run: ./artifacts/testnet --interval 30000
         env:
-          RUST_LOG: "sn_node,sn_consensus,sn_fault_detection=trace,sn_interface=trace"
+          RUST_LOG: "sn_node,sn_comms,sn_consensus,sn_fault_detection=trace,sn_interface=trace"
 
       - name: Wait for all nodes to join
         shell: bash

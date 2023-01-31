@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -9,7 +9,6 @@
 //! Data messages and their possible responses.
 
 mod cmd;
-mod data_exchange;
 mod errors;
 mod query;
 mod register;
@@ -17,7 +16,6 @@ mod spentbook;
 
 pub use self::{
     cmd::DataCmd,
-    data_exchange::{MetadataExchange, StorageLevel},
     errors::{Error, Result},
     query::{DataQuery, DataQueryVariant},
     register::{
@@ -32,13 +30,7 @@ use crate::types::{
     register::{Entry, EntryHash, Permissions, Policy, Register, User},
     Chunk,
 };
-use crate::{
-    messaging::{
-        msg_type::{CLIENT_CMD_PRIORITY, CLIENT_QUERY_PRIORITY},
-        MsgId,
-    },
-    types::ReplicatedData,
-};
+use crate::{messaging::MsgId, types::ReplicatedData};
 
 use qp2p::UsrMsgBytes;
 use serde::{Deserialize, Serialize};
@@ -71,21 +63,11 @@ pub enum ClientMsg {
     Query(DataQuery),
 }
 
-impl ClientMsg {
-    /// The priority of the message, when handled by lower level comms.
-    pub fn priority(&self) -> i32 {
-        match self {
-            Self::Cmd(_) => CLIENT_CMD_PRIORITY,
-            Self::Query(_) => CLIENT_QUERY_PRIORITY,
-        }
-    }
-}
-
 impl Display for ClientMsg {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Cmd(cmd) => write!(f, "ClientMsg::Cmd({:?})", cmd),
-            Self::Query(query) => write!(f, "ClientMsg::Query({:?})", query),
+            Self::Cmd(cmd) => write!(f, "ClientMsg::Cmd({cmd:?})"),
+            Self::Query(query) => write!(f, "ClientMsg::Query({query:?})"),
         }
     }
 }
@@ -124,13 +106,6 @@ pub enum ClientDataResponse {
         #[debug(skip)]
         bounced_msg: UsrMsgBytes,
     },
-}
-
-impl ClientDataResponse {
-    /// The priority of the message, when handled by lower level comms.
-    pub fn priority(&self) -> i32 {
-        CLIENT_QUERY_PRIORITY
-    }
 }
 
 impl Display for ClientDataResponse {
@@ -372,7 +347,7 @@ mod tests {
         if let Some(key) = gen_keys().first() {
             let errored_response =
                 QueryResponse::GetRegister(Err(Error::AccessDenied(User::Key(*key))));
-            assert!(format!("{:?}", errored_response).contains("GetRegister(Err(AccessDenied("));
+            assert!(format!("{errored_response:?}").contains("GetRegister(Err(AccessDenied("));
             Ok(())
         } else {
             Err(eyre!("Could not generate public key"))
@@ -420,8 +395,7 @@ mod tests {
             let deserialized_msg: ClientMsg =
                 rmp_serde::from_slice(&serialised_cmd).map_err(|err| {
                     crate::messaging::Error::FailedToParse(format!(
-                        "Data message payload as Msgpack: {}",
-                        err
+                        "Data message payload as Msgpack: {err}",
                     ))
                 })?;
             assert_eq!(original_msg, deserialized_msg);

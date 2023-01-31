@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -6,16 +6,18 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::network_knowledge::NetworkKnowledge;
+use crate::messaging::system::SectionSigned;
 use crate::network_knowledge::{section_has_room_for_node, Error, Result};
 use crate::types::Peer;
 
-use bls::PublicKey as BlsPublicKey;
-use ed25519_dalek::{Signature, Verifier};
+use ed25519_dalek::{PublicKey, Signature, Verifier};
+use hex_fmt::HexFmt;
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet};
-use std::fmt::{self, Debug, Formatter};
-use std::net::SocketAddr;
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fmt::{self, Debug, Formatter},
+    net::SocketAddr,
+};
 use xor_name::{Prefix, XorName};
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Debug)]
@@ -26,7 +28,7 @@ pub enum MembershipState {
     /// Node went offline.
     Left,
     /// Node was relocated to a different section.
-    Relocated(Box<RelocateDetails>),
+    Relocated(RelocationDst),
 }
 
 /// Information about a member of our section.
@@ -55,6 +57,7 @@ impl Debug for NodeState {
         f.finish()
     }
 }
+
 impl NodeState {
     // Creates a `NodeState` in the `Joined` state.
     pub fn joined(peer: Peer, previous_name: Option<XorName>) -> Self {
@@ -80,11 +83,11 @@ impl NodeState {
     pub fn relocated(
         peer: Peer,
         previous_name: Option<XorName>,
-        relocate_details: RelocateDetails,
+        relocation_dst: RelocationDst,
     ) -> Self {
         Self {
             peer,
-            state: MembershipState::Relocated(Box::new(relocate_details)),
+            state: MembershipState::Relocated(relocation_dst),
             previous_name,
         }
     }
@@ -96,17 +99,15 @@ impl NodeState {
         archived: &BTreeSet<XorName>,
     ) -> Result<()> {
         let name = self.name();
-        info!("Validating node state for {name}");
+        info!("Validating node state for {name} - {:?}", self.state);
 
         if !prefix.matches(&name) {
             info!("Membership - rejecting node {name}, name doesn't match our prefix {prefix:?}");
             return Err(Error::WrongSection);
         }
 
-        self.validate_relocation_details(prefix)?;
-
         match self.state {
-            MembershipState::Joined | MembershipState::Relocated(_) => {
+            MembershipState::Joined => {
                 if members.contains_key(&name) {
                     info!("Rejecting join from existing member {name}");
                     Err(Error::ExistingMemberConflict)
@@ -125,6 +126,10 @@ impl NodeState {
                     Ok(())
                 }
             }
+            MembershipState::Relocated(_) => {
+                // A node relocation is always OK
+                Ok(())
+            }
             MembershipState::Left => {
                 if !members.contains_key(&name) {
                     info!("Rejecting leave from non-existing member");
@@ -134,30 +139,6 @@ impl NodeState {
                 }
             }
         }
-    }
-
-    fn validate_relocation_details(&self, prefix: &Prefix) -> Result<()> {
-        if let MembershipState::Relocated(details) = &self.state {
-            let name = self.name();
-            let dest = details.dst;
-
-            if !prefix.matches(&dest) {
-                info!("Invalid relocation request from {name} - {dest} doesn't match our prefix {prefix:?}.");
-                return Err(Error::WrongSection);
-            }
-
-            // We requires the node name matches the relocation details age.
-            let age = details.age;
-            let state_age = self.age();
-            if age != state_age {
-                info!(
-		    "Invalid relocation request from {name} - relocation age ({age}) doesn't match peer's age ({state_age})."
-		);
-                return Err(Error::InvalidRelocationDetails);
-            }
-        }
-
-        Ok(())
     }
 
     pub fn peer(&self) -> &Peer {
@@ -200,58 +181,116 @@ impl NodeState {
     }
 
     // Convert this info into one with the state changed to `Relocated`.
-    pub fn relocate(self, relocate_details: RelocateDetails) -> Self {
+    pub fn relocate(self, relocation_dst: RelocationDst) -> Self {
         Self {
-            state: MembershipState::Relocated(Box::new(relocate_details)),
+            state: MembershipState::Relocated(relocation_dst),
             ..self
         }
     }
 }
 
-/// Details of a node that has been relocated
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
-pub struct RelocateDetails {
-    /// Name of the node to relocate (this is the node's name before relocation).
-    pub previous_name: XorName,
-    /// Relocation destination, the node will be relocated to
-    /// a section whose prefix matches this name.
-    pub dst: XorName,
-    /// The BLS key of the destination section used by the relocated node to verify messages.
-    pub dst_section_key: BlsPublicKey,
-    /// The age the node will have post-relocation.
-    pub age: u8,
+/// We are relocating to the section that matches the contained XorName.
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Debug)]
+pub struct RelocationDst(XorName);
+
+impl RelocationDst {
+    /// We are relocating to the section that matches `dst_name`.
+    pub fn new(dst_name: XorName) -> Self {
+        Self(dst_name)
+    }
+
+    pub fn name(&self) -> &XorName {
+        &self.0
+    }
 }
 
-impl RelocateDetails {
-    /// Constructs RelocateDetails given current network knowledge
-    pub fn with_age(
-        network_knowledge: &NetworkKnowledge,
-        peer: &Peer,
-        dst: XorName,
-        age: u8,
-    ) -> Self {
-        let genesis_key = *network_knowledge.genesis_key();
+/// The relocation info contains the dst (in `NodeState`),
+/// the old name, the new name and the source section signature
+/// over the fact that the section considered the node to be relocated.
+#[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
+pub struct RelocationInfo {
+    signed_relocation: SectionSigned<NodeState>,
+    new_name: XorName,
+}
 
-        let dst_section_key = network_knowledge
-            .section_auth_by_name(&dst)
-            .map_or_else(|_| genesis_key, |section_auth| section_auth.section_key());
+/// A relocation proof proves that a section started a relocation
+/// of one of its nodes, and that the new name provided was created by that node.
+///
+/// NB: Upper layers will need to verify that said section is also a known section,
+/// only then is the relocation fully valid.
+#[derive(Clone, PartialEq, Serialize, Deserialize, custom_debug::Debug)]
+pub struct RelocationProof {
+    info: RelocationInfo,
+    // This sig proves that the new name was actually created by the node holding the old keys.
+    #[serde(with = "serde_bytes")]
+    #[debug(with = "Self::fmt_ed25519")]
+    self_sig: Signature,
+    /// The old key that identified the node in the source section.
+    self_old_key: PublicKey,
+}
 
+impl RelocationInfo {
+    pub fn new(signed_relocation: SectionSigned<NodeState>, new_name: XorName) -> Self {
         Self {
-            previous_name: peer.name(),
-            dst,
-            dst_section_key,
-            age,
+            signed_relocation,
+            new_name,
+        }
+    }
+}
+
+impl RelocationProof {
+    pub fn new(info: RelocationInfo, self_sig: Signature, self_old_key: PublicKey) -> Self {
+        Self {
+            info,
+            self_sig,
+            self_old_key,
         }
     }
 
-    pub fn verify_identity(&self, new_name: &XorName, new_name_sig: &Signature) -> bool {
-        let pub_key = if let Ok(pub_key) = crate::types::keys::ed25519::pub_key(&self.previous_name)
-        {
-            pub_key
-        } else {
-            return false;
-        };
+    /// The key of the section that the node is relocating from.
+    pub fn signed_by(&self) -> &bls::PublicKey {
+        &self.info.signed_relocation.sig.public_key
+    }
 
-        pub_key.verify(&new_name.0, new_name_sig).is_ok()
+    /// This verifies that the new name was actually created by the node holding the old name,
+    /// and that the section signature is signed by the provided section key.
+    /// Calling context will need to verify that said section key is also a known section.
+    pub fn verify(&self) -> Result<()> {
+        // the key that we use to verify the sig over the new name, must match the name of the relocated node
+        if self.old_key_name() != self.info.signed_relocation.name() {
+            return Err(Error::InvalidRelocationProof);
+        }
+        let serialized_info =
+            bincode::serialize(&self.info).map_err(|_err| Error::InvalidRelocationProof)?;
+        self.self_old_key
+            .verify(&serialized_info, &self.self_sig)
+            .map_err(|_err| Error::InvalidRelocationProof)?;
+        let serialized_state = bincode::serialize(&self.info.signed_relocation.value)
+            .map_err(|_err| Error::InvalidRelocationProof)?;
+        if !self.info.signed_relocation.sig.verify(&serialized_state) {
+            Err(Error::InvalidRelocationProof)
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Previous name of the relocating node.
+    pub fn previous_name(&self) -> XorName {
+        self.info.signed_relocation.name()
+    }
+
+    /// Previous age of the relocating node.
+    pub fn previous_age(&self) -> u8 {
+        self.info.signed_relocation.age()
+    }
+
+    // ed25519_dalek::Signature has overly verbose debug output, so we provide our own
+    pub fn fmt_ed25519(sig: &Signature, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "Signature({:0.10})", HexFmt(sig))
+    }
+
+    fn old_key_name(&self) -> XorName {
+        use crate::types::PublicKey::Ed25519;
+        XorName::from(Ed25519(self.self_old_key))
     }
 }

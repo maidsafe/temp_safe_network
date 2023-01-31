@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -219,7 +219,7 @@ pub async fn files_commander(
                 if safe.dry_run_mode {
                     println!("FilesContainer not created since running in dry-run mode");
                 } else {
-                    println!("FilesContainer created at: \"{}\"", files_container_xorurl);
+                    println!("FilesContainer created at: \"{files_container_xorurl}\"");
                 }
 
                 let (table, _) = gen_processed_files_table(&processed_files, true);
@@ -259,26 +259,21 @@ pub async fn files_commander(
             // Now let's just print out a list of the files synced/processed
             let (table, success_count) = gen_processed_files_table(&processed_files, true);
             if OutputFmt::Pretty == output_fmt {
-                let version_str = version.map_or("empty".to_string(), |v| format!("version {}", v));
+                let version_str = version.map_or("empty".to_string(), |v| format!("version {v}"));
                 if success_count > 0 {
                     target_url.set_content_version(version);
                     target_url.set_path("");
-                    println!(
-                        "FilesContainer synced up ({}): \"{}\"",
-                        version_str, target_url
-                    );
+                    println!("FilesContainer synced up ({version_str}): \"{target_url}\"",);
                     println!("{table}");
                 } else if !processed_files.is_empty() {
                     println!(
-                        "No changes were made to FilesContainer ({}) at \"{}\"",
-                        version_str, target_url
+                        "No changes were made to FilesContainer ({version_str}) at \"{target_url}\"",
                     );
                     println!("{table}");
                 } else {
                     println!(
                         "No changes were required, source location is already in sync with \
-                        FilesContainer ({}) at: \"{}\"",
-                        version_str, target
+                        FilesContainer ({version_str}) at: \"{target}\"",
                     );
                 }
             } else {
@@ -680,7 +675,7 @@ fn format_file_system_node_line(
         } else {
             dir.name.clone()
         };
-        format!("{}{} {}", buf, conn, name)
+        format!("{buf}{conn} {name}")
     }
 }
 
@@ -696,7 +691,7 @@ fn format_symlink(name: &str, fd: &FileDetails) -> String {
                 Some(t) if t == "dir" => if_tty(target, Colour::Blue.bold()),
                 _ => target.to_string(),
             };
-            format!("{} -> {}", name_txt, target_txt)
+            format!("{name_txt} -> {target_txt}")
         }
         None => name_txt, // this shouldn't happen.  means that FileDetail was created incorrectly.
     }
@@ -710,9 +705,8 @@ fn print_files_map(
     target_url: &str,
 ) {
     println!(
-        "Files of FilesContainer ({}) at \"{}\":",
-        version.map_or("empty".to_string(), |v| format!("version {}", v)),
-        target_url
+        "Files of FilesContainer ({}) at \"{target_url}\":",
+        version.map_or("empty".to_string(), |v| format!("version {v}")),
     );
     let mut table = Table::new();
 
@@ -755,8 +749,7 @@ fn print_files_map(
         }
     }
     println!(
-        "Files: {}   Size: {}   Total Files: {}   Total Size: {}",
-        cwd_files, cwd_size, total_files, total_bytes
+        "Files: {cwd_files}   Size: {cwd_size}   Total Files: {total_files}   Total Size: {total_bytes}",
     );
     println!("{table}");
 }

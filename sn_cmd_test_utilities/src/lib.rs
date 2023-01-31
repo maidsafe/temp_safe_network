@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -6,7 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-#[allow(dead_code)]
 pub mod util {
     use assert_cmd::Command;
     use assert_fs::{
@@ -84,10 +83,8 @@ pub mod util {
     }
 
     pub fn get_sn_node_latest_released_version() -> Result<String> {
-        let latest_release_url = format!(
-            "{}/repos/maidsafe/safe_network/releases/latest",
-            GITHUB_API_URL
-        );
+        let latest_release_url =
+            format!("{GITHUB_API_URL}/repos/maidsafe/safe_network/releases/latest");
         let response = reqwest::blocking::Client::new()
             .get(latest_release_url)
             .header(reqwest::header::USER_AGENT, "sn_cmd_test_utilities")
@@ -95,10 +92,10 @@ pub mod util {
             .send()?;
         let response_json = response.json::<serde_json::Value>()?;
         let tag_name = response_json["tag_name"].as_str().ok_or_else(|| {
-            eyre!(format!(
+            eyre!(
                 "Failed to parse the tag_name field from the response: {}",
                 response_json
-            ))
+            )
         })?;
         let version = get_version_from_release_version(tag_name)?;
         Ok(version)
@@ -337,7 +334,7 @@ pub mod util {
     // returns sha3_256 digest/hash of a file as a string.
     pub fn digest_file(path: &str) -> Result<String> {
         let data = fs::read_to_string(path)
-            .wrap_err(format!("Failed to read string from file at: {}", path))?;
+            .wrap_err(format!("Failed to read string from file at: {path}"))?;
         Ok(str_to_sha3_256(&data))
     }
 
@@ -559,12 +556,7 @@ pub mod util {
         parts.next();
         let version = parts
             .next()
-            .ok_or_else(|| {
-                eyre!(format!(
-                    "Could not parse version number from {}",
-                    release_version
-                ))
-            })?
+            .ok_or_else(|| eyre!("Could not parse version number from {}", release_version))?
             .to_string();
         Ok(version)
     }

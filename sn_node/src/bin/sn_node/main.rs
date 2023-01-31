@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -28,7 +28,7 @@
     clippy::unwrap_used
 )]
 
-use sn_node::node::{start_node, Config, Error as NodeError};
+use sn_node::node::{start_new_node, Config, Error as NodeError, RejoinReason};
 
 use clap::{CommandFactory, Parser};
 use clap_complete::{generate, Shell};
@@ -40,8 +40,9 @@ use tokio::runtime::Runtime;
 use tokio::time::Duration;
 use tracing::{self, error, info, trace, warn};
 
-const JOIN_TIMEOUT_SEC: u64 = 100;
-const BOOTSTRAP_RETRY_TIME_SEC: u64 = 30;
+const JOIN_TIMEOUT_SEC: u64 = 60;
+const JOIN_TIMEOUT_RETRY_TIME_SEC: u64 = 30;
+const JOIN_DISALLOWED_RETRY_TIME_SEC: u64 = 60;
 
 mod log;
 
@@ -92,7 +93,7 @@ fn create_runtime_and_node(config: &Config) -> Result<()> {
                     exit(0);
                 }
             }
-            Err(e) => println!("Updating node failed: {:?}", e),
+            Err(e) => println!("Updating node failed: {e:?}"),
         }
 
         if config.update_only() {
@@ -102,7 +103,7 @@ fn create_runtime_and_node(config: &Config) -> Result<()> {
 
     let our_pid = std::process::id();
     let join_timeout = Duration::from_secs(JOIN_TIMEOUT_SEC);
-    let bootstrap_retry_duration = Duration::from_secs(BOOTSTRAP_RETRY_TIME_SEC);
+    let mut join_retry_sec = JOIN_DISALLOWED_RETRY_TIME_SEC;
     let log_path = if let Some(path) = config.log_dir() {
         format!("{}", path.display())
     } else {
@@ -123,60 +124,83 @@ fn create_runtime_and_node(config: &Config) -> Result<()> {
 
         let outcome = rt.block_on(async {
             trace!("Initial node config: {config:?}");
-            Ok::<_, ErrReport>(start_node(config, join_timeout).await)
+            Ok::<_, ErrReport>(start_new_node(config, join_timeout).await)
         })?;
 
         match outcome {
             Ok((_node, mut rejoin_network_rx)) => {
-                rt.block_on(async {
+                let join_future = async {
                     // Simulate failed node starts, and ensure that
-                   #[cfg(feature = "chaos")]
-                   {
-                       use rand::Rng;
-                       let mut rng = rand::thread_rng();
-                       let x: f64 = rng.gen_range(0.0..1.0);
+                    #[cfg(feature = "chaos")]
+                    {
+                        use rand::Rng;
+                        let mut rng = rand::thread_rng();
+                        let x: f64 = rng.gen_range(0.0..1.0);
 
-                       if !config.is_first() && x > 0.6 {
-                           println!(
-                               "\n =========== [Chaos] (PID: {our_pid}): Startup chaos crash w/ x of: {}. ============== \n",
-                               x
+                        if !config.is_first() && x > 0.6 {
+                            println!(
+                               "\n =========== [Chaos] (PID: {our_pid}): Startup chaos crash w/ x of: {x}. ============== \n",
                            );
 
-                           // tiny sleep so testnet doesn't detect a fauly node and exit
-                           tokio::time::sleep(Duration::from_secs(1)).await;
-                           warn!("[Chaos] (PID: {our_pid}): ChaoticStartupCrash");
-                           return Err(NodeError::ChaoticStartupCrash).map_err(ErrReport::msg);
-                       }
-                   }
+                            // tiny sleep so testnet doesn't detect a faulty node and exit
+                            tokio::time::sleep(Duration::from_secs(1)).await;
+                            warn!("[Chaos] (PID: {our_pid}): ChaoticStartupCrash");
+                            return Err(NodeError::ChaoticStartupCrash);
+                        }
+                    }
 
-                   // this keeps node running
-                   if rejoin_network_rx.recv().await.is_some() {
-                       return Err(NodeError::RemovedFromSection).map_err(ErrReport::msg);
-                   }
-                   Ok(())
-                })?;
-            }
-            Err(NodeError::TryJoinLater) => {
-                let message = format!(
-                    "The network is not accepting nodes right now. \
-                    Retrying after {BOOTSTRAP_RETRY_TIME_SEC} seconds."
-                );
-                println!("{message} Node log path: {log_path}");
-                info!("{message}");
-            }
-            Err(error @ NodeError::NodeNotReachable(_)) => {
-                let err = Err(error).suggestion(
-                    "Unfortunately we are unable to establish a connection to your machine through its \
-                    public IP address. This might involve forwarding ports on your router."
-                        .header("Please ensure your node is externally reachable")
-                );
+                    // this keeps node running
+                    if let Some(reason) = rejoin_network_rx.recv().await {
+                        error!("{reason:?}");
+                        return Err(NodeError::RejoinRequired(reason));
+                    }
+                    Ok(())
+                };
 
-                println!("{err:?}");
-                error!("{err:?}");
-                return err;
+                if let Err(error) = rt.block_on(join_future) {
+                    // actively shut down the runtime
+                    rt.shutdown_timeout(Duration::from_secs(2));
+
+                    // Here are both recoverable errors, (where anything we can just
+                    // restart to handle, we do so here), and irrecoverable ones, where we do not restart.
+                    use RejoinReason::*;
+                    match error {
+                        NodeError::RejoinRequired(RemovedFromSection) => {
+                            continue;
+                        }
+                        NodeError::RejoinRequired(JoinsDisallowed) => {
+                            let message = format!(
+                                "The network is not accepting nodes right now. \
+                                Retrying after {JOIN_DISALLOWED_RETRY_TIME_SEC} seconds."
+                            );
+                            println!("{message} Node log path: {log_path}");
+                            info!("{message}");
+                            join_retry_sec = JOIN_DISALLOWED_RETRY_TIME_SEC;
+                            continue;
+                        }
+                        NodeError::RejoinRequired(NodeNotReachable(addr)) => {
+                            let err = Err(NodeError::RejoinRequired(NodeNotReachable(addr))).suggestion(
+                                "Unfortunately we are unable to establish a connection to your machine through its \
+                                public IP address. This might involve forwarding ports on your router."
+                                    .header("Please ensure your node is externally reachable")
+                            );
+                            println!("{err:?}");
+                            error!("{err:?}");
+                            return err;
+                        }
+                        #[cfg(feature = "chaos")]
+                        NodeError::ChaoticStartupCrash => {
+                            continue;
+                        }
+                        _ => {
+                            error!("Irrecoverable error, closing node program: {error:?}");
+                            return Err(error).map_err(ErrReport::msg);
+                        }
+                    }
+                }
             }
             Err(NodeError::JoinTimeout) => {
-                let message = format!("(PID: {our_pid}): Encountered a timeout while trying to join the network. Retrying after {BOOTSTRAP_RETRY_TIME_SEC} seconds.");
+                let message = format!("(PID: {our_pid}): Encountered a timeout while trying to join the network. Retrying after {JOIN_TIMEOUT_RETRY_TIME_SEC} seconds.");
                 println!("{message} Node log path: {log_path}");
                 error!("{message}");
             }
@@ -186,6 +210,8 @@ fn create_runtime_and_node(config: &Config) -> Result<()> {
                     "If this is the first node on the network pass the local address to be used using --first",
                 ));
                 error!("{err:?}");
+                // actively shut down the runtime
+                rt.shutdown_timeout(Duration::from_secs(2));
                 return err;
             }
         }
@@ -194,7 +220,8 @@ fn create_runtime_and_node(config: &Config) -> Result<()> {
         rt.shutdown_timeout(Duration::from_secs(2));
         // The sleep shall only need to be carried out when being asked to join later?
         // For the case of a timed_out, a retry can be carried out immediately?
-        std::thread::sleep(bootstrap_retry_duration);
+        // OTOH: A timeout might indicate heavy load or some sync problems. Probably wise to stay a bit loose on the gas pedal then.
+        std::thread::sleep(Duration::from_secs(join_retry_sec));
     }
 }
 
@@ -241,7 +268,7 @@ fn update() -> Result<Status, Box<dyn (::std::error::Error)>> {
 fn gen_completions_for_shell(shell: Shell, mut cmd: clap::Command) -> Result<Vec<u8>, String> {
     // Get exe path
     let exe_path =
-        std::env::current_exe().map_err(|err| format!("Can't get the exec path: {}", err))?;
+        std::env::current_exe().map_err(|err| format!("Can't get the exec path: {err}"))?;
 
     // get filename without preceding path as std::ffi::OsStr (C string)
     let exec_name_ffi = match exe_path.file_name() {
@@ -259,8 +286,7 @@ fn gen_completions_for_shell(shell: Shell, mut cmd: clap::Command) -> Result<Vec
         Some(v) => v.to_string(),
         None => {
             return Err(format!(
-                "Can't decode unicode in executable name '{:?}'",
-                exec_name_ffi
+                "Can't decode unicode in executable name '{exec_name_ffi:?}'",
             ))
         }
     };

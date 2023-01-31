@@ -15,7 +15,7 @@ log_dir="${LOG_DIR:-$DEFAULT_LOG_DIR}"
 echo "Checking nodes log files to verify all nodes have joined. Logs path: $log_dir"
 
 # -u needed here to search log dirs
-nodes_ips=$(rg "connection info:.*" "$log_dir" -g "*.log*" -u | rg "(127.0.0.1:\d{5})" -or '$1')
+nodes_ips=$(rg "connection info:.*" "$log_dir" -g "*.log*" -u | rg "(127.0.0.1:\d{5})" -or '$1' | sort)
 nodes_ips_count=$(echo "$nodes_ips" | wc -l)
 
 echo "Number of nodes: $nodes_ips_count"
@@ -30,13 +30,22 @@ if [[ $nodes_ips_count -ne $NODE_COUNT ]]
         echo "$nodes_ips"
 fi
 
-# We'll use the logs from the last node that joined, to obtain the
+# We'll use the logs from the nodes that joined, to obtain the
 # list of members in the network knowledge they share with AE messages.
-last_node_log_dig="$log_dir/sn-node-$NODE_COUNT"
-members=$(rg ".* msg: AntiEntropy \{.* kind: Update \{ members: \{(SectionSigned \{.*\})+ \}.*" -or '$1' "$last_node_log_dig" -g "*.log*" | tail -1 | rg "(127.0.0.1:\d{5})" -or '$1')
+members=$(rg ".* msg: AntiEntropy \{.* kind: Update \{ members: \{(SectionSigned \{.*\})+ \}.*" -or '$1' "$log_dir" -g "*.log*" | rg "(127.0.0.1:\d{5})" -or '$1' | sort -u)
+members_count=$(echo "$members" | wc -l)
 
 echo ""
-echo "Checking if nodes in network knowledge match the list of nodes IPs..."
+if [[ $members_count -ne $NODE_COUNT ]]
+then
+  echo "Unexpected number of nodes in network knowledge. Expected $NODE_COUNT, we have $members_count:"
+  echo "$members"
+else
+  echo "Number of nodes found in network knowledge: $members_count"
+fi
+
+echo ""
+echo "Checking which nodes in network knowledge match the list of nodes IPs..."
 
 invalid_member_found=false
 for m in $members

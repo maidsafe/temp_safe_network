@@ -6,23 +6,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## v0.16.13 (2022-12-27)
+## v0.16.19 (2023-01-29)
 
-### Bug Fixes
+### Commit Statistics
 
- - <csr-id-220fd52ab3e1bac776ba74793d5042de220bb315/> set default keep-alive interval to be 1/2 of idle_timeout value set
-   - By default the sn_client keep_alive msgs interval will now be set to 1/2 the
-   value set for the idle_timeout value.
-   - Removing unused ClientBuilder::cmd_ack_wait config value.
-   - Decreasing the CI timeout for sn_client, sn_api, and CLI tests, to 7mins.
-   - New LogMarker::IncomingConnection logged by sn_node.
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release over the course of 1 calendar day.
+ - 2 days passed between releases.
+ - 0 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Merge #2041 ([`09fba13`](https://github.com/maidsafe/safe_network/commit/09fba13281fa7dadf810975c257e33fcc1f127f6))
+    - fix(storage): make data exists not be an error - The data storage is idempotent, and it's not an error that data already exists. ([`ce6718c`](https://github.com/maidsafe/safe_network/commit/ce6718ca0bcfb9e1a6eaf2729559b9b8ef148d7c))
+</details>
+
+## v0.16.18 (2023-01-27)
+
+<csr-id-6b923515f0f0cd1b0d1a4ed51d3ca418e41d9916/>
+
+### Chore
+
+ - <csr-id-6b923515f0f0cd1b0d1a4ed51d3ca418e41d9916/> fix issues reported by new clippy
+
+### Chore
+
+ - <csr-id-01ff2ccf45dfc9d45c5ad540144d7a4a640830fc/> sn_interface-0.16.18/sn_comms-0.1.4/sn_client-0.77.9/sn_node-0.72.34/sn_api-0.75.5/sn_cli-0.68.6
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 4 commits contributed to the release.
+ - 1 day passed between releases.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.16.18/sn_comms-0.1.4/sn_client-0.77.9/sn_node-0.72.34/sn_api-0.75.5/sn_cli-0.68.6 ([`01ff2cc`](https://github.com/maidsafe/safe_network/commit/01ff2ccf45dfc9d45c5ad540144d7a4a640830fc))
+    - Merge branch 'main' into chore-comms-remove-unused-async ([`e92dd49`](https://github.com/maidsafe/safe_network/commit/e92dd49f38f9b56c7276e86ba79f7fd8f816af76))
+    - Merge branch 'main' into RevertDkgCache ([`24ff625`](https://github.com/maidsafe/safe_network/commit/24ff6257f85922090cfaa5fa83044082d3ef8dab))
+    - fix issues reported by new clippy ([`6b92351`](https://github.com/maidsafe/safe_network/commit/6b923515f0f0cd1b0d1a4ed51d3ca418e41d9916))
+</details>
+
+## v0.16.17 (2023-01-25)
+
+<csr-id-a4d295ccdddea3d4d11bca5eb0236a5447c75633/>
+
+### Chore
+
+ - <csr-id-a4d295ccdddea3d4d11bca5eb0236a5447c75633/> sn_interface-0.16.17/sn_comms-0.1.2/sn_node-0.72.30
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
  - 2 commits contributed to the release.
- - 4 days passed between releases.
  - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
@@ -33,6 +85,239 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_interface-0.16.17/sn_comms-0.1.2/sn_node-0.72.30 ([`a4d295c`](https://github.com/maidsafe/safe_network/commit/a4d295ccdddea3d4d11bca5eb0236a5447c75633))
+    - Merge #2016 #2019 #2023 ([`c8e5746`](https://github.com/maidsafe/safe_network/commit/c8e574687ea74ed1adb69a722afe6bff734c19ad))
+</details>
+
+## v0.16.16 (2023-01-24)
+
+<csr-id-6acbe4920d9d3a7db88e76a21e026bdee04e9584/>
+
+### Chore
+
+ - <csr-id-6acbe4920d9d3a7db88e76a21e026bdee04e9584/> sn_interface-0.16.16/sn_node-0.72.28
+
+### New Features
+
+ - <csr-id-908ee34d116e2a9e5250d3044f9dbe1c6d471ecc/> add retry for relocating node
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 1 day passed between releases.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.16.16/sn_node-0.72.28 ([`6acbe49`](https://github.com/maidsafe/safe_network/commit/6acbe4920d9d3a7db88e76a21e026bdee04e9584))
+    - Merge #2024 ([`fc0aa80`](https://github.com/maidsafe/safe_network/commit/fc0aa8062c0003a9ac3c263d4ea01111b5e6a8d3))
+    - add retry for relocating node ([`908ee34`](https://github.com/maidsafe/safe_network/commit/908ee34d116e2a9e5250d3044f9dbe1c6d471ecc))
+</details>
+
+## v0.16.15 (2023-01-23)
+
+<csr-id-e6ec500629844ad2d328d38fff7ebd0f52a8cb12/>
+<csr-id-c94a953dddfcb20bf65d4bb34448dc2752a019c5/>
+
+### Refactor
+
+ - <csr-id-e6ec500629844ad2d328d38fff7ebd0f52a8cb12/> use existing join flow
+
+### Bug Fixes
+
+ - <csr-id-0f1ac79146aac0d0cea11644cca75b68012fa23d/> as elder request missing data on any membership update
+
+### Chore
+
+ - <csr-id-c94a953dddfcb20bf65d4bb34448dc2752a019c5/> sn_interface-0.16.15/sn_node-0.72.27
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 4 commits contributed to the release.
+ - 3 days passed between releases.
+ - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.16.15/sn_node-0.72.27 ([`c94a953`](https://github.com/maidsafe/safe_network/commit/c94a953dddfcb20bf65d4bb34448dc2752a019c5))
+    - Merge #2018 ([`1ee4f75`](https://github.com/maidsafe/safe_network/commit/1ee4f75af4dddb7b2bd18bb60317d3e977e356f7))
+    - use existing join flow ([`e6ec500`](https://github.com/maidsafe/safe_network/commit/e6ec500629844ad2d328d38fff7ebd0f52a8cb12))
+    - as elder request missing data on any membership update ([`0f1ac79`](https://github.com/maidsafe/safe_network/commit/0f1ac79146aac0d0cea11644cca75b68012fa23d))
+</details>
+
+## v0.16.14 (2023-01-20)
+
+<csr-id-6f214e2abae8be935652e93edda6d7eec2354af6/>
+<csr-id-7965789548e9e5deb64501a9a774532042ce6c16/>
+<csr-id-3b9304bab92f0715a134ce68afbfd08a7ad31e61/>
+<csr-id-21af053a5be2317be356e760c2b581c0f870a396/>
+<csr-id-027b164f851209f0662e0a84ee839618d95af58d/>
+<csr-id-a33d28e4bc3f11779eaf0bf6cafd67800dbc4e0d/>
+<csr-id-6c0f451646ea5840c79f112868637facdd08293c/>
+<csr-id-33a577f5e52029854757b9093e7b30535a7acabd/>
+<csr-id-b2edff4b5b63b5d8a7905428b2c78b1d26598f07/>
+<csr-id-9f5b5ffb5975810e22c634f171984fcc803062aa/>
+<csr-id-82ac545c7c3bbf1941fe9d9a80dcc2f99ff58a2f/>
+<csr-id-783d62461a65eb7c06b0d4f399b97216b6c75519/>
+
+### Chore
+
+ - <csr-id-6f214e2abae8be935652e93edda6d7eec2354af6/> remove unused priority
+ - <csr-id-7965789548e9e5deb64501a9a774532042ce6c16/> skip section_tree update earlier for outdated sap
+ - <csr-id-3b9304bab92f0715a134ce68afbfd08a7ad31e61/> some optimisations during AE probe
+ - <csr-id-21af053a5be2317be356e760c2b581c0f870a396/> happy new year 2023
+ - <csr-id-027b164f851209f0662e0a84ee839618d95af58d/> improve logging and comments
+ - <csr-id-a33d28e4bc3f11779eaf0bf6cafd67800dbc4e0d/> tidying up
+ - <csr-id-6c0f451646ea5840c79f112868637facdd08293c/> refactor away WireMsgUtils + make NodeJoin MsgKind
+ - <csr-id-33a577f5e52029854757b9093e7b30535a7acabd/> lighten the CouldNotStoreData flow
+   Dont return the full data, just the address. No
+   need to fill up other nodes as removing this one will trigger
+   that flow
+
+### Chore
+
+ - <csr-id-783d62461a65eb7c06b0d4f399b97216b6c75519/> sn_interface-0.16.14/sn_client-0.77.8/sn_node-0.72.25/sn_api-0.75.4/sn_cli-0.68.5
+
+### New Features
+
+ - <csr-id-ee90905abcf228d3a9d468ff0bb89a598cb0290d/> extra relocation criterias when relocate elder related node
+   1, not to relocate elder to self section
+   2, not counter join_as_relocated node as elder candidate immediately
+ - <csr-id-17877a2cd0d712e7a773f54e3df05698f2f201bc/> require total participation for handover requests
+ - <csr-id-8a8008cc668ef2578368ed74b96a75e0e03ce4e1/> remove unused node keypairs
+ - <csr-id-4e9826c656e8763e888825ee2511e806a6e34928/> remove accounting of storage levels
+
+### Bug Fixes
+
+ - <csr-id-16526095eba5520325ff0fb4fcda5ff620ffbb49/> resolve issues cause the relocation failure
+ - <csr-id-006b51e35435d61bac417674230e83d040814fac/> avoid reverifying for partial dag creation
+   AE back and forth and other messaging can mean we make a good amount of
+   partial_dags. Before this, we were pulling from a verified section_dag
+   and verifying _every_ insert into our fresh partial dag.
+   
+   This was costly. So now we avoid it.
+
+### Refactor
+
+ - <csr-id-b2edff4b5b63b5d8a7905428b2c78b1d26598f07/> replace nodejoin type with flag
+ - <csr-id-9f5b5ffb5975810e22c634f171984fcc803062aa/> proposal into multiple distinct messages
+ - <csr-id-82ac545c7c3bbf1941fe9d9a80dcc2f99ff58a2f/> removing Mutex we hold around SendStream
+   - Each SendStream is now moved into either `Cmd`s or functions
+   instead of being shared using a Mutex around it.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 48 commits contributed to the release over the course of 23 calendar days.
+ - 24 days passed between releases.
+ - 18 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.16.14/sn_client-0.77.8/sn_node-0.72.25/sn_api-0.75.4/sn_cli-0.68.5 ([`783d624`](https://github.com/maidsafe/safe_network/commit/783d62461a65eb7c06b0d4f399b97216b6c75519))
+    - Merge #1940 #1982 ([`3bddfdb`](https://github.com/maidsafe/safe_network/commit/3bddfdb6241116144e1e8869c192d20b89ae5534))
+    - Merge #1981 ([`85da86c`](https://github.com/maidsafe/safe_network/commit/85da86cd0d4914489fc74125bb7a2655136f3508))
+    - refactor(join): use existing msg-flow - Ae checks are made on TryJoin msg. - Elders drop msgs with invalid/unreachable parameters. - Unit tests more of `unit`-style than `e2e`. ([`8f596e9`](https://github.com/maidsafe/safe_network/commit/8f596e914f841839dffe89c67aa090f29bc03109))
+    - extra relocation criterias when relocate elder related node ([`ee90905`](https://github.com/maidsafe/safe_network/commit/ee90905abcf228d3a9d468ff0bb89a598cb0290d))
+    - Merge #1983 ([`c20b594`](https://github.com/maidsafe/safe_network/commit/c20b59440d148ec4b7c299bebae7f2030f511511))
+    - remove unused priority ([`6f214e2`](https://github.com/maidsafe/safe_network/commit/6f214e2abae8be935652e93edda6d7eec2354af6))
+    - Merge #1979 ([`6b8e25c`](https://github.com/maidsafe/safe_network/commit/6b8e25c6195c59d50ed61351e21570a594d209e8))
+    - require total participation for handover requests ([`17877a2`](https://github.com/maidsafe/safe_network/commit/17877a2cd0d712e7a773f54e3df05698f2f201bc))
+    - Merge #1974 ([`5afb1d0`](https://github.com/maidsafe/safe_network/commit/5afb1d064737daad6961ad290c2ff7c3ff2f1e38))
+    - resolve issues cause the relocation failure ([`1652609`](https://github.com/maidsafe/safe_network/commit/16526095eba5520325ff0fb4fcda5ff620ffbb49))
+    - Merge #1962 ([`61f7d98`](https://github.com/maidsafe/safe_network/commit/61f7d98c84df9d465d9e54c06e3d5569ceff097c))
+    - Merge #1963 ([`1eedb03`](https://github.com/maidsafe/safe_network/commit/1eedb030f46157de68e4b12f45b74ccc4692f790))
+    - feat(keypair): improves perf for smaller ranges - This becomes more important after a few splits. ([`43a06e0`](https://github.com/maidsafe/safe_network/commit/43a06e083f892dc56bbaa0485f1c0e76675428a4))
+    - replace nodejoin type with flag ([`b2edff4`](https://github.com/maidsafe/safe_network/commit/b2edff4b5b63b5d8a7905428b2c78b1d26598f07))
+    - Merge #1960 ([`2d52a72`](https://github.com/maidsafe/safe_network/commit/2d52a72d177653317d00655e772eee6a174b9716))
+    - skip section_tree update earlier for outdated sap ([`7965789`](https://github.com/maidsafe/safe_network/commit/7965789548e9e5deb64501a9a774532042ce6c16))
+    - Merge #1956 ([`d005784`](https://github.com/maidsafe/safe_network/commit/d005784be478c93a3e801e090f37ccf17a4acc19))
+    - some optimisations during AE probe ([`3b9304b`](https://github.com/maidsafe/safe_network/commit/3b9304bab92f0715a134ce68afbfd08a7ad31e61))
+    - Merge #1951 ([`24ca31f`](https://github.com/maidsafe/safe_network/commit/24ca31fd53c570c7c97849b74ded850c05273353))
+    - happy new year 2023 ([`21af053`](https://github.com/maidsafe/safe_network/commit/21af053a5be2317be356e760c2b581c0f870a396))
+    - Merge #1941 ([`a8227e8`](https://github.com/maidsafe/safe_network/commit/a8227e8b3bda5f51d1de8bd39e9d7bba5705a93a))
+    - improve logging and comments ([`027b164`](https://github.com/maidsafe/safe_network/commit/027b164f851209f0662e0a84ee839618d95af58d))
+    - tidying up ([`a33d28e`](https://github.com/maidsafe/safe_network/commit/a33d28e4bc3f11779eaf0bf6cafd67800dbc4e0d))
+    - proposal into multiple distinct messages ([`9f5b5ff`](https://github.com/maidsafe/safe_network/commit/9f5b5ffb5975810e22c634f171984fcc803062aa))
+    - Merge #1948 ([`bc2d0c1`](https://github.com/maidsafe/safe_network/commit/bc2d0c1d6672b86c05be2dd08567531149ad7355))
+    - avoid reverifying for partial dag creation ([`006b51e`](https://github.com/maidsafe/safe_network/commit/006b51e35435d61bac417674230e83d040814fac))
+    - Merge #1945 ([`b4fa062`](https://github.com/maidsafe/safe_network/commit/b4fa062f39a6617d0998efbd6dace72e6ae265bf))
+    - feat(ae): target 1 rand elder in 3 rand sections - Maintains the global network knowledge of all sections. ([`bf17cd2`](https://github.com/maidsafe/safe_network/commit/bf17cd21ca9dce28025a583c2bd6b8dcda477b2d))
+    - Merge #1942 ([`28d5b96`](https://github.com/maidsafe/safe_network/commit/28d5b967404b1c28406328a18d88bd4c85f7a335))
+    - refactor away WireMsgUtils + make NodeJoin MsgKind ([`6c0f451`](https://github.com/maidsafe/safe_network/commit/6c0f451646ea5840c79f112868637facdd08293c))
+    - Merge #1891 ([`716717c`](https://github.com/maidsafe/safe_network/commit/716717c1b3db9a881858bf8d2570f7fb9f4979f0))
+    - removing Mutex we hold around SendStream ([`82ac545`](https://github.com/maidsafe/safe_network/commit/82ac545c7c3bbf1941fe9d9a80dcc2f99ff58a2f))
+    - Merge #1926 #1936 ([`acc88c5`](https://github.com/maidsafe/safe_network/commit/acc88c5d94900c840cb6c3111ef92fc24b0f3a3d))
+    - Merge branch 'main' into proposal_refactor ([`0bc7f94`](https://github.com/maidsafe/safe_network/commit/0bc7f94c72c374d667a9b455c4f4f1830366e4a4))
+    - remove unused node keypairs ([`8a8008c`](https://github.com/maidsafe/safe_network/commit/8a8008cc668ef2578368ed74b96a75e0e03ce4e1))
+    - feat(storage): use nodes where adults were used - This continues the move over to also using elders for storage. ([`250da72`](https://github.com/maidsafe/safe_network/commit/250da72ea38b82037ae928ac0eeb8c4b91568448))
+    - remove accounting of storage levels ([`4e9826c`](https://github.com/maidsafe/safe_network/commit/4e9826c656e8763e888825ee2511e806a6e34928))
+    - refactor(cmd): remove disambiguation - Renames `ReplicateOneData` to `StoreData`, which is the cmd used when a client stores data. - This leaves `ReplicateDataBatch` as the unambiguous cmd, already exclusively used for data replication between nodes. ([`29ee1d5`](https://github.com/maidsafe/safe_network/commit/29ee1d5205c1f4d079160f133e27e1cd1039b406))
+    - feat(storage): report threshold reached only - This removes the book keeping of storage level on Elders. - Makes Adults report only when threshold reached. - Makes Elders allow joins until split when majority of Adults full. ([`a216003`](https://github.com/maidsafe/safe_network/commit/a216003b6275d36f1b419ad3cc2be30adb72700d))
+    - Merge #1873 ([`8be1563`](https://github.com/maidsafe/safe_network/commit/8be1563fcddde2323ae2f892687dc76f253f3fb2))
+    - chore(naming): rename dysfunction - Uses the more common vocabulary in fault tolerance area. ([`f68073f`](https://github.com/maidsafe/safe_network/commit/f68073f2897894375f5a09b870e2bfe4e03c3b10))
+    - Merge #1933 ([`b408f59`](https://github.com/maidsafe/safe_network/commit/b408f597cbb7f5ea4737af2b06f2fd1dbe3f1786))
+    - lighten the CouldNotStoreData flow ([`33a577f`](https://github.com/maidsafe/safe_network/commit/33a577f5e52029854757b9093e7b30535a7acabd))
+    - Merge #1931 ([`964a1bf`](https://github.com/maidsafe/safe_network/commit/964a1bfde64969a2335b1f6f4558d0ea917474b2))
+    - fix(name): rename from interrogative to imperative - The naming was confusing as to what the method actually did. ([`f2327d7`](https://github.com/maidsafe/safe_network/commit/f2327d7072612d02218ba3a55b181539f78cdf6b))
+    - chore(errors): fix naming - There was an aiming error in the sentence structure. It's not the proof chain that is not covered, it's the key that is not covered. ([`a9b45f1`](https://github.com/maidsafe/safe_network/commit/a9b45f10bb7086cf1a65311d6577f846fa6e2c02))
+    - Merge #1920 ([`71f2373`](https://github.com/maidsafe/safe_network/commit/71f2373f6ccc75e35a92b0a8736fc5ff72f28655))
+</details>
+
+## v0.16.13 (2022-12-27)
+
+<csr-id-a38cd49958df82fd65d0a3f13670693f40a1e6b2/>
+
+### Chore
+
+ - <csr-id-a38cd49958df82fd65d0a3f13670693f40a1e6b2/> sn_interface-0.16.13/sn_client-0.77.7/sn_node-0.72.24
+
+### Bug Fixes
+
+ - <csr-id-220fd52ab3e1bac776ba74793d5042de220bb315/> set default keep-alive interval to be 1/2 of idle_timeout value set
+   - By default the sn_client keep_alive msgs interval will now be set to 1/2 the
+   value set for the idle_timeout value.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 4 days passed between releases.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.16.13/sn_client-0.77.7/sn_node-0.72.24 ([`a38cd49`](https://github.com/maidsafe/safe_network/commit/a38cd49958df82fd65d0a3f13670693f40a1e6b2))
     - Merge #1924 ([`be2cded`](https://github.com/maidsafe/safe_network/commit/be2cdedb19154adf324782d7178f0e25018cd16c))
     - set default keep-alive interval to be 1/2 of idle_timeout value set ([`220fd52`](https://github.com/maidsafe/safe_network/commit/220fd52ab3e1bac776ba74793d5042de220bb315))
 </details>
@@ -40,6 +325,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## v0.16.12 (2022-12-22)
 
 <csr-id-ff4a6aea4edc722f0aef23cea8100d7c09d3100a/>
+<csr-id-c6ff5c120048c526788fd415c2db075f4be94090/>
 
 ### Chore
 
@@ -117,11 +403,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-id-bf159dc0477417bfd35b0f778822dbdeb3dd0023/>
 <csr-id-5ca4e906c3ff3a55cdedcff1203df57f9f5d4767/>
+<csr-id-73e2c106ae61177617f0fbb1ce1306ad3102bf5f/>
 
 ### Refactor
 
  - <csr-id-bf159dc0477417bfd35b0f778822dbdeb3dd0023/> serialise the msg header only once when replicating data to holders
    - Also removing some minor but unnecessary WireMsg caching, and some objs cloning.
+
+### Chore (BREAKING)
+
+ - <csr-id-73e2c106ae61177617f0fbb1ce1306ad3102bf5f/> removing unused Cargo features
 
 ### Chore
 
@@ -131,9 +422,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 3 commits contributed to the release.
+ - 4 commits contributed to the release.
  - 1 day passed between releases.
- - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -146,6 +437,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - sn_interface-0.16.10/sn_node-0.72.18 ([`5ca4e90`](https://github.com/maidsafe/safe_network/commit/5ca4e906c3ff3a55cdedcff1203df57f9f5d4767))
     - Merge #1921 ([`c3b09c5`](https://github.com/maidsafe/safe_network/commit/c3b09c5a851ce23ae4628455c7c7f3f17b58ed8c))
     - serialise the msg header only once when replicating data to holders ([`bf159dc`](https://github.com/maidsafe/safe_network/commit/bf159dc0477417bfd35b0f778822dbdeb3dd0023))
+    - removing unused Cargo features ([`73e2c10`](https://github.com/maidsafe/safe_network/commit/73e2c106ae61177617f0fbb1ce1306ad3102bf5f))
 </details>
 
 ## v0.16.9 (2022-12-20)

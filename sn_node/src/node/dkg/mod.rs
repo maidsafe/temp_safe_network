@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -240,9 +240,9 @@ impl DkgVoter {
                 return Err(Error::DoubleKeyAttackDetected(
                     key_owner,
                     Box::new(key),
-                    key_sig,
+                    Box::new(key_sig),
                     Box::new(*already_had),
-                    *old_sig,
+                    Box::new(*old_sig),
                 ));
             } else {
                 debug!(

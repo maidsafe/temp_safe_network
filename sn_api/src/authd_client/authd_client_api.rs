@@ -1,4 +1,4 @@
-// Copyright 2020 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -142,7 +142,7 @@ impl SafeAuthdClient {
         authd_notify_key_path: P,
     ) -> Self {
         let endpoint = match endpoint {
-            None => format!("{}:{}", SN_AUTHD_ENDPOINT_HOST, SN_AUTHD_ENDPOINT_PORT),
+            None => format!("{SN_AUTHD_ENDPOINT_HOST}:{SN_AUTHD_ENDPOINT_PORT}"),
             Some(endpoint) => endpoint,
         };
         debug!("Creating new authd client for endpoint {}", endpoint);
@@ -370,7 +370,7 @@ impl SafeAuthdClient {
             &self.authd_endpoint,
             SN_AUTHD_METHOD_SUBSCRIBE,
             json!(vec![endpoint_url, cert_path]),
-        ).await.map_err(|err| Error::AuthdClientError(format!("Failed when trying to subscribe endpoint URL ({}) to receive authorisation request for self-auth: {}", endpoint_url, err)))?;
+        ).await.map_err(|err| Error::AuthdClientError(format!("Failed when trying to subscribe endpoint URL ({endpoint_url}) to receive authorisation request for self-auth: {err}")))?;
 
         debug!(
             "Successfully subscribed to receive authorisation requests notifications: {}",
@@ -501,29 +501,24 @@ fn authd_run_cmd(authd_path: Option<&str>, args: &[&str]) -> Result<()> {
         .stderr(Stdio::piped())
         .output()
         .map_err(|err| {
-            Error::AuthdClientError(format!(
-                "Failed to execute authd from '{}': {}",
-                path_str, err
-            ))
+            Error::AuthdClientError(format!("Failed to execute authd from '{path_str}': {err}",))
         })?;
 
     if output.status.success() {
         io::stdout()
             .write_all(&output.stdout)
-            .map_err(|err| Error::AuthdClientError(format!("Failed to output stdout: {}", err)))?;
+            .map_err(|err| Error::AuthdClientError(format!("Failed to output stdout: {err}")))?;
         Ok(())
     } else {
         match output.status.code() {
             Some(10) => {
                 // sn_authd exit code 10 is sn_authd::errors::Error::AuthdAlreadyStarted
                 Err(Error::AuthdAlreadyStarted(format!(
-                       "Failed to start sn_authd daemon '{}' as an instance seems to be already running",
-                       path_str,
+                       "Failed to start sn_authd daemon '{path_str}' as an instance seems to be already running",
                    )))
             }
             Some(_) | None => Err(Error::AuthdError(format!(
-                "Failed when invoking sn_authd executable from '{}'",
-                path_str,
+                "Failed when invoking sn_authd executable from '{path_str}'",
             ))),
         }
     }

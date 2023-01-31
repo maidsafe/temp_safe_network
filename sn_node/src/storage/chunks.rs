@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -6,11 +6,11 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{list_files_in, prefix_tree_path, Error, Result, UsedSpace};
+use super::{list_files_in, prefix_tree_path, used_space::StorageLevel, Error, Result, UsedSpace};
 
 use sn_interface::{
     messaging::system::NodeQueryResponse,
-    types::{log_markers::LogMarker, Chunk, ChunkAddress, DataAddress},
+    types::{log_markers::LogMarker, Chunk, ChunkAddress},
 };
 
 use bytes::Bytes;
@@ -74,7 +74,6 @@ impl ChunkStorage {
         Ok(path.join(filename))
     }
 
-    #[allow(dead_code)]
     pub(super) async fn remove_chunk(&self, address: &ChunkAddress) -> Result<()> {
         trace!("Removing chunk, {:?}", address);
         let filepath = self.chunk_addr_to_filepath(address)?;
@@ -109,13 +108,16 @@ impl ChunkStorage {
 
     // Read chunk from local store and return NodeQueryResponse
     pub(super) async fn get(&self, address: &ChunkAddress) -> NodeQueryResponse {
-        trace!("{:?} {address:?}", LogMarker::ChunkQueryReceviedAtAdult);
+        trace!(
+            "{:?} {address:?}",
+            LogMarker::ChunkQueryReceviedAtStoringNode
+        );
         NodeQueryResponse::GetChunk(self.get_chunk(address).await.map_err(|error| error.into()))
     }
 
     /// Store a chunk in the local disk store unless it is already there
     #[instrument(skip_all)]
-    pub(super) async fn store(&self, chunk: &Chunk) -> Result<()> {
+    pub(super) async fn store(&self, chunk: &Chunk) -> Result<StorageLevel> {
         let addr = chunk.address();
         let filepath = self.chunk_addr_to_filepath(addr)?;
 
@@ -125,7 +127,7 @@ impl ChunkStorage {
                 self, addr
             );
             // Nothing more to do here
-            return Err(Error::DataExists(DataAddress::Bytes(*addr)));
+            return Ok(StorageLevel::NoChange);
         }
 
         // Cheap extra security check for space (prone to race conditions)
@@ -148,10 +150,10 @@ impl ChunkStorage {
         // concurrent reading failing by reading an empty/incomplete file
         file.sync_data().await?;
 
-        self.used_space.increase(chunk.value().len());
+        let storage_level = self.used_space.increase(chunk.value().len());
         trace!("{:?} {addr:?}", LogMarker::StoredNewChunk);
 
-        Ok(())
+        Ok(storage_level)
     }
 }
 
@@ -173,19 +175,18 @@ mod tests {
 
     fn init_file_store() -> ChunkStorage {
         let root = tempdir().expect("Failed to create temporary directory for chunk disk store");
-        ChunkStorage::new(root.path(), UsedSpace::new(usize::MAX))
+        ChunkStorage::new(root.path(), UsedSpace::default())
             .expect("Failed to create chunk disk store")
     }
 
     #[tokio::test]
-    #[ignore]
     async fn test_write_read_chunk() {
         let storage = init_file_store();
         // test that a range of different chunks return the written chunk
         for _ in 0..10 {
             let chunk = Chunk::new(random_bytes(100));
 
-            storage.store(&chunk).await.expect("Failed to write chunk.");
+            let _ = storage.store(&chunk).await.expect("Failed to write chunk.");
 
             let read_chunk = storage
                 .get_chunk(chunk.address())

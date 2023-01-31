@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -99,7 +99,7 @@ impl Safe {
         }
 
         self.client = Some(b.build().await.map_err(|err| {
-            Error::ConnectionError(format!("Failed to connect to the SAFE Network: {:?}", err))
+            Error::ConnectionError(format!("Failed to connect to the SAFE Network: {err:?}"))
         })?);
 
         debug!("Successfully connected to the Network!!!");

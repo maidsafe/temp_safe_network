@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -16,7 +16,6 @@ use sn_dbc::{
     SpentProofShare,
 };
 use sn_interface::{
-    data_copy_count,
     messaging::{
         data::{
             ClientDataResponse, ClientMsg, DataCmd, DataQueryVariant, EditRegister,
@@ -25,145 +24,121 @@ use sn_interface::{
         system::{NodeDataResponse, OperationId},
         AuthorityProof, ClientAuth, MsgId,
     },
-    network_knowledge::section_keys::build_spent_proof_share,
+    network_knowledge::{section_keys::build_spent_proof_share, SectionTreeUpdate},
     types::{
         log_markers::LogMarker,
         register::{Permissions, Policy, Register, User},
         Keypair, Peer, RegisterCmd, ReplicatedData, SPENTBOOK_TYPE_TAG,
     },
 };
-use tokio::sync::Mutex;
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::sync::Arc;
 use xor_name::XorName;
 
 impl MyNode {
     /// Forms a `QueryError` msg to send back to the client on a stream
-    pub(crate) async fn send_query_error_response_on_stream(
+    pub(crate) fn send_query_error_response_over_stream(
         context: NodeContext,
         error: Error,
         query: &DataQueryVariant,
-        source_peer: Peer,
+        source_client: Peer,
         correlation_id: MsgId,
-        send_stream: Arc<Mutex<SendStream>>,
-    ) -> Result<()> {
-        let the_error_msg = ClientDataResponse::QueryResponse {
+        send_stream: SendStream,
+    ) -> Cmd {
+        let msg = ClientDataResponse::QueryResponse {
             response: query.to_error_response(error.into()),
             correlation_id,
         };
 
-        let (kind, payload) = MyNode::serialize_client_msg_response(context.name, the_error_msg)?;
-
-        MyNode::send_msg_on_stream(
-            context.network_knowledge.section_key(),
-            payload,
-            kind,
-            send_stream,
-            Some(source_peer),
+        Cmd::SendClientResponse {
+            msg,
             correlation_id,
-        )
-        .await
+            send_stream,
+            context,
+            source_client,
+        }
     }
 
     /// Forms a `CmdError` msg to send back to the client over the response stream
-    pub(crate) async fn send_cmd_error_response_over_stream(
-        context: &NodeContext,
+    pub(crate) fn send_cmd_error_response_over_stream(
+        context: NodeContext,
         cmd: DataCmd,
         error: Error,
         correlation_id: MsgId,
-        send_stream: Arc<Mutex<SendStream>>,
-    ) -> Result<()> {
-        let client_msg = ClientDataResponse::CmdResponse {
+        send_stream: SendStream,
+        source_client: Peer,
+    ) -> Cmd {
+        let msg = ClientDataResponse::CmdResponse {
             response: cmd.to_error_response(error.into()),
             correlation_id,
         };
 
-        let (kind, payload) = MyNode::serialize_client_msg_response(context.name, client_msg)?;
-
         debug!("{correlation_id:?} sending cmd response error back to client");
-        MyNode::send_msg_on_stream(
-            context.network_knowledge.section_key(),
-            payload,
-            kind,
-            send_stream,
-            None, // we shouldn't need this...
+        Cmd::SendClientResponse {
+            msg,
             correlation_id,
-        )
-        .await
+            send_stream,
+            context,
+            source_client,
+        }
     }
 
     /// Handle data query
     #[allow(clippy::too_many_arguments)]
-    pub(crate) async fn handle_data_query_at_adult(
-        context: &NodeContext,
+    pub(crate) async fn handle_data_query_where_stored(
+        context: NodeContext,
         operation_id: OperationId,
         query: &DataQueryVariant,
         auth: ClientAuth,
-        requesting_elder: Peer,
+        requesting_peer: Peer,
         msg_id: MsgId,
-        send_stream: Option<Arc<Mutex<SendStream>>>,
-    ) -> Result<()> {
+        send_stream: Option<SendStream>,
+    ) -> Vec<Cmd> {
         let response = context
             .data_storage
             .query(query, User::Key(auth.public_key))
             .await;
 
-        trace!("{msg_id:?} data query response at adult is: {:?}", response);
-        let msg = NodeDataResponse::QueryResponse {
-            response,
-            operation_id,
-        };
-
-        let (kind, payload) = MyNode::serialize_node_msg_response(context.name, msg)?;
-
-        let bytes = MyNode::form_usr_msg_bytes_to_node(
-            context.network_knowledge.section_key(),
-            payload,
-            kind,
-            Some(requesting_elder),
-            msg_id,
-        )?;
-
         if let Some(send_stream) = send_stream {
-            // send response on the stream
-            let stream_prio = 10;
-            let mut send_stream = send_stream.lock().await;
-            send_stream.set_priority(stream_prio);
-            let stream_id = send_stream.id();
-            trace!("{msg_id:?} Sending response to {requesting_elder:?} over {stream_id}");
-            if let Err(error) = send_stream.send_user_msg(bytes).await {
-                error!("Could not send msg {msg_id:?} over response {stream_id} to {requesting_elder:?}: {error:?}");
-                return Err(error.into());
-            }
-            // Attempt to gracefully terminate the stream.
-            // If this errors it does _not_ mean our message has not been sent
-            let result = send_stream.finish().await;
-            trace!("{msg_id:?} Response sent to {requesting_elder:?} over {stream_id}. Stream finished with result: {result:?}");
-        } else {
-            error!("Send stream missing from {requesting_elder:?}, data request response was not sent out.")
-        }
+            trace!("{msg_id:?} data query response at node is: {response:?}");
+            let msg = NodeDataResponse::QueryResponse {
+                response,
+                operation_id,
+            };
 
-        Ok(())
+            vec![Cmd::SendNodeDataResponse {
+                msg,
+                correlation_id: msg_id,
+                send_stream,
+                context,
+                requesting_peer,
+            }]
+        } else {
+            error!("Send stream missing from {requesting_peer:?}, data request response was not sent out.");
+            vec![]
+        }
     }
 
     /// Handle incoming client msgs.
+    /// If this is a store request, and we are an Elder and one of
+    /// the `data_copy_count()` nodes, then we will send a wiremsg
+    /// to ourselves, among the msgs sent to the other holders.
     pub(crate) async fn handle_valid_client_msg(
-        context: NodeContext,
+        mut context: NodeContext,
         msg_id: MsgId,
         msg: ClientMsg,
         auth: AuthorityProof<ClientAuth>,
         origin: Peer,
-        send_stream: Arc<Mutex<SendStream>>,
+        send_stream: SendStream,
     ) -> Result<Vec<Cmd>> {
         debug!("Handling client {msg_id:?}");
 
-        trace!("{:?}: {:?} ", LogMarker::ClientMsgToBeHandled, msg);
+        trace!("{:?}: {msg:?} ", LogMarker::ClientMsgToBeHandled);
 
         let cmd = match msg {
             ClientMsg::Cmd(cmd) => cmd,
             ClientMsg::Query(query) => {
-                return MyNode::read_data_from_adult_and_respond_to_client(
+                return MyNode::read_data_and_respond_to_client(
                     context,
                     query,
                     msg_id,
@@ -177,7 +152,6 @@ impl MyNode {
 
         // extract the data from the request
         let data_result = match cmd.clone() {
-            // These reads/writes are for adult nodes...
             DataCmd::StoreChunk(chunk) => Ok(ReplicatedData::Chunk(chunk)),
             DataCmd::Register(cmd) => Ok(ReplicatedData::RegisterWrite(cmd)),
             DataCmd::Spentbook(cmd) => {
@@ -193,25 +167,35 @@ impl MyNode {
                         "Received updated network knowledge with the request. Will return new command \
                         to update the node network knowledge before processing the spend."
                     );
-                    // To avoid a loop, recompose the message without the updated proof_chain.
-                    let updated_client_msg =
-                        ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
-                            key_image,
-                            tx,
-                            spent_proofs,
-                            spent_transactions,
-                            network_knowledge: None,
-                        }));
-                    let update_command = Cmd::UpdateNetworkAndHandleValidClientMsg {
-                        proof_chain,
-                        signed_sap,
-                        msg_id,
-                        msg: updated_client_msg,
-                        origin,
-                        send_stream,
-                        auth,
-                    };
-                    return Ok(vec![update_command]);
+                    let name = context.name;
+                    let there_was_an_update = context.network_knowledge.update_knowledge_if_valid(
+                        SectionTreeUpdate::new(signed_sap.clone(), proof_chain.clone()),
+                        None,
+                        &name,
+                    )?;
+
+                    if there_was_an_update {
+                        // To avoid a loop, recompose the message without the updated proof_chain.
+                        let updated_client_msg =
+                            ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
+                                key_image,
+                                tx,
+                                spent_proofs,
+                                spent_transactions,
+                                network_knowledge: None,
+                            }));
+                        let update_command = Cmd::UpdateNetworkAndHandleValidClientMsg {
+                            proof_chain,
+                            signed_sap,
+                            msg_id,
+                            msg: updated_client_msg,
+                            origin,
+                            send_stream,
+                            auth,
+                            context,
+                        };
+                        return Ok(vec![update_command]);
+                    }
                 }
                 MyNode::extract_contents_as_replicated_data(&context, cmd)
             }
@@ -221,58 +205,32 @@ impl MyNode {
             Ok(data) => data,
             Err(error) => {
                 debug!("Will send error response back to client");
-                MyNode::send_cmd_error_response_over_stream(
-                    &context,
+                let cmd = MyNode::send_cmd_error_response_over_stream(
+                    context,
                     cmd,
                     error,
                     msg_id,
                     send_stream,
-                )
-                .await?;
-
-                return Ok(vec![]);
+                    origin,
+                );
+                return Ok(vec![cmd]);
             }
         };
 
         trace!("{:?}: {:?}", LogMarker::DataStoreReceivedAtElder, data);
 
-        let cmds = vec![];
-        let targets = MyNode::target_data_holders(&context, data.name());
-
-        // make sure the expected replication factor is achieved
-        if data_copy_count() > targets.len() {
-            error!("InsufficientAdults for storing data reliably");
-            let error = Error::InsufficientAdults {
-                prefix: context.network_knowledge.prefix(),
-                expected: data_copy_count() as u8,
-                found: targets.len() as u8,
-            };
-
-            debug!("Will send error response back to client");
-
-            // TODO: Use response stream here. This wont work anymore!
-            MyNode::send_cmd_error_response_over_stream(&context, cmd, error, msg_id, send_stream)
-                .await?;
-            return Ok(vec![]);
-        }
-
-        // the replication msg sent to adults
+        // the store msg sent to nodes
         // cmds here may be fault tracking.
         // CmdAcks are sent over the send stream herein
-        MyNode::replicate_data_to_adults_and_ack_to_client(
-            &context,
+        MyNode::store_data_at_nodes_and_ack_to_client(
+            context,
             cmd,
             data,
             msg_id,
-            targets,
             send_stream,
+            origin,
         )
-        .await?;
-
-        // TODO: handle failed responses
-        // cmds.extend();
-
-        Ok(cmds)
+        .await
     }
 
     // helper to extract the contents of the cmd as ReplicatedData
@@ -362,10 +320,7 @@ impl MyNode {
             .flat_map(|(k, v)| if &k == key_image { v } else { vec![] })
             .collect();
         if public_commitments.is_empty() {
-            let msg = format!(
-                "There are no commitments for the given key image {:?}",
-                key_image
-            );
+            let msg = format!("There are no commitments for the given key image {key_image:?}",);
             debug!("Dropping spend request: {msg}");
             return Err(Error::SpentbookError(msg));
         }
@@ -403,8 +358,7 @@ impl MyNode {
         let mut entry = vec![].writer();
         rmp_serde::encode::write(&mut entry, spent_proof_share).map_err(|err| {
             Error::SpentbookError(format!(
-                "Failed to serialise SpentProofShare to insert it into the spentbook (Register): {:?}",
-                err
+                "Failed to serialise SpentProofShare to insert it into the spentbook (Register): {err:?}",
             ))
         })?;
 

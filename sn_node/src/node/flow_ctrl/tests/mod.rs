@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -11,38 +11,37 @@ pub(crate) mod cmd_utils;
 pub(crate) mod dbc_utils;
 pub(crate) mod network_builder;
 
-use crate::{
-    comm::MsgFromPeer,
-    node::{
-        flow_ctrl::{
-            dispatcher::Dispatcher,
-            tests::network_builder::{TestNetwork, TestNetworkBuilder},
-        },
-        messages::WireMsgUtils,
-        messaging::Peers,
-        relocation_check, ChurnId, Cmd, Error, Proposal,
+use crate::node::{
+    flow_ctrl::{
+        dispatcher::Dispatcher,
+        tests::network_builder::{TestNetwork, TestNetworkBuilder},
     },
+    messaging::Peers,
+    relocation_check, ChurnId, Cmd, Error, SectionStateVote,
 };
-use cmd_utils::{
-    handle_online_cmd, run_and_collect_cmds, run_node_handle_client_msg_and_collect_cmds,
-};
+use cmd_utils::{handle_online_cmd, ProcessAndInspectCmds};
+
+use sn_comms::MsgFromPeer;
 use sn_consensus::Decision;
 use sn_dbc::Hash;
 use sn_interface::{
     dbcs::gen_genesis_dbc,
     elder_count, init_logger,
     messaging::{
-        data::{ClientMsg, DataCmd, SpentbookCmd},
-        system::{self, AntiEntropyKind, JoinAsRelocatedRequest, NodeDataCmd, NodeMsg},
+        data::{
+            ClientDataResponse, ClientMsg, CmdResponse, DataCmd, Error as MessagingDataError,
+            SpentbookCmd,
+        },
+        system::{AntiEntropyKind, NodeDataCmd, NodeMsg},
         Dst, MsgType, WireMsg,
     },
     network_knowledge::{
         recommended_section_size, supermajority, Error as NetworkKnowledgeError, MembershipState,
-        MyNodeInfo, NodeState, RelocateDetails, SapCandidate, SectionKeysProvider,
+        MyNodeInfo, NodeState, RelocationDst, RelocationInfo, RelocationProof, SectionKeysProvider,
         SectionTreeUpdate, SectionsDAG, MIN_ADULT_AGE,
     },
     test_utils::*,
-    types::{keys::ed25519, PublicKey, ReplicatedData},
+    types::{keys::ed25519, PublicKey},
 };
 
 use assert_matches::assert_matches;
@@ -63,62 +62,57 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
 
     let prefix = Prefix::default();
     let env = TestNetworkBuilder::new(thread_rng())
-        .sap(prefix, elder_count(), 0, None, None)
+        .sap(prefix, elder_count(), 1, None, None)
         .build();
-    let dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0);
+
     let sk_set = env.get_secret_key_set(prefix, None);
     let section_key = sk_set.public_keys().public_key();
-    let node = dispatcher.node();
-    let node_info = node.read().await.info();
-    let relocated_node_old_name = node_info.name();
-    let relocated_node_old_keypair = node_info.keypair.clone();
 
-    let relocated_node = MyNodeInfo::new(
-        ed25519::gen_keypair(&prefix.range_inclusive(), MIN_ADULT_AGE + 1),
+    let adult_dispatcher = env.get_dispatchers(prefix, 0, 1, None).remove(0);
+    let adult_node = adult_dispatcher.node();
+    let old_info = adult_node.read().await.info();
+    let old_name = old_info.name();
+    let old_keypair = old_info.keypair.clone();
+
+    let new_info = MyNodeInfo::new(
+        ed25519::gen_keypair(&prefix.range_inclusive(), old_info.age() + 1),
         gen_addr(),
     );
 
-    let relocate_details = RelocateDetails {
-        previous_name: relocated_node_old_name,
-        dst: relocated_node_old_name,
-        dst_section_key: section_key,
-        age: relocated_node.age(),
-    };
+    let relocation_dst = RelocationDst::new(xor_name::rand::random());
+    let relocated_state = NodeState::relocated(old_info.peer(), Some(old_name), relocation_dst);
+    let section_signed_state = TestKeys::get_section_signed(&sk_set.secret_key(), relocated_state);
 
-    let node_state = NodeState::relocated(
-        relocated_node.peer(),
-        Some(relocated_node_old_name),
-        relocate_details,
-    );
-    let relocate_proof = TestKeys::get_section_signed(&sk_set.secret_key(), node_state);
+    let info = RelocationInfo::new(section_signed_state, new_info.name());
+    let serialized_info = bincode::serialize(&info)?;
+    let signature_over_new_name = ed25519::sign(&serialized_info, &old_keypair);
 
-    let signature_over_new_name =
-        ed25519::sign(&relocated_node.name().0, &relocated_node_old_keypair);
+    let proof = RelocationProof::new(info, signature_over_new_name, old_keypair.public);
 
-    let wire_msg = WireMsg::single_src(
-        &relocated_node,
+    let wire_msg = WireMsg::single_src_node(
+        new_info.name(),
         Dst {
             name: XorName::from(PublicKey::Bls(section_key)),
             section_key,
         },
-        NodeMsg::JoinAsRelocatedRequest(Box::new(JoinAsRelocatedRequest {
-            section_key,
-            relocate_proof,
-            signature_over_new_name,
-        })),
+        NodeMsg::TryJoin(Some(proof)),
     )?;
 
-    let _ = run_and_collect_cmds(
+    let elder_dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0);
+    let elder_node = elder_dispatcher.node();
+
+    ProcessAndInspectCmds::new(
         Cmd::HandleMsg {
-            origin: relocated_node.peer(),
+            origin: new_info.peer(),
             wire_msg,
             send_stream: None,
         },
-        &dispatcher,
+        &elder_dispatcher,
     )
+    .process_all()
     .await?;
 
-    assert!(node
+    assert!(elder_node
         .read()
         .await
         .membership
@@ -138,8 +132,8 @@ async fn handle_agreement_on_online() -> Result<()> {
     let dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0);
     let sk_set = env.get_secret_key_set(prefix, None);
     let new_peer = gen_peer(MIN_ADULT_AGE);
-    let status = handle_online_cmd(&new_peer, &sk_set, &dispatcher).await?;
-    assert!(status.node_approval_sent);
+    let join_approval_sent = handle_online_cmd(&new_peer, &sk_set, &dispatcher).await?;
+    assert!(join_approval_sent.0);
 
     assert!(dispatcher
         .node()
@@ -179,7 +173,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
     // Handle agreement on Online of a peer that is older than the youngest
     // current elder - that means this peer is going to be promoted.
     let new_peer = gen_peer(MIN_ADULT_AGE + 1);
-    let node_state = NodeState::joined(new_peer, Some(xor_name::rand::random()));
+    let node_state = NodeState::joined(new_peer, None);
 
     let membership_decision = section_decision(&sk_set, node_state.clone());
 
@@ -193,17 +187,16 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
         .ok_or_else(|| eyre!("Membership for the node must be set"))?
         .force_bootstrap(node_state);
 
-    let cmds = run_and_collect_cmds(
+    let mut cmds = ProcessAndInspectCmds::new(
         Cmd::HandleMembershipDecision(membership_decision),
         &dispatcher,
-    )
-    .await?;
+    );
 
     // Verify we sent a `DkgStart` message with the expected participants.
     let mut dkg_start_sent = false;
     let _changed = expected_new_elders.insert(new_peer);
 
-    for cmd in cmds {
+    while let Some(cmd) = cmds.next().await? {
         let (msg, recipients) = match cmd {
             Cmd::SendMsg {
                 recipients, msg, ..
@@ -212,9 +205,10 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
         };
 
         let actual_elder_candidates = match msg {
-            NodeMsg::DkgStart(session, _) => session.elders,
+            NodeMsg::DkgStart(session, _) => session.elders.clone(),
             _ => continue,
         };
+
         itertools::assert_equal(
             actual_elder_candidates,
             expected_new_elders.iter().map(|p| (p.name(), p.addr())),
@@ -227,7 +221,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
             .collect();
 
         assert_matches!(recipients, Peers::Multiple(peers) => {
-            assert_eq!(peers, expected_dkg_start_recipients);
+            assert_eq!(peers, &expected_dkg_start_recipients);
         });
 
         dkg_start_sent = true;
@@ -293,10 +287,15 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
     let node_state = env.get_nodes(prefix, 0, 1, None).remove(0).info().peer();
     let node_state = NodeState::left(node_state, None);
 
-    let proposal = Proposal::VoteNodeOffline(node_state.clone());
+    let proposal = SectionStateVote::NodeIsOffline(node_state.clone());
     let sig = TestKeys::get_section_sig_bytes(&sk_set.secret_key(), &get_single_sig(&proposal));
 
-    let _cmds = run_and_collect_cmds(Cmd::HandleAgreement { proposal, sig }, &dispatcher).await?;
+    ProcessAndInspectCmds::new(
+        Cmd::HandleSectionDecisionAgreement { proposal, sig },
+        &dispatcher,
+    )
+    .process_all()
+    .await?;
 
     assert!(!dispatcher
         .node()
@@ -322,10 +321,15 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
     let remove_elder = NodeState::left(remove_elder, None);
 
     // Handle agreement on the Offline proposal
-    let proposal = Proposal::VoteNodeOffline(remove_elder.clone());
+    let proposal = SectionStateVote::NodeIsOffline(remove_elder.clone());
     let sig = TestKeys::get_section_sig_bytes(&sk_set.secret_key(), &get_single_sig(&proposal));
 
-    let _cmds = run_and_collect_cmds(Cmd::HandleAgreement { proposal, sig }, &dispatcher).await?;
+    ProcessAndInspectCmds::new(
+        Cmd::HandleSectionDecisionAgreement { proposal, sig },
+        &dispatcher,
+    )
+    .process_all()
+    .await?;
 
     // Verify we initiated a membership churn
     assert!(dispatcher
@@ -376,8 +380,8 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
 
     // Create the `Sync` message containing the new `Section`.
     let sender = gen_info(MIN_ADULT_AGE, None);
-    let wire_msg = WireMsg::single_src(
-        &sender,
+    let wire_msg = WireMsg::single_src_node(
+        sender.name(),
         Dst {
             name: XorName::from(PublicKey::Bls(pk_0)),
             section_key: pk_0,
@@ -397,7 +401,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
 
     let (dispatcher, _) = Dispatcher::new(Arc::new(RwLock::new(node)));
 
-    let _cmds = run_and_collect_cmds(
+    ProcessAndInspectCmds::new(
         Cmd::HandleMsg {
             origin: sender.peer(),
             wire_msg,
@@ -405,6 +409,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
         },
         &dispatcher,
     )
+    .process_all()
     .await?;
 
     // Verify our `Section` got updated.
@@ -428,14 +433,18 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
         .build();
     let dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0);
     let section = env.get_network_knowledge(prefix, None);
+    let signed_sap = section.signed_sap();
     let sk_set = env.get_secret_key_set(prefix, None);
     let pk = sk_set.secret_key().public_key();
 
     // a valid AE msg but with a non-verifiable SAP...
-    let signed_sap = section.signed_sap();
+    let bogus_env = TestNetworkBuilder::new(thread_rng())
+        .sap(prefix, elder_count(), 0, None, None)
+        .build();
+    let bogus_sap = bogus_env.get_network_knowledge(prefix, None).signed_sap();
     let bogus_section_pk = bls::SecretKey::random().public_key();
     let bogus_section_tree_update =
-        SectionTreeUpdate::new(signed_sap.clone(), SectionsDAG::new(bogus_section_pk));
+        SectionTreeUpdate::new(bogus_sap, SectionsDAG::new(bogus_section_pk));
 
     let node_msg = NodeMsg::AntiEntropy {
         section_tree_update: bogus_section_tree_update,
@@ -445,8 +454,8 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
     };
 
     let sender = gen_info(MIN_ADULT_AGE, None);
-    let wire_msg = WireMsg::single_src(
-        &sender,
+    let wire_msg = WireMsg::single_src_node(
+        sender.name(),
         Dst {
             name: XorName::from(PublicKey::Bls(bogus_section_pk)),
             section_key: bogus_section_pk,
@@ -456,7 +465,7 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
     )?;
 
     assert!(matches!(
-        run_and_collect_cmds(
+        ProcessAndInspectCmds::new(
             Cmd::HandleMsg {
                 origin: sender.peer(),
                 wire_msg,
@@ -464,9 +473,10 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
             },
             &dispatcher,
         )
+        .process_all()
         .await,
         Err(Error::NetworkKnowledge(
-            NetworkKnowledgeError::UntrustedProofChain(_)
+            NetworkKnowledgeError::SAPKeyNotCoveredByProofChain(_)
         ))
     ));
 
@@ -493,12 +503,7 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test]
-async fn relocation_of_non_elder() -> Result<()> {
-    relocation(RelocatedPeerRole::NonElder).await
-}
-
-/// Create a `Proposal::Online` whose agreement handling triggers relocation of a node with the
+/// Create a `SectionStateVote::Online` whose agreement handling triggers relocation of a node with the
 /// given age.
 ///
 /// NOTE: recommended to call this with low `age` (4 or 5), otherwise it might take very long time
@@ -525,18 +530,12 @@ fn threshold() -> usize {
     supermajority(elder_count()) - 1
 }
 
-enum RelocatedPeerRole {
-    NonElder,
-    Elder,
-}
+#[tokio::test]
+async fn relocation_decision_is_sent() -> Result<()> {
+    init_logger();
 
-async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
     let prefix: Prefix = prefix("0");
-    let section_size = match relocated_peer_role {
-        RelocatedPeerRole::Elder => elder_count(),
-        RelocatedPeerRole::NonElder => recommended_section_size(),
-    };
-    let adults = section_size - elder_count();
+    let adults = recommended_section_size() - elder_count();
     let env = TestNetworkBuilder::new(thread_rng())
         .sap(prefix, elder_count(), adults, None, None)
         .build();
@@ -544,44 +543,35 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
     let mut section = env.get_network_knowledge(prefix, None);
     let sk_set = env.get_secret_key_set(prefix, None);
 
-    let relocated_peer = match relocated_peer_role {
-        // our node is elder idx 0, so remove the second elder
-        RelocatedPeerRole::Elder => env.get_peers(prefix, 2, 0, None).remove(1),
-        RelocatedPeerRole::NonElder => {
-            let non_elder_peer = gen_peer(MIN_ADULT_AGE - 1);
-            let node_state = NodeState::joined(non_elder_peer, None);
-            let node_state = TestKeys::get_section_signed(&sk_set.secret_key(), node_state);
-            assert!(section.update_member(node_state));
-            // update our node with the new network_knowledge
-            dispatcher.node().write().await.network_knowledge = section.clone();
-            non_elder_peer
-        }
-    };
+    let relocated_peer = gen_peer_in_prefix(MIN_ADULT_AGE - 1, prefix);
+    let node_state = NodeState::joined(relocated_peer, None);
+    let node_state = TestKeys::get_section_signed(&sk_set.secret_key(), node_state);
+    assert!(section.update_member(node_state));
+    // update our node with the new network_knowledge
+    dispatcher.node().write().await.network_knowledge = section.clone();
 
     let membership_decision = create_relocation_trigger(&sk_set, relocated_peer.age());
-    let cmds = run_and_collect_cmds(
+    let mut cmds = ProcessAndInspectCmds::new(
         Cmd::HandleMembershipDecision(membership_decision),
         &dispatcher,
-    )
-    .await?;
+    );
 
     let mut offline_relocate_sent = false;
 
-    for cmd in cmds {
+    while let Some(cmd) = cmds.next().await? {
         let msg = match cmd {
             Cmd::SendMsg { msg, .. } => msg,
             _ => continue,
         };
 
-        if let NodeMsg::Propose {
-            proposal: system::Proposal::VoteNodeOffline(node_state),
-            ..
-        } = msg
-        {
-            assert_eq!(node_state.name(), relocated_peer.name());
-            if let MembershipState::Relocated(relocate_details) = node_state.state() {
-                assert_eq!(relocate_details.age, relocated_peer.age() + 1);
-                offline_relocate_sent = true;
+        // Verify that there was a membership vote to relocate this node.
+        if let NodeMsg::MembershipVotes(votes) = msg {
+            let node_state_proposals = votes.iter().flat_map(|v| v.proposals());
+            for node_state in node_state_proposals {
+                assert_eq!(node_state.name(), relocated_peer.name());
+                if let MembershipState::Relocated(_dst) = node_state.state() {
+                    offline_relocate_sent = true;
+                }
             }
         }
     }
@@ -671,23 +661,22 @@ async fn handle_elders_update() -> Result<()> {
         .insert(TestKeys::get_section_key_share(&sk_set1, 0));
     let (dispatcher, _) = Dispatcher::new(Arc::new(RwLock::new(node)));
 
-    // Create `HandleAgreement` cmd for an `NewElders` proposal. This will demote one of the
+    // Create `HandleNewEldersAgreement` cmd. This will demote one of the
     // current elders and promote the oldest peer.
     let elders_1: BTreeSet<_> = sap1.elders_set();
-    let proposal = Proposal::HandoverCompleted(SapCandidate::ElderHandover(sap1.clone()));
-    let sig = TestKeys::get_section_sig_bytes(&sk_set0.secret_key(), &get_single_sig(&proposal));
+    let bytes = bincode::serialize(&sap1.sig.public_key).expect("Failed to serialize");
+    let sig = TestKeys::get_section_sig_bytes(&sk_set0.secret_key(), &bytes);
 
-    let cmds = run_and_collect_cmds(
+    let mut cmds = ProcessAndInspectCmds::new(
         Cmd::HandleNewEldersAgreement {
             new_elders: sap1,
             sig,
         },
         &dispatcher,
-    )
-    .await?;
+    );
 
     let mut update_actual_recipients = HashSet::new();
-    for cmd in cmds {
+    while let Some(cmd) = cmds.next().await? {
         let (msg, recipients) = match cmd {
             Cmd::SendMsg {
                 msg,
@@ -702,7 +691,7 @@ async fn handle_elders_update() -> Result<()> {
                 section_tree_update,
                 kind: AntiEntropyKind::Update { .. },
                 ..
-            } => section_tree_update,
+            } => section_tree_update.clone(),
             _ => continue,
         };
 
@@ -813,9 +802,8 @@ async fn handle_demote_during_split() -> Result<()> {
         let sap0 = TestKeys::get_section_signed(&sk_set0.secret_key(), sap0);
         let sap1 = TestKeys::get_section_signed(&sk_set1.secret_key(), sap1);
 
-        let proposal =
-            Proposal::HandoverCompleted(SapCandidate::SectionSplit(sap0.clone(), sap1.clone()));
-        let (bytes0, bytes1) = get_double_sig(&proposal);
+        let bytes0 = bincode::serialize(&sap0.sig.public_key).expect("Failed to serialize");
+        let bytes1 = bincode::serialize(&sap1.sig.public_key).expect("Failed to serialize");
 
         Cmd::HandleNewSectionsAgreement {
             sap1: sap0,
@@ -824,14 +812,14 @@ async fn handle_demote_during_split() -> Result<()> {
             sig2: TestKeys::get_section_sig_bytes(&sk_set_gen.secret_key(), &bytes1),
         }
     };
-    let cmds = run_and_collect_cmds(cmd, &dispatcher).await?;
+    let mut cmds = ProcessAndInspectCmds::new(cmd, &dispatcher);
 
     let mut update_recipients = BTreeSet::new();
-    for cmd in cmds {
+    while let Some(cmd) = cmds.next().await? {
         let (msg, recipients) = match cmd {
             Cmd::SendMsg {
                 msg, recipients, ..
-            } => (msg, recipients),
+            } => (msg, recipients.clone()),
             _ => continue,
         };
 
@@ -850,24 +838,23 @@ async fn handle_demote_during_split() -> Result<()> {
 }
 
 #[tokio::test]
-#[ignore = "This needs to be refactored away from Cmd handling, as we need/use a client response stream therein"]
 async fn spentbook_spend_client_message_should_replicate_to_adults_and_send_ack() -> Result<()> {
     init_logger();
     let prefix = Prefix::default();
     let replication_count = 5;
     std::env::set_var("SN_DATA_COPY_COUNT", replication_count.to_string());
 
-    let env = TestNetworkBuilder::new(thread_rng())
+    let mut env = TestNetworkBuilder::new(thread_rng())
         .sap(prefix, elder_count(), 6, None, Some(0))
         .build();
     let dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0);
-    let peer = dispatcher.node().read().await.info().peer();
     let sk_set = env.get_secret_key_set(prefix, None);
 
     let (key_image, tx, spent_proofs, spent_transactions) =
         dbc_utils::get_genesis_dbc_spend_info(&sk_set)?;
 
-    let cmds = run_node_handle_client_msg_and_collect_cmds(
+    let comm_rx = env.take_comm_rx(dispatcher.node().read().await.info().public_key());
+    let mut cmds = ProcessAndInspectCmds::new_from_client_msg(
         ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
             key_image,
             tx: tx.clone(),
@@ -875,46 +862,45 @@ async fn spentbook_spend_client_message_should_replicate_to_adults_and_send_ack(
             spent_transactions,
             network_knowledge: None,
         })),
-        peer,
         &dispatcher,
+        comm_rx,
     )
     .await?;
 
-    assert_eq!(cmds.len(), 2);
+    while let Some(cmd) = cmds.next().await? {
+        if let Cmd::SendMsgAwaitResponseAndRespondToClient {
+            msg: NodeMsg::NodeDataCmd(NodeDataCmd::StoreData(data)),
+            targets,
+            ..
+        } = cmd
+        {
+            assert_eq!(targets.len(), replication_count);
+            let spent_proof_share =
+                dbc_utils::get_spent_proof_share_from_replicated_data(data.clone())?;
+            assert_eq!(key_image.to_hex(), spent_proof_share.key_image().to_hex());
+            assert_eq!(Hash::from(tx.hash()), spent_proof_share.transaction_hash());
+            assert_eq!(
+                sk_set.public_keys().public_key().to_hex(),
+                spent_proof_share.spentbook_pks().public_key().to_hex()
+            );
+            return Ok(());
+        }
+    }
 
-    let replicate_cmd = cmds[0].clone();
-    let recipients = replicate_cmd.recipients()?;
-    assert_eq!(recipients.len(), replication_count);
-
-    let replicated_data = replicate_cmd.get_replicated_data()?;
-    assert_matches!(replicated_data, ReplicatedData::SpentbookWrite(_));
-
-    let spent_proof_share = dbc_utils::get_spent_proof_share_from_replicated_data(replicated_data)?;
-    assert_eq!(key_image.to_hex(), spent_proof_share.key_image().to_hex());
-    assert_eq!(Hash::from(tx.hash()), spent_proof_share.transaction_hash());
-    assert_eq!(
-        sk_set.public_keys().public_key().to_hex(),
-        spent_proof_share.spentbook_pks().public_key().to_hex()
-    );
-
-    // let client_msg = cmds[1].clone().get_client_msg()?;
-    // assert_matches!(client_msg, ClientMsg::CmdResponse { response, .. } => response.is_success());
-    Ok(())
+    bail!("No cmd msg was generate to replicate the data to node holders");
 }
 
 #[tokio::test]
-#[ignore = "This needs to be refactored away from Cmd handling, as we need/use a client response stream therein"]
 async fn spentbook_spend_transaction_with_no_inputs_should_return_spentbook_error() -> Result<()> {
     init_logger();
     let prefix = prefix("1");
     let replication_count = 5;
     std::env::set_var("SN_DATA_COPY_COUNT", replication_count.to_string());
 
-    let env = TestNetworkBuilder::new(thread_rng())
+    let mut env = TestNetworkBuilder::new(thread_rng())
         .sap(prefix, elder_count(), 6, None, Some(0))
         .build();
     let dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0);
-    let peer = dispatcher.node().read().await.info().peer();
     let section = env.get_network_knowledge(prefix, None);
     let sk_set = env.get_secret_key_set(prefix, None);
 
@@ -932,47 +918,40 @@ async fn spentbook_spend_transaction_with_no_inputs_should_return_spentbook_erro
     let new_dbc2_sk = bls::SecretKey::random();
     let new_dbc2 = dbc_utils::reissue_invalid_dbc_with_no_inputs(&new_dbc, 5, &new_dbc2_sk)?;
 
-    let _cmds = run_node_handle_client_msg_and_collect_cmds(
+    let comm_rx = env.take_comm_rx(dispatcher.node().read().await.info().public_key());
+    let mut cmds = ProcessAndInspectCmds::new_from_client_msg(
         ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
             key_image: new_dbc2_sk.public_key(),
-            tx: new_dbc2.transaction.clone(),
+            tx: new_dbc2.transaction,
             spent_proofs: new_dbc.spent_proofs.clone(),
-            spent_transactions: new_dbc.spent_transactions.clone(),
+            spent_transactions: new_dbc.spent_transactions,
             network_knowledge: None,
         })),
-        peer,
         &dispatcher,
+        comm_rx,
     )
     .await?;
 
-    // for cmd in cmds {
-    //     match cmd {
-    //         Cmd::SendMsg {
-    //             msg:
-    //                 OutgoingMsg::Client(ClientMsg::CmdResponse {
-    //                     response: CmdResponse::SpendKey(result),
-    //                     ..
-    //                 }),
-    //             ..
-    //         } => {
-    //             if let Some(error) = result.err() {
-    //                 assert_eq!(
-    //                     error.to_string(),
-    //                     MessagingDataError::from(Error::SpentbookError(
-    //                         "The DBC transaction must have at least one input".to_string()
-    //                     ))
-    //                     .to_string(),
-    //                     "A different error was expected for this case: {:?}",
-    //                     error
-    //                 );
-    //                 return Ok(());
-    //             } else {
-    //                 bail!("We expected an error to be returned");
-    //             }
-    //         }
-    //         _ => continue,
-    //     }
-    // }
+    while let Some(cmd) = cmds.next().await? {
+        if let Cmd::SendClientResponse {
+            msg:
+                ClientDataResponse::CmdResponse {
+                    response: CmdResponse::SpendKey(Err(error)),
+                    ..
+                },
+            ..
+        } = cmd
+        {
+            assert_eq!(
+                error,
+                &MessagingDataError::from(Error::SpentbookError(
+                    "The DBC transaction must have at least one input".to_string()
+                )),
+                "A different error was expected for this case: {error:?}"
+            );
+            return Ok(());
+        }
+    }
 
     bail!("We expected an error to be returned");
 }
@@ -981,21 +960,26 @@ async fn spentbook_spend_transaction_with_no_inputs_should_return_spentbook_erro
 /// with the spend request, but I don't know exactly what the conditions are for getting the
 /// network knowledge to update correctly.
 #[tokio::test]
-#[ignore = "Needs to be refactored to take into account that ClientMsgs require a stream (or to avoid this)"]
 async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node() -> Result<()> {
     init_logger();
     let replication_count = 5;
     let prefix1 = prefix("1");
     std::env::set_var("SN_DATA_COPY_COUNT", replication_count.to_string());
 
-    let env = TestNetworkBuilder::new(thread_rng())
-        .sap(prefix("0"), elder_count(), 6, None, Some(0))
-        .sap(prefix1, elder_count(), 6, None, Some(0))
+    let mut env = TestNetworkBuilder::new(thread_rng())
+        .sap(Prefix::default(), elder_count(), 0, None, Some(0))
+        .sap(prefix("0"), elder_count(), 0, None, Some(0))
+        .sap(prefix1, elder_count(), 0, None, Some(0))
         .build();
+
     let dispatcher = env.get_dispatchers(Prefix::default(), 1, 0, None).remove(0);
     let info = dispatcher.node().read().await.info();
     let genesis_sk_set = env.get_secret_key_set(Prefix::default(), None);
-    let other_section_key_share = env.get_section_key_share(prefix1, info.public_key(), None);
+
+    let other_dispatcher = env.get_dispatchers(prefix1, 1, 0, None).remove(0);
+    let other_node_info = other_dispatcher.node().read().await.info();
+    let other_section_key_share =
+        env.get_section_key_share(prefix1, other_node_info.public_key(), None);
     let other_section = env.get_network_knowledge(prefix1, None);
     let other_section_key = env.get_secret_key_set(prefix1, None);
 
@@ -1045,7 +1029,8 @@ async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node()
     let proof_chain = other_section.section_chain();
     let (key_image, tx) = get_input_dbc_spend_info(&new_dbc2, 2, &bls::SecretKey::random())?;
 
-    let _cmds = run_node_handle_client_msg_and_collect_cmds(
+    let comm_rx = env.take_comm_rx(info.public_key());
+    let mut cmds = ProcessAndInspectCmds::new_from_client_msg(
         ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
             key_image,
             tx,
@@ -1053,17 +1038,21 @@ async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node()
             spent_transactions: new_dbc2.spent_transactions,
             network_knowledge: Some((proof_chain, sap)),
         })),
-        info.peer(),
         &dispatcher,
+        comm_rx,
     )
     .await?;
 
     // // The commands returned here should include the new command to update the network
     // // knowledge and also the other two commands to replicate the spent proof shares and
     // // the ack command, but we've already validated the other two as part of another test.
-    // assert_eq!(cmds.len(), 3);
-    // let update_cmd = cmds[0].clone();
-    // assert_matches!(update_cmd, Cmd::UpdateNetworkAndHandleValidClientMsg { .. });
+    let mut found = false;
+    while let Some(cmd) = cmds.next().await? {
+        if let Cmd::UpdateNetworkAndHandleValidClientMsg { .. } = cmd {
+            found = true;
+        }
+    }
+    assert!(found, "UpdateNetworkAndHandleValidClientMsg was not generated to update the node's network knowledge");
 
     // Now the proof chain should have the other section key.
     let tree = dispatcher
@@ -1093,16 +1082,6 @@ async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node()
     Ok(())
 }
 
-fn get_single_sig(proposal: &Proposal) -> Vec<u8> {
-    match proposal.as_signable_bytes().expect("Failed to serialize") {
-        itertools::Either::Left(bytes) => bytes,
-        _ => panic!("Invalid expectations! Use another proposal variant."),
-    }
-}
-
-fn get_double_sig(proposal: &Proposal) -> (Vec<u8>, Vec<u8>) {
-    match proposal.as_signable_bytes().expect("Failed to serialize") {
-        itertools::Either::Right((bytes1, bytes2)) => (bytes1, bytes2),
-        _ => panic!("Invalid expectations! Use another proposal variant."),
-    }
+fn get_single_sig(proposal: &SectionStateVote) -> Vec<u8> {
+    bincode::serialize(proposal).expect("Failed to serialize")
 }

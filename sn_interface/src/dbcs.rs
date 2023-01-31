@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -73,8 +73,7 @@ pub fn gen_genesis_dbc(
         .build(rng::thread_rng())
         .map_err(|err| {
             Error::GenesisDbcError(format!(
-                "Failed to build the ringct transaction for genesis DBC: {}",
-                err
+                "Failed to build the ringct transaction for genesis DBC: {err}",
             ))
         })?;
 
@@ -112,8 +111,7 @@ pub fn gen_genesis_dbc(
     // build the output DBCs
     let outputs = dbc_builder.build_without_verifying().map_err(|err| {
         Error::GenesisDbcError(format!(
-            "DBC builder failed to create output genesis DBC: {}",
-            err
+            "DBC builder failed to create output genesis DBC: {err}",
         ))
     })?;
 

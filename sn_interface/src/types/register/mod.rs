@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -113,7 +113,9 @@ impl Register {
 
     /// Return user permissions, if applicable.
     pub fn permissions(&self, user: User) -> Result<Permissions> {
-        self.policy.permissions(user).ok_or(Error::NoSuchUser(user))
+        self.policy
+            .permissions(user)
+            .ok_or(Error::NoSuchUser(Box::new(user)))
     }
 
     /// Return the policy.
@@ -409,7 +411,7 @@ mod tests {
         let random_user = User::Key(random_keypair.public_key());
         assert_eq!(
             replica2.permissions(random_user),
-            Err(Error::NoSuchUser(random_user))
+            Err(Error::NoSuchUser(Box::new(random_user)))
         );
 
         Ok(())

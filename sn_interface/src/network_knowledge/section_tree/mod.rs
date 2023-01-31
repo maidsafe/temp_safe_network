@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -99,37 +99,8 @@ impl SectionTree {
         &self.sections_dag
     }
 
-    /// Inserts new entry into the map. Replaces previous entry at the same prefix.
-    /// Removes those ancestors of the inserted prefix.
-    /// Does not insert anything if any descendant of the prefix of `entry` is already present in
-    /// the map.
-    /// Returns a boolean indicating whether anything changed.
-    //
-    // This is not a public API since we shall not allow any insert/update without a
-    // proof chain, users shall call the `update` API.
-    fn insert(&mut self, sap: SectionSigned<SectionAuthorityProvider>) -> bool {
-        let prefix = sap.prefix();
-        // Don't insert if any descendant is already present in the map.
-        if let Some(extension_p) = self.sections.keys().find(|p| p.is_extension_of(&prefix)) {
-            info!("Dropping update since we have a prefix '{extension_p}' that is an extension of '{prefix}'");
-            return false;
-        }
-
-        let _prev = self.sections.insert(prefix, sap);
-
-        if prefix.is_empty() {
-            return true;
-        }
-        let parent_prefix = prefix.popped();
-
-        self.prune(parent_prefix);
-        true
-    }
-
-    /// For testing purpose, we may need to populate a `section_tree` without a proof chain.
-    #[cfg(any(test, feature = "test-utils"))]
-    pub fn insert_without_chain(&mut self, sap: SectionSigned<SectionAuthorityProvider>) -> bool {
-        self.insert(sap)
+    pub fn prefixes(&self) -> impl Iterator<Item = &Prefix> {
+        self.sections.keys()
     }
 
     /// Returns the known section that is closest to the given name,
@@ -196,6 +167,47 @@ impl SectionTree {
     ) -> Result<SectionSigned<SectionAuthorityProvider>> {
         self.get_signed_by_name(&prefix.name())
     }
+
+    /// Returns the known section public keys.
+    pub fn section_keys(&self) -> Vec<bls::PublicKey> {
+        self.sections
+            .values()
+            .map(|sap| sap.section_key())
+            .collect()
+    }
+
+    /// Number of SAPs we know about.
+    pub fn len(&self) -> usize {
+        self.sections.len()
+    }
+
+    /// Is the section tree empty?
+    pub fn is_empty(&self) -> bool {
+        self.sections.is_empty()
+    }
+
+    /// Get total number of known sections
+    pub fn known_sections_count(&self) -> usize {
+        self.sections.len()
+    }
+
+    pub fn generate_section_tree_update(&self, prefix: &Prefix) -> Result<SectionTreeUpdate> {
+        let signed_sap = self
+            .sections
+            .get(prefix)
+            .ok_or(Error::NoMatchingSection)?
+            .clone();
+
+        let proof_chain = self
+            .sections_dag
+            .partial_dag(self.sections_dag.genesis_key(), &signed_sap.section_key())?;
+
+        Ok(SectionTreeUpdate {
+            signed_sap,
+            proof_chain,
+        })
+    }
+
     /// Update our `SectionTree` if the provided update can be verified
     /// Returns true if an update was made
     pub fn update_the_section_tree(
@@ -205,6 +217,50 @@ impl SectionTree {
         let signed_sap = section_tree_update.signed_sap;
         let proof_chain = section_tree_update.proof_chain;
 
+        if self.sections_dag.has_key(&signed_sap.value.section_key()) {
+            info!(
+                "Dropping SectionTree update as already have the incoming SAP {:?}",
+                signed_sap.value
+            );
+            return Ok(false);
+        }
+
+        let incoming_prefix = &signed_sap.prefix();
+        if let Some(sap) = self.get_signed(incoming_prefix) {
+            let current_sap_elder_count = sap.elder_count();
+            let proposed_sap_elder_count = signed_sap.elder_count();
+            if proposed_sap_elder_count < current_sap_elder_count {
+                warn!("Proposed SAP elder count is LESS than current...\
+                proposed: {proposed_sap_elder_count:?}, current: {current_sap_elder_count:?} (proposed is: {signed_sap:?})");
+            }
+
+            // Verify the new SAP with the SAP we know and the proof chain provided.
+            if !proof_chain.has_key(&sap.section_key()) {
+                // This case may happen when both the sender and receiver is about to using
+                // a new SAP. The AE-Update was sent before sender switching to use new SAP,
+                // hence it only contains proof_chain covering the old SAP.
+                // When the update arrives after the receiver got switched to use new SAP,
+                // this error will be complained.
+                // As an outdated node will got updated via AE triggered by other messages,
+                // there is no need to bounce back here (assuming the sender is outdated) to
+                // avoid potential looping.
+                return Err(Error::SAPKeyNotCoveredByProofChain(format!(
+                    "{proof_chain:?}, {:?}",
+                    sap.value
+                )));
+            }
+        } else {
+            warn!("Could not find related section to {incoming_prefix:?} in order to validate SAP's section is not shrinking");
+            // We are not aware of the prefix, let's then verify it can be
+            // trusted based on our own sections_dag and the provided proof chain.
+            if !proof_chain.check_trust(self.sections_dag.keys()) {
+                return Err(Error::UntrustedProofChain(format!(
+                    "None of the keys were found on our section chain: {:?}",
+                    signed_sap.value
+                )));
+            }
+        }
+
         // Check if SAP signature is valid
         if !signed_sap.self_verify() {
             return Err(Error::UntrustedSectionAuthProvider(format!(
@@ -212,7 +268,6 @@ impl SectionTree {
                 signed_sap.value
             )));
         }
-
         // Check if SAP's section key matches SAP signature's key
         if signed_sap.sig.public_key != signed_sap.section_key() {
             return Err(Error::UntrustedSectionAuthProvider(format!(
@@ -220,15 +275,6 @@ impl SectionTree {
                 signed_sap.value
             )));
         }
-
-        // Make sure the proof chain can be trusted,
-        // i.e. check each key is signed by its parent/predecessor key.
-        if !proof_chain.self_verify() {
-            return Err(Error::UntrustedProofChain(format!(
-                "Proof chain failed self verification: {proof_chain:?}",
-            )));
-        }
-
         // SAP's key should be the last key of the proof chain
         if proof_chain.last_key()? != signed_sap.section_key() {
             return Err(Error::UntrustedProofChain(format!(
@@ -236,65 +282,6 @@ impl SectionTree {
                 signed_sap.section_key(),
                 signed_sap.prefix(),
             )));
-        }
-
-        let incoming_prefix = &signed_sap.prefix();
-        // Lets warn if we're in a SAP that's shrinking for some reason.
-        // So we check the incoming elder count vs what we know of for
-        // the incoming prefix. If elder_count() is smaller at _all_ we
-        // should warn! something so we can track this.
-        if !incoming_prefix.is_empty() {
-            match self.get_signed_by_prefix(incoming_prefix) {
-                Ok(sap) => {
-                    let current_sap_elder_count = sap.elder_count();
-                    let proposed_sap_elder_count = signed_sap.elder_count();
-
-                    if proposed_sap_elder_count < current_sap_elder_count {
-                        warn!("Proposed SAP elder count is LESS than current...\
-                        proposed: {proposed_sap_elder_count:?}, current: {current_sap_elder_count:?} (proposed is: {signed_sap:?})");
-                    }
-                }
-                Err(e) => {
-                    warn!("Could not find related section to {incoming_prefix:?} in order to validate SAP's section is not shrinking");
-                    warn!("Error on prefix search: {e}");
-                }
-            };
-        }
-
-        match self.get_signed(incoming_prefix) {
-            Some(sap) if sap == &signed_sap => {
-                // It's the same SAP we are already aware of
-                info!("Dropping SectionTree update since the incoming SAP for prefix '{incoming_prefix}' is not new");
-                return Ok(false);
-            }
-            Some(sap) => {
-                // We are then aware of the prefix, let's just verify the new SAP can
-                // be trusted based on the SAP we aware of and the proof chain provided.
-                if !proof_chain.has_key(&sap.section_key()) {
-                    // This case may happen when both the sender and receiver is about to using
-                    // a new SAP. The AE-Update was sent before sender switching to use new SAP,
-                    // hence it only contains proof_chain covering the old SAP.
-                    // When the update arrives after the receiver got switched to use new SAP,
-                    // this error will be complained.
-                    // As an outdated node will got updated via AE triggered by other messages,
-                    // there is no need to bounce back here (assuming the sender is outdated) to
-                    // avoid potential looping.
-                    return Err(Error::SAPKeyNotCoveredByProofChain(format!(
-                        "{proof_chain:?}, {:?}",
-                        sap.value
-                    )));
-                }
-            }
-            None => {
-                // We are not aware of the prefix, let's then verify it can be
-                // trusted based on our own sections_dag and the provided proof chain.
-                if !proof_chain.check_trust(self.sections_dag.keys()) {
-                    return Err(Error::UntrustedProofChain(format!(
-                        "None of the keys were found on our section chain: {:?}",
-                        signed_sap.value
-                    )));
-                }
-            }
         }
 
         // We can now update our knowledge of the remote section's SAP.
@@ -316,72 +303,10 @@ impl SectionTree {
         }
     }
 
-    /// Returns the known section public keys.
-    pub fn section_keys(&self) -> Vec<bls::PublicKey> {
-        self.sections
-            .values()
-            .map(|sap| sap.section_key())
-            .collect()
-    }
-
-    /// Number of SAPs we know about.
-    pub fn len(&self) -> usize {
-        self.sections.len()
-    }
-
-    /// Is the section tree empty?
-    pub fn is_empty(&self) -> bool {
-        self.sections.is_empty()
-    }
-
-    pub fn generate_section_tree_update(&self, prefix: &Prefix) -> Result<SectionTreeUpdate> {
-        let signed_sap = self
-            .sections
-            .get(prefix)
-            .ok_or(Error::NoMatchingSection)?
-            .clone();
-
-        let proof_chain = self
-            .sections_dag
-            .partial_dag(self.sections_dag.genesis_key(), &signed_sap.section_key())?;
-
-        Ok(SectionTreeUpdate {
-            signed_sap,
-            proof_chain,
-        })
-    }
-
-    /// Get total number of known sections
-    pub fn known_sections_count(&self) -> usize {
-        self.sections.len()
-    }
-
-    /// Returns network statistics.
-    pub fn network_stats(&self, our: &SectionAuthorityProvider) -> NetworkStats {
-        // Let's compute an estimate of the total number of elders in the network
-        // from the size of our routing table.
-        let section_prefixes = self.sections.keys().copied();
-        let known_prefixes: Vec<_> = section_prefixes.chain(iter::once(our.prefix())).collect();
-
-        let total_elders_exact = Prefix::default().is_covered_by(&known_prefixes);
-
-        // Estimated fraction of the network that we have in our RT.
-        // Computed as the sum of 1 / 2^(prefix.bit_count) for all known section prefixes.
-        let network_fraction: f64 = known_prefixes
-            .iter()
-            .map(|p| 1.0 / (p.bit_count() as f64).exp2())
-            .sum();
-
-        let network_elders_count: usize = self.sections.values().map(|sap| sap.elder_count()).sum();
-        let total = network_elders_count as f64 / network_fraction;
-
-        // `total_elders_exact` indicates whether `total_elders` is
-        // an exact number or an estimate.
-        NetworkStats {
-            known_elders: network_elders_count as u64,
-            total_elders: total.ceil() as u64,
-            total_elders_exact,
-        }
+    /// For testing purpose, we may need to populate a `section_tree` without a proof chain.
+    #[cfg(any(test, feature = "test-utils"))]
+    pub fn insert_without_chain(&mut self, sap: SectionSigned<SectionAuthorityProvider>) -> bool {
+        self.insert(sap)
     }
 
     /// Serialise and write it to disk on the provided file path
@@ -433,6 +358,34 @@ impl SectionTree {
         Ok(())
     }
 
+    /// Returns network statistics.
+    pub fn network_stats(&self, our: &SectionAuthorityProvider) -> NetworkStats {
+        // Let's compute an estimate of the total number of elders in the network
+        // from the size of our routing table.
+        let section_prefixes = self.sections.keys().copied();
+        let known_prefixes: Vec<_> = section_prefixes.chain(iter::once(our.prefix())).collect();
+
+        let total_elders_exact = Prefix::default().is_covered_by(&known_prefixes);
+
+        // Estimated fraction of the network that we have in our RT.
+        // Computed as the sum of 1 / 2^(prefix.bit_count) for all known section prefixes.
+        let network_fraction: f64 = known_prefixes
+            .iter()
+            .map(|p| 1.0 / (p.bit_count() as f64).exp2())
+            .sum();
+
+        let network_elders_count: usize = self.sections.values().map(|sap| sap.elder_count()).sum();
+        let total = network_elders_count as f64 / network_fraction;
+
+        // `total_elders_exact` indicates whether `total_elders` is
+        // an exact number or an estimate.
+        NetworkStats {
+            known_elders: network_elders_count as u64,
+            total_elders: total.ceil() as u64,
+            total_elders_exact,
+        }
+    }
+
     /// Remove `prefix` and any of its ancestors.
     fn prune(&mut self, mut prefix: Prefix) {
         loop {
@@ -444,6 +397,33 @@ impl SectionTree {
                 prefix = prefix.popped();
             }
         }
+    }
+
+    /// Inserts new entry into the map. Replaces previous entry at the same prefix.
+    /// Removes those ancestors of the inserted prefix.
+    /// Does not insert anything if any descendant of the prefix of `entry` is already present in
+    /// the map.
+    /// Returns a boolean indicating whether anything changed.
+    //
+    // This is not a public API since we shall not allow any insert/update without a
+    // proof chain, users shall call the `update` API.
+    fn insert(&mut self, sap: SectionSigned<SectionAuthorityProvider>) -> bool {
+        let prefix = sap.prefix();
+        // Don't insert if any descendant is already present in the map.
+        if let Some(extension_p) = self.sections.keys().find(|p| p.is_extension_of(&prefix)) {
+            info!("Dropping update since we have a prefix '{extension_p}' that is an extension of '{prefix}'");
+            return false;
+        }
+
+        let _prev = self.sections.insert(prefix, sap);
+
+        if prefix.is_empty() {
+            return true;
+        }
+        let parent_prefix = prefix.popped();
+
+        self.prune(parent_prefix);
+        true
     }
 }
 
@@ -520,7 +500,7 @@ pub mod test_utils {
             let signed_key = TestKeys::get_section_signed(parent_sk, sap.section_key());
             let mut proof_chain = proof_chain.clone();
             proof_chain
-                .insert(
+                .verify_and_insert(
                     &parent_sk.public_key(),
                     signed_key.value,
                     signed_key.sig.signature,
@@ -539,7 +519,7 @@ pub mod test_utils {
             for key in other_keys {
                 let sig = parent.sign(key.public_key().to_bytes());
                 proof_chain
-                    .insert(&parent.public_key(), key.public_key(), sig)
+                    .verify_and_insert(&parent.public_key(), key.public_key(), sig)
                     .expect("Failed to insert into proof_chain");
                 parent = key.clone();
             }
@@ -852,7 +832,7 @@ mod tests {
     }
 
     #[test]
-    fn outdated_sap_for_the_same_prefix_should_result_in_error_during_update() -> Result<()> {
+    fn outdated_sap_result_in_no_update() -> Result<()> {
         let (mut tree, genesis_sk) = TestSectionTree::random_tree();
 
         // node updated with sap0
@@ -871,7 +851,7 @@ mod tests {
         // node receives an outdated AE update for sap0
         assert!(matches!(
             tree.update_the_section_tree(tree_update_outdated),
-            Err(Error::SAPKeyNotCoveredByProofChain(_))
+            Ok(false)
         ));
 
         Ok(())

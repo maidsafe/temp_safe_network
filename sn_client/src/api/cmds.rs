@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -35,6 +35,7 @@ impl Client {
         client_pk: PublicKey,
         serialised_cmd: Bytes,
         signature: Signature,
+        needs_super_majority: bool,
     ) -> Result<()> {
         let auth = ClientAuth {
             public_key: client_pk,
@@ -43,7 +44,7 @@ impl Client {
 
         tokio::time::timeout(self.cmd_timeout, async {
             self.session
-                .send_cmd(dst_address, auth, serialised_cmd)
+                .send_cmd(dst_address, auth, serialised_cmd, needs_super_majority)
                 .await
         })
         .await
@@ -64,6 +65,7 @@ impl Client {
         let debug_cmd = format!("{:?}", cmd);
         debug!("Attempting {debug_cmd}");
 
+        let needs_super_majority = matches!(cmd, DataCmd::Spentbook(_));
         let serialised_cmd = {
             let msg = ClientMsg::Cmd(cmd);
             WireMsg::serialize_msg_payload(&msg)?
@@ -71,7 +73,13 @@ impl Client {
         let signature = self.sign(&serialised_cmd);
 
         let res = self
-            .send_signed_cmd(dst_name, client_pk, serialised_cmd, signature)
+            .send_signed_cmd(
+                dst_name,
+                client_pk,
+                serialised_cmd,
+                signature,
+                needs_super_majority,
+            )
             .await;
 
         if res.is_ok() {

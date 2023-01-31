@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -101,11 +101,7 @@ impl MyNode {
                         // We'll send a membership AE request to see if they can help us catch up.
                         debug!("{:?}", LogMarker::MembershipSendingAeUpdateRequest);
                         let msg = NodeMsg::MembershipAE(membership.generation());
-                        cmds.push(MyNode::send_system_msg(
-                            msg,
-                            Peers::Single(peer),
-                            self.context(),
-                        ));
+                        cmds.push(Cmd::send_msg(msg, Peers::Single(peer), self.context()));
                         // return the vec w/ the AE cmd there so as not to loop and generate AE for
                         // any subsequent commands
                         return Ok(cmds);
@@ -159,7 +155,7 @@ impl MyNode {
             match membership.anti_entropy(gen) {
                 Ok(catchup_votes) => {
                     debug!("Sending catchup votes to {peer:?}");
-                    Some(MyNode::send_system_msg(
+                    Some(Cmd::send_msg(
                         NodeMsg::MembershipVotes(catchup_votes),
                         Peers::Single(peer),
                         node_context,
@@ -182,7 +178,7 @@ impl MyNode {
         &mut self,
         decision: Decision<NodeState>,
     ) -> Result<Vec<Cmd>> {
-        debug!("{}", LogMarker::AgreementOfOnline);
+        debug!("{}", LogMarker::AgreementOfMembership);
         let mut cmds = vec![];
 
         let (joining_nodes, leaving_nodes): (Vec<_>, Vec<_>) = decision
@@ -208,22 +204,7 @@ impl MyNode {
         cmds.push(self.send_node_approvals(decision.clone()));
 
         // Do not disable node joins in first section.
-        let our_prefix = self.network_knowledge.prefix();
-
-        let allow_startup_joins = {
-            const TEMP_SECTION_LIMIT: usize = 20;
-
-            let is_first_section = our_prefix.is_empty();
-            let members_count = self.network_knowledge.members().len();
-
-            if cfg!(feature = "limit-network-size") {
-                is_first_section && members_count <= TEMP_SECTION_LIMIT
-            } else {
-                is_first_section
-            }
-        };
-
-        if !allow_startup_joins {
+        if !self.is_startup_joining_allowed() {
             // ..otherwise, switch off joins_allowed on a node joining.
             // TODO: fix racing issues here? https://github.com/maidsafe/safe_network/issues/890
             self.joins_allowed = false;
@@ -234,15 +215,21 @@ impl MyNode {
             let excluded_from_relocation =
                 BTreeSet::from_iter(joining_nodes.iter().map(|(n, _)| n.name()));
 
-            cmds.extend(self.relocate_peers(churn_id, excluded_from_relocation)?);
+            cmds.extend(self.try_relocate_peers(churn_id, excluded_from_relocation)?);
         }
 
         cmds.extend(self.trigger_dkg()?);
+
         cmds.extend(self.send_ae_update_to_our_section()?);
 
-        self.liveness_retain_only(
+        self.fault_detection_retain_only(
             self.network_knowledge
                 .adults()
+                .iter()
+                .map(|peer| peer.name())
+                .collect(),
+            self.network_knowledge
+                .elders()
                 .iter()
                 .map(|peer| peer.name())
                 .collect(),
@@ -253,10 +240,50 @@ impl MyNode {
             self.joins_allowed = true;
         }
 
+        let net_increase = joining_nodes.len() > leaving_nodes.len();
+
+        // We do this check on every net node join.
+        // It is a cheap check and any actual cleanup won't happen back to back,
+        // due to requirement of `has_reached_min_capacity() == true` before doing it.
+        if net_increase {
+            self.data_storage
+                .try_retain_data_of(self.network_knowledge.prefix());
+            // if we are _still_ at min capacity, then it's time to allow joins until split
+            if self.data_storage.has_reached_min_capacity() {
+                self.joins_allowed = true;
+                self.joins_allowed_until_split = true;
+            }
+        }
+
+        // Once we've grown the section, we do not need to allow more nodes in.
+        // (Unless we've triggered the storage critical fail safe to grow until split.)
+        if net_increase && !self.is_startup_joining_allowed() && !self.joins_allowed_until_split {
+            self.joins_allowed = false;
+        }
+
         self.log_section_stats();
         self.log_network_stats();
 
+        // updates comm with new members and removes connections that are not from our members
+        self.comm.set_comm_targets(self.network_knowledge.members());
+
+        // lets check that we have the correct data now we're changing membership
+        cmds.push(MyNode::ask_for_any_new_data_from_whole_section(&self.context()).await);
+
         Ok(cmds)
+    }
+
+    pub(crate) fn is_startup_joining_allowed(&self) -> bool {
+        const TEMP_SECTION_LIMIT: usize = 20;
+
+        let is_first_section = self.network_knowledge.prefix().is_empty();
+        let members_count = self.network_knowledge.members().len();
+
+        if cfg!(feature = "limit-network-size") {
+            is_first_section && members_count <= TEMP_SECTION_LIMIT
+        } else {
+            is_first_section
+        }
     }
 
     async fn handle_node_joined(&mut self, new_info: NodeState, signature: Signature) -> Vec<Cmd> {
@@ -293,10 +320,10 @@ impl MyNode {
         let prefix = self.network_knowledge.prefix();
         info!("Section {prefix:?} has approved new peers {peers:?}.");
 
-        let msg = NodeMsg::JoinResponse(JoinResponse::Approved { decision });
+        let msg = NodeMsg::JoinResponse(JoinResponse::Approved(decision));
 
         trace!("{}", LogMarker::SendNodeApproval);
-        MyNode::send_system_msg(msg, Peers::Multiple(peers), self.context())
+        Cmd::send_msg(msg, Peers::Multiple(peers), self.context())
     }
 
     pub(crate) fn handle_node_left(
@@ -327,12 +354,9 @@ impl MyNode {
         // containing the relocation details.
         if node_state.is_relocated() {
             let peer = *node_state.peer();
+            info!("Notify relocation to node {:?}", peer);
             let msg = NodeMsg::Relocate(node_state);
-            Some(MyNode::send_system_msg(
-                msg,
-                Peers::Single(peer),
-                self.context(),
-            ))
+            Some(Cmd::send_msg(msg, Peers::Single(peer), self.context()))
         } else {
             None
         }

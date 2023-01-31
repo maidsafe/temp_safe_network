@@ -1,4 +1,4 @@
-// Copyright 2020 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -41,8 +41,7 @@ impl std::str::FromStr for OutputFmt {
             "yaml" => Ok(Self::Yaml),
             other => {
                 Err(format!(
-                    "Output serialisation format '{}' not supported. Supported values are json, jsoncompact, and yaml",
-                    other
+                    "Output serialisation format '{other}' not supported. Supported values are json, jsoncompact, and yaml",
                 ))
             }
         }

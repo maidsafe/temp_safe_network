@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -21,7 +21,7 @@ pub enum LogMarker {
     SplitAttempt,
     NewPrefix,
     AeSendUpdateToSiblings,
-    AgreementOfOnline,
+    AgreementOfMembership,
     // ProposalAgreed
     ProposalAgreed,
     // Handover
@@ -52,7 +52,7 @@ pub enum LogMarker {
     StoredNewChunk,
     DataResponseReceviedFromAdult,
     ChunkQueryReceviedAtElder,
-    ChunkQueryReceviedAtAdult,
+    ChunkQueryReceviedAtStoringNode,
     // Data reorganisation
     RequestForAnyMissingData,
     DataReorganisationUnderway,
@@ -96,11 +96,6 @@ pub enum LogMarker {
     SendJoinRequest,
     SendJoinAsRelocatedResponse,
     SendJoinRejected,
-    SendJoinRedirected,
-    SendJoinRetryNotCorrectKey,
-    SendJoinRetryAgeIssue,
-    SendJoinRetryNotAdult,
-    SendJoinsDisallowed,
     SendNodeApproval,
     // Approved to join
     ReceivedJoinApproval,

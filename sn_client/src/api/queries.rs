@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -9,7 +9,10 @@
 // use std::collections::BTreeSet;
 
 use super::Client;
-use crate::{errors::Error, sessions::QueryResult};
+use crate::{
+    errors::{Error, Result},
+    sessions::QueryResult,
+};
 
 use sn_interface::{
     data_copy_count,
@@ -22,6 +25,7 @@ use sn_interface::{
 
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use bytes::Bytes;
+use std::collections::BTreeSet;
 use tokio::time::sleep;
 use tracing::{debug, info_span};
 
@@ -30,17 +34,14 @@ impl Client {
     /// Queries are automatically retried using exponential backoff if the timeout is hit.
     #[cfg(not(feature = "check-replicas"))]
     #[instrument(skip(self), level = "debug")]
-    pub async fn send_query(&self, query: DataQueryVariant) -> Result<QueryResult, Error> {
+    pub async fn send_query(&self, query: DataQueryVariant) -> Result<QueryResult> {
         self.send_query_with_retry(query, true).await
     }
 
     /// Send a Query to the network and await a response.
     /// Queries are not retried if the timeout is hit.
     #[instrument(skip(self), level = "debug")]
-    pub async fn send_query_without_retry(
-        &self,
-        query: DataQueryVariant,
-    ) -> Result<QueryResult, Error> {
+    pub async fn send_query_without_retry(&self, query: DataQueryVariant) -> Result<QueryResult> {
         self.send_query_with_retry(query, false).await
     }
 
@@ -52,10 +53,10 @@ impl Client {
         &self,
         query: DataQueryVariant,
         retry: bool,
-    ) -> Result<QueryResult, Error> {
+    ) -> Result<QueryResult> {
         let client_pk = self.public_key();
         let mut query = DataQuery {
-            adult_index: 0,
+            node_index: 0,
             variant: query,
         };
 
@@ -84,7 +85,7 @@ impl Client {
             let msg = ClientMsg::Query(query.clone());
             let serialised_query = WireMsg::serialize_msg_payload(&msg)?;
             let signature = self.keypair.sign(&serialised_query);
-            debug!("Attempting {query:?} (adult_index #{})", query.adult_index);
+            debug!("Attempting {query:?} (node_index #{})", query.node_index);
 
             // grab up to date destination section from our local network knowledge
             let (section_pk, elders) = self.session.get_query_elders(dst).await?;
@@ -99,10 +100,10 @@ impl Client {
                 )
                 .await;
 
-            // There should not be more than a certain amount of adults holding
-            // copies of the data. Retry the closest adult again.
-            if !retry || query.adult_index >= data_copy_count() - 1 {
-                // we don't want to retry beyond data_copy_count Adults
+            // There should not be more than a certain number of nodes holding
+            // copies of the data. Retry the closest node again.
+            if !retry || query.node_index >= data_copy_count() - 1 {
+                // we don't want to retry beyond `data_copy_count()` nodes
                 return res;
             }
 
@@ -120,8 +121,8 @@ impl Client {
                     }
                 }
 
-                // In the next attempt, try the next adult, further away.
-                query.adult_index += 1;
+                // In the next attempt, try the next node, further away.
+                query.node_index += 1;
                 debug!("Sleeping before trying query again: {delay:?} sleep for {query:?}");
                 sleep(delay).await;
             } else {
@@ -141,7 +142,7 @@ impl Client {
         client_pk: PublicKey,
         serialised_query: Bytes,
         signature: Signature,
-    ) -> Result<QueryResult, Error> {
+    ) -> Result<QueryResult> {
         debug!("Sending Query: {:?}", query);
         self.send_signed_query_to_section(query, client_pk, serialised_query, signature, None)
             .await
@@ -157,7 +158,7 @@ impl Client {
         serialised_query: Bytes,
         signature: Signature,
         dst_section_info: Option<(bls::PublicKey, Vec<Peer>)>,
-    ) -> Result<QueryResult, Error> {
+    ) -> Result<QueryResult> {
         let auth = ClientAuth {
             public_key: client_pk,
             signature,
@@ -169,28 +170,26 @@ impl Client {
     }
 
     /// Send a Query to the network and await a response.
-    /// Queries are sent once per each replica, i.e. it sends the query targetting
-    /// all Adults replicas (using `query_index`) to make sure the piece of content
-    /// is stored in each and all of the expected data replicas at section Adults.
-    #[cfg(feature = "check-replicas")]
+    /// Queries are sent once per each replica, i.e. it sends the query targeting
+    /// the replicas (using `node_index`) matching the indexes provided.
     #[instrument(skip(self), level = "debug")]
-    pub async fn send_query(&self, query: DataQueryVariant) -> Result<QueryResult, Error> {
-        use crate::errors::DataReplicasCheckError;
-        let span = info_span!("Attempting a query");
-        let _ = span.enter();
-
+    pub async fn send_query_to_replicas(
+        &self,
+        query: DataQueryVariant,
+        replicas: &[usize],
+    ) -> Result<Vec<(usize, Result<QueryResult>)>, Error> {
         let client_pk = self.public_key();
         let dst = query.dst_name();
 
         // grab up to date destination section from our local network knowledge
         let (section_pk, elders) = self.session.get_query_elders(dst).await?;
 
-        // Send queries to all replicas concurrently
-        let num_of_replicas = data_copy_count();
+        // Send queries to the replicas concurrently
         let mut tasks = vec![];
-        for adult_index in 0..num_of_replicas {
+        let unique_indexes = replicas.iter().cloned().collect::<BTreeSet<usize>>();
+        for node_index in unique_indexes.into_iter() {
             let data_query = DataQuery {
-                adult_index,
+                node_index,
                 variant: query.clone(),
             };
             let msg = ClientMsg::Query(data_query.clone());
@@ -211,18 +210,56 @@ impl Client {
                     )
                     .await;
 
-                (result, adult_index)
+                (node_index, result)
             });
         }
 
         // Let's await for all queries to be sent
         let results = futures::future::join_all(tasks).await;
 
+        Ok(results)
+    }
+
+    /// Send a Query to the network and await a response.
+    /// Queries are sent once per each replica, i.e. it sends the query targeting
+    /// all replicas (using `node_index`) to make sure the piece of content
+    /// is stored in each and all of the expected data replica nodes in the section.
+    #[cfg(feature = "check-replicas")]
+    #[instrument(skip(self), level = "debug")]
+    pub async fn send_query(&self, query: DataQueryVariant) -> Result<QueryResult, Error> {
+        match self.query_all_data_replicas(query.clone()).await {
+            Err(Error::DataReplicasCheck(
+                error @ crate::errors::DataReplicasCheckError::DifferentResponses { .. },
+            )) => {
+                warn!("Different responses received for query, we'll retry to send it only once: {error:?}");
+                sleep(tokio::time::Duration::from_secs(10)).await;
+                let response = self.query_all_data_replicas(query).await;
+                debug!("Second attempt to send query to check-replicas: {response:?}");
+                response
+            }
+            other => other,
+        }
+    }
+
+    #[cfg(feature = "check-replicas")]
+    #[instrument(skip(self), level = "debug")]
+    async fn query_all_data_replicas(&self, query: DataQueryVariant) -> Result<QueryResult> {
+        use crate::errors::DataReplicasCheckError;
+        let span = info_span!("Attempting a query");
+        let _ = span.enter();
+
+        // Send queries to all replicas concurrently
+        let num_of_replicas = data_copy_count();
+        let all_replicas: Vec<usize> = (0..num_of_replicas).collect();
+        let results = self
+            .send_query_to_replicas(query.clone(), &all_replicas)
+            .await?;
+
         let mut errors = vec![];
         let mut responses = vec![];
         results.into_iter().for_each(|result| match result {
-            (Err(error), adult_index) => errors.push((error, adult_index)),
-            (Ok(resp), adult_index) => responses.push((resp, adult_index)),
+            (node_index, Err(error)) => errors.push((error, node_index)),
+            (node_index, Ok(resp)) => responses.push((resp, node_index)),
         });
 
         if !errors.is_empty() {
@@ -232,7 +269,7 @@ impl Client {
                     of the replicas. Errors received: ",
                     errors.len()
                 ),
-                |acc, (e, i)| format!("{acc}, [ Adult-#{i}: {e:?} ]"),
+                |acc, (e, i)| format!("{acc}, [ Node-#{i}: {e:?} ]"),
             );
             error!(error_msg);
 
@@ -244,13 +281,13 @@ impl Client {
             .into());
         }
 
-        if let Some((resp, adult_index)) = responses.pop() {
+        if let Some((resp, node_index)) = responses.pop() {
             if responses.iter().all(|(r, _)| r.response == resp.response) {
                 return Ok(resp);
             }
 
             // put the last response back in the list so it's included in the report
-            responses.push((resp, adult_index));
+            responses.push((resp, node_index));
             let error_msg = responses.iter().fold(
                 format!(
                     "Not all responses received are the same when sending query to all \

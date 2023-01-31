@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -94,7 +94,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     let client = match runtime.block_on(create_client()) {
         Ok(client) => client,
         Err(err) => {
-            println!("Failed to create client with {:?}", err);
+            println!("Failed to create client with {err:?}");
             return;
         }
     };
@@ -109,7 +109,7 @@ fn criterion_benchmark(c: &mut Criterion) {
                 let bytes = grows_vec_to_bytes(seed, 3072);
                 match upload_and_read_bytes(client, bytes).await {
                     Ok(_) => {}
-                    Err(error) => println!("3072b upload and read bench failed with {:?}", error),
+                    Err(error) => println!("3072b upload and read bench failed with {error:?}"),
                 }
             });
         },
@@ -122,7 +122,7 @@ fn criterion_benchmark(c: &mut Criterion) {
                 let bytes = grows_vec_to_bytes(seed, 1024 * 1024);
                 match upload_and_read_bytes(client, bytes).await {
                     Ok(_) => {}
-                    Err(error) => println!("1mb upload and read bench failed with {:?}", error),
+                    Err(error) => println!("1mb upload and read bench failed with {error:?}"),
                 }
             });
         },
@@ -135,7 +135,7 @@ fn criterion_benchmark(c: &mut Criterion) {
                 let bytes = grows_vec_to_bytes(seed, 1024 * 1024 * 10);
                 match upload_and_read_bytes(client, bytes).await {
                     Ok(_) => {}
-                    Err(error) => println!("10mb upload and read bench failed with {:?}", error),
+                    Err(error) => println!("10mb upload and read bench failed with {error:?}"),
                 }
             });
         },
@@ -147,7 +147,7 @@ fn criterion_benchmark(c: &mut Criterion) {
             let bytes = grows_vec_to_bytes(seed, 3072);
             match client.upload(bytes).await {
                 Ok(_) => {}
-                Err(error) => println!("3072b upload bench failed with {:?}", error),
+                Err(error) => println!("3072b upload bench failed with {error:?}"),
             }
         });
     });
@@ -156,7 +156,7 @@ fn criterion_benchmark(c: &mut Criterion) {
             let bytes = grows_vec_to_bytes(seed, 1024 * 1024);
             match client.upload(bytes).await {
                 Ok(_) => {}
-                Err(error) => println!("1mb upload bench failed with {:?}", error),
+                Err(error) => println!("1mb upload bench failed with {error:?}"),
             }
         });
     });
@@ -165,7 +165,7 @@ fn criterion_benchmark(c: &mut Criterion) {
             let bytes = grows_vec_to_bytes(seed, 1024 * 1024 * 10);
             match client.upload(bytes).await {
                 Ok(_) => {}
-                Err(error) => println!("10mb upload bench failed with {:?}", error),
+                Err(error) => println!("10mb upload bench failed with {error:?}"),
             }
         });
     });

@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -48,7 +48,6 @@ mod detection;
 
 pub use detection::IssueType;
 
-use sn_interface::messaging::system::OperationId;
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
     time::Instant,
@@ -68,27 +67,45 @@ pub struct FaultDetection {
     pub communication_issues: TimedTracker,
     /// The dkg issues logged against a node, along with a timestamp to expire after some time.
     pub dkg_issues: TimedTracker,
+    /// The elder voting issues logged against a node, along with a timestamp to expire after some time.
+    pub elder_voting_issues: TimedTracker,
     /// The probe issues logged against a node and as yet unfulfilled, along with a timestamp to expire after some time.
     pub probe_issues: TimedTracker,
-    /// The knowledge issues logged against a node, along with a timestamp.
-    pub knowledge_issues: TimedTracker,
+    /// The network knowledge issues logged against a node, along with a timestamp.
+    pub network_knowledge_issues: TimedTracker,
     /// The unfulfilled pending request operation issues logged against a node, along with an
     /// operation ID.
-    pub unfulfilled_ops: BTreeMap<NodeIdentifier, Vec<(OperationId, Instant)>>,
-    nodes: Vec<XorName>,
+    pub unfulfilled_ops: TimedTracker,
+    /// All non elder nodes to be tracked
+    non_elder_nodes: BTreeSet<XorName>,
+    /// All elders in the section (we distinguish between elders and all other nodes as their roles mean
+    /// elders may have relatively higher fault levels during normal operation)
+    elders: BTreeSet<XorName>,
 }
 
 impl FaultDetection {
     /// Set up a new tracker.
-    pub fn new(nodes: Vec<NodeIdentifier>) -> Self {
+    pub fn new(
+        non_elder_nodes: BTreeSet<NodeIdentifier>,
+        elders: BTreeSet<NodeIdentifier>,
+    ) -> Self {
+        debug!("Starting faults with elders: {elders:?}, non_elder_nodes: {non_elder_nodes:?}");
         Self {
+            elders,
             communication_issues: BTreeMap::new(),
             dkg_issues: BTreeMap::new(),
+            elder_voting_issues: BTreeMap::new(),
             probe_issues: BTreeMap::new(),
-            knowledge_issues: BTreeMap::new(),
+            network_knowledge_issues: BTreeMap::new(),
             unfulfilled_ops: BTreeMap::new(),
-            nodes,
+            non_elder_nodes,
         }
+    }
+
+    /// Set to track provided elders
+    pub fn update_elders(&mut self, elders: BTreeSet<NodeIdentifier>) {
+        info!("Setting elder nodes:{elders:?} in FaultDetection tracker");
+        self.elders = elders
     }
 
     /// Adds an issue to the fault tracker.
@@ -101,6 +118,10 @@ impl FaultDetection {
                 let queue = self.dkg_issues.entry(node_id).or_default();
                 queue.push_back(Instant::now());
             }
+            IssueType::ElderVoting => {
+                let queue = self.elder_voting_issues.entry(node_id).or_default();
+                queue.push_back(Instant::now());
+            }
             IssueType::AeProbeMsg => {
                 let queue = self.probe_issues.entry(node_id).or_default();
                 queue.push_back(Instant::now());
@@ -109,56 +130,15 @@ impl FaultDetection {
                 let queue = self.communication_issues.entry(node_id).or_default();
                 queue.push_back(Instant::now());
             }
-            IssueType::Knowledge => {
-                let queue = self.knowledge_issues.entry(node_id).or_default();
+            IssueType::NetworkKnowledge => {
+                let queue = self.network_knowledge_issues.entry(node_id).or_default();
                 queue.push_back(Instant::now());
             }
-            IssueType::RequestOperation(op_id) => {
+            IssueType::RequestOperation => {
                 let queue = self.unfulfilled_ops.entry(node_id).or_default();
-                trace!("New issue has associated operation ID: {op_id:#?}");
-                queue.push((op_id, Instant::now()));
+                queue.push_back(Instant::now());
             }
         }
-    }
-
-    /// Removes a `pending_operation` from the node liveness records. Returns true if a record was removed
-    pub fn request_operation_fulfilled(
-        &mut self,
-        node_id: &NodeIdentifier,
-        operation_id: OperationId,
-    ) -> bool {
-        trace!(
-            "Attempting to remove pending_operation {:?} op: {:?}",
-            node_id,
-            operation_id
-        );
-        let mut has_removed = false;
-
-        if let Some(v) = self.unfulfilled_ops.get_mut(node_id) {
-            // only remove the first instance from the vec
-            v.retain(|(op_id, _)| {
-                if has_removed || op_id != &operation_id {
-                    true
-                } else {
-                    has_removed = true;
-                    false
-                }
-            });
-            if has_removed {
-                trace!(
-                    "Pending operation removed for node: {:?} op: {:?}",
-                    node_id,
-                    operation_id
-                );
-            } else {
-                trace!(
-                    "No Pending operation found for node: {:?} op: {:?}",
-                    node_id,
-                    operation_id
-                );
-            }
-        }
-        has_removed
     }
 
     /// Removes a DKG session from the node liveness records.
@@ -176,6 +156,26 @@ impl FaultDetection {
             }
         }
     }
+
+    /// Removes a Knowledge issue from the node liveness records.
+    pub fn elder_vote_received(&mut self, node_id: &NodeIdentifier) {
+        trace!(
+            "Attempting to remove logged elder_vote issue for {:?}",
+            node_id,
+        );
+
+        if let Some(v) = self.elder_voting_issues.get_mut(node_id) {
+            // only remove the first instance from the vec
+            let prev = v.pop_front();
+
+            if prev.is_some() {
+                trace!("Pending elder_vote issue removed for node: {:?}", node_id,);
+            } else {
+                trace!("No Pending elder_vote issue found for node: {:?}", node_id);
+            }
+        }
+    }
+
     /// Removes a probe tracker from the node liveness records.
     pub fn ae_update_msg_received(&mut self, node_id: &NodeIdentifier) {
         trace!(
@@ -195,47 +195,53 @@ impl FaultDetection {
         }
     }
 
-    /// Gets the unfulfilled operation IDs for a given node.
-    ///
-    /// This is for convenience, to wrap reading the concurrent data structure that stores the
-    /// values.
-    ///
-    /// If there are no unfulfilled operations tracked, an empty list will be returned.
-    pub fn get_unfulfilled_ops(&self, node: XorName) -> Vec<OperationId> {
-        if let Some(val) = self.unfulfilled_ops.get(&node) {
-            return val.clone().iter().map(|(op_id, _)| *op_id).collect();
-        }
-        Vec::new()
-    }
+    /// List all current tracked nodes, elders and non alike
+    fn all_current_nodes(&self) -> BTreeSet<XorName> {
+        let mut all_nodes = BTreeSet::new();
 
-    /// List all current tracked nodes
-    pub fn current_nodes(&self) -> &Vec<XorName> {
-        &self.nodes
+        for node in &self.non_elder_nodes {
+            let _prev = all_nodes.insert(*node);
+        }
+
+        for node in &self.elders {
+            let _prev = all_nodes.insert(*node);
+        }
+
+        all_nodes
     }
 
     /// Add a new node to the tracker and recompute closest nodes.
     pub fn add_new_node(&mut self, node: XorName) {
-        info!("Adding new node:{node} to FaultDetection tracker");
-        self.nodes.push(node);
+        info!("Adding new non-elder node:{node} to FaultDetection tracker");
+        let _prev = self.non_elder_nodes.insert(node);
     }
 
     /// Removes tracked nodes not present in `current_members`.
     ///
     /// Tracked issues related to nodes that were removed will also be removed.
-    pub fn retain_members_only(&mut self, current_members: BTreeSet<XorName>) {
-        let nodes = self.current_nodes();
-        let nodes_being_removed = nodes
+    pub fn update_and_only_retain_members(
+        &mut self,
+        non_elder_nodes: BTreeSet<XorName>,
+        elders: BTreeSet<NodeIdentifier>,
+    ) {
+        // first, queue up removals from the various fault sets
+        let current_members = self.all_current_nodes();
+
+        // after that we can straight up overwrite and then prep the removal set
+        self.non_elder_nodes = non_elder_nodes;
+        self.elders = elders;
+
+        let nodes_being_removed = current_members
             .iter()
-            .filter(|x| !current_members.contains(x))
+            .filter(|x| !self.non_elder_nodes.contains(x) && !self.elders.contains(x))
             .copied()
             .collect::<Vec<XorName>>();
 
-        self.nodes.retain(|x| current_members.contains(x));
-
         for node in &nodes_being_removed {
             let _ = self.communication_issues.remove(node);
-            let _ = self.knowledge_issues.remove(node);
+            let _ = self.network_knowledge_issues.remove(node);
             let _ = self.dkg_issues.remove(node);
+            let _ = self.elder_voting_issues.remove(node);
             let _ = self.probe_issues.remove(node);
             let _ = self.unfulfilled_ops.remove(node);
         }
@@ -277,7 +283,6 @@ fn std_deviation(data: &[f32]) -> Option<f32> {
 #[cfg(test)]
 mod tests {
     use super::{FaultDetection, IssueType};
-    use sn_interface::messaging::system::OperationId;
 
     use eyre::Error;
     use std::{collections::BTreeSet, sync::Once};
@@ -304,16 +309,27 @@ mod tests {
 
     #[tokio::test]
     async fn retain_members_should_remove_other_nodes() -> Result<()> {
-        let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
-        let mut fault_detection = FaultDetection::new(nodes.clone());
-        let nodes_to_retain = nodes[5..10].iter().cloned().collect::<BTreeSet<XorName>>();
+        let nodes = (0..10)
+            .map(|_| random_xorname())
+            .collect::<BTreeSet<XorName>>();
+        let nodes_vec = nodes.iter().cloned().collect::<Vec<XorName>>();
 
-        fault_detection.retain_members_only(nodes_to_retain.clone());
+        let elders = (0..7)
+            .map(|_| random_xorname())
+            .collect::<BTreeSet<XorName>>();
+        let mut fault_detection = FaultDetection::new(nodes, elders);
+        let nodes_to_retain = nodes_vec[5..10]
+            .iter()
+            .cloned()
+            .collect::<BTreeSet<XorName>>();
 
-        let current_nodes = fault_detection.current_nodes();
+        fault_detection
+            .update_and_only_retain_members(nodes_to_retain.clone(), nodes_to_retain.clone());
+
+        let current_nodes = fault_detection.all_current_nodes();
         assert_eq!(current_nodes.len(), 5);
         for member in current_nodes {
-            assert!(nodes_to_retain.contains(member));
+            assert!(nodes_to_retain.contains(&member));
         }
 
         Ok(())
@@ -321,27 +337,33 @@ mod tests {
 
     #[tokio::test]
     async fn retain_members_should_remove_issues_relating_to_nodes_not_retained() -> Result<()> {
-        let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
-        let mut fault_detection = FaultDetection::new(nodes.clone());
+        let nodes = (0..10)
+            .map(|_| random_xorname())
+            .collect::<BTreeSet<XorName>>();
+        let elders = (0..7)
+            .map(|_| random_xorname())
+            .collect::<BTreeSet<XorName>>();
+        let mut fault_detection = FaultDetection::new(nodes.clone(), elders.clone());
 
+        let nodes_vec = nodes.iter().cloned().collect::<Vec<XorName>>();
         // Track some issues for nodes that are going to be removed.
         for node in nodes.iter().take(3) {
             fault_detection.track_issue(*node, IssueType::Communication);
-            fault_detection.track_issue(*node, IssueType::Knowledge);
-            fault_detection.track_issue(*node, IssueType::RequestOperation(OperationId([1; 32])));
+            fault_detection.track_issue(*node, IssueType::NetworkKnowledge);
+            fault_detection.track_issue(*node, IssueType::RequestOperation);
         }
 
         // Track some issues for nodes that will be retained.
-        fault_detection.track_issue(nodes[5], IssueType::Communication);
-        fault_detection.track_issue(nodes[6], IssueType::Knowledge);
-        fault_detection.track_issue(nodes[7], IssueType::RequestOperation(OperationId([1; 32])));
+        fault_detection.track_issue(nodes_vec[5], IssueType::Communication);
+        fault_detection.track_issue(nodes_vec[6], IssueType::NetworkKnowledge);
+        fault_detection.track_issue(nodes_vec[7], IssueType::RequestOperation);
 
-        let nodes_to_retain = nodes[5..10].iter().cloned().collect::<BTreeSet<XorName>>();
+        let nodes_to_retain = nodes_vec[5..10].iter().cloned().collect();
 
-        fault_detection.retain_members_only(nodes_to_retain);
+        fault_detection.update_and_only_retain_members(nodes_to_retain, elders);
 
         assert_eq!(fault_detection.communication_issues.len(), 1);
-        assert_eq!(fault_detection.knowledge_issues.len(), 1);
+        assert_eq!(fault_detection.network_knowledge_issues.len(), 1);
         assert_eq!(fault_detection.unfulfilled_ops.len(), 1);
 
         Ok(())
@@ -349,25 +371,34 @@ mod tests {
 
     #[tokio::test]
     async fn track_issue_should_add_a_comm_issue() -> Result<()> {
-        let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
-        let mut fault_detection = FaultDetection::new(nodes.clone());
+        let nodes = (0..10)
+            .map(|_| random_xorname())
+            .collect::<BTreeSet<XorName>>();
+        let first_node = nodes.first().expect("A first node must exist here");
 
-        fault_detection.track_issue(nodes[0], IssueType::Communication);
+        // elder/non set doesnt matter here
+        let mut fault_detection = FaultDetection::new(nodes.clone(), BTreeSet::new());
+
+        fault_detection.track_issue(*first_node, IssueType::Communication);
 
         assert_eq!(fault_detection.communication_issues.len(), 1);
-        assert_eq!(fault_detection.knowledge_issues.len(), 0);
+        assert_eq!(fault_detection.network_knowledge_issues.len(), 0);
         assert_eq!(fault_detection.unfulfilled_ops.len(), 0);
         Ok(())
     }
 
     #[tokio::test]
     async fn track_issue_should_add_a_knowledge_issue() -> Result<()> {
-        let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
-        let mut fault_detection = FaultDetection::new(nodes.clone());
+        let nodes = (0..10)
+            .map(|_| random_xorname())
+            .collect::<BTreeSet<XorName>>();
+        let first_node = nodes.first().expect("A first node must exist here");
+        // elder/non set doesnt matter here
+        let mut fault_detection = FaultDetection::new(nodes.clone(), BTreeSet::new());
 
-        fault_detection.track_issue(nodes[0], IssueType::Knowledge);
+        fault_detection.track_issue(*first_node, IssueType::NetworkKnowledge);
 
-        assert_eq!(fault_detection.knowledge_issues.len(), 1);
+        assert_eq!(fault_detection.network_knowledge_issues.len(), 1);
         assert_eq!(fault_detection.communication_issues.len(), 0);
         assert_eq!(fault_detection.unfulfilled_ops.len(), 0);
         Ok(())
@@ -375,113 +406,36 @@ mod tests {
 
     #[tokio::test]
     async fn track_issue_should_add_a_pending_op_issue() -> Result<()> {
-        let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
-        let mut fault_detection = FaultDetection::new(nodes.clone());
+        let nodes = (0..10)
+            .map(|_| random_xorname())
+            .collect::<BTreeSet<XorName>>();
 
-        fault_detection.track_issue(nodes[0], IssueType::RequestOperation(OperationId([1; 32])));
+        let first_node = nodes.first().expect("A first node must exist here");
+        // elder/non set doesnt matter here
+        let mut fault_detection = FaultDetection::new(nodes.clone(), BTreeSet::new());
+
+        fault_detection.track_issue(*first_node, IssueType::RequestOperation);
 
         assert_eq!(fault_detection.unfulfilled_ops.len(), 1);
-        assert_eq!(fault_detection.knowledge_issues.len(), 0);
+        assert_eq!(fault_detection.network_knowledge_issues.len(), 0);
         assert_eq!(fault_detection.communication_issues.len(), 0);
         Ok(())
     }
 
     #[tokio::test]
     async fn add_new_node_should_track_new_node() -> Result<()> {
-        let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
-        let mut fault_detection = FaultDetection::new(nodes);
+        let nodes = (0..10)
+            .map(|_| random_xorname())
+            .collect::<BTreeSet<XorName>>();
+        // elder/non set doesnt matter here
+        let mut fault_detection = FaultDetection::new(nodes.clone(), nodes);
 
         let new_adult = random_xorname();
         fault_detection.add_new_node(new_adult);
 
-        let current_nodes = fault_detection.current_nodes();
+        let current_nodes = fault_detection.all_current_nodes();
 
         assert_eq!(current_nodes.len(), 11);
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn get_unfulfilled_ops_should_return_op_ids() -> Result<()> {
-        let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
-        let mut fault_detection = FaultDetection::new(nodes.clone());
-
-        fault_detection.track_issue(nodes[0], IssueType::RequestOperation(OperationId([1; 32])));
-        fault_detection.track_issue(nodes[0], IssueType::RequestOperation(OperationId([2; 32])));
-        fault_detection.track_issue(nodes[0], IssueType::RequestOperation(OperationId([3; 32])));
-
-        let op_ids = fault_detection.get_unfulfilled_ops(nodes[0]);
-
-        assert_eq!(3, op_ids.len());
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn get_unfulfilled_ops_should_return_empty_list_for_node_with_no_ops() -> Result<()> {
-        let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
-        let mut fault_detection = FaultDetection::new(nodes.clone());
-
-        fault_detection.track_issue(nodes[0], IssueType::RequestOperation(OperationId([1; 32])));
-        fault_detection.track_issue(nodes[0], IssueType::RequestOperation(OperationId([2; 32])));
-        fault_detection.track_issue(nodes[0], IssueType::RequestOperation(OperationId([3; 32])));
-
-        let op_ids = fault_detection.get_unfulfilled_ops(nodes[1]);
-
-        assert_eq!(0, op_ids.len());
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn request_operation_fulfilled_should_remove_pending_op() -> Result<()> {
-        let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
-        let mut fault_detection = FaultDetection::new(nodes.clone());
-        let op_id = OperationId([2; 32]);
-
-        fault_detection.track_issue(nodes[0], IssueType::RequestOperation(OperationId([1; 32])));
-        fault_detection.track_issue(nodes[0], IssueType::RequestOperation(OperationId([2; 32])));
-        fault_detection.track_issue(nodes[0], IssueType::RequestOperation(OperationId([3; 32])));
-
-        let has_removed = fault_detection.request_operation_fulfilled(&nodes[0], op_id);
-
-        assert!(has_removed);
-        let op_ids = fault_detection.get_unfulfilled_ops(nodes[0]);
-        assert_eq!(2, op_ids.len());
-        assert_eq!(OperationId([1; 32]), op_ids[0]);
-        assert_eq!(OperationId([3; 32]), op_ids[1]);
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn request_operation_fulfilled_should_return_false_for_node_with_no_ops() -> Result<()> {
-        let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
-        let mut fault_detection = FaultDetection::new(nodes.clone());
-        let op_id = OperationId([2; 32]);
-
-        fault_detection.track_issue(nodes[0], IssueType::RequestOperation(OperationId([1; 32])));
-        fault_detection.track_issue(nodes[0], IssueType::RequestOperation(OperationId([2; 32])));
-        fault_detection.track_issue(nodes[0], IssueType::RequestOperation(OperationId([3; 32])));
-
-        let has_removed = fault_detection.request_operation_fulfilled(&nodes[1], op_id);
-
-        assert!(!has_removed);
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn request_operation_fulfilled_should_return_false_when_op_id_not_tracked() -> Result<()>
-    {
-        let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
-        let mut fault_detection = FaultDetection::new(nodes.clone());
-        let op_id = OperationId([4; 32]);
-
-        fault_detection.track_issue(nodes[0], IssueType::RequestOperation(OperationId([1; 32])));
-        fault_detection.track_issue(nodes[0], IssueType::RequestOperation(OperationId([2; 32])));
-        fault_detection.track_issue(nodes[0], IssueType::RequestOperation(OperationId([3; 32])));
-
-        let has_removed = fault_detection.request_operation_fulfilled(&nodes[1], op_id);
-
-        assert!(!has_removed);
-        let op_ids = fault_detection.get_unfulfilled_ops(nodes[0]);
-        assert_eq!(3, op_ids.len());
         Ok(())
     }
 }

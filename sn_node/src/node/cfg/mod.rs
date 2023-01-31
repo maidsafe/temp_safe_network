@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -21,7 +21,7 @@ mod test_utils {
     use tempfile::tempdir;
 
     /// Create a register store for routing examples
-    pub fn create_test_max_capacity_and_root_storage() -> eyre::Result<(usize, PathBuf)> {
+    pub fn create_test_capacity_and_root_storage() -> eyre::Result<(usize, usize, PathBuf)> {
         let random_filename: String = thread_rng()
             .sample_iter(&Alphanumeric)
             .take(15)
@@ -32,6 +32,6 @@ mod test_utils {
         let storage_dir = Path::new(root_dir.path()).join(random_filename);
         let config = Config::default();
 
-        Ok((config.max_capacity(), storage_dir))
+        Ok((config.min_capacity(), config.max_capacity(), storage_dir))
     }
 }

@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -60,16 +60,13 @@ fn main() -> Result<()> {
         match cmd {
             SubCmds::Cmds { cmd_id } => {
                 if report.is_empty() {
-                    println!("** No cmds were found for cmd id {} **", cmd_id);
+                    println!("** No cmds were found for cmd id {cmd_id} **");
                 } else {
-                    println!(
-                        "*** REPORT: The following cmds were found for cmd id {} ***",
-                        cmd_id
-                    );
+                    println!("*** REPORT: The following cmds were found for cmd id {cmd_id} ***",);
                     for (cmd_id, log_entries) in &report {
-                        println!("==> Log entries for sub-cmd {}:", cmd_id);
+                        println!("==> Log entries for sub-cmd {cmd_id}:");
                         for log_entry in log_entries.iter() {
-                            println!("{}", log_entry);
+                            println!("{log_entry}");
                         }
                         println!();
                     }
@@ -77,16 +74,13 @@ fn main() -> Result<()> {
             }
             SubCmds::Msgs { msg_id } => {
                 if report.is_empty() {
-                    println!("** No cmds were found for msg id {} **", msg_id);
+                    println!("** No cmds were found for msg id {msg_id} **");
                 } else {
-                    println!(
-                        "*** REPORT: The following cmds were found for msg id {} ***",
-                        msg_id
-                    );
+                    println!("*** REPORT: The following cmds were found for msg id {msg_id} ***",);
                     for (cmd_id, log_entries) in &report {
-                        println!("==> Log entries for sub-cmd {}:", cmd_id);
+                        println!("==> Log entries for sub-cmd {cmd_id}:");
                         for log_entry in log_entries.iter() {
-                            println!("{}", log_entry);
+                            println!("{log_entry}");
                         }
                         println!();
                     }
@@ -98,9 +92,9 @@ fn main() -> Result<()> {
                 } else {
                     println!("*** REPORT: The following issues were detected ***");
                     for (logfile, log_entries) in &report {
-                        println!("Cmds not completed in log {}:", logfile);
+                        println!("Cmds not completed in log {logfile}:");
                         for log_entry in log_entries.iter() {
-                            println!("{}", log_entry);
+                            println!("{log_entry}");
                         }
                     }
                 }
@@ -297,7 +291,7 @@ fn inspect_log_files(args: &CmdArgs) -> Result<BTreeMap<String, Vec<String>>> {
     println!("-------------------------");
     println!("LogMarker Stats: (markers found across all log files): ");
     for (marker, count) in info.clone().counts {
-        println!("{} found: {} times", marker, count);
+        println!("{marker} found: {count} times");
     }
     println!("-------------------------");
 
@@ -345,7 +339,7 @@ fn inspect_log_files(args: &CmdArgs) -> Result<BTreeMap<String, Vec<String>>> {
 
     for (node_name, markers) in info.by_node {
         println!("///////////////////////");
-        println!("Node {:?}", node_name);
+        println!("Node {node_name:?}");
         println!("///////////////////////");
 
         if markers.get(&LogMarker::PromotedToElder).is_some() {
@@ -451,7 +445,7 @@ fn check_completed_cmds(
     if !cmds_not_completed.is_empty() {
         println!("\n!!! ERROR !!!: Some cmd/s were not completed in log:");
         for (id, line) in cmds_not_completed {
-            println!("{}{}", id, line);
+            println!("{id}{line}");
         }
     }
     println!();
@@ -459,7 +453,7 @@ fn check_completed_cmds(
     if !cmds_with_error.is_empty() {
         println!("\n!!! ERROR !!!: Some cmds produced errors:");
         for (id, line) in cmds_with_error {
-            println!("{} {}", id, line);
+            println!("{id} {line}");
         }
     }
 
@@ -475,7 +469,7 @@ fn populate_cmds_tree(
     report: &mut BTreeMap<String, Vec<String>>,
     cmd_id: &str,
 ) {
-    println!("Looking for cmds spawned from cmd id {}", cmd_id);
+    println!("Looking for cmds spawned from cmd id {cmd_id}");
     let root_cmd_id = get_root_cmd_id(cmd_id);
 
     populate_tree_for(spawned, &root_cmd_id, report);
@@ -516,7 +510,7 @@ fn populate_cmds_tree_for_msgs(
     report: &mut BTreeMap<String, Vec<String>>,
     msg_id: &str,
 ) {
-    println!("Looking for cmds spawned from msg id {}", msg_id);
+    println!("Looking for cmds spawned from msg id {msg_id}");
 
     if let Some(ids) = info.cmd_by_msg_id.get(msg_id) {
         for root_cmd_id in ids.iter() {

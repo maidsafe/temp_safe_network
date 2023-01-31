@@ -30,7 +30,7 @@ impl TracingLayers {
         let fmt_layer = tracing_fmt::layer().with_ansi(false);
 
         if let Some(log_dir) = config.log_dir() {
-            println!("Starting logging to directory: {:?}", log_dir);
+            println!("Starting logging to directory: {log_dir:?}");
 
             let (non_blocking, worker_guard) = appender::file_rotater(
                 log_dir,
@@ -74,6 +74,8 @@ impl TracingLayers {
         use opentelemetry_otlp::WithExportConfig;
         use opentelemetry_semantic_conventions::resource::{SERVICE_INSTANCE_ID, SERVICE_NAME};
 
+        let service_name =
+            std::env::var("OTLP_SERVICE_NAME").unwrap_or_else(|_| current_crate_str().to_string());
         let tracer = opentelemetry_otlp::new_pipeline()
             .tracing()
             .with_exporter(
@@ -83,7 +85,7 @@ impl TracingLayers {
                     .with_env(),
             )
             .with_trace_config(trace::config().with_resource(Resource::new(vec![
-                KeyValue::new(SERVICE_NAME, current_crate_str()),
+                KeyValue::new(SERVICE_NAME, service_name),
                 KeyValue::new(SERVICE_INSTANCE_ID, std::process::id().to_string()),
             ])))
             .install_batch(opentelemetry::runtime::Tokio)?;

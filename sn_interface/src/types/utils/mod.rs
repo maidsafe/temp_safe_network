@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -39,8 +39,7 @@ pub fn decode<I: AsRef<str>, O: DeserializeOwned>(encoded: I) -> Result<O> {
         multibase::decode(encoded).map_err(|e| Error::FailedToParse(e.to_string()))?;
     if base != Base::Base32Z {
         return Err(Error::FailedToParse(format!(
-            "Expected z-base-32 encoding, but got {:?}",
-            base
+            "Expected z-base-32 encoding, but got {base:?}",
         )));
     }
     deserialise(&decoded).map_err(|e| Error::FailedToParse(e.to_string()))

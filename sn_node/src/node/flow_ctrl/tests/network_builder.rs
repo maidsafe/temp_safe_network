@@ -1,11 +1,11 @@
 use crate::{
-    comm::{Comm, MsgFromPeer},
     node::{
-        cfg::create_test_max_capacity_and_root_storage, core::MyNode,
-        flow_ctrl::dispatcher::Dispatcher,
+        cfg::create_test_capacity_and_root_storage, core::MyNode, flow_ctrl::dispatcher::Dispatcher,
     },
     UsedSpace,
 };
+
+use sn_comms::{Comm, MsgFromPeer};
 use sn_interface::{
     elder_count,
     messaging::system::SectionSigned,
@@ -146,7 +146,7 @@ impl<R: RngCore> TestNetworkBuilder<R> {
             let (tx, rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
             let socket_addr: SocketAddr = (Ipv4Addr::LOCALHOST, 0).into();
             let comm = futures::executor::block_on(Comm::new(socket_addr, Default::default(), tx))
-                .expect("failed to create comm");
+                .expect("failed to create Comm");
             let mut node = node.clone();
             node.addr = comm.socket_addr();
 
@@ -186,9 +186,10 @@ impl<R: RngCore> TestNetworkBuilder<R> {
             .iter()
             .map(|(n, _)| n.public_key())
             .collect::<BTreeSet<_>>();
-        if !elder_keys.iter().all(|k| member_keys.contains(k)) {
-            panic!("some elders are not part of the members list");
-        }
+        assert!(
+            elder_keys.iter().all(|k| member_keys.contains(k)),
+            "some elders are not part of the members list"
+        );
 
         let elder_count = elders.len();
         let elders_iter = elders.iter().map(|(node, _)| MyNodeInfo::peer(node));
@@ -411,7 +412,7 @@ impl<R: RngCore> TestNetworkBuilder<R> {
                 // each anc can have multiple churns
                 for (sap, sk) in sections
                     .get(&anc)
-                    .expect("The ancestor {anc:?} should be present")
+                    .unwrap_or_else(|| panic!("The ancestor {anc:?} should be present"))
                 {
                     // to skip the first iteration of Prefix() since we have used that to create the
                     // SectionTree
@@ -423,7 +424,7 @@ impl<R: RngCore> TestNetworkBuilder<R> {
                     let sig = TestKeys::sign(&parent, &sk.public_key());
                     let mut proof_chain = SectionsDAG::new(parent.public_key());
                     proof_chain
-                        .insert(&parent.public_key(), sk.public_key(), sig)
+                        .verify_and_insert(&parent.public_key(), sk.public_key(), sig)
                         .expect("should not fail");
                     let update =
                         TestSectionTree::get_section_tree_update(sap, &proof_chain, &parent);
@@ -516,13 +517,16 @@ impl TestNetwork {
         let nodes = self.get_nodes_single_churn(prefix, churn_idx);
         let sap_details = self.get_sap_single_churn(prefix, churn_idx);
 
-        if elder_count > sap_details.0.elder_count() {
-            panic!("elder_count should be <= {}", sap_details.0.elder_count());
-        }
+        assert!(
+            elder_count <= sap_details.0.elder_count(),
+            "elder_count should be <= {}",
+            sap_details.0.elder_count()
+        );
         let sap_adult_count = sap_details.0.members().count() - sap_details.0.elder_count();
-        if adult_count > sap_adult_count {
-            panic!("adult_count should be <= {}", sap_adult_count);
-        }
+        assert!(
+            adult_count <= sap_adult_count,
+            "adult_count should be <= {sap_adult_count}",
+        );
 
         let network_knowledge = self.build_network_knowledge(&sap_details.0, &sap_details.1);
 
@@ -653,13 +657,16 @@ impl TestNetwork {
         let nodes = self.get_nodes_single_churn(prefix, churn_idx);
         let sap_details = self.get_sap_single_churn(prefix, churn_idx);
 
-        if elder_count > sap_details.0.elder_count() {
-            panic!("elder_count should be <= {}", sap_details.0.elder_count());
-        }
+        assert!(
+            elder_count <= sap_details.0.elder_count(),
+            "elder_count should be <= {}",
+            sap_details.0.elder_count()
+        );
         let sap_adult_count = sap_details.0.members().count() - sap_details.0.elder_count();
-        if adult_count > sap_adult_count {
-            panic!("adult_count should be <= {}", sap_adult_count);
-        }
+        assert!(
+            adult_count <= sap_adult_count,
+            "adult_count should be <= {sap_adult_count}"
+        );
 
         let elder_iter = nodes.iter().take(elder_count).map(|(node, ..)| node.peer());
         let adult_iter = nodes
@@ -769,14 +776,14 @@ impl TestNetwork {
                     MIN_ADULT_AGE
                 };
                 let (node, comm, rx) = Self::gen_info(age, Some(*prefix));
-                comm_rx.extend(rx.into_iter());
+                let _ = comm_rx.insert(node.public_key(), Some(rx));
                 (node, comm)
             })
             .collect();
         let adults = (0..adult)
             .map(|_| {
                 let (node, comm, rx) = Self::gen_info(MIN_ADULT_AGE, Some(*prefix));
-                comm_rx.extend(rx.into_iter());
+                let _ = comm_rx.insert(node.public_key(), Some(rx));
                 (node, comm)
             })
             .collect();
@@ -784,7 +791,10 @@ impl TestNetwork {
     }
 
     /// Generate `MyNodeInfo` and `Comm`
-    pub(crate) fn gen_info(age: u8, prefix: Option<Prefix>) -> (MyNodeInfo, Comm, TestCommRx) {
+    pub(crate) fn gen_info(
+        age: u8,
+        prefix: Option<Prefix>,
+    ) -> (MyNodeInfo, Comm, Receiver<MsgFromPeer>) {
         let handle = Handle::current();
         let _ = handle.enter();
         let (tx, rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
@@ -795,8 +805,32 @@ impl TestNetwork {
             gen_keypair(&prefix.unwrap_or_default().range_inclusive(), age),
             comm.socket_addr(),
         );
-        let comm_rx = BTreeMap::from([(info.public_key(), Some(rx))]);
-        (info, comm, comm_rx)
+        (info, comm, rx)
+    }
+
+    /// Creates a single `MyNode` instance
+    pub(crate) fn build_a_node_instance(
+        info: &MyNodeInfo,
+        comm: &Comm,
+        network_knowledge: &NetworkKnowledge,
+    ) -> MyNode {
+        // enter the current tokio runtime
+        let handle = Handle::current();
+        let _ = handle.enter();
+
+        let (min_capacity, max_capacity, root_storage_dir) =
+            create_test_capacity_and_root_storage().expect("Failed to create root storage");
+
+        futures::executor::block_on(MyNode::new(
+            comm.clone(),
+            info.keypair.clone(),
+            network_knowledge.clone(),
+            None,
+            UsedSpace::new(min_capacity, max_capacity),
+            root_storage_dir,
+            mpsc::channel(10).0,
+        ))
+        .expect("Failed to create MyNode")
     }
 
     // Creates a single `MyNode` instance
@@ -813,14 +847,14 @@ impl TestNetwork {
         let handle = Handle::current();
         let _ = handle.enter();
 
-        let (max_capacity, root_storage_dir) =
-            create_test_max_capacity_and_root_storage().expect("Failed to create root storage");
+        let (min_capacity, max_capacity, root_storage_dir) =
+            create_test_capacity_and_root_storage().expect("Failed to create root storage");
         let mut my_node = futures::executor::block_on(MyNode::new(
             comm.clone(),
             info.keypair.clone(),
             network_knowledge.clone(),
             sk_share.clone(),
-            UsedSpace::new(max_capacity),
+            UsedSpace::new(min_capacity, max_capacity),
             root_storage_dir,
             mpsc::channel(10).0,
         ))
@@ -926,7 +960,7 @@ impl TestNetwork {
         let churn_idx = churn_idx.unwrap_or(all_sap_details.len() - 1);
         all_sap_details
             .get(churn_idx)
-            .expect("invalid churn idx: {churn_idx}")
+            .unwrap_or_else(|| panic!("invalid churn idx: {churn_idx}"))
     }
 
     // Get the SAP, sk_set for all the churns of a section
@@ -936,7 +970,7 @@ impl TestNetwork {
     ) -> &Vec<(SectionSigned<SectionAuthorityProvider>, SecretKeySet)> {
         self.sections
             .get(&prefix)
-            .expect("section not found for {prefix:?}")
+            .unwrap_or_else(|| panic!("section not found for {prefix:?}"))
     }
 
     // Get the all the nodes for a particular churn of a section
@@ -949,7 +983,7 @@ impl TestNetwork {
         let churn_idx = churn_idx.unwrap_or(nodes.len() - 1);
         nodes
             .get(churn_idx)
-            .expect("invalid churn idx: {churn_idx}")
+            .unwrap_or_else(|| panic!("invalid churn idx: {churn_idx}"))
     }
 
     // Get all the nodes for all the churns of a section
@@ -959,6 +993,6 @@ impl TestNetwork {
     ) -> &Vec<Vec<(MyNodeInfo, Comm, TestMemberType)>> {
         self.nodes
             .get(&prefix)
-            .expect("nodes not found for {prefix:?}")
+            .unwrap_or_else(|| panic!("nodes not found for {prefix:?}"))
     }
 }

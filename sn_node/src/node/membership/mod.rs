@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -300,6 +300,9 @@ impl Membership {
         };
         let signed_vote = self.sign_vote(vote)?;
 
+        // For relocation, the `validate_proposals` will call `NodeState::validate`,
+        // where the name of the node_state is using old_name, and won't match the relocate_details
+        // within the node_state, hence fail the `expected age` check.
         self.validate_proposals(&signed_vote, prefix)?;
         if let Err(e) = signed_vote.detect_byzantine_faults(
             &self.consensus.elders,
@@ -386,6 +389,11 @@ impl Membership {
                 let _ = self
                     .history
                     .insert(vote_gen, (decision.clone(), decided_consensus));
+                info!(
+                    "Membership - updated generation from {:?} to {:?}",
+                    self.gen, vote_gen
+                );
+                info!("Membership - history is {:?}", self.history);
                 self.gen = vote_gen;
 
                 Some(decision)
@@ -436,7 +444,16 @@ impl Membership {
         let archived_members = self.archived_members();
 
         for proposal in signed_vote.proposals() {
-            proposal.validate(prefix, &members, &archived_members)?;
+            if let Err(err) = proposal.validate(prefix, &members, &archived_members) {
+                warn!("Failed to validate {proposal:?} with error {:?}", err);
+                warn!(
+                    "Members at generation {} are: {:?}",
+                    signed_vote.vote.gen - 1,
+                    members
+                );
+                warn!("Archived members are {:?}", archived_members);
+                return Err(Error::NetworkKnowledge(err));
+            }
         }
 
         Ok(())

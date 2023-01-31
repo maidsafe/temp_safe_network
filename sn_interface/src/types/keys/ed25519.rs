@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -43,8 +43,29 @@ pub fn gen_name_with_age(age: u8) -> XorName {
 /// Construct a `Keypair` whose name is in the interval [start, end] (both endpoints inclusive).
 /// And the last byte equals to the targeted age.
 pub fn gen_keypair(range: &RangeInclusive<XorName>, age: u8) -> Keypair {
-    let mut rng = rand_07::thread_rng();
+    use rayon::prelude::*;
+    let parallelism = std::thread::available_parallelism()
+        .map(|s| s.get())
+        .unwrap_or(1);
+    let result = (0..parallelism)
+        .par_bridge()
+        .map(|_| loop {
+            let keypair = Keypair::generate(&mut rand_07::thread_rng());
+            let new_name = XorName::from(crate::types::PublicKey::Ed25519(keypair.public));
+            if range.contains(&new_name) && age == new_name[XOR_NAME_LEN - 1] {
+                return Some(keypair);
+            }
+        })
+        .find_map_any(|keypair| keypair);
 
+    match result {
+        Some(keypair) => keypair,
+        None => gen_keypair_single_thread(range, age),
+    }
+}
+
+fn gen_keypair_single_thread(range: &RangeInclusive<XorName>, age: u8) -> Keypair {
+    let mut rng = rand_07::thread_rng();
     loop {
         let keypair = Keypair::generate(&mut rng);
         let new_name = XorName::from(crate::types::PublicKey::Ed25519(keypair.public));

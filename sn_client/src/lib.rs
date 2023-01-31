@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -47,6 +47,7 @@
     clippy::unicode_not_nfc,
     clippy::unwrap_used
 )]
+#![allow(clippy::result_large_err, clippy::uninlined_format_args)]
 
 #[macro_use]
 extern crate tracing;
@@ -58,7 +59,9 @@ mod connections;
 mod errors;
 
 // Export public API.
-pub use api::{Client, RegisterWriteAheadLog, DEFAULT_NETWORK_CONTACTS_FILE_NAME};
+pub use api::{
+    Client, QueriedDataReplicas, RegisterWriteAheadLog, DEFAULT_NETWORK_CONTACTS_FILE_NAME,
+};
 pub use connections::LinkError;
 pub use errors::{Error, Result};
 pub use qp2p::Config as QuicP2pConfig;

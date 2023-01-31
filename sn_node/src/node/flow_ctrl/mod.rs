@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -16,7 +16,9 @@ mod periodic_checks;
 pub(crate) mod tests;
 pub(crate) use cmd_ctrl::CmdCtrl;
 
-use crate::comm::MsgFromPeer;
+use super::DataStorage;
+use periodic_checks::PeriodicChecksTimestamps;
+
 use crate::node::{
     flow_ctrl::{
         cmds::Cmd,
@@ -25,21 +27,40 @@ use crate::node::{
     messaging::Peers,
     MyNode, Result, STANDARD_CHANNEL_SIZE,
 };
-use periodic_checks::PeriodicChecksTimestamps;
+
+use sn_comms::MsgFromPeer;
 use sn_fault_detection::FaultDetection;
 use sn_interface::{
-    messaging::system::{NodeDataCmd, NodeMsg},
+    messaging::system::{JoinRejectReason, NodeDataCmd, NodeMsg},
     types::{log_markers::LogMarker, DataAddress, Peer},
 };
 
-use super::DataStorage;
-use std::sync::Arc;
+use std::{collections::BTreeSet, net::SocketAddr, sync::Arc};
 use tokio::sync::{mpsc, RwLock};
 use xor_name::XorName;
 
-/// Sent via the rejoin_network_tx to start the bootstrap process again
+/// Sent via the rejoin_network_tx to restart the join process.
+/// This would only occur when joins are not allowed, or non-recoverable states.
 #[derive(Debug)]
-pub struct RejoinNetwork;
+pub enum RejoinReason {
+    /// Happens when trying to join; we will wait a moment and then try again.
+    /// NB: Relocated nodes that try to join, are accepted even if joins are disallowed.
+    JoinsDisallowed,
+    /// Happens when already part of the network; we need to start from scratch.
+    RemovedFromSection,
+    /// Unrecoverable error, requires node operator network config.
+    NodeNotReachable(SocketAddr),
+}
+
+impl RejoinReason {
+    pub(crate) fn from_reject_reason(reason: JoinRejectReason) -> RejoinReason {
+        use JoinRejectReason::*;
+        match reason {
+            JoinsDisallowed => RejoinReason::JoinsDisallowed,
+            NodeNotReachable(add) => RejoinReason::NodeNotReachable(add),
+        }
+    }
+}
 
 /// Listens for incoming msgs and forms Cmds for each,
 /// Periodically triggers other Cmd Processes (eg health checks, fault detection etc)
@@ -60,7 +81,7 @@ impl FlowCtrl {
         fault_cmds_channels: (mpsc::Sender<FaultsCmd>, mpsc::Receiver<FaultsCmd>),
     ) -> (
         mpsc::Sender<(Cmd, Vec<usize>)>,
-        mpsc::Receiver<RejoinNetwork>,
+        mpsc::Receiver<RejoinReason>,
     ) {
         debug!("[NODE READ]: flowctrl node context lock got");
         let node_context = cmd_ctrl.node().read().await.context();
@@ -70,15 +91,20 @@ impl FlowCtrl {
 
         let node_identifier = node_context.info.name();
 
+        let all_members = node_context
+            .network_knowledge
+            .adults()
+            .iter()
+            .map(|peer| peer.name())
+            .collect::<BTreeSet<XorName>>();
+        let elders = node_context
+            .network_knowledge
+            .elders()
+            .iter()
+            .map(|peer| peer.name())
+            .collect::<BTreeSet<XorName>>();
         let fault_channels = {
-            let tracker = FaultDetection::new(
-                node_context
-                    .network_knowledge
-                    .members()
-                    .iter()
-                    .map(|peer| peer.name())
-                    .collect::<Vec<XorName>>(),
-            );
+            let tracker = FaultDetection::new(all_members, elders);
             // start FaultDetection in a new thread
             let faulty_nodes_receiver = Self::start_fault_detection(tracker, fault_cmds_channels.1);
             FaultChannels {
@@ -94,17 +120,14 @@ impl FlowCtrl {
             timestamps: PeriodicChecksTimestamps::now(),
         };
 
-        let _ =
-            tokio::task::spawn(
-                async move { flow_ctrl.process_messages_and_periodic_checks().await },
-            );
+        let _handle = tokio::task::spawn(flow_ctrl.process_messages_and_periodic_checks());
 
         let cmd_channel = cmd_sender_channel.clone();
         let cmd_channel_for_msgs = cmd_sender_channel.clone();
 
         let node_arc_for_replication = cmd_ctrl.node();
         // start a new thread to kick off incoming cmds
-        let _ = tokio::task::spawn(async move {
+        let _handle = tokio::task::spawn(async move {
             // Get a stable identifier for statemap naming. This is NOT the node's current name.
             // It's the initial name... but will not change for the entire statemap
             while let Some((cmd, cmd_id)) = incoming_cmds_from_apis.recv().await {
@@ -129,7 +152,7 @@ impl FlowCtrl {
         .await;
 
         // start a new thread to convert msgs to Cmds
-        let _ = tokio::task::spawn(async move {
+        let _handle = tokio::task::spawn(async move {
             while let Some(peer_msg) = incoming_msg_events.recv().await {
                 let cmd = match Self::handle_new_msg_event(peer_msg).await {
                     Ok(cmd) => cmd,
@@ -139,7 +162,7 @@ impl FlowCtrl {
                     }
                 };
 
-                if let Err(error) = cmd_channel_for_msgs.send((cmd.clone(), vec![])).await {
+                if let Err(error) = cmd_channel_for_msgs.send((cmd, vec![])).await {
                     error!("Error sending msg onto cmd channel {error:?}");
                 }
             }
@@ -156,7 +179,7 @@ impl FlowCtrl {
         cmd_channel: mpsc::Sender<(Cmd, Vec<usize>)>,
     ) {
         // start a new thread to kick off data replication
-        let _ = tokio::task::spawn(async move {
+        let _handle = tokio::task::spawn(async move {
             // is there a simple way to dedupe common data going to many peers?
             // is any overhead reduction worth the increased complexity?
             while let Some((data_addresses, peer)) = data_replication_receiver.recv().await {
@@ -164,7 +187,7 @@ impl FlowCtrl {
                 let the_node = node_arc.clone();
                 let data_storage = node_data_storage.clone();
                 // move replication off thread so we don't block the receiver
-                let _ = tokio::task::spawn(async move {
+                let _handle = tokio::task::spawn(async move {
                     debug!(
                         "{:?} Data {:?} to: {:?}",
                         LogMarker::SendingMissingReplicatedData,

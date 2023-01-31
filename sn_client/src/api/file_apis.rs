@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -22,12 +22,23 @@ use bytes::Bytes;
 use futures::future::join_all;
 use itertools::Itertools;
 use self_encryption::{self, ChunkInfo, DataMap, EncryptedChunk};
+use std::collections::BTreeMap;
 use tokio::{task, time::sleep};
 use tracing::trace;
 use xor_name::XorName;
 
 // Maximum number of concurrent chunks to be uploaded/retrieved for a file
 const CHUNKS_BATCH_MAX_SIZE: usize = 5;
+
+/// List of results obtained when querying a chunk to several replicas.
+// TODO: expand this definition to support other types of data like Registers.
+#[derive(Debug)]
+pub struct QueriedDataReplicas {
+    /// Name of the chunk queried
+    pub name: XorName,
+    /// List of indexes of the replicas queried and their corresponding outcome
+    pub outcomes: BTreeMap<usize, Result<()>>,
+}
 
 impl Client {
     #[instrument(skip(self), level = "debug")]
@@ -42,6 +53,31 @@ impl Client {
             // if an error occurs, we assume it's a SmallFile
             Ok(chunk.value().clone())
         }
+    }
+
+    #[instrument(skip(self), level = "debug")]
+    /// Reads [`Bytes`] from the network, querying each of the data
+    /// replicas which match any of the indexes provided.
+    pub async fn read_bytes_from_replicas(
+        &self,
+        name: XorName,
+        replicas: &[usize],
+    ) -> Result<Vec<QueriedDataReplicas>> {
+        let (datamap_replicas, found_chunk) = self.get_chunk_from_replicas(name, replicas).await?;
+        let mut chunks_replicas = vec![datamap_replicas];
+
+        if let Some(chunk) = found_chunk {
+            // first try to deserialize a LargeFile, if it works, retrieve all unpacked chunks.
+            // if an error occurs, we assume it's a SmallFile
+            if let Ok(data_map) = self.unpack_chunk(chunk).await {
+                chunks_replicas.extend(
+                    self.get_chunks_from_replicas(data_map.infos(), replicas)
+                        .await?,
+                );
+            }
+        }
+
+        Ok(chunks_replicas)
     }
 
     /// Read bytes from the network. The contents are spread across
@@ -258,7 +294,7 @@ impl Client {
     // Gets and decrypts chunks from the network using nothing else but the data map,
     // then returns the raw data.
     async fn read_all(&self, data_map: DataMap) -> Result<Bytes> {
-        let encrypted_chunks = Self::try_get_chunks(self, data_map.infos()).await?;
+        let encrypted_chunks = self.try_get_chunks(data_map.infos()).await?;
         let bytes = self_encryption::decrypt_full_set(&data_map, &encrypted_chunks)?;
         Ok(bytes)
     }
@@ -271,14 +307,14 @@ impl Client {
         let range = &info.index_range;
         let all_infos = data_map.infos();
 
-        let encrypted_chunks = Self::try_get_chunks(
-            self,
-            (range.start..range.end + 1)
-                .clone()
-                .map(|i| all_infos[i].clone())
-                .collect_vec(),
-        )
-        .await?;
+        let encrypted_chunks = self
+            .try_get_chunks(
+                (range.start..range.end + 1)
+                    .clone()
+                    .map(|i| all_infos[i].clone())
+                    .collect_vec(),
+            )
+            .await?;
 
         let bytes =
             self_encryption::decrypt_range(&data_map, &encrypted_chunks, info.relative_pos, len)?;
@@ -287,15 +323,12 @@ impl Client {
     }
 
     #[instrument(skip_all, level = "trace")]
-    async fn try_get_chunks(
-        client: &Self,
-        chunks_info: Vec<ChunkInfo>,
-    ) -> Result<Vec<EncryptedChunk>> {
+    async fn try_get_chunks(&self, chunks_info: Vec<ChunkInfo>) -> Result<Vec<EncryptedChunk>> {
         let expected_count = chunks_info.len();
         let mut retrieved_chunks = vec![];
         for next_batch in chunks_info.chunks(CHUNKS_BATCH_MAX_SIZE) {
             let tasks = next_batch.iter().cloned().map(|chunk_info| {
-                let client = client.clone();
+                let client = self.clone();
                 task::spawn(async move {
                     match client.get_chunk(&chunk_info.dst_hash).await {
                         Ok(chunk) => Ok(EncryptedChunk {
@@ -304,8 +337,8 @@ impl Client {
                         }),
                         Err(err) => {
                             warn!(
-                                "Reading chunk {} from network, resulted in error {:?}.",
-                                chunk_info.dst_hash, err
+                                "Reading chunk {} from network, resulted in error {err:?}.",
+                                chunk_info.dst_hash
                             );
                             Err(err)
                         }
@@ -326,6 +359,66 @@ impl Client {
         } else {
             Ok(retrieved_chunks)
         }
+    }
+
+    async fn get_chunk_from_replicas(
+        &self,
+        name: XorName,
+        replicas: &[usize],
+    ) -> Result<(QueriedDataReplicas, Option<Chunk>)> {
+        let mut chunk_replicas = QueriedDataReplicas {
+            name,
+            outcomes: BTreeMap::new(),
+        };
+        let mut found_chunk = None;
+
+        let query = DataQueryVariant::GetChunk(ChunkAddress(name));
+        let results = self.send_query_to_replicas(query.clone(), replicas).await?;
+        for (replica_index, res) in results {
+            let outcome = res.map(|query_result| match query_result.response {
+                QueryResponse::GetChunk(Ok(chunk)) => {
+                    found_chunk = Some(chunk);
+                    Ok(())
+                }
+                QueryResponse::GetChunk(Err(err)) => Err(Error::ErrorMsg { source: err }),
+                other => Err(Error::UnexpectedQueryResponse {
+                    query: query.clone(),
+                    response: other,
+                }),
+            })?;
+
+            let _ = chunk_replicas.outcomes.insert(replica_index, outcome);
+        }
+
+        Ok((chunk_replicas, found_chunk))
+    }
+
+    #[instrument(skip_all, level = "trace")]
+    async fn get_chunks_from_replicas(
+        &self,
+        chunks_info: Vec<ChunkInfo>,
+        replicas: &[usize],
+    ) -> Result<Vec<QueriedDataReplicas>> {
+        let mut chunks_replicas = vec![];
+        for next_batch in chunks_info.chunks(CHUNKS_BATCH_MAX_SIZE) {
+            let tasks = next_batch.iter().cloned().map(|chunk_info| {
+                let client = self.clone();
+                let replicas_indexes = replicas.to_vec();
+                task::spawn(async move {
+                    let name = chunk_info.dst_hash;
+                    client
+                        .get_chunk_from_replicas(name, &replicas_indexes)
+                        .await
+                        .map(|(chunk_replicas, _)| chunk_replicas)
+                })
+            });
+
+            for result in join_all(tasks).await.into_iter().flatten() {
+                chunks_replicas.push(result?);
+            }
+        }
+
+        Ok(chunks_replicas)
     }
 
     /// Extracts a file DataMapLevel from a chunk.

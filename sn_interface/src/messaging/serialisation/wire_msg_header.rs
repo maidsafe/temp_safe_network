@@ -1,4 +1,4 @@
-// Copyright 2021 MaidSafe.net limited.
+// Copyright 2023 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -101,13 +101,12 @@ impl WireMsgHeader {
         let meta: HeaderMeta = BINCODE_OPTIONS
             .allow_trailing_bytes()
             .deserialize(&bytes)
-            .map_err(|err| Error::FailedToParse(format!("invalid message header: {}", err)))?;
+            .map_err(|err| Error::FailedToParse(format!("invalid message header: {err}")))?;
 
         // We check that we have at least the claimed number of header bytes.
         if meta.header_len() > bytes_len {
             return Err(Error::FailedToParse(format!(
-                "not enough bytes received ({}) to deserialize wire message header",
-                bytes_len
+                "not enough bytes received ({bytes_len}) to deserialize wire message header",
             )));
         }
 
@@ -121,8 +120,7 @@ impl WireMsgHeader {
         let msg_envelope: MsgEnvelope =
             rmp_serde::from_slice(msg_envelope_bytes).map_err(|err| {
                 Error::FailedToParse(format!(
-                    "source authority couldn't be deserialized from the header: {}",
-                    err
+                    "source authority couldn't be deserialized from the header: {err}",
                 ))
             })?;
 
@@ -139,8 +137,7 @@ impl WireMsgHeader {
         // first serialise the msg envelope so we can figure out the total header size
         let msg_envelope_vec = rmp_serde::to_vec_named(&self.msg_envelope).map_err(|err| {
             Error::Serialisation(format!(
-                "could not serialize message envelope with Msgpack: {}",
-                err
+                "could not serialize message envelope with Msgpack: {err}",
             ))
         })?;
 
@@ -156,8 +153,7 @@ impl WireMsgHeader {
             .serialize_into(&mut buffer_writer, &meta)
             .map_err(|err| {
                 Error::Serialisation(format!(
-                    "header metadata couldn't be serialized into the header: {}",
-                    err
+                    "header metadata couldn't be serialized into the header: {err}",
                 ))
             })?;
 
