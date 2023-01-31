@@ -73,9 +73,20 @@ impl TracingLayers {
         };
         use opentelemetry_otlp::WithExportConfig;
         use opentelemetry_semantic_conventions::resource::{SERVICE_INSTANCE_ID, SERVICE_NAME};
+        use rand::{distributions::Alphanumeric, thread_rng, Rng};
+        use tracing_subscriber::filter::LevelFilter;
 
-        let service_name =
-            std::env::var("OTLP_SERVICE_NAME").unwrap_or_else(|_| current_crate_str().to_string());
+        // Set the service_name through env variable. Defaults to a randomly generated name
+        let service_name = std::env::var("OTLP_SERVICE_NAME").unwrap_or_else(|_| {
+            let random_node_name: String = thread_rng()
+                .sample_iter(&Alphanumeric)
+                .take(10)
+                .map(char::from)
+                .collect();
+            format!("{}_{}", current_crate_str(), random_node_name)
+        });
+        println!("The opentelemetry traces are logged under the name: {service_name}");
+
         let tracer = opentelemetry_otlp::new_pipeline()
             .tracing()
             .with_exporter(
@@ -89,9 +100,16 @@ impl TracingLayers {
                 KeyValue::new(SERVICE_INSTANCE_ID, std::process::id().to_string()),
             ])))
             .install_batch(opentelemetry::runtime::Tokio)?;
+
+        // Set filter level through env variable. Defaults to Info log level
+        let env_filter = EnvFilter::builder()
+            .with_default_directive(LevelFilter::INFO.into())
+            .with_env_var("RUST_LOG_OTLP")
+            .from_env_lossy();
+
         let otlp_layer = tracing_opentelemetry::layer()
             .with_tracer(tracer)
-            .with_filter(EnvFilter::from_env("RUST_LOG_OTLP"))
+            .with_filter(env_filter)
             .boxed();
         self.layers.push(otlp_layer);
         Ok(())
