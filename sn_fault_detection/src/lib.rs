@@ -113,6 +113,7 @@ impl FaultDetection {
     /// The `op_id` only applies when adding an operational issue.
     pub fn track_issue(&mut self, node_id: NodeIdentifier, issue_type: IssueType) {
         debug!("Adding a new issue to {node_id:?} the fault tracker: {issue_type:?}");
+
         match issue_type {
             IssueType::Dkg => {
                 let queue = self.dkg_issues.entry(node_id).or_default();

@@ -72,10 +72,32 @@ impl MyNode {
         wire_msg: WireMsg,
         send_stream: Option<SendStream>,
     ) -> Result<Vec<Cmd>> {
-        // Deserialize the payload of the incoming message
         let msg_id = wire_msg.msg_id();
-        trace!("Handling msg {msg_id:?}. Validating first...");
+        let msg_kind = wire_msg.kind();
 
+        trace!("Handling msg {msg_id:?}. Checking for AE first...");
+
+        let context = node.read().await.context();
+        trace!("[NODE READ]: Handle msg read lock attempt success");
+
+        // first check for AE, if this isn't an ae msg itself
+        if !msg_kind.is_ae_msg() {
+            let entropy =
+                MyNode::check_for_entropy(&wire_msg, &context.network_knowledge, &origin)?;
+            if let Some((update, ae_kind)) = entropy {
+                debug!("bailing early, AE found for {msg_id:?}");
+                return MyNode::perform_any_anti_entropy_cmds(
+                    &context,
+                    &wire_msg,
+                    origin,
+                    update,
+                    ae_kind,
+                    send_stream,
+                );
+            }
+        }
+
+        // Deserialize the payload of the incoming message
         let msg_type = match wire_msg.into_msg() {
             Ok(msg_type) => msg_type,
             Err(error) => {
@@ -84,44 +106,20 @@ impl MyNode {
             }
         };
 
-        trace!("[NODE READ]: Handle msg read lock attempt");
-        let context = { node.read().await.context() };
         match msg_type {
-            MsgType::Node { dst, msg, .. } => {
-                MyNode::handle_node_msg_with_ae_check(
-                    node,
-                    context,
-                    origin,
-                    msg,
-                    &wire_msg,
-                    dst,
-                    send_stream,
-                )
-                .await
+            MsgType::Node { msg, .. } => {
+                MyNode::handle_valid_node_msg(node, context, msg_id, msg, origin, send_stream).await
             }
             MsgType::Client {
-                msg_id,
-                msg,
-                dst,
-                auth,
+                msg_id, msg, auth, ..
             } => {
                 debug!("Valid client msg {msg_id:?}");
 
-                let Some(send_stream) = send_stream else {
+                let Some(stream) = send_stream else {
                     return Err(Error::NoClientResponseStream);
                 };
 
-                // Check for entropy before we proceed further
-                MyNode::check_ae_on_client_msg(
-                    context,
-                    origin,
-                    wire_msg,
-                    dst,
-                    msg,
-                    auth,
-                    send_stream,
-                )
-                .await
+                MyNode::handle_valid_client_msg(context, msg_id, msg, auth, origin, stream).await
             }
             other @ MsgType::ClientDataResponse { .. } => {
                 error!(

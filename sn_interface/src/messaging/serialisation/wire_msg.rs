@@ -89,6 +89,7 @@ impl WireMsg {
             msg_payload,
             MsgKind::Node {
                 name,
+                is_ae: msg.is_ae(),
                 is_join: msg.is_join(),
             },
             dst,
@@ -298,6 +299,7 @@ mod tests {
         let kind = MsgKind::Node {
             name: Default::default(),
             is_join: true,
+            is_ae: false,
         };
         let wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
         let serialized = wire_msg.serialize()?;

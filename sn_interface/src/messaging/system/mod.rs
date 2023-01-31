@@ -172,6 +172,9 @@ impl NodeMsg {
         // we could also differentiate, say if it's a relocation
         matches!(self, NodeMsg::TryJoin(_))
     }
+    pub fn is_ae(&self) -> bool {
+        matches!(self, NodeMsg::AntiEntropy { .. })
+    }
 }
 
 /// Messages sent from adults to the elders in response to client queries or commands

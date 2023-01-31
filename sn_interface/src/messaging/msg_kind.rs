@@ -23,7 +23,21 @@ pub enum MsgKind {
     /// A data response sent from a Node (along with its name) to the client
     ClientDataResponse(XorName),
     /// A message from a Node along with its name
-    Node { name: XorName, is_join: bool },
+    Node {
+        name: XorName,
+        is_join: bool,
+        is_ae: bool,
+    },
     /// A data response sent from an Adult (along with its name) to Elders
     NodeDataResponse(XorName),
+}
+
+impl MsgKind {
+    /// is this an ae msg
+    pub fn is_ae_msg(&self) -> bool {
+        match self {
+            Self::Node { is_ae, .. } => *is_ae,
+            _ => false,
+        }
+    }
 }
