@@ -5,19 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.72.41 (2023-01-31)
+## v0.72.42 (2023-02-01)
 
-### New Features
+### Chore
 
- - <csr-id-6153fcf52e02551443642d60a13e48de28e2ed3d/> perform ae before we deserialise msgs
-   This removes unnecessary work
+ - <csr-id-50c69469b488224c7f69de4e728a66594a31380e/> log more info when membership vote failed byzatine detect
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
- - 1 day passed between releases.
+ - 2 commits contributed to the release over the course of 1 calendar day.
  - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
@@ -28,6 +26,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #2049 ([`a9389c1`](https://github.com/maidsafe/safe_network/commit/a9389c11db261b8bb9a082ef93cef9d766f0f516))
+    - log more info when membership vote failed byzatine detect ([`50c6946`](https://github.com/maidsafe/safe_network/commit/50c69469b488224c7f69de4e728a66594a31380e))
+</details>
+
+## v0.72.41 (2023-01-31)
+
+### Chore
+
+ - <csr-id-fc34870f7d59344da39e38834e87e55ab6860376/> sn_interface-0.16.20/sn_fault_detection-0.15.2/sn_node-0.72.41
+
+### New Features
+
+ - <csr-id-6153fcf52e02551443642d60a13e48de28e2ed3d/> perform ae before we deserialise msgs
+   This removes unnecessary work
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 1 day passed between releases.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.16.20/sn_fault_detection-0.15.2/sn_node-0.72.41 ([`fc34870`](https://github.com/maidsafe/safe_network/commit/fc34870f7d59344da39e38834e87e55ab6860376))
     - Merge #2039 ([`5b27450`](https://github.com/maidsafe/safe_network/commit/5b2745051d91eb3a4b6b8e575258b5c93ab81b04))
     - perform ae before we deserialise msgs ([`6153fcf`](https://github.com/maidsafe/safe_network/commit/6153fcf52e02551443642d60a13e48de28e2ed3d))
 </details>
@@ -35,6 +65,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## v0.72.40 (2023-01-30)
 
 <csr-id-89b6344e590a22894f88fc643ff8aa2c7aab2464/>
+<csr-id-3377f4b4142e324bb769d4666f3ac127354bb107/>
 
 ### Chore
 

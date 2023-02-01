@@ -4107,7 +4107,7 @@ dependencies = [
 
 [[package]]
 name = "sn_node"
-version = "0.72.41"
+version = "0.72.42"
 dependencies = [
  "assert_matches",
  "base64 0.13.1",
