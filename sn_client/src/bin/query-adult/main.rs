@@ -142,8 +142,7 @@ async fn send_query(client: &Client, query: DataQuery) -> Result<QueryResponse> 
             serialised_query.clone(),
             signature.clone(),
         )
-        .await?
-        .response)
+        .await?)
 }
 
 /// Parse arguments and setup file/bytes to use

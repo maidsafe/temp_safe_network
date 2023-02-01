@@ -29,22 +29,6 @@ pub(super) enum MsgResponse {
     Failure(SocketAddr, Error),
 }
 
-#[derive(Debug)]
-pub struct QueryResult {
-    pub response: QueryResponse,
-}
-
-impl QueryResult {
-    /// Returns true if the QueryResponse is DataNotFound
-    pub(crate) fn data_was_found(&self) -> bool {
-        let found = !self.response.is_data_not_found();
-
-        debug!("was the data found??? {found:?}, {self:?}");
-
-        found
-    }
-}
-
 #[derive(Clone, Debug)]
 pub(super) struct Session {
     // Session endpoint.

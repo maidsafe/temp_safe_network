@@ -133,10 +133,10 @@ impl Client {
     pub async fn get_register(&self, address: Address) -> Result<Register> {
         // Let's fetch the Register from the network
         let query = DataQueryVariant::Register(RegisterQuery::Get(address));
-        let query_result = self.send_query(query.clone()).await?;
+        let response = self.send_query(query.clone()).await?;
 
-        debug!("get_register result is; {query_result:?}");
-        match query_result.response {
+        debug!("get_register response is; {response:?}");
+        match response {
             QueryResponse::GetRegister(res) => res.map_err(|err| Error::ErrorMsg { source: err }),
             other => Err(Error::UnexpectedQueryResponse {
                 query,
@@ -149,8 +149,8 @@ impl Client {
     #[instrument(skip(self), level = "debug")]
     pub async fn read_register(&self, address: Address) -> Result<BTreeSet<(EntryHash, Entry)>> {
         let query = DataQueryVariant::Register(RegisterQuery::Read(address));
-        let query_result = self.send_query(query.clone()).await?;
-        match query_result.response {
+        let response = self.send_query(query.clone()).await?;
+        match response {
             QueryResponse::ReadRegister(res) => res.map_err(|err| Error::ErrorMsg { source: err }),
             other => Err(Error::UnexpectedQueryResponse {
                 query,
@@ -163,8 +163,8 @@ impl Client {
     #[instrument(skip(self), level = "debug")]
     pub async fn get_register_entry(&self, address: Address, hash: EntryHash) -> Result<Entry> {
         let query = DataQueryVariant::Register(RegisterQuery::GetEntry { address, hash });
-        let query_result = self.send_query(query.clone()).await?;
-        match query_result.response {
+        let response = self.send_query(query.clone()).await?;
+        match response {
             QueryResponse::GetRegisterEntry(res) => {
                 res.map_err(|err| Error::ErrorMsg { source: err })
             }
@@ -183,8 +183,8 @@ impl Client {
     #[instrument(skip(self), level = "debug")]
     pub async fn get_register_owner(&self, address: Address) -> Result<User> {
         let query = DataQueryVariant::Register(RegisterQuery::GetOwner(address));
-        let query_result = self.send_query(query.clone()).await?;
-        match query_result.response {
+        let response = self.send_query(query.clone()).await?;
+        match response {
             QueryResponse::GetRegisterOwner(res) => {
                 res.map_err(|err| Error::ErrorMsg { source: err })
             }
@@ -207,8 +207,8 @@ impl Client {
         user: User,
     ) -> Result<Permissions> {
         let query = DataQueryVariant::Register(RegisterQuery::GetUserPermissions { address, user });
-        let query_result = self.send_query(query.clone()).await?;
-        match query_result.response {
+        let response = self.send_query(query.clone()).await?;
+        match response {
             QueryResponse::GetRegisterUserPermissions(res) => {
                 res.map_err(|err| Error::ErrorMsg { source: err })
             }
@@ -223,8 +223,8 @@ impl Client {
     #[instrument(skip(self), level = "debug")]
     pub async fn get_register_policy(&self, address: Address) -> Result<Policy> {
         let query = DataQueryVariant::Register(RegisterQuery::GetPolicy(address));
-        let query_result = self.send_query(query.clone()).await?;
-        match query_result.response {
+        let response = self.send_query(query.clone()).await?;
+        match response {
             QueryResponse::GetRegisterPolicy(res) => {
                 res.map_err(|err| Error::ErrorMsg { source: err })
             }

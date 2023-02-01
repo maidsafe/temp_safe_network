@@ -109,8 +109,8 @@ impl Client {
     pub async fn spent_proof_shares(&self, key_image: KeyImage) -> Result<Vec<SpentProofShare>> {
         let address = SpentbookAddress::new(XorName::from_content(&key_image.to_bytes()));
         let query = DataQueryVariant::Spentbook(SpentbookQuery::SpentProofShares(address));
-        let query_result = self.send_query(query.clone()).await?;
-        match query_result.response {
+        let response = self.send_query(query.clone()).await?;
+        match response {
             QueryResponse::SpentProofShares(res) => {
                 res.map_err(|err| Error::ErrorMsg { source: err })
             }
