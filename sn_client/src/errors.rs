@@ -331,6 +331,6 @@ pub enum DataReplicasCheckError {
         /// Query sent to data replicas
         query: DataQueryVariant,
         /// List of responses received with their corresponding replica/Adult index
-        responses: Vec<(crate::sessions::QueryResult, usize)>,
+        responses: Vec<(QueryResponse, usize)>,
     },
 }

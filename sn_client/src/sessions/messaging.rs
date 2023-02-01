@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{MsgResponse, QueryResult, Session};
+use super::{MsgResponse, Session};
 use crate::{Error, Result};
 
 use sn_interface::{
@@ -323,7 +323,7 @@ impl Session {
         auth: ClientAuth,
         payload: Bytes,
         dst_section_info: Option<(bls::PublicKey, Vec<Peer>)>,
-    ) -> Result<QueryResult> {
+    ) -> Result<QueryResponse> {
         let endpoint = self.endpoint.clone();
 
         let chunk_addr = if let DataQueryVariant::GetChunk(address) = query.variant {
@@ -378,7 +378,7 @@ impl Session {
         elders: Vec<Peer>,
         chunk_addr: Option<ChunkAddress>,
         mut send_query_tasks: JoinSet<MsgResponse>,
-    ) -> Result<QueryResult> {
+    ) -> Result<QueryResponse> {
         let mut discarded_responses: usize = 0;
         let mut error_response = None;
         let mut valid_response = None;
@@ -485,12 +485,12 @@ impl Session {
         // if any are valid, lets return it
         if let Some(response) = valid_response {
             debug!("Valid response in!!!: {response:?}");
-            return Ok(QueryResult { response });
+            return Ok(response);
             // otherwise, if we've got an error in
             // we can return that too
         } else if let Some(response) = error_response {
             if discarded_responses > elders_len / 2 {
-                return Ok(QueryResult { response });
+                return Ok(response);
             }
         }
 
