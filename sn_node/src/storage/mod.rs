@@ -23,7 +23,7 @@ use registers::RegisterStorage;
 use sn_dbc::SpentProofShare;
 use sn_interface::{
     messaging::{
-        data::{DataQueryVariant, Error as MessagingError, RegisterQuery},
+        data::{DataQuery, Error as MessagingError, RegisterQuery},
         system::NodeQueryResponse,
     },
     types::{
@@ -121,15 +121,11 @@ impl DataStorage {
     }
 
     // Query the local store and return NodeQueryResponse
-    pub(crate) async fn query(
-        &self,
-        query: &DataQueryVariant,
-        requester: User,
-    ) -> NodeQueryResponse {
+    pub(crate) async fn query(&self, query: &DataQuery, requester: User) -> NodeQueryResponse {
         match query {
-            DataQueryVariant::GetChunk(addr) => self.chunks.get(addr).await,
-            DataQueryVariant::Register(read) => self.registers.read(read, requester).await,
-            DataQueryVariant::Spentbook(read) => {
+            DataQuery::GetChunk(addr) => self.chunks.get(addr).await,
+            DataQuery::Register(read) => self.registers.read(read, requester).await,
+            DataQuery::Spentbook(read) => {
                 // TODO: this is temporary till spentbook native data type is implemented,
                 // we read from the Register where we store the spentbook data
                 let reg_addr = RegisterAddress::new(read.dst_name(), SPENTBOOK_TYPE_TAG);
@@ -267,7 +263,7 @@ mod tests {
     use sn_interface::{
         init_logger,
         messaging::{
-            data::{CreateRegister, DataQueryVariant, SignedRegisterCreate},
+            data::{CreateRegister, DataQuery, SignedRegisterCreate},
             system::NodeQueryResponse,
         },
         test_utils::TestKeys,
@@ -324,7 +320,7 @@ mod tests {
         assert_eq!(replicated_data, fetched_data);
 
         // Test client fetch
-        let query = DataQueryVariant::GetChunk(*chunk.address());
+        let query = DataQuery::GetChunk(*chunk.address());
         let user = User::Anyone;
         let query_response = storage.query(&query, user).await;
 
@@ -534,7 +530,7 @@ mod tests {
                     // +1 for a chance to get random xor_name
                     let key = get_xor_name(&model, idx % (model.len() + 1));
                     let addr = ChunkAddress(key);
-                    let query = DataQueryVariant::GetChunk(addr);
+                    let query = DataQuery::GetChunk(addr);
                     let user = User::Anyone;
                     let stored_res = runtime.block_on(storage.query(&query, user));
                     let model_res = model.get(&key);

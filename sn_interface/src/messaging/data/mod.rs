@@ -17,7 +17,7 @@ mod spentbook;
 pub use self::{
     cmd::DataCmd,
     errors::{Error, Result},
-    query::{DataQuery, DataQueryVariant},
+    query::DataQuery,
     register::{
         CreateRegister, EditRegister, RegisterCmd, RegisterQuery, SignedRegisterCreate,
         SignedRegisterEdit,
@@ -138,7 +138,7 @@ pub enum QueryResponse {
     //
     /// Response to [`GetChunk`]
     ///
-    /// [`GetChunk`]: crate::messaging::data::DataQueryVariant::GetChunk
+    /// [`GetChunk`]: crate::messaging::data::DataQuery::GetChunk
     GetChunk(Result<Chunk>),
     //
     // ===== Register Data =====

@@ -210,7 +210,7 @@ mod tests {
 
     use sn_interface::{
         messaging::{
-            data::{ClientMsg, DataQuery, DataQueryVariant},
+            data::{ClientMsg, DataQuery},
             ClientAuth, Dst, MsgId, MsgKind,
         },
         types::{ChunkAddress, Keypair, Peer},
@@ -377,11 +377,7 @@ mod tests {
     fn new_test_msg(dst: Dst) -> Result<WireMsg> {
         let src_keypair = Keypair::new_ed25519();
 
-        let query = DataQueryVariant::GetChunk(ChunkAddress(xor_name::rand::random()));
-        let query = DataQuery {
-            node_index: 0,
-            variant: query,
-        };
+        let query = DataQuery::GetChunk(ChunkAddress(xor_name::rand::random()));
         let query = ClientMsg::Query(query);
         let payload = WireMsg::serialize_msg_payload(&query)?;
 

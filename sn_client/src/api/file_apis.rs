@@ -13,7 +13,7 @@ use super::{
 use crate::{api::data::DataMapLevel, Error, Result};
 
 use sn_interface::{
-    messaging::data::{DataCmd, DataQueryVariant, QueryResponse},
+    messaging::data::{DataCmd, DataQuery, QueryResponse},
     types::{Chunk, ChunkAddress},
 };
 
@@ -126,7 +126,7 @@ impl Client {
             return Ok(chunk.clone());
         }
 
-        let query = DataQueryVariant::GetChunk(ChunkAddress(*name));
+        let query = DataQuery::GetChunk(ChunkAddress(*name));
         let response = self.send_query(query.clone()).await?;
 
         let chunk: Chunk = match response {
@@ -372,7 +372,7 @@ impl Client {
         };
         let mut found_chunk = None;
 
-        let query = DataQueryVariant::GetChunk(ChunkAddress(name));
+        let query = DataQuery::GetChunk(ChunkAddress(name));
         let results = self.send_query_to_replicas(query.clone(), replicas).await?;
         for (replica_index, res) in results {
             let outcome = res.map(|response| match response {

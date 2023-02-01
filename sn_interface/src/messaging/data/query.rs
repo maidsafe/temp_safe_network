@@ -11,15 +11,6 @@ use crate::types::{ChunkAddress, DataAddress, SpentbookAddress};
 use serde::{Deserialize, Serialize};
 use xor_name::XorName;
 
-/// A query for requesting data at a particular node.
-#[derive(Hash, Eq, PartialEq, PartialOrd, Clone, Serialize, Deserialize, Debug)]
-pub struct DataQuery {
-    /// The actual query, e.g. retrieving a Chunk or Register
-    pub variant: DataQueryVariant,
-    /// nth closest node (XOR distance) to query for data
-    pub node_index: usize,
-}
-
 /// Data queries - retrieving data and inspecting their structure.
 ///
 /// See the [`types`] module documentation for more details of the types supported by the Safe
@@ -28,7 +19,7 @@ pub struct DataQuery {
 /// [`types`]: crate::types
 #[allow(clippy::large_enum_variant)]
 #[derive(Hash, Eq, PartialEq, PartialOrd, Clone, Serialize, Deserialize, Debug)]
-pub enum DataQueryVariant {
+pub enum DataQuery {
     /// Retrieve a [`Chunk`] at the given address.
     ///
     /// This should eventually lead to a [`GetChunk`] response.
@@ -44,25 +35,23 @@ pub enum DataQueryVariant {
     Spentbook(SpentbookQuery),
 }
 
-impl DataQueryVariant {
+impl DataQuery {
     /// Creates a Response containing an error, with the Response variant corresponding to the
-    /// Request variant.
+    /// Request.
     pub fn to_error_response(&self, error: Error) -> QueryResponse {
-        use DataQueryVariant::*;
         match self {
-            GetChunk(_) => QueryResponse::GetChunk(Err(error)),
-            Register(q) => q.to_error_response(error),
-            Spentbook(q) => q.to_error_response(error),
+            Self::GetChunk(_) => QueryResponse::GetChunk(Err(error)),
+            Self::Register(q) => q.to_error_response(error),
+            Self::Spentbook(q) => q.to_error_response(error),
         }
     }
 
     /// Returns the xorname of the data destination for `request`.
     pub fn dst_name(&self) -> XorName {
-        use DataQueryVariant::*;
         match self {
-            GetChunk(address) => *address.name(),
-            Register(q) => q.dst_name(),
-            Spentbook(q) => q.dst_name(),
+            Self::GetChunk(address) => *address.name(),
+            Self::Register(q) => q.dst_name(),
+            Self::Spentbook(q) => q.dst_name(),
         }
     }
 

@@ -13,13 +13,13 @@ use crate::{Error, Result};
 use qp2p::{RecvStream, UsrMsgBytes};
 use sn_interface::{
     messaging::{
-        data::{ClientDataResponse, ClientMsg},
-        AuthorityProof, ClientAuth, Dst, MsgId, MsgKind, MsgType, WireMsg,
+        data::ClientDataResponse, AuthorityProof, ClientAuth, Dst, MsgId, MsgKind, MsgType, WireMsg,
     },
     network_knowledge::SectionTreeUpdate,
     types::{log_markers::LogMarker, Peer},
 };
 
+use bytes::Bytes;
 use itertools::Itertools;
 
 // Maximum number of times we'll re-send a msg upon receiving an AE response for it
@@ -194,7 +194,7 @@ impl Session {
         self.update_network_knowledge(section_tree_update, src_peer)
             .await;
 
-        let (msg_id, elders, client_msg, dst, auth) = self
+        let (msg_id, elders, query_index, payload, dst, auth) = self
             .new_target_elders(src_peer, bounced_msg, correlation_id)
             .await?;
 
@@ -210,13 +210,8 @@ impl Session {
         // deterministically sent to closest elder based upon the initial sender index
         let target_elder = ordered_elders.get(src_peer_index);
 
-        let query_index = match &client_msg {
-            ClientMsg::Query(msg) => Some(msg.node_index),
-            _ => None,
-        };
         // there should always be one
         if let Some(elder) = target_elder {
-            let payload = WireMsg::serialize_msg_payload(&client_msg)?;
             let wire_msg = WireMsg::new_msg(
                 msg_id,
                 payload,
@@ -291,8 +286,22 @@ impl Session {
         src_peer: Peer,
         bounced_msg: UsrMsgBytes,
         correlation_id: MsgId,
-    ) -> Result<(MsgId, Vec<Peer>, ClientMsg, Dst, AuthorityProof<ClientAuth>), Error> {
-        let (msg_id, client_msg, bounced_msg_dst, auth) = match WireMsg::deserialize(bounced_msg)? {
+    ) -> Result<
+        (
+            MsgId,
+            Vec<Peer>,
+            Option<usize>,
+            Bytes,
+            Dst,
+            AuthorityProof<ClientAuth>,
+        ),
+        Error,
+    > {
+        let wire_msg = WireMsg::from(bounced_msg)?;
+        let msg_kind = wire_msg.kind();
+        let msg_type = wire_msg.into_msg()?;
+        let query_index = *msg_kind.query_index();
+        let (msg_id, client_msg, bounced_msg_dst, auth) = match msg_type {
             MsgType::Client {
                 msg_id,
                 msg,
@@ -336,7 +345,14 @@ impl Session {
                 "Final target elders for resending {msg_id:?}: {client_msg:?} msg \
                 are {target_elders:?}"
             );
-            Ok((msg_id, target_elders, client_msg, dst, auth))
+            Ok((
+                msg_id,
+                target_elders,
+                query_index,
+                wire_msg.payload,
+                dst,
+                auth,
+            ))
         }
     }
 }

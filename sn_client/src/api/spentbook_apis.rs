@@ -13,8 +13,7 @@ use crate::{Error, Result};
 use sn_dbc::{KeyImage, RingCtTransaction, SpentProof, SpentProofShare};
 use sn_interface::{
     messaging::data::{
-        DataCmd, DataQueryVariant, Error as NetworkDataError, QueryResponse, SpentbookCmd,
-        SpentbookQuery,
+        DataCmd, DataQuery, Error as NetworkDataError, QueryResponse, SpentbookCmd, SpentbookQuery,
     },
     types::SpentbookAddress,
 };
@@ -108,7 +107,7 @@ impl Client {
     #[instrument(skip(self), level = "debug")]
     pub async fn spent_proof_shares(&self, key_image: KeyImage) -> Result<Vec<SpentProofShare>> {
         let address = SpentbookAddress::new(XorName::from_content(&key_image.to_bytes()));
-        let query = DataQueryVariant::Spentbook(SpentbookQuery::SpentProofShares(address));
+        let query = DataQuery::Spentbook(SpentbookQuery::SpentProofShares(address));
         let response = self.send_query(query.clone()).await?;
         match response {
             QueryResponse::SpentProofShares(res) => {

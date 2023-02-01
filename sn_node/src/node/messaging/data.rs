@@ -95,8 +95,8 @@ impl MyNode {
         data: ReplicatedData,
         context: &NodeContext,
         msg_id: MsgId,
-        origin: Peer,
-        send_stream: SendStream,
+        source_client: Peer,
+        client_stream: SendStream,
     ) -> Result<Vec<Cmd>> {
         debug!("{msg_id:?} Forwarding on RegisterCmd for Spentbook msg");
         let name = *data.address().name();
@@ -109,21 +109,20 @@ impl MyNode {
         let (kind, payload) = MyNode::serialize_node_msg(context.name, &node_msg)?;
         let wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
 
-        // return Ok(vec![Cmd::Send])
         let targets = MyNode::target_data_holders(context, name, None);
         debug!(
             "{msg_id:?} Forwarding on RegisterCmd for Spentbook msg to data holders: {targets:?}"
         );
 
         let context = context.clone();
-        MyNode::send_msg_await_response_and_send_to_client(
+
+        Ok(vec![Cmd::SendMsgAwaitResponseAndRespondToClient {
             wire_msg,
             context,
             targets,
-            send_stream,
-            origin,
-        )
-        .await
+            client_stream,
+            source_client,
+        }])
     }
 
     /// Used to fetch the list of holders for given name of data.

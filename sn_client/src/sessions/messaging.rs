@@ -11,7 +11,7 @@ use crate::{Error, Result};
 
 use sn_interface::{
     messaging::{
-        data::{DataQuery, DataQueryVariant, QueryResponse},
+        data::{DataQuery, QueryResponse},
         ClientAuth, Dst, MsgId, MsgKind, WireMsg,
     },
     network_knowledge::supermajority,
@@ -323,19 +323,20 @@ impl Session {
     pub(crate) async fn send_query(
         &self,
         query: DataQuery,
+        query_node_index: usize,
         auth: ClientAuth,
         payload: Bytes,
         dst_section_info: Option<(bls::PublicKey, Vec<Peer>)>,
     ) -> Result<QueryResponse> {
         let endpoint = self.endpoint.clone();
 
-        let chunk_addr = if let DataQueryVariant::GetChunk(address) = query.variant {
+        let chunk_addr = if let DataQuery::GetChunk(address) = query {
             Some(address)
         } else {
             None
         };
 
-        let dst = query.variant.dst_name();
+        let dst = query.dst_name();
 
         let (section_pk, elders) = if let Some(section_info) = dst_section_info {
             section_info
@@ -359,8 +360,7 @@ impl Session {
         let kind = MsgKind::Client {
             auth,
             is_spend: false,
-            // TODO: remove this from DataQuery
-            query_index: Some(query.node_index),
+            query_index: Some(query_node_index),
         };
         let wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
 

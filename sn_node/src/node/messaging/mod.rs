@@ -101,12 +101,6 @@ impl MyNode {
             }
         }
 
-        debug!(
-            "{msg_id:?} Members.... dst: {:?}: us: {:?}",
-            wire_msg.dst().name,
-            context.name
-        );
-
         // if it's not directly for us, but is a node msg, it's perhaps for the section, and so we handle it as normal
         if !is_for_us {
             if let MsgKind::Client { .. } = msg_kind {

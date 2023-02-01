@@ -61,4 +61,11 @@ impl MsgKind {
             _ => false,
         }
     }
+    /// return query index
+    pub fn query_index(&self) -> &Option<usize> {
+        match self {
+            Self::Client { query_index, .. } => query_index,
+            _ => &None,
+        }
+    }
 }

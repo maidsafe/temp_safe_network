@@ -26,7 +26,7 @@ use crate::{
 
 use sn_dbc::Owner;
 use sn_interface::{
-    messaging::data::{DataQueryVariant, RegisterQuery},
+    messaging::data::{DataQuery, RegisterQuery},
     network_knowledge::SectionTree,
     types::{Chunk, Keypair, PublicKey, RegisterAddress},
 };
@@ -79,7 +79,7 @@ impl Client {
         // trigger the AE flows.
 
         // Generate a random query to send a dummy message
-        let query = DataQueryVariant::Register(RegisterQuery::Get(RegisterAddress {
+        let query = DataQuery::Register(RegisterQuery::Get(RegisterAddress {
             name: xor_name::rand::random(),
             tag: 1,
         }));

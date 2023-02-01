@@ -17,8 +17,8 @@ use sn_dbc::{
 use sn_interface::{
     messaging::{
         data::{
-            ClientDataResponse, ClientMsg, DataCmd, DataQueryVariant, EditRegister,
-            SignedRegisterEdit, SpentbookCmd,
+            ClientDataResponse, ClientMsg, DataCmd, DataQuery, EditRegister, SignedRegisterEdit,
+            SpentbookCmd,
         },
         AuthorityProof, ClientAuth, MsgId,
     },
@@ -62,7 +62,7 @@ impl MyNode {
     #[allow(clippy::too_many_arguments)]
     pub(crate) async fn handle_data_query_where_stored(
         context: NodeContext,
-        query: &DataQueryVariant,
+        query: &DataQuery,
         auth: ClientAuth,
         source_client: Peer,
         msg_id: MsgId,
@@ -109,7 +109,7 @@ impl MyNode {
             }
             ClientMsg::Query(query) => Ok(MyNode::handle_data_query_where_stored(
                 context,
-                &query.variant,
+                &query,
                 auth.into_inner(),
                 origin,
                 msg_id,
