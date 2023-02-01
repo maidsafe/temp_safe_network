@@ -139,32 +139,6 @@ impl Config {
             ));
         }
 
-        // if let Some(local_addr) = self.local_addr {
-        //     if local_addr.ip().is_loopback() && self.public_addr.is_some() {
-        //         return Err(Error::Configuration(
-        //             "Cannot specify --public-addr when --local-addr uses a loopback IP. \
-        //             When local-addr uses a loopback IP, the node will never be reachable publicly. \
-        //             You can drop public-addr if this is a local-only node, or change local-addr to \
-        //             a public or unspecified IP."
-        //                 .to_string(),
-        //         ));
-        //     }
-        // }
-
-        // let local_ip_unspecified = self
-        //     .local_addr
-        //     .map(|addr| addr.ip().is_unspecified())
-        //     .unwrap_or(true);
-        // if local_ip_unspecified && self.first && self.public_addr.is_none() {
-        //     return Err(Error::Configuration(
-        //         "Must specify public address for --first node. \
-        //         The first node cannot query its public address from peers, so one must be \
-        //         specifed. This can be specified with --public-addr, or by setting a concrete IP \
-        //         for --local-addr."
-        //             .to_string(),
-        //     ));
-        // }
-
         Ok(())
     }
 
