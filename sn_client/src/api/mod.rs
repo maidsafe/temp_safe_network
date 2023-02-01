@@ -89,7 +89,7 @@ impl Client {
         loop {
             // Send the dummy message to probe the network for it's infrastructure details.
             match self.send_query_without_retry(query.clone()).await {
-                Ok(result) if result.response.is_data_not_found() => {
+                Ok(response) if response.is_data_not_found() => {
                     // A data-not-found response means it comes from the right set of Elders,
                     // any AE retries should have taken place as well.
                     let network_knowledge = self.session.network.read().await;
