@@ -389,6 +389,7 @@ impl Session {
     ) -> Result<QueryResponse> {
         let mut discarded_responses: usize = 0;
         let mut error_response = None;
+        let mut last_error_response = None;
         let mut valid_response = None;
         let elders_len = elders.len();
 
@@ -402,6 +403,7 @@ impl Session {
                 }
                 Ok(MsgResponse::Failure(src, error)) => {
                     debug!("Failure occurred with msg {msg_id:?} from {src:?}: {error:?}");
+                    last_error_response = Some(error);
                     discarded_responses += 1;
                     continue;
                 }
@@ -502,10 +504,14 @@ impl Session {
             }
         }
 
-        Err(Error::NoResponse {
-            msg_id,
-            peers: elders,
-        })
+        if let Some(error) = last_error_response {
+            Err(error)
+        } else {
+            Err(Error::NoResponse {
+                msg_id,
+                peers: elders,
+            })
+        }
     }
 
     /// Get DataSection elders details. Resort to own section if DataSection is not available.

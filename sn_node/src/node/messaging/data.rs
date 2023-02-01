@@ -11,11 +11,14 @@ use crate::node::{
 };
 use crate::storage::{Error as StorageError, StorageLevel};
 
-use sn_interface::messaging::{MsgId, MsgKind, WireMsg};
 use sn_interface::{
     data_copy_count,
-    messaging::system::{NodeDataCmd, NodeEvent, NodeMsg},
-    types::{log_markers::LogMarker, Keypair, Peer, PublicKey, ReplicatedData},
+    messaging::{
+        data::ClientDataResponse,
+        system::{NodeDataCmd, NodeEvent, NodeMsg},
+        MsgId, MsgKind, WireMsg,
+    },
+    types::{log_markers::LogMarker, DataError, Keypair, Peer, PublicKey, ReplicatedData},
 };
 
 use qp2p::SendStream;
@@ -33,6 +36,7 @@ impl MyNode {
         source_client: Peer,
         client_stream: SendStream,
     ) -> Cmd {
+        let msg_id = wire_msg.msg_id();
         // We accept that we might be sending a WireMsg to ourselves.
         // The extra load is not that big. But we can optimize this later if necessary.
 
@@ -52,6 +56,53 @@ impl MyNode {
         };
 
         let targets = Self::target_data_holders(&context, target_addr, query_index);
+
+        // make sure the expected replication factor is achieved
+        if query_index.is_none() && data_copy_count() > targets.len() {
+            error!(
+                "InsufficientNodeCount for storing data reliably for {msg_id:?}, {:?}",
+                targets.len()
+            );
+            let error = DataError::InsufficientNodeCount {
+                prefix: context.network_knowledge.prefix(),
+                expected: data_copy_count() as u8,
+                found: targets.len() as u8,
+            };
+
+            let data_response = ClientDataResponse::NetworkIssue(error);
+
+            return MyNode::send_cmd_error_response_over_stream(
+                context,
+                data_response,
+                msg_id,
+                client_stream,
+                source_client,
+            );
+        }
+
+        if let Some(index) = query_index {
+            // could not find our desired index
+            if targets.is_empty() {
+                error!(
+                    "InsufficientNodeCount for querying reliably for {msg_id:?} index: {index:?}"
+                );
+                let error = DataError::InsufficientNodeCount {
+                    prefix: context.network_knowledge.prefix(),
+                    expected: index as u8 + 1, // plus one here as we're 0 index
+                    found: context.network_knowledge.members().len() as u8,
+                };
+
+                let data_response = ClientDataResponse::NetworkIssue(error);
+
+                return MyNode::send_cmd_error_response_over_stream(
+                    context,
+                    data_response,
+                    msg_id,
+                    client_stream,
+                    source_client,
+                );
+            }
+        }
 
         Cmd::SendMsgAwaitResponseAndRespondToClient {
             wire_msg,

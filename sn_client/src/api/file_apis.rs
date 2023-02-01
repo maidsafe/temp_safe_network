@@ -374,18 +374,22 @@ impl Client {
 
         let query = DataQuery::GetChunk(ChunkAddress(name));
         let results = self.send_query_to_replicas(query.clone(), replicas).await?;
+
         for (replica_index, res) in results {
-            let outcome = res.map(|response| match response {
-                QueryResponse::GetChunk(Ok(chunk)) => {
-                    found_chunk = Some(chunk);
-                    Ok(())
-                }
-                QueryResponse::GetChunk(Err(err)) => Err(Error::ErrorMsg { source: err }),
-                other => Err(Error::UnexpectedQueryResponse {
-                    query: query.clone(),
-                    response: other,
-                }),
-            })?;
+            let outcome = match res {
+                Ok(response) => match response {
+                    QueryResponse::GetChunk(Ok(chunk)) => {
+                        found_chunk = Some(chunk);
+                        Ok(())
+                    }
+                    QueryResponse::GetChunk(Err(err)) => Err(Error::ErrorMsg { source: err }),
+                    other => Err(Error::UnexpectedQueryResponse {
+                        query: query.clone(),
+                        response: other,
+                    }),
+                },
+                Err(error) => Err(error),
+            };
 
             let _ = chunk_replicas.outcomes.insert(replica_index, outcome);
         }

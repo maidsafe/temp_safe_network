@@ -78,6 +78,8 @@ impl Display for ClientMsg {
 pub enum ClientDataResponse {
     /// There was an error in send or receipt of message to storage nodes
     CommunicationIssues(Error),
+    /// Network Issue
+    NetworkIssue(Error),
     /// The response to a query, containing the query result.
     QueryResponse {
         /// The result of the query.
@@ -124,6 +126,9 @@ impl Display for ClientDataResponse {
             }
             Self::CommunicationIssues(error) => {
                 write!(f, "ClientDataResponse::CommunicationIssues({error:?})")
+            }
+            Self::NetworkIssue(error) => {
+                write!(f, "ClientDataResponse::NetworkIssue({error:?})")
             }
         }
     }

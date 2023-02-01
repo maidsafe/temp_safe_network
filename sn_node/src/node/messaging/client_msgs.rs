@@ -37,17 +37,11 @@ impl MyNode {
     /// Forms a `CmdError` msg to send back to the client over the response stream
     pub(crate) fn send_cmd_error_response_over_stream(
         context: NodeContext,
-        cmd: DataCmd,
-        error: Error,
+        msg: ClientDataResponse,
         correlation_id: MsgId,
         send_stream: SendStream,
         source_client: Peer,
     ) -> Cmd {
-        let msg = ClientDataResponse::CmdResponse {
-            response: cmd.to_error_response(error.into()),
-            correlation_id,
-        };
-
         debug!("{correlation_id:?} sending cmd response error back to client");
         Cmd::SendClientResponse {
             msg,
@@ -198,11 +192,14 @@ impl MyNode {
                 MyNode::store_data_and_respond(context, data, send_stream, origin, msg_id).await
             }
             Err(error) => {
-                debug!("Will send error response back to client");
+                let data_response = ClientDataResponse::CmdResponse {
+                    response: cmd.to_error_response(error.into()),
+                    correlation_id: msg_id,
+                };
+
                 let cmd = MyNode::send_cmd_error_response_over_stream(
                     context.clone(),
-                    cmd,
-                    error,
+                    data_response,
                     msg_id,
                     send_stream,
                     origin,
