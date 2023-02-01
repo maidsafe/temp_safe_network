@@ -85,7 +85,7 @@ impl Session {
         debug!(
             "Sending cmd with {msg_id:?}, dst: {dst_address:?}, from {}, \
             to {elders_len} Elders: {elders:?}",
-            endpoint.public_addr(),
+            endpoint.local_addr(),
         );
 
         let dst = Dst {
@@ -98,7 +98,7 @@ impl Session {
         let log_line = |elders_len_s: String| {
             debug!(
                 "Sending cmd w/id {msg_id:?}, from {}, to {elders_len_s} w/ dst: {dst_address:?}",
-                endpoint.public_addr(),
+                endpoint.local_addr(),
             )
         };
 
@@ -346,7 +346,7 @@ impl Session {
         debug!(
             "Sending query message {msg_id:?}, from {}, {query:?} to \
             the {elders_len} Elders closest to data name: {elders:?}",
-            endpoint.public_addr(),
+            endpoint.local_addr(),
         );
 
         let dst = Dst {
@@ -639,7 +639,6 @@ mod tests {
     };
 
     use eyre::Result;
-    use qp2p::Config;
     use std::net::{Ipv4Addr, SocketAddr};
     use xor_name::Prefix;
 
@@ -665,7 +664,6 @@ mod tests {
         assert!(network_contacts.insert_without_chain(sap0));
 
         let session = Session::new(
-            Config::default(),
             SocketAddr::from((Ipv4Addr::UNSPECIFIED, 0)),
             network_contacts,
         )?;

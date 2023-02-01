@@ -83,10 +83,7 @@ impl Client {
             name: xor_name::rand::random(),
             tag: 1,
         }));
-        debug!(
-            "Making initial contact with network. Our public addr: {:?}. Probe msg: {query:?}",
-            self.session.endpoint.public_addr()
-        );
+        debug!("Making initial contact with network. Probe msg: {query:?}");
 
         let mut attempts = 1;
         loop {

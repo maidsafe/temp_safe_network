@@ -91,11 +91,12 @@ impl Comm {
     #[tracing::instrument(skip_all)]
     pub async fn new(
         local_addr: SocketAddr,
-        config: qp2p::Config,
         incoming_msg_pipe: Sender<MsgFromPeer>,
     ) -> Result<Self> {
-        let (our_endpoint, incoming_connections, _) =
-            Endpoint::new_peer(local_addr, Default::default(), config).await?;
+        let (our_endpoint, incoming_connections) = Endpoint::builder()
+            .addr(local_addr)
+            .idle_timeout(70_000)
+            .server()?;
 
         let msg_listener = MsgListener::new(incoming_msg_pipe);
         msg_listener.listen_for_incoming_msgs(incoming_connections);
@@ -108,43 +109,7 @@ impl Comm {
 
     /// The socket address of our endpoint.
     pub fn socket_addr(&self) -> SocketAddr {
-        self.our_endpoint.public_addr()
-    }
-
-    /// Fake function used as replacement for testing only.
-    ///
-    /// NB: Testing this from an external crate will require referencing
-    /// this crate with the feature "test", otherwise this fn will not be called.
-    /// <https://github.com/rust-lang/rust/issues/59168#issuecomment-962214945>
-    #[cfg(any(test, feature = "test"))]
-    pub async fn is_reachable(&self, _peer: &SocketAddr) -> Result<(), Error> {
-        Ok(())
-    }
-
-    /// Tests whether the peer is reachable.
-    ///
-    /// NB: If testing comms from an external crate, this fn will be called instead
-    /// of the intended test fn above, unless referencing this crate with the feature "test".
-    /// <https://github.com/rust-lang/rust/issues/59168#issuecomment-962214945>
-    #[cfg(not(any(test, feature = "test")))]
-    pub async fn is_reachable(&self, peer: &SocketAddr) -> Result<(), Error> {
-        let qp2p_config = qp2p::Config::default();
-
-        let connectivity_endpoint =
-            Endpoint::new_client((self.our_endpoint.local_addr().ip(), 0), qp2p_config)?;
-
-        let result = connectivity_endpoint
-            .is_reachable(peer)
-            .await
-            .map_err(|err| {
-                info!("Peer {peer} is NOT externally reachable: {err:?}");
-                err.into()
-            })
-            .map(|()| {
-                info!("Peer {peer} is externally reachable.");
-            });
-        connectivity_endpoint.close();
-        result
+        self.our_endpoint.local_addr()
     }
 
     /// Closes the endpoint.
@@ -253,7 +218,6 @@ mod tests {
     use assert_matches::assert_matches;
     use eyre::Result;
     use futures::future;
-    use qp2p::Config;
     use std::{net::Ipv4Addr, time::Duration};
     use tokio::{
         net::UdpSocket,
@@ -266,7 +230,7 @@ mod tests {
     #[tokio::test]
     async fn successful_send() -> Result<()> {
         let (tx, _rx) = mpsc::channel(1);
-        let comm = Comm::new(local_addr(), Config::default(), tx).await?;
+        let comm = Comm::new(local_addr(), tx).await?;
 
         let (peer0, mut rx0) = new_peer().await?;
         let (peer1, mut rx1) = new_peer().await?;
@@ -296,16 +260,7 @@ mod tests {
     #[tokio::test]
     async fn failed_send() -> Result<()> {
         let (tx, _rx) = mpsc::channel(1);
-        let comm = Comm::new(
-            local_addr(),
-            Config {
-                // This makes this test faster.
-                idle_timeout: Some(Duration::from_millis(1)),
-                ..Config::default()
-            },
-            tx,
-        )
-        .await?;
+        let comm = Comm::new(local_addr(), tx).await?;
 
         let invalid_peer = get_invalid_peer().await?;
         let invalid_addr = invalid_peer.addr();
@@ -331,11 +286,13 @@ mod tests {
     #[tokio::test]
     async fn send_after_reconnect() -> Result<()> {
         let (tx, _rx) = mpsc::channel(1);
-        let send_comm = Comm::new(local_addr(), Config::default(), tx).await?;
+        let send_comm = Comm::new(local_addr(), tx).await?;
 
-        let (recv_endpoint, mut incoming_connections, _) =
-            Endpoint::new_peer(local_addr(), &[], Config::default()).await?;
-        let recv_addr = recv_endpoint.public_addr();
+        let (recv_endpoint, mut incoming_connections) = Endpoint::builder()
+            .addr(local_addr())
+            .idle_timeout(70_000)
+            .server()?;
+        let recv_addr = recv_endpoint.local_addr();
         let name = xor_name::rand::random();
         let peer = Peer::new(name, recv_addr);
         let msg0 = new_test_msg(dst(peer))?;
@@ -353,7 +310,7 @@ mod tests {
         {
             if let Some((_, mut incoming_msgs)) = incoming_connections.next().await {
                 if let Some(msg) = time::timeout(TIMEOUT, incoming_msgs.next()).await?? {
-                    assert_eq!(WireMsg::from(msg)?, msg0);
+                    assert_eq!(WireMsg::from(msg.0)?, msg0);
                     msg0_received = true;
                 }
                 // connection dropped here
@@ -370,7 +327,7 @@ mod tests {
 
         if let Some((_, mut incoming_msgs)) = incoming_connections.next().await {
             if let Some(msg) = time::timeout(TIMEOUT, incoming_msgs.next()).await?? {
-                assert_eq!(WireMsg::from(msg)?, msg1);
+                assert_eq!(WireMsg::from(msg.0)?, msg1);
                 msg1_received = true;
             }
         }
@@ -383,10 +340,10 @@ mod tests {
     #[tokio::test]
     async fn incoming_connection_lost() -> Result<()> {
         let (tx, mut rx0) = mpsc::channel(1);
-        let comm0 = Comm::new(local_addr(), Config::default(), tx.clone()).await?;
+        let comm0 = Comm::new(local_addr(), tx.clone()).await?;
         let addr0 = comm0.socket_addr();
 
-        let comm1 = Comm::new(local_addr(), Config::default(), tx).await?;
+        let comm1 = Comm::new(local_addr(), tx).await?;
 
         let peer = Peer::new(xor_name::rand::random(), addr0);
         let msg = new_test_msg(dst(peer))?;
@@ -441,16 +398,18 @@ mod tests {
     }
 
     async fn new_peer() -> Result<(Peer, Receiver<UsrMsgBytes>)> {
-        let (endpoint, mut incoming_connections, _) =
-            Endpoint::new_peer(local_addr(), &[], Config::default()).await?;
-        let addr = endpoint.public_addr();
+        let (endpoint, mut incoming_connections) = Endpoint::builder()
+            .addr(local_addr())
+            .idle_timeout(70_000)
+            .server()?;
+        let addr = endpoint.local_addr();
 
         let (tx, rx) = mpsc::channel(1);
 
         let _handle = tokio::task::spawn(async move {
             while let Some((_, mut incoming_messages)) = incoming_connections.next().await {
                 while let Ok(Some(msg)) = incoming_messages.next().await {
-                    let _ = tx.send(msg).await;
+                    let _ = tx.send(msg.0).await;
                 }
             }
         });
