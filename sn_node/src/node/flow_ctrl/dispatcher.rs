@@ -108,19 +108,11 @@ impl Dispatcher {
             }
             Cmd::SendNodeDataResponse {
                 msg,
-                correlation_id,
                 send_stream,
                 context,
                 requesting_peer,
             } => {
-                MyNode::send_node_data_response(
-                    msg,
-                    correlation_id,
-                    send_stream,
-                    context,
-                    requesting_peer,
-                )
-                .await?;
+                MyNode::send_node_data_response(msg, send_stream, context, requesting_peer).await?;
                 Ok(vec![])
             }
             Cmd::TrackNodeIssue { name, issue } => {

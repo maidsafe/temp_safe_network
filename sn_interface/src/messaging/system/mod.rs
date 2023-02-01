@@ -9,7 +9,6 @@
 mod dkg;
 mod join;
 mod node_msgs;
-mod op_id;
 mod section_sig;
 
 use super::{data::CmdResponse, MsgId};
@@ -21,7 +20,6 @@ use crate::SectionAuthorityProvider;
 pub use dkg::DkgSessionId;
 pub use join::{JoinRejectReason, JoinRequest, JoinResponse};
 pub use node_msgs::{NodeDataCmd, NodeDataQuery, NodeEvent, NodeQueryResponse};
-pub use op_id::OperationId;
 pub use section_sig::{SectionSig, SectionSigShare, SectionSigned};
 
 use bls::PublicKey as BlsPublicKey;
@@ -185,8 +183,8 @@ pub enum NodeDataResponse {
     QueryResponse {
         /// The result of the query.
         response: NodeQueryResponse,
-        /// ID of the requested operation.
-        operation_id: OperationId,
+        /// ID of causing ClientMsg::Query.
+        correlation_id: MsgId,
     },
     /// The response will be sent back to the client when the handling on the
     /// receiving Elder has been finished.
@@ -196,6 +194,15 @@ pub enum NodeDataResponse {
         /// ID of causing ClientMsg::Cmd.
         correlation_id: MsgId,
     },
+}
+
+impl NodeDataResponse {
+    pub fn correlation_id(&self) -> &MsgId {
+        match self {
+            NodeDataResponse::QueryResponse { correlation_id, .. }
+            | NodeDataResponse::CmdResponse { correlation_id, .. } => correlation_id,
+        }
+    }
 }
 
 impl Display for NodeDataResponse {

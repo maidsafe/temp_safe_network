@@ -21,7 +21,7 @@ use sn_interface::{
             ClientDataResponse, ClientMsg, DataCmd, DataQueryVariant, EditRegister,
             SignedRegisterEdit, SpentbookCmd,
         },
-        system::{NodeDataResponse, OperationId},
+        system::NodeDataResponse,
         AuthorityProof, ClientAuth, MsgId,
     },
     network_knowledge::{section_keys::build_spent_proof_share, SectionTreeUpdate},
@@ -86,13 +86,12 @@ impl MyNode {
     /// Handle data query
     #[allow(clippy::too_many_arguments)]
     pub(crate) async fn handle_data_query_where_stored(
-        context: NodeContext,
-        operation_id: OperationId,
+        msg_id: MsgId,
         query: &DataQueryVariant,
         auth: ClientAuth,
         requesting_peer: Peer,
-        msg_id: MsgId,
         send_stream: Option<SendStream>,
+        context: NodeContext,
     ) -> Vec<Cmd> {
         let response = context
             .data_storage
@@ -103,12 +102,11 @@ impl MyNode {
             trace!("{msg_id:?} data query response at node is: {response:?}");
             let msg = NodeDataResponse::QueryResponse {
                 response,
-                operation_id,
+                correlation_id: msg_id,
             };
 
             vec![Cmd::SendNodeDataResponse {
                 msg,
-                correlation_id: msg_id,
                 send_stream,
                 context,
                 requesting_peer,

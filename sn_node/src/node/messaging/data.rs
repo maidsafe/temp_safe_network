@@ -16,7 +16,7 @@ use sn_interface::{
     data_copy_count,
     messaging::{
         data::{DataCmd, DataQuery},
-        system::{NodeDataCmd, NodeDataQuery, NodeEvent, NodeMsg, OperationId},
+        system::{NodeDataCmd, NodeDataQuery, NodeEvent, NodeMsg},
         AuthorityProof, ClientAuth, MsgId,
     },
     types::{log_markers::LogMarker, Keypair, Peer, PublicKey, ReplicatedData},
@@ -25,7 +25,6 @@ use sn_interface::{
 use qp2p::SendStream;
 use xor_name::XorName;
 
-use bytes::Bytes;
 use itertools::Itertools;
 use std::collections::BTreeSet;
 use tracing::info;
@@ -98,10 +97,10 @@ impl MyNode {
 
         // We generate the operation id to track the response from the node
         // by using the query msg id, which shall be unique per query.
-        let operation_id = OperationId::from(&Bytes::copy_from_slice(msg_id.as_ref()));
+        // let operation_id = OperationId::from(&Bytes::copy_from_slice(msg_id.as_ref()));
         let address = query.variant.address();
         trace!(
-            "{:?} preparing to query other nodes for data at {address:?} with op_id: {operation_id:?}",
+            "{:?} preparing to query other nodes for data at {address:?} with op_id: {msg_id:?}",
             LogMarker::DataQueryReceviedAtElder,
         );
 
@@ -136,7 +135,6 @@ impl MyNode {
         let msg = NodeMsg::NodeDataQuery(NodeDataQuery {
             query: query.variant,
             auth: auth.into_inner(),
-            operation_id,
         });
 
         let cmd = Cmd::SendMsgAwaitResponseAndRespondToClient {

@@ -119,12 +119,11 @@ impl MyNode {
 
     pub(crate) async fn send_node_data_response(
         msg: NodeDataResponse,
-        correlation_id: MsgId,
         send_stream: SendStream,
         context: NodeContext,
         requesting_peer: Peer,
     ) -> Result<()> {
-        trace!("Sending node response msg for {correlation_id:?}");
+        trace!("Sending data response to msg {:?}..", msg.correlation_id());
         let (kind, payload) = MyNode::serialize_node_data_response(context.name, &msg)?;
         send_msg_on_stream(
             context.network_knowledge.section_key(),
@@ -132,7 +131,7 @@ impl MyNode {
             kind,
             send_stream,
             requesting_peer,
-            correlation_id,
+            *msg.correlation_id(),
         )
         .await
     }
@@ -405,25 +404,28 @@ async fn send_msg_on_stream(
         name: target_peer.name(),
         section_key,
     };
-    let wire_msg = WireMsg::new_msg(correlation_id, payload, kind, dst);
+    let msg_id = MsgId::new();
+    let wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
     let bytes = wire_msg.serialize().map_err(|_| Error::InvalidMessage)?;
 
     let stream_id = send_stream.id();
-    trace!("Sending response {correlation_id:?} to {target_peer:?} over {stream_id}");
+    trace!("Sending response {msg_id:?} of msg {correlation_id:?}, to {target_peer:?} over {stream_id}");
 
     let stream_prio = 10;
     send_stream.set_priority(stream_prio);
-    trace!("Prio set for {correlation_id:?} to {target_peer:?}, over {stream_id}");
+    trace!("Prio set on stream {stream_id}, response {msg_id:?} of msg {correlation_id:?}, to {target_peer:?}");
 
     if let Err(error) = send_stream.send_user_msg(bytes).await {
         error!(
-            "Could not send response {correlation_id:?} to peer {target_peer:?} \
+            "Could not send response {msg_id:?} of msg {correlation_id:?}, to {target_peer:?} \
             over response {stream_id}: {error:?}"
         );
         return Err(error.into());
     }
 
-    trace!("Msg away for {correlation_id:?} to {target_peer:?}, over {stream_id}");
+    trace!(
+        "Sent: Response {msg_id:?} of msg {correlation_id:?} to {target_peer:?}, over {stream_id}."
+    );
 
     // unblock + move finish off thread as it's not strictly related to the sending of the msg.
     let stream_id_clone = stream_id.clone();
@@ -431,10 +433,10 @@ async fn send_msg_on_stream(
         // Attempt to gracefully terminate the stream.
         // If this errors it does _not_ mean our message has not been sent
         let result = send_stream.finish().await;
-        trace!("Response {correlation_id:?} sent to {target_peer:?} over {stream_id_clone}. Stream finished with result: {result:?}");
+        trace!("Response {msg_id:?} of msg {correlation_id:?} sent to {target_peer:?} over {stream_id_clone}. Stream finished with result: {result:?}");
     });
 
-    debug!("Sent the msg {correlation_id:?} to {target_peer:?} over {stream_id}");
+    debug!("Sent the response {msg_id:?} of msg {correlation_id:?} to {target_peer:?} over {stream_id}");
 
     Ok(())
 }

@@ -105,14 +105,14 @@ impl MyNode {
         data: ReplicatedData,
         response_stream: Option<SendStream>,
         target: Peer,
-        original_msg_id: MsgId,
+        correlation_id: MsgId,
     ) -> Result<Vec<Cmd>> {
         let mut cmds = vec![];
         let section_pk = PublicKey::Bls(context.network_knowledge.section_key());
         let node_keypair = Keypair::Ed25519(context.keypair.clone());
         let data_addr = data.address();
 
-        trace!("About to store data from {original_msg_id:?}: {data_addr:?}");
+        trace!("About to store data from {correlation_id:?}: {data_addr:?}");
 
         // This may return a DatabaseFull error... but we should have
         // reported StorageError::NotEnoughSpace well before this
@@ -162,11 +162,10 @@ impl MyNode {
         if let Some(send_stream) = response_stream {
             let msg = NodeDataResponse::CmdResponse {
                 response,
-                correlation_id: original_msg_id,
+                correlation_id,
             };
             cmds.push(Cmd::SendNodeDataResponse {
                 msg,
-                correlation_id: original_msg_id,
                 send_stream,
                 context: context.clone(),
                 requesting_peer: target,
@@ -461,25 +460,17 @@ impl MyNode {
                         .collect(),
                 )
             }
-            NodeMsg::NodeDataQuery(NodeDataQuery {
-                query,
-                auth,
-                operation_id,
-            }) => {
+            NodeMsg::NodeDataQuery(NodeDataQuery { query, auth }) => {
                 // A request from EndUser - via Elders - for locally stored data
-                debug!(
-                    "Handle NodeQuery with msg_id {:?}, operation_id {}",
-                    msg_id, operation_id
-                );
+                debug!("Handle NodeQuery with msg_id {:?}", msg_id);
 
                 let cmds = MyNode::handle_data_query_where_stored(
-                    context,
-                    operation_id,
+                    msg_id,
                     &query,
                     auth,
                     sender,
-                    msg_id,
                     send_stream,
+                    context,
                 )
                 .await;
                 Ok(cmds)

@@ -156,7 +156,6 @@ pub(crate) enum Cmd {
     /// over the given stream.
     SendNodeDataResponse {
         msg: NodeDataResponse,
-        correlation_id: MsgId,
         send_stream: SendStream,
         #[debug(skip)]
         context: NodeContext,
