@@ -5,13 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.73.1 (2023-02-01)
+## v0.73.2 (2023-02-01)
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 1 commit contributed to the release.
+ - 2 commits contributed to the release.
  - 0 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
@@ -22,12 +22,112 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #2052 ([`6ba5453`](https://github.com/maidsafe/safe_network/commit/6ba5453b572431d7dcbd15948de712458bc736dc))
+    - refactor: moves serialize call to where needed - We were serializing before hitting the branch where it was needed. - Also aligns fn name withy doc. The cases when no cmd is generated are the unreachable and invalid msg cases. ([`98dc5e4`](https://github.com/maidsafe/safe_network/commit/98dc5e4efd110fb5d08ad2c58926dad8767619d8))
+</details>
+
+## v0.73.1 (2023-02-01)
+
+### Chore
+
+ - <csr-id-817e20910874ad287ebb1b9bf5071ed452419414/> sn_node-0.73.1
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_node-0.73.1 ([`817e209`](https://github.com/maidsafe/safe_network/commit/817e20910874ad287ebb1b9bf5071ed452419414))
     - Merge #2053 ([`3c7b043`](https://github.com/maidsafe/safe_network/commit/3c7b0434e784e5b7484d55d9d41b19898b941c1b))
+</details>
+
+## v0.73.0 (2023-02-01)
+
+<csr-id-69f8ade1ea8bb3e77c169b17ae21a40370bfab58/>
+<csr-id-839c540cf4c076de6d44a47daa4d139531fc6615/>
+<csr-id-cee5c65a1a099606d5430452995d26edfd1f6bfc/>
+<csr-id-f779144986a6b2b06f550d3a2a4cbc39c64af83d/>
+<csr-id-47e0f87d5ccad33cfa82ef80f3648fe8270acaaa/>
+<csr-id-9ef9a2f2c8711895b62b82d25cb9d208c464cad6/>
+
+### Chore
+
+ - <csr-id-69f8ade1ea8bb3e77c169b17ae21a40370bfab58/> sn_interface-0.17.0/sn_comms-0.2.0/sn_client-0.78.0/sn_node-0.73.0/sn_api-0.76.0/sn_cli-0.69.0
+ - <csr-id-839c540cf4c076de6d44a47daa4d139531fc6615/> clean up comments [skip ci]
+
+### Bug Fixes
+
+ - <csr-id-8ca6e995817c6b8127e4874a6026bd1572b3991b/> config size
+
+### Refactor
+
+ - <csr-id-cee5c65a1a099606d5430452995d26edfd1f6bfc/> leave out reachability check for join
+   This reachability check tries to reply/reach out to the node that could
+   not connect, but we only save incoming connections, so this will not
+   make it out to the node.
+   
+   Also, the reachability check was left out of the last release of qp2p,
+   as the network should not only rely on these reachability checks, but
+   the nodes should be unable to join the network anyway if they're not
+   reachable in the first place.
+ - <csr-id-f779144986a6b2b06f550d3a2a4cbc39c64af83d/> idle_timeout from 10s to 70s
+   This was the timeout before this pull request. 70s was deduced to be a
+   value that gave CI the time to pass many tests. Although this value is
+   not optimal in a real world scenario, as routers might close the holes
+   where the connections rely on, and thus the connections will actually
+   timeout sooner in some cases. An optimal value was previously decided to
+   be 18s, as some routers supposedly close holes after 20s.
+ - <csr-id-47e0f87d5ccad33cfa82ef80f3648fe8270acaaa/> remove passing parameters to qp2p
+   Rely on defaults in qp2p instead, which are sensible. This means the
+   idle timeout from now on will be 10s which is currently the default in
+   quinn too.
+
+### Refactor (BREAKING)
+
+ - <csr-id-9ef9a2f2c8711895b62b82d25cb9d208c464cad6/> implement new qp2p version
+   This introduces quite some changes to the API that hopefully simplifies
+   much of the internals of the node and client.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 8 commits contributed to the release.
+ - 7 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.17.0/sn_comms-0.2.0/sn_client-0.78.0/sn_node-0.73.0/sn_api-0.76.0/sn_cli-0.69.0 ([`69f8ade`](https://github.com/maidsafe/safe_network/commit/69f8ade1ea8bb3e77c169b17ae21a40370bfab58))
+    - Merge #1996 ([`bb7b2db`](https://github.com/maidsafe/safe_network/commit/bb7b2dbcae9c0a67fc0a23c279537df49d88a07a))
+    - clean up comments [skip ci] ([`839c540`](https://github.com/maidsafe/safe_network/commit/839c540cf4c076de6d44a47daa4d139531fc6615))
+    - leave out reachability check for join ([`cee5c65`](https://github.com/maidsafe/safe_network/commit/cee5c65a1a099606d5430452995d26edfd1f6bfc))
+    - idle_timeout from 10s to 70s ([`f779144`](https://github.com/maidsafe/safe_network/commit/f779144986a6b2b06f550d3a2a4cbc39c64af83d))
+    - config size ([`8ca6e99`](https://github.com/maidsafe/safe_network/commit/8ca6e995817c6b8127e4874a6026bd1572b3991b))
+    - remove passing parameters to qp2p ([`47e0f87`](https://github.com/maidsafe/safe_network/commit/47e0f87d5ccad33cfa82ef80f3648fe8270acaaa))
+    - implement new qp2p version ([`9ef9a2f`](https://github.com/maidsafe/safe_network/commit/9ef9a2f2c8711895b62b82d25cb9d208c464cad6))
 </details>
 
 ## v0.72.42 (2023-02-01)
 
 <csr-id-50c69469b488224c7f69de4e728a66594a31380e/>
+<csr-id-9d17c6c99c48046a361fffe30749419a594715f5/>
+<csr-id-58affbd6b7c6cf6450492796867e47a75456d0c0/>
 
 ### Chore
 
@@ -1890,71 +1990,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - allow client tests to be multithreaded ([`52be4b1`](https://github.com/maidsafe/safe_network/commit/52be4b12a07f3851474b713f66c821defd7a29f5))
     - ignore qp2p::SendStream::finish errors ([`89e1e40`](https://github.com/maidsafe/safe_network/commit/89e1e40ed9100b28a1ad5ed196620a6d6415706e))
     - change split detection instead of size ([`38ebca0`](https://github.com/maidsafe/safe_network/commit/38ebca089ed7134a63d9fefbf69f4f791b5858fb))
-</details>
-
-## v0.73.0 (2023-02-01)
-
-### Chore
-
- - <csr-id-69f8ade1ea8bb3e77c169b17ae21a40370bfab58/> sn_interface-0.17.0/sn_comms-0.2.0/sn_client-0.78.0/sn_node-0.73.0/sn_api-0.76.0/sn_cli-0.69.0
- - <csr-id-839c540cf4c076de6d44a47daa4d139531fc6615/> clean up comments [skip ci]
-
-### Bug Fixes
-
- - <csr-id-8ca6e995817c6b8127e4874a6026bd1572b3991b/> config size
-
-### Refactor
-
- - <csr-id-cee5c65a1a099606d5430452995d26edfd1f6bfc/> leave out reachability check for join
-   This reachability check tries to reply/reach out to the node that could
-   not connect, but we only save incoming connections, so this will not
-   make it out to the node.
-   
-   Also, the reachability check was left out of the last release of qp2p,
-   as the network should not only rely on these reachability checks, but
-   the nodes should be unable to join the network anyway if they're not
-   reachable in the first place.
- - <csr-id-f779144986a6b2b06f550d3a2a4cbc39c64af83d/> idle_timeout from 10s to 70s
-   This was the timeout before this pull request. 70s was deduced to be a
-   value that gave CI the time to pass many tests. Although this value is
-   not optimal in a real world scenario, as routers might close the holes
-   where the connections rely on, and thus the connections will actually
-   timeout sooner in some cases. An optimal value was previously decided to
-   be 18s, as some routers supposedly close holes after 20s.
- - <csr-id-47e0f87d5ccad33cfa82ef80f3648fe8270acaaa/> remove passing parameters to qp2p
-   Rely on defaults in qp2p instead, which are sensible. This means the
-   idle timeout from now on will be 10s which is currently the default in
-   quinn too.
-
-### Refactor (BREAKING)
-
- - <csr-id-9ef9a2f2c8711895b62b82d25cb9d208c464cad6/> implement new qp2p version
-   This introduces quite some changes to the API that hopefully simplifies
-   much of the internals of the node and client.
-
-### Commit Statistics
-
-<csr-read-only-do-not-edit/>
-
- - 8 commits contributed to the release.
- - 7 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' were seen in commit messages
-
-### Commit Details
-
-<csr-read-only-do-not-edit/>
-
-<details><summary>view details</summary>
-
- * **Uncategorized**
-    - sn_interface-0.17.0/sn_comms-0.2.0/sn_client-0.78.0/sn_node-0.73.0/sn_api-0.76.0/sn_cli-0.69.0 ([`69f8ade`](https://github.com/maidsafe/safe_network/commit/69f8ade1ea8bb3e77c169b17ae21a40370bfab58))
-    - Merge #1996 ([`bb7b2db`](https://github.com/maidsafe/safe_network/commit/bb7b2dbcae9c0a67fc0a23c279537df49d88a07a))
-    - clean up comments [skip ci] ([`839c540`](https://github.com/maidsafe/safe_network/commit/839c540cf4c076de6d44a47daa4d139531fc6615))
-    - leave out reachability check for join ([`cee5c65`](https://github.com/maidsafe/safe_network/commit/cee5c65a1a099606d5430452995d26edfd1f6bfc))
-    - idle_timeout from 10s to 70s ([`f779144`](https://github.com/maidsafe/safe_network/commit/f779144986a6b2b06f550d3a2a4cbc39c64af83d))
-    - config size ([`8ca6e99`](https://github.com/maidsafe/safe_network/commit/8ca6e995817c6b8127e4874a6026bd1572b3991b))
-    - remove passing parameters to qp2p ([`47e0f87`](https://github.com/maidsafe/safe_network/commit/47e0f87d5ccad33cfa82ef80f3648fe8270acaaa))
-    - implement new qp2p version ([`9ef9a2f`](https://github.com/maidsafe/safe_network/commit/9ef9a2f2c8711895b62b82d25cb9d208c464cad6))
 </details>
 
 ## v0.72.0 (2022-12-13)
