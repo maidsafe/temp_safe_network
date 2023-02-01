@@ -7,7 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 mod listeners;
-mod messaging;
+mod send_cmd;
+mod send_query;
 
 use crate::{connections::PeerLinks, Error, Result};
 
