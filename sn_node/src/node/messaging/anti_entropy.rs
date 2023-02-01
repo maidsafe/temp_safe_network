@@ -298,7 +298,7 @@ impl MyNode {
     }
 
     /// Generate and return AE commmands for a given wire_msg and section_tree_update
-    pub(crate) fn perform_any_anti_entropy_cmds(
+    pub(crate) fn generate_anti_entropy_cmds(
         context: &NodeContext,
         wire_msg: &WireMsg,
         origin: Peer,
@@ -307,18 +307,10 @@ impl MyNode {
         send_stream: Option<SendStream>,
     ) -> Result<Vec<Cmd>> {
         let msg_id = wire_msg.msg_id();
-        let original_msg = wire_msg.serialize()?;
-
-        // If we need to log, here's a cmd ready for us...
-        // we may want to log issues with any node repeatedly out of sync here...
-        let track_node_cmd = Cmd::TrackNodeIssue {
-            name: origin.name(),
-            issue: sn_fault_detection::IssueType::NetworkKnowledge,
-        };
-
         match wire_msg.kind() {
             MsgKind::Client(_) => {
                 if let Some(stream) = send_stream {
+                    let original_msg = wire_msg.serialize()?;
                     Ok(vec![MyNode::gen_ae_response_cmd_to_client(
                         msg_id,
                         context.clone(),
@@ -334,6 +326,12 @@ impl MyNode {
                 }
             }
             MsgKind::Node { .. } | MsgKind::NodeDataResponse(_) => {
+                // If we need to log, here's a cmd ready for us...
+                // we may want to log issues with any node repeatedly out of sync here...
+                let track_node_cmd = Cmd::TrackNodeIssue {
+                    name: origin.name(),
+                    issue: sn_fault_detection::IssueType::NetworkKnowledge,
+                };
                 if let Some(stream) = send_stream {
                     debug!("Sending AE response over send_stream for {msg_id:?}");
                     Ok(vec![
@@ -365,7 +363,7 @@ impl MyNode {
                 }
             }
             MsgKind::ClientDataResponse(_) => {
-                // shuld be unreachable at node
+                // should be unreachable at node
                 error!("ClientDataResponse goes out from us. There should be no AE needed here...");
                 // TODO: error
                 Ok(vec![])
@@ -383,7 +381,6 @@ impl MyNode {
         let msg_id = wire_msg.msg_id();
         let dst = wire_msg.dst();
 
-        let bounced_msg = wire_msg.serialize()?;
         // Check if the message has reached the correct section,
         // if not, we'll need to respond with AE
         let our_prefix = network_knowledge.prefix();
@@ -406,6 +403,7 @@ impl MyNode {
                         LogMarker::AeSendRedirect
                     );
                     let section_tree_update = SectionTreeUpdate::new(signed_sap, proof_chain);
+                    let bounced_msg = wire_msg.serialize()?;
                     let kind = AntiEntropyKind::Redirect { bounced_msg };
 
                     Ok(Some((section_tree_update, kind)))
@@ -439,7 +437,8 @@ impl MyNode {
         let section_tree_update =
             generate_ae_section_tree_update(network_knowledge, Some(dst.section_key));
 
-        trace!("Sending AE-Retry message to {sender:?} with {section_tree_update:?}",);
+        trace!("Sending AE-Retry message to {sender:?} with {section_tree_update:?}");
+        let bounced_msg = wire_msg.serialize()?;
         let kind = AntiEntropyKind::Retry { bounced_msg };
 
         Ok(Some((section_tree_update, kind)))
@@ -473,7 +472,7 @@ impl MyNode {
 }
 
 // Private helper to generate a SectionTreeUpdate to update
-// a peer abot our SAP, with proof_chain and members list.
+// a peer about our SAP, with proof_chain and members list.
 fn generate_ae_section_tree_update(
     network_knowledge: &NetworkKnowledge,
     dst_section_key: Option<BlsPublicKey>,
@@ -523,15 +522,13 @@ mod tests {
 
         let dst_section_key = node.network_knowledge().section_key();
         let mut msg = create_msg(&our_prefix, dst_section_key)?;
-        let sender = node.info().peer();
-        let dst = Dst {
+        msg.dst = Dst {
             name: our_prefix.substituted_in(xor_name::rand::random()),
             section_key: dst_section_key,
         };
 
-        msg.dst = dst;
-
         let context = node.context();
+        let sender = node.info().peer();
 
         let ae_msg = MyNode::check_for_entropy(&msg, &context.network_knowledge, &sender)?;
 
@@ -560,18 +557,16 @@ mod tests {
         let other_pk = other_sk.public_key();
 
         let mut wire_msg = create_msg(&other_prefix, other_pk)?;
-        let sender = node.info().peer();
 
+        // set our target dst
         // since it's not aware of the other prefix, it will redirect to self
-        let dst = Dst {
+        wire_msg.dst = Dst {
             section_key: other_pk,
             name: other_sap.prefix().name(),
         };
 
-        // set our target dst
-        wire_msg.dst = dst;
-
         let context = node.context();
+        let sender = node.info().peer();
 
         let (section_tree_update, _kind) =
             MyNode::check_for_entropy(&wire_msg, &context.network_knowledge, &sender)?
@@ -616,23 +611,21 @@ mod tests {
         // get node from the latest section of our_prefix
         let node = env.get_nodes(our_prefix, 1, 0, None).remove(0);
 
-        let context = node.context();
-        let mut msg = create_msg(&our_prefix, node.network_knowledge().section_key())?;
-        let sender = node.info().peer();
-        let dst = Dst {
-            section_key: *node.network_knowledge().genesis_key(),
+        let network_knowledge = node.network_knowledge();
+        let mut msg = create_msg(&our_prefix, network_knowledge.section_key())?;
+        msg.dst = Dst {
+            section_key: *network_knowledge.genesis_key(),
             name: our_prefix.substituted_in(xor_name::rand::random()),
         };
 
-        msg.dst = dst;
-
+        let sender = node.info().peer();
         let (section_tree_update, _kind) =
-            MyNode::check_for_entropy(&msg, &context.network_knowledge, &sender)?
+            MyNode::check_for_entropy(&msg, network_knowledge, &sender)?
                 .context("no entropy found")?;
 
         assert_eq!(
             section_tree_update.signed_sap,
-            node.network_knowledge().signed_sap()
+            network_knowledge.signed_sap()
         );
         assert_eq!(section_tree_update.proof_chain, node.section_chain());
         Ok(())
@@ -653,16 +646,14 @@ mod tests {
         let node = env.get_nodes(our_prefix, 1, 0, None).remove(0);
 
         let mut msg = create_msg(&our_prefix, node.network_knowledge().section_key())?;
-        let sender = node.info().peer();
-
         let bogus_network_gen = bls::SecretKey::random();
-        let dst = Dst {
+        msg.dst = Dst {
             section_key: bogus_network_gen.public_key(),
             name: our_prefix.substituted_in(xor_name::rand::random()),
         };
-        let context = node.context();
 
-        msg.dst = dst;
+        let context = node.context();
+        let sender = node.info().peer();
 
         let (section_tree_update, _kind) =
             MyNode::check_for_entropy(&msg, &context.network_knowledge, &sender)?
@@ -691,9 +682,8 @@ mod tests {
             name: xor_name::rand::random(),
             section_key: SecretKey::random().public_key(),
         };
-        let msg_id = MsgId::new();
         Ok(WireMsg::new_msg(
-            msg_id,
+            MsgId::new(),
             payload,
             MsgKind::Node {
                 name: sender.name(),
