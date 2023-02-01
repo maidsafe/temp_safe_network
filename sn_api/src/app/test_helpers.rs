@@ -222,3 +222,23 @@ pub fn random_nrs_name() -> String {
         .map(char::from)
         .collect()
 }
+
+pub fn extract_error_string(
+    received_errors: Vec<(sn_interface::types::Peer, Vec<sn_client::ErrorMsg>)>,
+) -> anyhow::Result<String> {
+    match received_errors
+        .into_iter()
+        .flat_map(|(_, errors)| errors)
+        .filter_map(|err| {
+            if let sn_client::ErrorMsg::InvalidOperation(error_string) = err {
+                Some(error_string)
+            } else {
+                None
+            }
+        })
+        .last()
+    {
+        Some(error_string) => Ok(error_string),
+        None => anyhow::bail!("We expected an error to be returned"),
+    }
+}

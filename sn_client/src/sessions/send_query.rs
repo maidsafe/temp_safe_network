@@ -283,7 +283,7 @@ impl Session {
                             );
                             // let's listen for responses on the bi-stream
                             break session
-                                .recv_stream_listener(msg_id, peer, peer_index, recv_stream)
+                                .receive_query_response(msg_id, peer, peer_index, recv_stream)
                                 .await;
                         }
                         Err(error) if !connect_now => {

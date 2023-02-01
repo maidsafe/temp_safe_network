@@ -21,3 +21,29 @@ pub use test_client::read_genesis_dbc_from_first_node;
 
 #[cfg(test)]
 pub use sn_interface::init_logger;
+
+#[cfg(test)]
+use eyre::{bail, Result};
+#[cfg(test)]
+use sn_interface::messaging::data::Error as ErrorMsg;
+
+#[cfg(test)]
+pub fn extract_error_string(
+    received_errors: Vec<(sn_interface::types::Peer, Vec<ErrorMsg>)>,
+) -> Result<String> {
+    match received_errors
+        .into_iter()
+        .flat_map(|(_, errors)| errors)
+        .filter_map(|err| {
+            if let ErrorMsg::InvalidOperation(error_string) = err {
+                Some(error_string)
+            } else {
+                None
+            }
+        })
+        .last()
+    {
+        Some(error_string) => Ok(error_string),
+        None => bail!("We expected an error to be returned"),
+    }
+}

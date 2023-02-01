@@ -566,11 +566,11 @@ fn verify_spent_proof_shares_for_tx<'a>(
 mod tests {
     use super::*;
     use crate::app::test_helpers::{
-        get_next_bearer_dbc, new_read_only_safe_instance, new_safe_instance,
+        extract_error_string, get_next_bearer_dbc, new_read_only_safe_instance, new_safe_instance,
         new_safe_instance_with_dbc, new_safe_instance_with_dbc_owner, GENESIS_DBC,
     };
     use anyhow::{anyhow, Result};
-    use sn_client::{Error as ClientError, ErrorMsg};
+    use sn_client::Error as ClientError;
     use sn_dbc::{Error as DbcError, Owner};
 
     #[tokio::test]
@@ -1202,9 +1202,9 @@ mod tests {
         // It shall detect no spent proofs for this TX, thus fail to reissue
         match safe.wallet_reissue(&wallet_xorurl, "0.1", None).await {
             Err(Error::ClientError(ClientError::CmdError {
-                source: ErrorMsg::InvalidOperation(msg),
-                ..
+                received_errors, ..
             })) => {
+                let msg = extract_error_string(received_errors)?;
                 assert_eq!(
                     msg,
                     format!(

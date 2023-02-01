@@ -67,10 +67,26 @@ impl Client {
             let result = self.send_cmd(DataCmd::Spentbook(cmd)).await;
 
             if let Err(Error::CmdError {
-                source: NetworkDataError::SpentProofUnknownSectionKey(unknown_section_key),
-                ..
-            }) = result
+                received_errors, ..
+            }) = &result
             {
+                let unknown_section_key = match received_errors
+                    .iter()
+                    .flat_map(|(_, error)| error)
+                    .filter_map(|err| {
+                        if let NetworkDataError::SpentProofUnknownSectionKey(unknown_section_key) =
+                            err
+                        {
+                            Some(unknown_section_key)
+                        } else {
+                            None
+                        }
+                    })
+                    .last()
+                {
+                    Some(unknown_section_key) => *unknown_section_key,
+                    None => return result,
+                };
                 debug!(
                     "Encountered unknown section key during spend request. \
                         Will obtain updated network knowledge and retry. \
@@ -125,12 +141,12 @@ impl Client {
 #[cfg(test)]
 mod tests {
     use crate::utils::test_utils::{
-        create_test_client_with, init_logger, read_genesis_dbc_from_first_node,
+        create_test_client_with, extract_error_string, init_logger,
+        read_genesis_dbc_from_first_node,
     };
     use crate::Client;
 
     use sn_dbc::{rng, Hash, OwnerOnce, RingCtTransaction, TransactionBuilder};
-    use sn_interface::messaging::data::Error as ErrorMsg;
 
     use eyre::{bail, Result};
     use std::collections::{BTreeSet, HashSet};
@@ -251,15 +267,16 @@ mod tests {
         match result {
             Ok(_) => bail!("We expected an error to be returned"),
             Err(crate::Error::CmdError {
-                source: ErrorMsg::InvalidOperation(error_string),
-                ..
+                received_errors, ..
             }) => {
+                let error_string = extract_error_string(received_errors)?;
                 let correct_error_str =
                     format!("SpentbookError(\"Spent proof signature {invalid_pk:?} is invalid\"");
                 assert!(
                     error_string.contains(&correct_error_str),
                     "A different SpentbookError error was expected for this case. What we got: {error_string:?}"
                 );
+
                 Ok(())
             }
             Err(error) => bail!("We expected a different error to be returned. Actual: {error:?}"),
@@ -368,9 +385,9 @@ mod tests {
         match result {
             Ok(_) => bail!("We expected an error to be returned"),
             Err(crate::Error::CmdError {
-                source: ErrorMsg::InvalidOperation(error_string),
-                ..
+                received_errors, ..
             }) => {
+                let error_string = extract_error_string(received_errors)?;
                 let correct_error_str =
                     "DbcError(CommitmentsInputLenMismatch { current: 0, expected: 1 })";
                 assert!(
@@ -414,9 +431,9 @@ mod tests {
         match result {
             Ok(_) => bail!("We expected an error to be returned"),
             Err(crate::Error::CmdError {
-                source: ErrorMsg::InvalidOperation(error_string),
-                ..
+                received_errors, ..
             }) => {
+                let error_string = extract_error_string(received_errors)?;
                 let correct_error_str =
                     format!("SpentbookError(\"There are no commitments for the given key image {random_key_image:?}\"");
                 assert!(

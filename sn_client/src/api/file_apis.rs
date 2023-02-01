@@ -219,7 +219,7 @@ impl Client {
         for next_batch in all_chunks.chunks(CHUNKS_BATCH_MAX_SIZE) {
             // Connect to all relevant elders before we fire off all msgs...
             self.session
-                .setup_connections_to_relevant_nodes(next_batch.iter().map(|c| *c.name()).collect())
+                .prepare_connections(next_batch.iter().map(|c| *c.name()).collect(), false)
                 .await?;
 
             let tasks = next_batch.iter().cloned().map(|chunk| {

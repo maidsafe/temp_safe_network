@@ -211,12 +211,12 @@ pub enum Error {
         source: ErrorMsg,
     },
     /// Error response received for a client cmd sent to the network
-    #[error("Error received from the network: {source:?} for cmd: {msg_id:?}")]
+    #[error("Errors received from the network: {received_errors:?} for cmd: {msg_id:?}")]
     CmdError {
-        /// The source of an error msg
-        source: ErrorMsg,
         /// MsgId of the cmd sent
         msg_id: MsgId,
+        /// The errors returned from remote nodes (via Elders).
+        received_errors: Vec<(Peer, Vec<ErrorMsg>)>,
     },
     /// Errors occurred when serialising or deserialising msgs
     #[error(transparent)]
