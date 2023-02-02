@@ -8,7 +8,7 @@ license = "GPL-3.0"
 name = "sn_comms"
 readme = "README.md"
 repository = "https://github.com/maidsafe/safe_network"
-version = "0.2.0"
+version = "0.2.1"
 
 [features]
 default = []
@@ -21,7 +21,7 @@ tokio = { version = "1.0.23", features = [ "sync" ] }
 tracing = "~0.1.26"
 xor_name = "~5.0.0"
 qp2p = "~0.35.0"
-sn_interface = { path = "../sn_interface", version = "^0.17.0" }
+sn_interface = { path = "../sn_interface", version = "^0.17.1" }
 thiserror = "1.0.23"
 
 [dev-dependencies]

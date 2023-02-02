@@ -5,14 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.73.2 (2023-02-01)
+## v0.73.3 (2023-02-02)
+
+### Chore
+
+ - <csr-id-e706848522d6c52d6ed5eddf638376996cc947a9/> add clippy check for unused async
+
+### Refactor
+
+ - <csr-id-1540f6e00a5cd6a3803054d3e8386927a0962a1f/> unused async removal
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
- - 0 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 3 commits contributed to the release.
+ - 1 day passed between releases.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -22,11 +31,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #2061 ([`bab8208`](https://github.com/maidsafe/safe_network/commit/bab82087260ac4f1f44e688db2e67ca2387a7175))
+    - add clippy check for unused async ([`e706848`](https://github.com/maidsafe/safe_network/commit/e706848522d6c52d6ed5eddf638376996cc947a9))
+    - unused async removal ([`1540f6e`](https://github.com/maidsafe/safe_network/commit/1540f6e00a5cd6a3803054d3e8386927a0962a1f))
+</details>
+
+## v0.73.2 (2023-02-01)
+
+### Chore
+
+ - <csr-id-2f1c6edded1f40761b55add3af53dc1849ac36a5/> sn_node-0.73.2
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_node-0.73.2 ([`2f1c6ed`](https://github.com/maidsafe/safe_network/commit/2f1c6edded1f40761b55add3af53dc1849ac36a5))
     - Merge #2052 ([`6ba5453`](https://github.com/maidsafe/safe_network/commit/6ba5453b572431d7dcbd15948de712458bc736dc))
     - refactor: moves serialize call to where needed - We were serializing before hitting the branch where it was needed. - Also aligns fn name withy doc. The cases when no cmd is generated are the unreachable and invalid msg cases. ([`98dc5e4`](https://github.com/maidsafe/safe_network/commit/98dc5e4efd110fb5d08ad2c58926dad8767619d8))
 </details>
 
 ## v0.73.1 (2023-02-01)
+
+<csr-id-817e20910874ad287ebb1b9bf5071ed452419414/>
 
 ### Chore
 
