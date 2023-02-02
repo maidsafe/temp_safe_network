@@ -1113,18 +1113,17 @@ needed, as they keypair itself contains the Arcs we need.
     - Self authentication Example
     - Example to demonstrate Storage API
 
-## v0.77.9 (2023-01-27)
+## v0.78.1 (2023-02-01)
 
-### Chore
+### Refactor
 
- - <csr-id-6b923515f0f0cd1b0d1a4ed51d3ca418e41d9916/> fix issues reported by new clippy
+ - <csr-id-55acb9be12fc1b0523e598033f1a86408ddd4581/> remove query result indirection
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
  - 2 commits contributed to the release.
- - 6 days passed between releases.
  - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
@@ -1135,6 +1134,40 @@ needed, as they keypair itself contains the Arcs we need.
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #2058 ([`22b09ec`](https://github.com/maidsafe/safe_network/commit/22b09ec4ab2060d89e0d365a106df9aab2063631))
+    - remove query result indirection ([`55acb9b`](https://github.com/maidsafe/safe_network/commit/55acb9be12fc1b0523e598033f1a86408ddd4581))
+</details>
+
+## v0.77.9 (2023-01-27)
+
+<csr-id-6b923515f0f0cd1b0d1a4ed51d3ca418e41d9916/>
+
+### Chore
+
+ - <csr-id-6b923515f0f0cd1b0d1a4ed51d3ca418e41d9916/> fix issues reported by new clippy
+
+### Chore
+
+ - <csr-id-01ff2ccf45dfc9d45c5ad540144d7a4a640830fc/> sn_interface-0.16.18/sn_comms-0.1.4/sn_client-0.77.9/sn_node-0.72.34/sn_api-0.75.5/sn_cli-0.68.6
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 4 commits contributed to the release.
+ - 6 days passed between releases.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.16.18/sn_comms-0.1.4/sn_client-0.77.9/sn_node-0.72.34/sn_api-0.75.5/sn_cli-0.68.6 ([`01ff2cc`](https://github.com/maidsafe/safe_network/commit/01ff2ccf45dfc9d45c5ad540144d7a4a640830fc))
+    - Merge branch 'main' into chore-comms-remove-unused-async ([`e92dd49`](https://github.com/maidsafe/safe_network/commit/e92dd49f38f9b56c7276e86ba79f7fd8f816af76))
     - Merge branch 'main' into RevertDkgCache ([`24ff625`](https://github.com/maidsafe/safe_network/commit/24ff6257f85922090cfaa5fa83044082d3ef8dab))
     - fix issues reported by new clippy ([`6b92351`](https://github.com/maidsafe/safe_network/commit/6b923515f0f0cd1b0d1a4ed51d3ca418e41d9916))
 </details>
@@ -1144,6 +1177,7 @@ needed, as they keypair itself contains the Arcs we need.
 <csr-id-21af053a5be2317be356e760c2b581c0f870a396/>
 <csr-id-4b1bc4edfad3ad25711a4833181a629746abba19/>
 <csr-id-04525595bc5de39f85a128cfb691644b71a3fb79/>
+<csr-id-783d62461a65eb7c06b0d4f399b97216b6c75519/>
 
 ### Chore
 
@@ -1164,17 +1198,11 @@ needed, as they keypair itself contains the Arcs we need.
  - <csr-id-cf6daa778c1d4278b444f1a61da3513506c14ea9/> expose a public API to query chunks to specific data replicas
    - Exposing also an `sn_api` public API to fetch a file from a specified set of
    data replicas indexes and a `SafeUrl`.
-- Adding `--replicas` arg to CLI `dog` command which allows the user to perform
-   a check on several data replicas for the content being targeted by specifying their indexes.
 
 ### Bug Fixes
 
  - <csr-id-986ef817c053c4b5d8de78d13429fa85244228d9/> retry only once when check-replicas test query fails due to diff responses
    - Run e2e sn_client tests in multi-threaded mode.
-- Retrying a test query only once, and only if the failure was due to receiving
-   different responses from the data replicas, which may be due to a temporary out
-   of sync. We've seen this very occasionally in CI.
-- Wait for stream to be finished to consider msg was sent successfully by sn_client.
 
 ### Commit Statistics
 
@@ -1214,6 +1242,9 @@ needed, as they keypair itself contains the Arcs we need.
     - disabling keep-alive msgs from client to nodes ([`0452559`](https://github.com/maidsafe/safe_network/commit/04525595bc5de39f85a128cfb691644b71a3fb79))
 </details>
 
+<csr-unknown>
+Adding --replicas arg to CLI dog command which allows the user to performa check on several data replicas for the content being targeted by specifying their indexes.Retrying a test query only once, and only if the failure was due to receivingdifferent responses from the data replicas, which may be due to a temporary outof sync. We’ve seen this very occasionally in CI.Wait for stream to be finished to consider msg was sent successfully by sn_client.<csr-unknown/>
+
 ## v0.77.7 (2022-12-27)
 
 <csr-id-a38cd49958df82fd65d0a3f13670693f40a1e6b2/>
@@ -1248,9 +1279,6 @@ needed, as they keypair itself contains the Arcs we need.
     - Merge #1924 ([`be2cded`](https://github.com/maidsafe/safe_network/commit/be2cdedb19154adf324782d7178f0e25018cd16c))
     - set default keep-alive interval to be 1/2 of idle_timeout value set ([`220fd52`](https://github.com/maidsafe/safe_network/commit/220fd52ab3e1bac776ba74793d5042de220bb315))
 </details>
-
-<csr-unknown>
-Removing unused ClientBuilder::cmd_ack_wait config value.Decreasing the CI timeout for sn_client, sn_api, and CLI tests, to 7mins.New LogMarker::IncomingConnection logged by sn_node.<csr-unknown/>
 
 ## v0.77.6 (2022-12-22)
 
@@ -1473,6 +1501,55 @@ Removing unused ClientBuilder::cmd_ack_wait config value.Decreasing the CI timeo
     - use latest 0.33 qp2p ([`8020106`](https://github.com/maidsafe/safe_network/commit/80201067111349306a651a3f42a8ca740f48abaa))
     - make stream.finish non blocking where we can ([`841a004`](https://github.com/maidsafe/safe_network/commit/841a004786767c53ab9d60d4a310299d535b86bc))
     - ignore qp2p::SendStream::finish errors ([`89e1e40`](https://github.com/maidsafe/safe_network/commit/89e1e40ed9100b28a1ad5ed196620a6d6415706e))
+</details>
+
+## v0.78.0 (2023-02-01)
+
+### Chore
+
+ - <csr-id-69f8ade1ea8bb3e77c169b17ae21a40370bfab58/> sn_interface-0.17.0/sn_comms-0.2.0/sn_client-0.78.0/sn_node-0.73.0/sn_api-0.76.0/sn_cli-0.69.0
+
+### Refactor
+
+ - <csr-id-f779144986a6b2b06f550d3a2a4cbc39c64af83d/> idle_timeout from 10s to 70s
+   This was the timeout before this pull request. 70s was deduced to be a
+   value that gave CI the time to pass many tests. Although this value is
+   not optimal in a real world scenario, as routers might close the holes
+   where the connections rely on, and thus the connections will actually
+   timeout sooner in some cases. An optimal value was previously decided to
+   be 18s, as some routers supposedly close holes after 20s.
+ - <csr-id-47e0f87d5ccad33cfa82ef80f3648fe8270acaaa/> remove passing parameters to qp2p
+   Rely on defaults in qp2p instead, which are sensible. This means the
+   idle timeout from now on will be 10s which is currently the default in
+   quinn too.
+
+### Refactor (BREAKING)
+
+ - <csr-id-9ef9a2f2c8711895b62b82d25cb9d208c464cad6/> implement new qp2p version
+   This introduces quite some changes to the API that hopefully simplifies
+   much of the internals of the node and client.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 5 commits contributed to the release.
+ - 5 days passed between releases.
+ - 4 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.17.0/sn_comms-0.2.0/sn_client-0.78.0/sn_node-0.73.0/sn_api-0.76.0/sn_cli-0.69.0 ([`69f8ade`](https://github.com/maidsafe/safe_network/commit/69f8ade1ea8bb3e77c169b17ae21a40370bfab58))
+    - Merge #1996 ([`bb7b2db`](https://github.com/maidsafe/safe_network/commit/bb7b2dbcae9c0a67fc0a23c279537df49d88a07a))
+    - idle_timeout from 10s to 70s ([`f779144`](https://github.com/maidsafe/safe_network/commit/f779144986a6b2b06f550d3a2a4cbc39c64af83d))
+    - remove passing parameters to qp2p ([`47e0f87`](https://github.com/maidsafe/safe_network/commit/47e0f87d5ccad33cfa82ef80f3648fe8270acaaa))
+    - implement new qp2p version ([`9ef9a2f`](https://github.com/maidsafe/safe_network/commit/9ef9a2f2c8711895b62b82d25cb9d208c464cad6))
 </details>
 
 ## v0.77.0 (2022-12-13)

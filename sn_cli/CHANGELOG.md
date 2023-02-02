@@ -4,18 +4,26 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
+## v0.69.0 (2023-02-01)
+
 ## v0.68.7 (2023-01-27)
+
+<csr-id-846b1080944a229000b152513c0e2ed840bc9033/>
 
 ### Chore
 
  - <csr-id-846b1080944a229000b152513c0e2ed840bc9033/> fix additional issues from updated clippy
 
+### Chore
+
+ - <csr-id-c01008dc8cd48c0170388b2cb45d10be38a8210e/> sn_cli-0.68.7
+
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
- - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 3 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -25,6 +33,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_cli-0.68.7 ([`c01008d`](https://github.com/maidsafe/safe_network/commit/c01008dc8cd48c0170388b2cb45d10be38a8210e))
     - Merge #2037 ([`6e11b79`](https://github.com/maidsafe/safe_network/commit/6e11b793c1c311cf1c57f40c89825abb78b8baa4))
     - fix additional issues from updated clippy ([`846b108`](https://github.com/maidsafe/safe_network/commit/846b1080944a229000b152513c0e2ed840bc9033))
 </details>
@@ -32,6 +41,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## v0.68.6 (2023-01-27)
 
 <csr-id-6b923515f0f0cd1b0d1a4ed51d3ca418e41d9916/>
+<csr-id-01ff2ccf45dfc9d45c5ad540144d7a4a640830fc/>
 
 ### Chore
 
@@ -117,9 +127,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
     - Merge #1873 ([`8be1563`](https://github.com/maidsafe/safe_network/commit/8be1563fcddde2323ae2f892687dc76f253f3fb2))
     - chore(naming): rename dysfunction - Uses the more common vocabulary in fault tolerance area. ([`f68073f`](https://github.com/maidsafe/safe_network/commit/f68073f2897894375f5a09b870e2bfe4e03c3b10))
 </details>
-
-<csr-unknown>
-Exposing also an sn_api public API to fetch a file from a specified set ofdata replicas indexes and a SafeUrl.Adding --replicas arg to CLI dog command which allows the user to performa check on several data replicas for the content being targeted by specifying their indexes.<csr-unknown/>
 
 ## v0.68.4 (2022-12-22)
 

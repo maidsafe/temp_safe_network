@@ -9,15 +9,12 @@
 // use std::collections::BTreeSet;
 
 use super::Client;
-use crate::{
-    errors::{Error, Result},
-    sessions::QueryResult,
-};
+use crate::errors::{Error, Result};
 
 use sn_interface::{
     data_copy_count,
     messaging::{
-        data::{ClientMsg, DataQuery, DataQueryVariant},
+        data::{ClientMsg, DataQuery, DataQueryVariant, QueryResponse},
         ClientAuth, WireMsg,
     },
     types::{Peer, PublicKey, Signature},
@@ -34,14 +31,14 @@ impl Client {
     /// Queries are automatically retried using exponential backoff if the timeout is hit.
     #[cfg(not(feature = "check-replicas"))]
     #[instrument(skip(self), level = "debug")]
-    pub async fn send_query(&self, query: DataQueryVariant) -> Result<QueryResult> {
+    pub async fn send_query(&self, query: DataQueryVariant) -> Result<QueryResponse> {
         self.send_query_with_retry(query, true).await
     }
 
     /// Send a Query to the network and await a response.
     /// Queries are not retried if the timeout is hit.
     #[instrument(skip(self), level = "debug")]
-    pub async fn send_query_without_retry(&self, query: DataQueryVariant) -> Result<QueryResult> {
+    pub async fn send_query_without_retry(&self, query: DataQueryVariant) -> Result<QueryResponse> {
         self.send_query_with_retry(query, false).await
     }
 
@@ -53,7 +50,7 @@ impl Client {
         &self,
         query: DataQueryVariant,
         retry: bool,
-    ) -> Result<QueryResult> {
+    ) -> Result<QueryResponse> {
         let client_pk = self.public_key();
         let mut query = DataQuery {
             node_index: 0,
@@ -108,16 +105,16 @@ impl Client {
             }
 
             if let Some(delay) = backoff.next_backoff() {
-                // if we've an acceptable result, return instead of wait/retry loop
-                if let Ok(result) = res {
-                    if result.data_was_found() {
-                        debug!("{query:?} sent and received okay");
-                        return Ok(result);
-                    } else {
+                // if the response is acceptable, return instead of wait/retry loop
+                if let Ok(response) = res {
+                    if response.is_data_not_found() {
                         warn!(
                             "Data not found... querying again until we hit query_timeout ({:?})",
                             self.query_timeout
                         );
+                    } else {
+                        debug!("{query:?} sent and received okay");
+                        return Ok(response);
                     }
                 }
 
@@ -142,7 +139,7 @@ impl Client {
         client_pk: PublicKey,
         serialised_query: Bytes,
         signature: Signature,
-    ) -> Result<QueryResult> {
+    ) -> Result<QueryResponse> {
         debug!("Sending Query: {:?}", query);
         self.send_signed_query_to_section(query, client_pk, serialised_query, signature, None)
             .await
@@ -158,7 +155,7 @@ impl Client {
         serialised_query: Bytes,
         signature: Signature,
         dst_section_info: Option<(bls::PublicKey, Vec<Peer>)>,
-    ) -> Result<QueryResult> {
+    ) -> Result<QueryResponse> {
         let auth = ClientAuth {
             public_key: client_pk,
             signature,
@@ -177,7 +174,7 @@ impl Client {
         &self,
         query: DataQueryVariant,
         replicas: &[usize],
-    ) -> Result<Vec<(usize, Result<QueryResult>)>, Error> {
+    ) -> Result<Vec<(usize, Result<QueryResponse>)>, Error> {
         let client_pk = self.public_key();
         let dst = query.dst_name();
 
@@ -226,7 +223,7 @@ impl Client {
     /// is stored in each and all of the expected data replica nodes in the section.
     #[cfg(feature = "check-replicas")]
     #[instrument(skip(self), level = "debug")]
-    pub async fn send_query(&self, query: DataQueryVariant) -> Result<QueryResult, Error> {
+    pub async fn send_query(&self, query: DataQueryVariant) -> Result<QueryResponse, Error> {
         match self.query_all_data_replicas(query.clone()).await {
             Err(Error::DataReplicasCheck(
                 error @ crate::errors::DataReplicasCheckError::DifferentResponses { .. },
@@ -243,7 +240,7 @@ impl Client {
 
     #[cfg(feature = "check-replicas")]
     #[instrument(skip(self), level = "debug")]
-    async fn query_all_data_replicas(&self, query: DataQueryVariant) -> Result<QueryResult> {
+    async fn query_all_data_replicas(&self, query: DataQueryVariant) -> Result<QueryResponse> {
         use crate::errors::DataReplicasCheckError;
         let span = info_span!("Attempting a query");
         let _ = span.enter();
@@ -282,7 +279,7 @@ impl Client {
         }
 
         if let Some((resp, node_index)) = responses.pop() {
-            if responses.iter().all(|(r, _)| r.response == resp.response) {
+            if responses.iter().all(|(r, _)| r == &resp) {
                 return Ok(resp);
             }
 

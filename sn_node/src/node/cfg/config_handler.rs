@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{Error, NetworkConfig, Result};
+use crate::node::{Error, Result};
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -17,7 +17,6 @@ use std::{
 use tokio::{
     fs::{self, File},
     io::AsyncWriteExt,
-    time::Duration,
 };
 use tracing::{debug, error, warn, Level};
 
@@ -26,10 +25,6 @@ pub(crate) const DEFAULT_MAX_CAPACITY: usize = 2 * DEFAULT_MIN_CAPACITY;
 
 const CONFIG_FILE: &str = "node.config";
 const DEFAULT_ROOT_DIR_NAME: &str = "root_dir";
-
-// In the absence of any (QUIC) keep-alive messages, connections will be closed
-// if they remain idle for at least this duration.
-const DEFAULT_IDLE_TIMEOUT_MSEC: u64 = 70_000;
 
 /// Node configuration
 #[derive(Default, Clone, Debug, Serialize, Deserialize, clap::StructOpt)]
@@ -104,38 +99,12 @@ pub struct Config {
     /// non-local nodes).
     #[clap(long)]
     pub local_addr: Option<SocketAddr>,
-    /// External address of the node, to use when writing connection info.
-    ///
-    /// If unspecified, it will be queried from a peer; if there are no peers, the `local-addr` will
-    /// be used, if specified.
-    #[clap(long, parse(try_from_str = parse_public_addr))]
-    pub public_addr: Option<SocketAddr>,
     /// DEPRECATED (to be removed)
     /// This flag can be used to skip automated port forwarding using IGD. This is used when running
     /// a network on a LAN or when a node is connected to the internet directly, without a router,
     /// e.g. Digital Ocean droplets.
     #[clap(long)]
     pub skip_auto_port_forwarding: bool,
-    /// This is the maximum message size we'll allow the peer to send to us. Any bigger message and
-    /// we'll error out probably shutting down the connection to the peer. If none supplied we'll
-    /// default to the documented constant.
-    #[clap(long)]
-    pub max_msg_size_allowed: Option<u32>,
-    /// If we hear nothing from the peer in the given interval we declare it offline to us. If none
-    /// supplied we'll default to the documented constant.
-    ///
-    /// The interval is in milliseconds. A value of 0 disables this feature.
-    #[clap(long)]
-    pub idle_timeout_msec: Option<u64>,
-    /// Interval to send keep-alives if we are idling so that the peer does not disconnect from us
-    /// declaring us offline. If none is supplied we'll default to the documented constant.
-    ///
-    /// The interval is in milliseconds. A value of 0 disables this feature.
-    #[clap(long)]
-    pub keep_alive_interval_msec: Option<u32>,
-    /// Duration of a UPnP port mapping.
-    #[clap(long)]
-    pub upnp_lease_duration: Option<u32>,
 }
 
 impl Config {
@@ -166,32 +135,6 @@ impl Config {
                 "Either the --first or --network-contacts-file argument is required, and they \
                 are mutually exclusive. Please run the command again and use one or the other, \
                 but not both, of these arguments."
-                    .to_string(),
-            ));
-        }
-
-        if let Some(local_addr) = self.local_addr {
-            if local_addr.ip().is_loopback() && self.public_addr.is_some() {
-                return Err(Error::Configuration(
-                    "Cannot specify --public-addr when --local-addr uses a loopback IP. \
-                    When local-addr uses a loopback IP, the node will never be reachable publicly. \
-                    You can drop public-addr if this is a local-only node, or change local-addr to \
-                    a public or unspecified IP."
-                        .to_string(),
-                ));
-            }
-        }
-
-        let local_ip_unspecified = self
-            .local_addr
-            .map(|addr| addr.ip().is_unspecified())
-            .unwrap_or(true);
-        if local_ip_unspecified && self.first && self.public_addr.is_none() {
-            return Err(Error::Configuration(
-                "Must specify public address for --first node. \
-                The first node cannot query its public address from peers, so one must be \
-                specifed. This can be specified with --public-addr, or by setting a concrete IP \
-                for --local-addr."
                     .to_string(),
             ));
         }
@@ -240,23 +183,6 @@ impl Config {
 
         if config.local_addr.is_some() {
             self.local_addr = config.local_addr;
-        }
-
-        if config.public_addr.is_some() {
-            self.public_addr = config.public_addr;
-        }
-
-        if config.max_msg_size_allowed.is_some() {
-            self.max_msg_size_allowed = config.max_msg_size_allowed;
-        }
-
-        match config.idle_timeout_msec {
-            Some(t) => self.idle_timeout_msec = Some(t),
-            None => self.idle_timeout_msec = Some(DEFAULT_IDLE_TIMEOUT_MSEC),
-        }
-
-        if config.keep_alive_interval_msec.is_some() {
-            self.keep_alive_interval_msec = config.keep_alive_interval_msec;
         }
     }
 
@@ -320,25 +246,6 @@ impl Config {
     pub fn local_addr(&self) -> SocketAddr {
         self.local_addr
             .unwrap_or_else(|| SocketAddr::from((std::net::Ipv4Addr::UNSPECIFIED, 0)))
-    }
-
-    /// Network configuration options.
-    pub fn network_config(&self) -> NetworkConfig {
-        let mut network_config = NetworkConfig::default();
-        if let Some(public_addr) = self.public_addr {
-            network_config.external_port = Some(public_addr.port());
-            network_config.external_ip = Some(public_addr.ip());
-        }
-
-        if let Some(t) = self.idle_timeout_msec {
-            network_config.idle_timeout = Some(Duration::from_millis(t));
-        }
-
-        if let Some(t) = self.keep_alive_interval_msec {
-            network_config.keep_alive_interval = Some(Duration::from_millis(t.into()));
-        }
-
-        network_config
     }
 
     /// Get the completions option
@@ -435,28 +342,6 @@ impl Config {
     }
 }
 
-fn parse_public_addr(public_addr: &str) -> Result<SocketAddr, String> {
-    let public_addr: SocketAddr = public_addr.parse().map_err(|err| format!("{err}"))?;
-
-    if public_addr.ip().is_unspecified() {
-        return Err("Cannot use unspecified IP for public address. \
-            You can drop this option to query the public IP from a peer instead."
-            .to_string());
-    }
-    if public_addr.ip().is_loopback() {
-        return Err("Cannot use loopback IP for public address. \
-            You can drop this option for a local-only network."
-            .to_string());
-    }
-    if public_addr.port() == 0 {
-        return Err("Cannot use unspecified port for public address. \
-            You must specify the concrete port on which the node will be reachable."
-            .to_string());
-    }
-
-    Ok(public_addr)
-}
-
 fn project_dirs() -> Result<PathBuf> {
     let mut home_dir = dirs_next::home_dir()
         .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Home directory not found"))?;
@@ -472,7 +357,7 @@ fn smoke() -> Result<()> {
     // NOTE: IF this value is being changed due to a change in the config,
     // the change in config also be handled in Config::merge()
     // and in examples/config_handling.rs
-    let expected_size = 51;
+    let expected_size = 46;
 
     assert_eq!(bincode::serialize(&Config::default())?.len(), expected_size);
     Ok(())

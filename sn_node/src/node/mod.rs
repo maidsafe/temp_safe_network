@@ -45,7 +45,7 @@ use sn_interface::{
     types::Peer,
 };
 
-pub use qp2p::{Config as NetworkConfig, SendStream};
+pub use qp2p::SendStream;
 pub use xor_name::{Prefix, XorName, XOR_NAME_LEN}; // TODO remove pub on API update
 
 mod core {

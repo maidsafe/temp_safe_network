@@ -16,7 +16,6 @@
 //! ```
 use crate::{sessions::Session, Client, Error, DEFAULT_NETWORK_CONTACTS_FILE_NAME};
 
-use qp2p::Config as Qp2pConfig;
 use sn_dbc::Owner;
 use sn_interface::{network_knowledge::SectionTree, types::Keypair};
 use std::{
@@ -48,7 +47,6 @@ pub struct ClientBuilder {
     keypair: Option<Keypair>,
     dbc_owner: Option<Owner>,
     local_addr: Option<SocketAddr>,
-    qp2p: Option<Qp2pConfig>,
     query_timeout: Option<Duration>,
     max_backoff_interval: Option<Duration>,
     cmd_timeout: Option<Duration>,
@@ -76,12 +74,6 @@ impl ClientBuilder {
     /// Local address to bind client endpoint to
     pub fn local_addr(mut self, addr: impl Into<Option<SocketAddr>>) -> Self {
         self.local_addr = addr.into();
-        self
-    }
-
-    /// QuicP2p options
-    pub fn qp2p(mut self, cfg: impl Into<Option<Qp2pConfig>>) -> Self {
-        self.qp2p = cfg.into();
         self
     }
 
@@ -136,7 +128,6 @@ impl ClientBuilder {
     /// - `[Self::keypair]` and `[Self::dbc_owner]` are randomly generated
     /// - `[Self::query_timeout`] and `[Self::cmd_timeout]` default to [`DEFAULT_QUERY_CMD_TIMEOUT`]
     /// - `[Self::max_backoff_interval`] defaults to [`DEFAULT_MAX_QUERY_CMD_BACKOFF_INTERVAL`]
-    /// - [`qp2p::Config`] will default to it's [`Default`] impl
     /// - Network contacts file will be read from a standard location
     pub async fn build(self) -> Result<Client, Error> {
         let max_backoff_interval = self
@@ -155,20 +146,7 @@ impl ClientBuilder {
             }
         };
 
-        let mut qp2p = self.qp2p.unwrap_or_default();
-        if qp2p.idle_timeout.is_none() {
-            let idle_timeout = if query_timeout > cmd_timeout {
-                query_timeout
-            } else {
-                cmd_timeout
-            };
-            qp2p.idle_timeout = Some(idle_timeout);
-        }
-
-        debug!("Session config: {:?}", qp2p);
-
         let session = Session::new(
-            qp2p,
             self.local_addr
                 .unwrap_or_else(|| SocketAddr::from(DEFAULT_LOCAL_ADDR)),
             network_contacts,

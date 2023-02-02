@@ -127,9 +127,9 @@ impl Client {
         }
 
         let query = DataQueryVariant::GetChunk(ChunkAddress(*name));
-        let res = self.send_query(query.clone()).await?;
+        let response = self.send_query(query.clone()).await?;
 
-        let chunk: Chunk = match res.response {
+        let chunk: Chunk = match response {
             QueryResponse::GetChunk(result) => {
                 result.map_err(|err| Error::ErrorMsg { source: err })
             }
@@ -375,7 +375,7 @@ impl Client {
         let query = DataQueryVariant::GetChunk(ChunkAddress(name));
         let results = self.send_query_to_replicas(query.clone(), replicas).await?;
         for (replica_index, res) in results {
-            let outcome = res.map(|query_result| match query_result.response {
+            let outcome = res.map(|response| match response {
                 QueryResponse::GetChunk(Ok(chunk)) => {
                     found_chunk = Some(chunk);
                     Ok(())

@@ -16,7 +16,7 @@ use sn_interface::{
     network_knowledge::SectionTree,
 };
 
-use qp2p::{Config as QuicP2pConfig, Endpoint};
+use qp2p::Endpoint;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::sync::RwLock;
 
@@ -27,22 +27,6 @@ pub(super) enum MsgResponse {
     CmdResponse(SocketAddr, Box<CmdResponse>),
     QueryResponse(SocketAddr, Box<QueryResponse>),
     Failure(SocketAddr, Error),
-}
-
-#[derive(Debug)]
-pub struct QueryResult {
-    pub response: QueryResponse,
-}
-
-impl QueryResult {
-    /// Returns true if the QueryResponse is DataNotFound
-    pub(crate) fn data_was_found(&self) -> bool {
-        let found = !self.response.is_data_not_found();
-
-        debug!("was the data found??? {found:?}, {self:?}");
-
-        found
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -58,12 +42,11 @@ pub(super) struct Session {
 impl Session {
     /// Acquire a session by bootstrapping to a section, maintaining connections to several nodes.
     #[instrument(level = "debug")]
-    pub(crate) fn new(
-        qp2p_config: QuicP2pConfig,
-        local_addr: SocketAddr,
-        network_contacts: SectionTree,
-    ) -> Result<Self> {
-        let endpoint = Endpoint::new_client(local_addr, qp2p_config)?;
+    pub(crate) fn new(local_addr: SocketAddr, network_contacts: SectionTree) -> Result<Self> {
+        let endpoint = Endpoint::builder()
+            .addr(local_addr)
+            .idle_timeout(70_000)
+            .client()?;
         let peer_links = PeerLinks::new(endpoint.clone());
 
         let session = Self {

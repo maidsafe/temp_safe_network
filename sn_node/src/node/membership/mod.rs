@@ -295,7 +295,7 @@ impl Membership {
         info!("[{}] proposing {:?}", self.id(), node_state);
         let vote = Vote {
             gen: self.gen + 1,
-            ballot: Ballot::Propose(node_state),
+            ballot: Ballot::Propose(node_state.clone()),
             faults: self.consensus.faults(),
         };
         let signed_vote = self.sign_vote(vote)?;
@@ -310,7 +310,7 @@ impl Membership {
             &self.consensus.processed_votes_cache,
         ) {
             error!(
-                "Attempted invalid proposal: {e:?}. (Genereation for attempted proposal is: {:?})",
+                "Attempted proposal {node_state:?} at genereation {:?} invalidated with error {e:?}",
                 self.gen + 1
             );
             return Err(Error::InvalidProposal);

@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{MsgResponse, QueryResult, Session};
+use super::{MsgResponse, Session};
 use crate::{Error, Result};
 
 use sn_interface::{
@@ -85,7 +85,7 @@ impl Session {
         debug!(
             "Sending cmd with {msg_id:?}, dst: {dst_address:?}, from {}, \
             to {elders_len} Elders: {elders:?}",
-            endpoint.public_addr(),
+            endpoint.local_addr(),
         );
 
         let dst = Dst {
@@ -98,7 +98,7 @@ impl Session {
         let log_line = |elders_len_s: String| {
             debug!(
                 "Sending cmd w/id {msg_id:?}, from {}, to {elders_len_s} w/ dst: {dst_address:?}",
-                endpoint.public_addr(),
+                endpoint.local_addr(),
             )
         };
 
@@ -323,7 +323,7 @@ impl Session {
         auth: ClientAuth,
         payload: Bytes,
         dst_section_info: Option<(bls::PublicKey, Vec<Peer>)>,
-    ) -> Result<QueryResult> {
+    ) -> Result<QueryResponse> {
         let endpoint = self.endpoint.clone();
 
         let chunk_addr = if let DataQueryVariant::GetChunk(address) = query.variant {
@@ -346,7 +346,7 @@ impl Session {
         debug!(
             "Sending query message {msg_id:?}, from {}, {query:?} to \
             the {elders_len} Elders closest to data name: {elders:?}",
-            endpoint.public_addr(),
+            endpoint.local_addr(),
         );
 
         let dst = Dst {
@@ -378,7 +378,7 @@ impl Session {
         elders: Vec<Peer>,
         chunk_addr: Option<ChunkAddress>,
         mut send_query_tasks: JoinSet<MsgResponse>,
-    ) -> Result<QueryResult> {
+    ) -> Result<QueryResponse> {
         let mut discarded_responses: usize = 0;
         let mut error_response = None;
         let mut valid_response = None;
@@ -485,12 +485,12 @@ impl Session {
         // if any are valid, lets return it
         if let Some(response) = valid_response {
             debug!("Valid response in!!!: {response:?}");
-            return Ok(QueryResult { response });
+            return Ok(response);
             // otherwise, if we've got an error in
             // we can return that too
         } else if let Some(response) = error_response {
             if discarded_responses > elders_len / 2 {
-                return Ok(QueryResult { response });
+                return Ok(response);
             }
         }
 
@@ -639,7 +639,6 @@ mod tests {
     };
 
     use eyre::Result;
-    use qp2p::Config;
     use std::net::{Ipv4Addr, SocketAddr};
     use xor_name::Prefix;
 
@@ -665,7 +664,6 @@ mod tests {
         assert!(network_contacts.insert_without_chain(sap0));
 
         let session = Session::new(
-            Config::default(),
             SocketAddr::from((Ipv4Addr::UNSPECIFIED, 0)),
             network_contacts,
         )?;

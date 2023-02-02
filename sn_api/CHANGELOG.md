@@ -5,19 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.76.0 (2023-02-01)
+
 ## v0.75.5 (2023-01-27)
+
+<csr-id-6b923515f0f0cd1b0d1a4ed51d3ca418e41d9916/>
 
 ### Chore
 
  - <csr-id-6b923515f0f0cd1b0d1a4ed51d3ca418e41d9916/> fix issues reported by new clippy
 
+### Chore
+
+ - <csr-id-01ff2ccf45dfc9d45c5ad540144d7a4a640830fc/> sn_interface-0.16.18/sn_comms-0.1.4/sn_client-0.77.9/sn_node-0.72.34/sn_api-0.75.5/sn_cli-0.68.6
+
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
+ - 4 commits contributed to the release.
  - 6 days passed between releases.
- - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -27,6 +35,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_interface-0.16.18/sn_comms-0.1.4/sn_client-0.77.9/sn_node-0.72.34/sn_api-0.75.5/sn_cli-0.68.6 ([`01ff2cc`](https://github.com/maidsafe/safe_network/commit/01ff2ccf45dfc9d45c5ad540144d7a4a640830fc))
+    - Merge branch 'main' into chore-comms-remove-unused-async ([`e92dd49`](https://github.com/maidsafe/safe_network/commit/e92dd49f38f9b56c7276e86ba79f7fd8f816af76))
     - Merge branch 'main' into RevertDkgCache ([`24ff625`](https://github.com/maidsafe/safe_network/commit/24ff6257f85922090cfaa5fa83044082d3ef8dab))
     - fix issues reported by new clippy ([`6b92351`](https://github.com/maidsafe/safe_network/commit/6b923515f0f0cd1b0d1a4ed51d3ca418e41d9916))
 </details>
@@ -34,6 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## v0.75.4 (2023-01-20)
 
 <csr-id-21af053a5be2317be356e760c2b581c0f870a396/>
+<csr-id-783d62461a65eb7c06b0d4f399b97216b6c75519/>
 
 ### Chore
 
@@ -48,8 +59,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-cf6daa778c1d4278b444f1a61da3513506c14ea9/> expose a public API to query chunks to specific data replicas
    - Exposing also an `sn_api` public API to fetch a file from a specified set of
    data replicas indexes and a `SafeUrl`.
-- Adding `--replicas` arg to CLI `dog` command which allows the user to perform
-   a check on several data replicas for the content being targeted by specifying their indexes.
 
 ### Commit Statistics
 
@@ -77,6 +86,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - feat(queries): add happy path feature - This allows clients to default to a lower impact interaction with elders (todo: only expanding the impact on failures). - Adds combined feat for both cmd and query happy path. ([`a77d95b`](https://github.com/maidsafe/safe_network/commit/a77d95b57ff179d1f8fedc00529c69204a8f89e0))
     - feat(cmds): add happy path feature - This allows clients to default to a lower impact interaction with elders, only expanding the impact on failures. ([`21b4167`](https://github.com/maidsafe/safe_network/commit/21b4167f68b7bd145d02dcdf1b5d8f9acb7971a8))
 </details>
+
+<csr-unknown>
+Adding --replicas arg to CLI dog command which allows the user to performa check on several data replicas for the content being targeted by specifying their indexes.<csr-unknown/>
 
 ## v0.75.3 (2022-12-20)
 
@@ -112,9 +124,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Merge #1848 ([`ddaf857`](https://github.com/maidsafe/safe_network/commit/ddaf8571749c142e9960407cfd9cfa94231a36ad))
     - genesis_sap is required to create the `SectionTree` ([`22402ca`](https://github.com/maidsafe/safe_network/commit/22402ca6acb0215ecfe9b1fdbf306c0f9cb87d95))
 </details>
-
-<csr-unknown>
-This can be fixed by accepting the genesis sap while creating the tree.<csr-unknown/>
 
 ## v0.75.2 (2022-12-16)
 

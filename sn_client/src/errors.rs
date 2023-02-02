@@ -229,7 +229,7 @@ pub enum Error {
     IoError(#[from] io::Error),
     /// Endpoint setup error.
     #[error(transparent)]
-    EndpointSetup(#[from] qp2p::ClientEndpointError),
+    EndpointSetup(#[from] qp2p::EndpointError),
     /// QuicP2p Recv error.
     #[error(transparent)]
     QuicP2p(#[from] qp2p::RecvError),
@@ -331,6 +331,6 @@ pub enum DataReplicasCheckError {
         /// Query sent to data replicas
         query: DataQueryVariant,
         /// List of responses received with their corresponding replica/Adult index
-        responses: Vec<(crate::sessions::QueryResult, usize)>,
+        responses: Vec<(QueryResponse, usize)>,
     },
 }

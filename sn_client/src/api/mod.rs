@@ -83,16 +83,13 @@ impl Client {
             name: xor_name::rand::random(),
             tag: 1,
         }));
-        debug!(
-            "Making initial contact with network. Our public addr: {:?}. Probe msg: {query:?}",
-            self.session.endpoint.public_addr()
-        );
+        debug!("Making initial contact with network. Probe msg: {query:?}");
 
         let mut attempts = 1;
         loop {
             // Send the dummy message to probe the network for it's infrastructure details.
             match self.send_query_without_retry(query.clone()).await {
-                Ok(result) if result.response.is_data_not_found() => {
+                Ok(response) if response.is_data_not_found() => {
                     // A data-not-found response means it comes from the right set of Elders,
                     // any AE retries should have taken place as well.
                     let network_knowledge = self.session.network.read().await;
