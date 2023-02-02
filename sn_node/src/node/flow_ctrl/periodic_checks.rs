@@ -108,7 +108,7 @@ impl FlowCtrl {
 
         if self.timestamps.last_probe.elapsed() > PROBE_INTERVAL {
             self.timestamps.last_probe = now;
-            if let Some(cmd) = Self::probe_the_network(context).await {
+            if let Some(cmd) = Self::probe_the_network(context) {
                 cmds.push(cmd);
             }
         }
@@ -227,7 +227,7 @@ impl FlowCtrl {
 
     /// Generates a probe msg, which goes to up to three random sections in order to
     /// passively maintain network knowledge over time.
-    async fn probe_the_network(context: &NodeContext) -> Option<Cmd> {
+    fn probe_the_network(context: &NodeContext) -> Option<Cmd> {
         let prefix = context.network_knowledge.prefix();
 
         // Send a probe message if we are an elder

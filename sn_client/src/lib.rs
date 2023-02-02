@@ -45,7 +45,8 @@
     unused_qualifications,
     unused_results,
     clippy::unicode_not_nfc,
-    clippy::unwrap_used
+    clippy::unwrap_used,
+    clippy::unused_async
 )]
 #![allow(clippy::result_large_err, clippy::uninlined_format_args)]
 

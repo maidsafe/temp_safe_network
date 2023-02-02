@@ -154,7 +154,7 @@ impl FlowCtrl {
         // start a new thread to convert msgs to Cmds
         let _handle = tokio::task::spawn(async move {
             while let Some(peer_msg) = incoming_msg_events.recv().await {
-                let cmd = match Self::handle_new_msg_event(peer_msg).await {
+                let cmd = match Self::handle_new_msg_event(peer_msg) {
                     Ok(cmd) => cmd,
                     Err(error) => {
                         error!("Could not handle incoming msg event: {error:?}");
@@ -232,7 +232,7 @@ impl FlowCtrl {
     }
 
     // Listen for a new incoming connection event and handle it.
-    async fn handle_new_msg_event(msg: MsgFromPeer) -> Result<Cmd> {
+    fn handle_new_msg_event(msg: MsgFromPeer) -> Result<Cmd> {
         let MsgFromPeer {
             sender,
             wire_msg,

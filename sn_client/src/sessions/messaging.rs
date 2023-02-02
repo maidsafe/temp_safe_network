@@ -174,9 +174,7 @@ impl Session {
                 skip
             };
 
-            let elders = self
-                .pick_elders(target, all_elders.clone(), skip, take)
-                .await;
+            let elders = self.pick_elders(target, all_elders.clone(), skip, take);
 
             trace!("Sending cmd {msg_id:?}, skipping {skip}, sending to {take} elders..");
             let send_cmd_tasks = self.send_msg(elders.clone(), wire_msg.clone()).await?;
@@ -202,7 +200,7 @@ impl Session {
     }
 
     #[cfg(feature = "cmd-happy-path")]
-    async fn pick_elders(
+    fn pick_elders(
         &self,
         target: XorName,
         elders: Vec<Peer>,

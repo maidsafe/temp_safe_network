@@ -229,8 +229,7 @@ async fn start_genesis_node(
         root_storage_dir.to_path_buf(),
         genesis_sk_set,
         fault_cmds_sender,
-    )
-    .await?;
+    )?;
 
     // Write the genesis DBC to disk
     let path = root_storage_dir.join(GENESIS_DBC_FILENAME);
@@ -283,8 +282,7 @@ async fn start_node(
         used_space.clone(),
         root_storage_dir.to_path_buf(),
         fault_cmds_sender,
-    )
-    .await?;
+    )?;
 
     info!("Node {} started.", node.info().name());
 

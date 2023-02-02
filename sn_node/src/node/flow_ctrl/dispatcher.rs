@@ -159,7 +159,6 @@ impl Dispatcher {
                 debug!("Network knowledge was updated: {updated}");
 
                 MyNode::handle_valid_client_msg(context, msg_id, msg, auth, origin, send_stream)
-                    .await
             }
             Cmd::HandleSectionDecisionAgreement { proposal, sig } => {
                 debug!("[NODE WRITE]: section decision agreements node write...");

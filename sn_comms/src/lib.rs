@@ -37,7 +37,8 @@
     unused_qualifications,
     unused_results,
     clippy::unicode_not_nfc,
-    clippy::unwrap_used
+    clippy::unwrap_used,
+    clippy::unused_async
 )]
 
 #[macro_use]
