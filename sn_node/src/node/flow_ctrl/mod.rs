@@ -239,10 +239,7 @@ impl FlowCtrl {
             send_stream,
         } = msg;
 
-        trace!(
-            "{:?} from {sender:?}", // length {original_bytes_len}",
-            LogMarker::DispatchHandleMsgCmd,
-        );
+        trace!("{:?} from {sender:?}", LogMarker::DispatchHandleMsgCmd,);
 
         Ok(Cmd::HandleMsg {
             origin: sender,

@@ -226,9 +226,6 @@ impl MyNode {
                     msg_id,
                 )
                 .await?;
-            } else {
-                // This should not be possible with above checks
-                error!("No valid response to send from all responses for {msg_id:?}");
             }
         } else {
             error!("Request to holder node/s was not completely successful for {msg_id:?}");
@@ -258,12 +255,8 @@ async fn send_wiremsg_to_target_peers_and_await_responses(
     targets: BTreeSet<Peer>,
     context: &NodeContext,
 ) -> Result<Vec<(Peer, Result<Result<WireMsg, CommsError>, Elapsed>)>> {
-    // let (kind, payload) = MyNode::serialize_node_msg(context.name, )?;
-
     // We create a Dst with random dst name, but we'll update it accordingly for each target
     let mut dst = *wire_msg.dst();
-    // let mut wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
-    // let _bytes = wire_msg.serialize()?;
 
     let mut send_tasks = vec![];
     for target in targets {
