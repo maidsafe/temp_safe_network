@@ -136,13 +136,9 @@ impl MyNode {
                     "{msg_id:?}: No response from {peer:?} after {:?} timeout.",
                     *NODE_RESPONSE_TIMEOUT
                 );
-                // output_cmds.push(Cmd::TrackNodeIssue {
-                //     name: peer.name(),
-                //     issue: IssueType::Communication,
-                // });
             }
             Ok(Ok(wire_msg)) => {
-                debug!("Unexpected response in from {peer:?} for {msg_id:?}: {wire_msg:?}");
+                debug!("A response came in from {peer:?} for {msg_id:?}: {wire_msg:?}");
 
                 output_cmds.push(Cmd::HandleMsg { origin: peer, wire_msg, send_stream: None });
             }
@@ -308,8 +304,8 @@ async fn send_to_target_peers_and_await_responses(
         name: XorName::default(),
         section_key: context.network_knowledge.section_key(),
     };
-    let wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
-    let _bytes = wire_msg.serialize()?;
+    let mut wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
+    let _bytes = wire_msg.serialize_and_cache_bytes()?;
 
     let mut send_tasks = vec![];
     for target in targets {
