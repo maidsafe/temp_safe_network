@@ -32,7 +32,7 @@ use tracing::info;
 
 impl MyNode {
     // Instruct data holders to store the data awaiting for their confirmation response to ack the client
-    pub(crate) async fn store_data_at_nodes_and_ack_to_client(
+    pub(crate) fn store_data_at_nodes_and_ack_to_client(
         context: NodeContext,
         data_cmd: DataCmd,
         data: ReplicatedData,
@@ -85,7 +85,7 @@ impl MyNode {
     }
 
     /// Find target node, sends a bidi msg, awaiting response, and then sends this on to the client
-    pub(crate) async fn read_data_and_respond_to_client(
+    pub(crate) fn read_data_and_respond_to_client(
         context: NodeContext,
         query: DataQuery,
         msg_id: MsgId,

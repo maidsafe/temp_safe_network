@@ -821,7 +821,7 @@ impl TestNetwork {
         let (min_capacity, max_capacity, root_storage_dir) =
             create_test_capacity_and_root_storage().expect("Failed to create root storage");
 
-        futures::executor::block_on(MyNode::new(
+        MyNode::new(
             comm.clone(),
             info.keypair.clone(),
             network_knowledge.clone(),
@@ -829,7 +829,7 @@ impl TestNetwork {
             UsedSpace::new(min_capacity, max_capacity),
             root_storage_dir,
             mpsc::channel(10).0,
-        ))
+        )
         .expect("Failed to create MyNode")
     }
 
@@ -849,7 +849,7 @@ impl TestNetwork {
 
         let (min_capacity, max_capacity, root_storage_dir) =
             create_test_capacity_and_root_storage().expect("Failed to create root storage");
-        let mut my_node = futures::executor::block_on(MyNode::new(
+        let mut my_node = MyNode::new(
             comm.clone(),
             info.keypair.clone(),
             network_knowledge.clone(),
@@ -857,7 +857,7 @@ impl TestNetwork {
             UsedSpace::new(min_capacity, max_capacity),
             root_storage_dir,
             mpsc::channel(10).0,
-        ))
+        )
         .expect("Failed to create MyNode");
 
         // the node might've been an elder in any of the ancestor saps of the current prefix
