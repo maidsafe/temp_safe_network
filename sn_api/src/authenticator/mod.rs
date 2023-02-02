@@ -173,6 +173,7 @@ impl SafeAuthenticator {
     /// }
     /// # });
     ///```
+    #[allow(clippy::unused_async)]
     pub async fn create(&mut self, _passphrase: &str, _password: &str) -> Result<()> {
         unimplemented!("Authenticator hasn't yet been updated to work with the new Safe Network");
         // debug!("Attempting to create a Safe from provided passphrase and password.");
@@ -263,6 +264,7 @@ impl SafeAuthenticator {
     /// }
     /// # });
     ///```
+    #[allow(clippy::unused_async)]
     pub async fn unlock(&mut self, _passphrase: &str, _password: &str) -> Result<()> {
         unimplemented!("Authenticator hasn't yet been updated to work with the new Safe Network");
 
@@ -316,6 +318,7 @@ impl SafeAuthenticator {
         // is_a_safe_unlocked
     }
 
+    #[allow(clippy::unused_async)]
     pub async fn decode_req(&self, _req: &str) -> Result<SafeAuthReq> {
         unimplemented!("Authenticator hasn't yet been updated to work with the new Safe Network");
 
@@ -336,11 +339,13 @@ impl SafeAuthenticator {
     }
 
     // TODO: update terminology around apps auth here
+    #[allow(clippy::unused_async)]
     pub async fn revoke_app(&self, _y: &str) -> Result<()> {
         unimplemented!()
     }
 
     /// Decode requests and trigger application authorisation against the current client
+    #[allow(clippy::unused_async)]
     pub async fn authorise_app(&self, _req: &str) -> Result<String> {
         unimplemented!("Authenticator hasn't yet been updated to work with the new Safe Network");
 
@@ -373,6 +378,7 @@ impl SafeAuthenticator {
     /// First, this function searches for an app info in the Safe.
     /// If the app is found, then the `AuthGranted` struct is returned based on that information.
     /// If the app is not found in the Safe, then it will be authenticated.
+    #[allow(clippy::unused_async)]
     pub async fn authenticate(&self, _auth_req: AuthReq) -> Result<AuthGranted> {
         unimplemented!("Authenticator hasn't yet been updated to work with the new Safe Network");
 
