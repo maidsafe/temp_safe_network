@@ -12,6 +12,8 @@ use crate::node::{
 };
 use crate::storage::{Error as StorageError, StorageLevel};
 
+use sn_interface::messaging::data::ClientMsg;
+use sn_interface::messaging::system::NodeDataResponse;
 use sn_interface::{
     data_copy_count,
     messaging::{
@@ -40,15 +42,15 @@ impl MyNode {
         source_client: Peer,
     ) -> Result<Vec<Cmd>> {
         let data_name = data.name();
-        let targets = Self::target_data_holders(&context, data_name);
+        let recipients = Self::target_data_holders(&context, data_name);
 
         // make sure the expected replication factor is achieved
-        if data_copy_count() > targets.len() {
+        if data_copy_count() > recipients.len() {
             error!("InsufficientNodeCount for storing data reliably for {msg_id:?}");
             let error = Error::InsufficientNodeCount {
                 prefix: context.network_knowledge.prefix(),
                 expected: data_copy_count() as u8,
-                found: targets.len() as u8,
+                found: recipients.len() as u8,
             };
 
             debug!("Will send error response back to client");
@@ -64,20 +66,19 @@ impl MyNode {
             return Ok(vec![cmd]);
         }
 
-        info!("Replicating data from {msg_id:?} {data_name:?} to holders: {targets:?}");
+        info!("Replicating data from {msg_id:?} {data_name:?} to holders: {recipients:?}");
 
         // TODO: general ReplicateData flow could go bidi?
         // Right now we've a new msg for just one datum.
         // Atm that's perhaps more bother than its worth..
-        let msg = NodeMsg::NodeDataCmd(NodeDataCmd::StoreData(data));
 
-        let cmd = Cmd::SendAndForwardResponseToClient {
+        let cmd = Cmd::SendAndTrackResponses {
             msg_id,
-            msg,
+            msg: NodeMsg::NodeDataCmd(NodeDataCmd::StoreData(data)),
             context,
-            targets,
+            recipients,
+            causing_msg: ClientMsg::Cmd(data_cmd),
             client_stream,
-            source_client,
         };
 
         Ok(vec![cmd])
@@ -104,20 +105,20 @@ impl MyNode {
             LogMarker::DataQueryReceviedAtElder,
         );
 
-        let targets = Self::target_data_holders(&context, *address.name());
+        let recipients = Self::target_data_holders(&context, *address.name());
 
         // We accept the chance that we will be querying an Elder that the client already queried directly.
         // The extra load is not that big. But we can optimize this later if necessary.
 
         // Query only the nth node
-        let recipient = if let Some(peer) = targets.iter().nth(query.node_index) {
+        let recipient = if let Some(peer) = recipients.iter().nth(query.node_index) {
             *peer
         } else {
-            debug!("No targets found for {msg_id:?}");
+            debug!("No recipients found for {msg_id:?}");
             let error = Error::InsufficientNodeCount {
                 prefix: context.network_knowledge.prefix(),
                 expected: query.node_index as u8 + 1,
-                found: targets.len() as u8,
+                found: recipients.len() as u8,
             };
 
             let cmd = MyNode::send_query_error_response_over_stream(
@@ -133,17 +134,17 @@ impl MyNode {
 
         // Form a msg to the node
         let msg = NodeMsg::NodeDataQuery(NodeDataQuery {
-            query: query.variant,
+            query: query.variant.clone(),
             auth: auth.into_inner(),
         });
 
-        let cmd = Cmd::SendAndForwardResponseToClient {
+        let cmd = Cmd::SendAndTrackResponses {
             msg_id,
             msg,
             context,
-            targets: BTreeSet::from([recipient]),
+            recipients: BTreeSet::from([recipient]),
+            causing_msg: ClientMsg::Query(query),
             client_stream,
-            source_client,
         };
 
         Ok(vec![cmd])
@@ -172,6 +173,53 @@ impl MyNode {
         if let Err(error) = self.fault_cmds_sender.send(FaultsCmd::AddNode(adult)).await {
             warn!("Could not send AddNode through fault_cmds_tx: {error}");
         };
+    }
+
+    /// Tracks an outgoing msg to data holders, and its corresponding responses.
+    pub(crate) fn track_data_response(
+        &mut self,
+        msg_id: MsgId,
+        client_name: XorName,
+        causing_msg: ClientMsg,
+        client_stream: SendStream,
+        expected_responders: BTreeSet<Peer>,
+    ) {
+        self.data_responses.track(
+            msg_id,
+            client_name,
+            causing_msg,
+            client_stream,
+            expected_responders,
+        );
+    }
+
+    /// Updates a pending request with a msg from data holders.
+    pub(crate) async fn update_data_response(
+        &mut self,
+        peer: Peer,
+        response: NodeDataResponse,
+    ) -> Result<Option<Cmd>> {
+        let correlation_id = *response.correlation_id();
+        if let Some((msg, client_name, send_stream)) = self.data_responses.update(peer, response) {
+            return MyNode::send_client_response(
+                msg,
+                correlation_id,
+                client_name,
+                send_stream,
+                self.context(),
+            )
+            .await;
+        }
+        self.clear_expired_data_trackers();
+        Ok(None)
+    }
+
+    pub(crate) fn clear_expired_data_trackers(&mut self) {
+        let timed_out_nodes = self.data_responses.clear_expired();
+        for node in timed_out_nodes {
+            error!("No response from {node:?} after timeout. Marking node as faulty");
+            self.track_node_issue(node.name(), sn_fault_detection::IssueType::Communication);
+        }
     }
 
     /// Used to fetch the list of holders for given name of data.

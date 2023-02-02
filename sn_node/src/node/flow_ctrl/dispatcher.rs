@@ -67,25 +67,28 @@ impl Dispatcher {
                 recipients,
                 context,
             } => {
-                MyNode::send_and_enqueue_any_response(msg, msg_id, context, recipients)?;
+                MyNode::send_and_enqueue_any_response(msg_id, msg, context, recipients)?;
                 Ok(vec![])
             }
-            Cmd::SendAndForwardResponseToClient {
+            Cmd::SendAndTrackResponses {
                 msg_id,
                 msg,
                 context,
-                targets,
+                recipients,
+                causing_msg,
                 client_stream,
-                source_client,
             } => {
-                MyNode::send_and_forward_response_to_client(
+                MyNode::send_and_enqueue_any_response(msg_id, msg, context, recipients.clone())?;
+                let mut node = self.node.write().await;
+                debug!("[NODE WRITE]: send_and_forward_response_to_client write got");
+                let dummy_client_name = xor_name::rand::random();
+                node.track_data_response(
                     msg_id,
-                    msg,
-                    context,
-                    targets,
+                    dummy_client_name,
+                    causing_msg,
                     client_stream,
-                    source_client,
-                )?;
+                    recipients,
+                );
                 Ok(vec![])
             }
             Cmd::SendNodeMsgResponse {
@@ -95,7 +98,7 @@ impl Dispatcher {
                 send_stream,
                 context,
             } => Ok(
-                MyNode::send_node_msg_response(msg, msg_id, recipient, context, send_stream)
+                MyNode::send_node_msg_response(msg, msg_id, recipient, send_stream, context)
                     .await?
                     .into_iter()
                     .collect(),
@@ -109,9 +112,9 @@ impl Dispatcher {
             } => Ok(MyNode::send_client_response(
                 msg,
                 correlation_id,
-                send_stream,
+                source_client.name(),
+                Arc::new(RwLock::new(send_stream)),
                 context,
-                source_client,
             )
             .await?
             .into_iter()

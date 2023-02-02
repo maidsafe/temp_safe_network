@@ -121,18 +121,19 @@ impl MyNode {
 
                 MyNode::handle_valid_client_msg(context, msg_id, msg, auth, origin, stream).await
             }
+            MsgType::NodeDataResponse { msg, .. } => {
+                let mut node = node.write().await;
+                debug!("[NODE WRITE]: handle_msg NodeDataResponse write got");
+                Ok(node
+                    .update_data_response(origin, msg)
+                    .await?
+                    .into_iter()
+                    .collect())
+            }
             other @ MsgType::ClientDataResponse { .. } => {
                 error!(
                     "Client data response {msg_id:?}, from {}, has been dropped since it's not \
                     meant to be handled by a node: {other:?}",
-                    origin.addr()
-                );
-                Ok(vec![])
-            }
-            other @ MsgType::NodeDataResponse { .. } => {
-                error!(
-                    "Node data response {msg_id:?}, from {}, has been dropped since it's not \
-                    meant to be handled this way (it is directly forwarded to client): {other:?}",
                     origin.addr()
                 );
                 Ok(vec![])

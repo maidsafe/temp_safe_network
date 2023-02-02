@@ -162,15 +162,15 @@ pub(crate) enum Cmd {
         requesting_peer: Peer,
     },
     /// Performs serialisation and sends the msg to the peer node over a new bi-stream,
-    /// awaiting for a response which is forwarded to the client.
-    SendAndForwardResponseToClient {
+    /// tracking responses which are aggregated, and then a single response forwarded to the client .
+    SendAndTrackResponses {
         msg_id: MsgId,
         msg: NodeMsg,
         #[debug(skip)]
         context: NodeContext,
-        targets: BTreeSet<Peer>,
+        recipients: BTreeSet<Peer>,
+        causing_msg: ClientMsg,
         client_stream: SendStream,
-        source_client: Peer,
     },
     /// Proposes peers as offline
     ProposeVoteNodesOffline(BTreeSet<XorName>),
@@ -196,7 +196,7 @@ impl Cmd {
             | Cmd::SendNodeMsgResponse { .. }
             | Cmd::SendClientResponse { .. }
             | Cmd::SendNodeDataResponse { .. }
-            | Cmd::SendAndForwardResponseToClient { .. } => State::Comms,
+            | Cmd::SendAndTrackResponses { .. } => State::Comms,
             Cmd::HandleCommsError { .. } => State::Comms,
             Cmd::HandleMsg { .. } => State::HandleMsg,
             Cmd::UpdateNetworkAndHandleValidClientMsg { .. } => State::ClientMsg,
@@ -235,13 +235,11 @@ impl fmt::Display for Cmd {
             Cmd::HandleMembershipDecision(_) => write!(f, "HandleMembershipDecision"),
             Cmd::HandleDkgOutcome { .. } => write!(f, "HandleDkgOutcome"),
             Cmd::SendMsg { .. } => write!(f, "SendMsg"),
+            Cmd::SendAndTrackResponses { .. } => write!(f, "SendAndTrackResponses"),
             Cmd::SendAndEnqueueAnyResponse { .. } => write!(f, "SendAndEnqueueAnyResponse"),
             Cmd::SendNodeMsgResponse { .. } => write!(f, "SendNodeMsgResponse"),
             Cmd::SendClientResponse { .. } => write!(f, "SendClientResponse"),
             Cmd::SendNodeDataResponse { .. } => write!(f, "SendNodeDataResponse"),
-            Cmd::SendAndForwardResponseToClient { .. } => {
-                write!(f, "SendAndForwardResponseToClient")
-            }
             Cmd::EnqueueDataForReplication { .. } => write!(f, "EnqueueDataForReplication"),
             Cmd::TrackNodeIssue { name, issue } => {
                 write!(f, "TrackNodeIssue {name:?}, {issue:?}")

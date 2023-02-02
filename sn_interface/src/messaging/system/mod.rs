@@ -203,6 +203,14 @@ pub enum NodeDataResponse {
 }
 
 impl NodeDataResponse {
+    /// Returns true if the result returned is a success or not
+    pub fn is_success(&self) -> bool {
+        use NodeDataResponse::*;
+        match self {
+            QueryResponse { response, .. } => response.is_success(),
+            CmdResponse { response, .. } => response.is_success(),
+        }
+    }
     pub fn correlation_id(&self) -> &MsgId {
         match self {
             NodeDataResponse::QueryResponse { correlation_id, .. }

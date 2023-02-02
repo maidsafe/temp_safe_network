@@ -868,13 +868,13 @@ async fn spentbook_spend_client_message_should_replicate_to_adults_and_send_ack(
     .await?;
 
     while let Some(cmd) = cmds.next().await? {
-        if let Cmd::SendAndForwardResponseToClient {
+        if let Cmd::SendAndTrackResponses {
             msg: NodeMsg::NodeDataCmd(NodeDataCmd::StoreData(data)),
-            targets,
+            recipients,
             ..
         } = cmd
         {
-            assert_eq!(targets.len(), replication_count);
+            assert_eq!(recipients.len(), replication_count);
             let spent_proof_share =
                 dbc_utils::get_spent_proof_share_from_replicated_data(data.clone())?;
             assert_eq!(key_image.to_hex(), spent_proof_share.key_image().to_hex());

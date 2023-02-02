@@ -52,11 +52,7 @@ pub use self::error::{Error, Result};
 use self::peer_session::PeerSession;
 
 use sn_interface::{
-    messaging::{
-        data::ClientDataResponse as ClientResponse,
-        system::{NodeDataResponse as NodeResponse, NodeMsgType},
-        Dst, MsgId, MsgKind, MsgType, WireMsg,
-    },
+    messaging::{MsgId, WireMsg},
     types::Peer,
 };
 
@@ -65,13 +61,9 @@ use qp2p::{Endpoint, SendStream, UsrMsgBytes};
 use std::{
     collections::{BTreeMap, BTreeSet},
     net::SocketAddr,
-    sync::Arc,
 };
 use tokio::{
-    sync::{
-        mpsc::{self, Receiver, Sender},
-        RwLock,
-    },
+    sync::mpsc::{self, Receiver, Sender},
     task,
 };
 
@@ -180,25 +172,6 @@ impl Comm {
         })
     }
 
-    /// Sends the payload on new bidi-stream to noe and sends the response on the dst stream.
-    #[tracing::instrument(skip(self, bytes))]
-    pub fn send_and_respond_on_stream(
-        &self,
-        msg_id: MsgId,
-        msg_type: NodeMsgType,
-        peer: Peer,
-        bytes: UsrMsgBytes,
-        dst_stream: (Dst, Arc<RwLock<SendStream>>),
-    ) {
-        self.send_cmd(CommCmd::SendAndRespondOnStream {
-            msg_id,
-            msg_type,
-            peer,
-            bytes,
-            dst_stream,
-        })
-    }
-
     fn send_cmd(&self, cmd: CommCmd) {
         let sender = self.cmd_sender.clone();
         let _handle = task::spawn(async move {
@@ -225,14 +198,6 @@ enum CommCmd {
         msg_id: MsgId,
         #[debug(skip)]
         bytes: UsrMsgBytes,
-    },
-    SendAndRespondOnStream {
-        msg_id: MsgId,
-        msg_type: NodeMsgType,
-        peer: Peer,
-        #[debug(skip)]
-        bytes: UsrMsgBytes,
-        dst_stream: (Dst, Arc<RwLock<SendStream>>),
     },
 }
 
@@ -276,25 +241,6 @@ fn process_cmds(
                     if let Some(session) = get_session(msg_id, peer, &sessions, comm_events.clone())
                     {
                         send_and_return_response(msg_id, session, bytes, comm_events.clone())
-                    }
-                }
-                CommCmd::SendAndRespondOnStream {
-                    msg_id,
-                    msg_type,
-                    peer,
-                    bytes,
-                    dst_stream,
-                } => {
-                    if let Some(session) = get_session(msg_id, peer, &sessions, comm_events.clone())
-                    {
-                        send_and_respond_on_stream(
-                            msg_id,
-                            msg_type,
-                            session,
-                            bytes,
-                            dst_stream,
-                            comm_events.clone(),
-                        )
                     }
                 }
             }
@@ -372,126 +318,6 @@ fn send_and_return_response(
             }
         };
     });
-}
-
-#[tracing::instrument(skip_all)]
-fn send_and_respond_on_stream(
-    msg_id: MsgId,
-    msg_type: NodeMsgType,
-    session: PeerSession,
-    bytes: UsrMsgBytes,
-    dst_stream: (Dst, Arc<RwLock<SendStream>>),
-    comm_events: Sender<CommEvent>,
-) {
-    let _handle = task::spawn(async move {
-        let peer = session.peer();
-        let (dst, stream) = dst_stream;
-
-        // do we need to use `NODE_RESPONSE_TIMEOUT`?
-        let response_bytes = match session.send_with_bi_return_response(bytes, msg_id).await {
-            Ok(response_bytes) => response_bytes,
-            Err(error) => {
-                error!("Failed sending {msg_id:?} to {peer:?}: {error:?}");
-                send_error(peer, Error::FailedSend(msg_id), comm_events.clone());
-                return;
-            }
-        };
-        let response_bytes_len =
-            response_bytes.0.len() + response_bytes.1.len() + response_bytes.2.len();
-        trace!(
-            "{:?}: {msg_id:?} from {peer:?} length {response_bytes_len}",
-            sn_interface::types::log_markers::LogMarker::MsgReceived,
-        );
-
-        let received = match WireMsg::from(response_bytes) {
-            Ok(received) => match received.into_msg() {
-                Ok(msg) => msg,
-                Err(_error) => {
-                    send_error(peer, Error::InvalidMsgReceived(msg_id), comm_events.clone());
-                    return;
-                }
-            },
-            Err(error) => {
-                error!("Failed sending {msg_id:?} to {peer:?}: {error:?}");
-                send_error(peer, Error::InvalidMsgReceived(msg_id), comm_events.clone());
-                return;
-            }
-        };
-
-        match map_to_client_response(msg_type, msg_id, received, dst) {
-            Some(bytes) => {
-                let mut stream = stream.write().await;
-                match stream.send_user_msg(bytes).await {
-                    Ok(()) => trace!("Response from node {peer:?} for {msg_id:?} sent to client."),
-                    Err(error) => {
-                        send_error(peer, Error::from(error), comm_events.clone());
-                    }
-                }
-            }
-            None => {
-                send_error(peer, Error::InvalidMsgReceived(msg_id), comm_events.clone());
-            }
-        }
-    });
-}
-
-/// Verify what kind of response was received, and if that's the expected type based on
-/// the type of msg sent to the nodes, then return the corresponding response to the client.
-#[tracing::instrument(skip_all)]
-fn map_to_client_response(
-    sent: NodeMsgType,
-    correlation_id: MsgId,
-    received: MsgType,
-    dst: Dst,
-) -> Option<UsrMsgBytes> {
-    let response = match sent {
-        NodeMsgType::DataQuery => {
-            match received {
-                MsgType::NodeDataResponse {
-                    msg: NodeResponse::QueryResponse { response, .. },
-                    ..
-                } => {
-                    // We sent a data query and we received a query response,
-                    // so let's forward it to the client
-                    debug!("{correlation_id:?} sending query response back to client");
-                    ClientResponse::QueryResponse {
-                        response,
-                        correlation_id,
-                    }
-                }
-                other_resp => {
-                    error!("Unexpected response to query from node for {correlation_id:?}: {other_resp:?}");
-                    return None;
-                }
-            }
-        }
-        NodeMsgType::StoreData => {
-            match received {
-                MsgType::NodeDataResponse {
-                    msg: NodeResponse::CmdResponse { response, .. },
-                    ..
-                } => {
-                    // We sent a data cmd to store client data and we received a
-                    // cmd response, so let's forward it to the client
-                    debug!("{correlation_id:?} sending cmd response ACK back to client");
-                    ClientResponse::CmdResponse {
-                        response,
-                        correlation_id,
-                    }
-                }
-                other_resp => {
-                    error!("Unexpected response to cmd from node for {correlation_id:?}: {other_resp:?}");
-                    return None;
-                }
-            }
-        }
-    };
-
-    let kind = MsgKind::ClientDataResponse(dst.name);
-    let payload = WireMsg::serialize_msg_payload(&response).ok()?;
-    let wire_msg = WireMsg::new_msg(correlation_id, payload, kind, dst);
-
-    wire_msg.serialize().ok()
 }
 
 fn send_error(peer: Peer, error: Error, comm_events: Sender<CommEvent>) {

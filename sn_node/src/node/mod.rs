@@ -13,6 +13,7 @@ pub mod cfg;
 
 mod api;
 mod connectivity;
+mod data_responses;
 mod dkg;
 pub(crate) mod error;
 mod flow_ctrl;
@@ -85,6 +86,8 @@ mod core {
     };
     use tokio::sync::mpsc;
 
+    use super::data_responses::DataResponses;
+
     // File name where to cache this node's section tree (stored at this node's set root storage dir)
     const SECTION_TREE_FILE_NAME: &str = "section_tree";
     const GOSSIP_SECTION_COUNT: usize = 3;
@@ -122,6 +125,7 @@ mod core {
         // Section administration
         pub(crate) section_proposal_aggregator: SignatureAggregator,
         pub(crate) relocation_proof: Option<RelocationProof>,
+        pub(crate) data_responses: DataResponses,
     }
 
     #[derive(custom_debug::Debug, Clone)]
@@ -280,6 +284,7 @@ mod core {
                 handover_request_aggregator: TotalParticipationAggregator::default(),
                 section_proposal_aggregator: SignatureAggregator::default(),
                 relocation_proof: None,
+                data_responses: DataResponses::new(),
             };
 
             let context = &node.context();
