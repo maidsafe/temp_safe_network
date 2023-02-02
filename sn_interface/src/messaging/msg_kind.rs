@@ -35,8 +35,6 @@ pub enum MsgKind {
         is_join: bool,
         is_ae: bool,
     },
-    /// A data response sent from an Adult (along with its name) to Elders
-    NodeDataResponse(XorName),
 }
 
 impl MsgKind {

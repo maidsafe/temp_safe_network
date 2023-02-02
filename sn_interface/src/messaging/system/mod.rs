@@ -12,8 +12,6 @@ mod node_msgs;
 mod op_id;
 mod section_sig;
 
-use super::{data::CmdResponse, MsgId};
-
 use crate::messaging::AuthorityProof;
 use crate::network_knowledge::{NodeState, RelocationProof, SapCandidate, SectionTreeUpdate};
 use crate::SectionAuthorityProvider;
@@ -31,7 +29,7 @@ use serde::{Deserialize, Serialize};
 use sn_consensus::{Generation, SignedVote};
 use sn_sdkg::DkgSignedVote;
 use std::collections::{BTreeMap, BTreeSet};
-use std::fmt::{self, Display, Formatter};
+use std::fmt::{Display, Formatter};
 use xor_name::XorName;
 
 /// List of peers of a section
@@ -172,40 +170,6 @@ impl NodeMsg {
     }
     pub fn is_ae(&self) -> bool {
         matches!(self, NodeMsg::AntiEntropy { .. })
-    }
-}
-
-/// Messages sent from adults to the elders in response to client queries or commands
-#[allow(clippy::large_enum_variant)]
-#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub enum NodeDataResponse {
-    /// The response to a query, containing the query result.
-    QueryResponse {
-        /// The result of the query.
-        response: NodeQueryResponse,
-        /// ID of the requested operation.
-        operation_id: OperationId,
-    },
-    /// The response will be sent back to the client when the handling on the
-    /// receiving Elder has been finished.
-    CmdResponse {
-        /// The result of the command.
-        response: CmdResponse,
-        /// ID of causing ClientMsg::Cmd.
-        correlation_id: MsgId,
-    },
-}
-
-impl Display for NodeDataResponse {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::QueryResponse { response, .. } => {
-                write!(f, "NodeDataResponse::QueryResponse({response:?})")
-            }
-            Self::CmdResponse { response, .. } => {
-                write!(f, "NodeDataResponse::CmdResponse({response:?})")
-            }
-        }
     }
 }
 

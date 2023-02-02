@@ -73,9 +73,7 @@ impl MsgListener {
 
                     let src_name = match wire_msg.kind() {
                         MsgKind::Client { auth, .. } => auth.public_key.into(),
-                        MsgKind::Node { name, .. }
-                        | MsgKind::ClientDataResponse(name)
-                        | MsgKind::NodeDataResponse(name) => *name,
+                        MsgKind::Node { name, .. } | MsgKind::ClientDataResponse(name) => *name,
                     };
 
                     let peer = Peer::new(src_name, remote_address);

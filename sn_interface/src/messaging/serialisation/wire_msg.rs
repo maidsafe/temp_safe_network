@@ -10,7 +10,7 @@ use super::wire_msg_header::WireMsgHeader;
 
 use crate::messaging::{
     data::{ClientDataResponse, ClientMsg},
-    system::{NodeDataResponse, NodeMsg},
+    system::NodeMsg,
     AuthorityProof, Dst, Error, MsgId, MsgKind, MsgType, Result,
 };
 
@@ -226,17 +226,6 @@ impl WireMsg {
                 Ok(MsgType::Node {
                     msg_id: self.header.msg_envelope.msg_id,
                     dst: self.dst,
-                    msg,
-                })
-            }
-            MsgKind::NodeDataResponse(_) => {
-                let msg: NodeDataResponse =
-                    rmp_serde::from_slice(&self.payload).map_err(|err| {
-                        Error::FailedToParse(format!("Data message payload as Msgpack: {err}"))
-                    })?;
-
-                Ok(MsgType::NodeDataResponse {
-                    msg_id: self.header.msg_envelope.msg_id,
                     msg,
                 })
             }

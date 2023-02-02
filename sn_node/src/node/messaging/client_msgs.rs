@@ -185,8 +185,7 @@ impl MyNode {
                         msg_id,
                         origin,
                         send_stream,
-                    )
-                    .await;
+                    );
                 }
                 // TODO: This would mean all spendbook is at elders...
                 MyNode::store_data_and_respond(context, data, send_stream, origin, msg_id).await

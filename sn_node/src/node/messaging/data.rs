@@ -142,7 +142,7 @@ impl MyNode {
     /// on storage nodes.
     ///
     /// The response is forwarded back on to the client
-    pub(crate) async fn forward_on_spentbook_cmd(
+    pub(crate) fn forward_on_spentbook_cmd(
         data: ReplicatedData,
         context: &NodeContext,
         msg_id: MsgId,

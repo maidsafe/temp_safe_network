@@ -325,7 +325,7 @@ impl MyNode {
                     Ok(vec![])
                 }
             }
-            MsgKind::Node { .. } | MsgKind::NodeDataResponse(_) => {
+            MsgKind::Node { .. } => {
                 // If we need to log, here's a cmd ready for us...
                 // we may want to log issues with any node repeatedly out of sync here...
                 let track_node_cmd = Cmd::TrackNodeIssue {
