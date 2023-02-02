@@ -388,7 +388,7 @@ fn send_and_respond_on_stream(
         let (dst, stream) = dst_stream;
 
         // do we need to use `NODE_RESPONSE_TIMEOUT`?
-        let node_response_bytes = match session.send_with_bi_return_response(bytes, msg_id).await {
+        let response_bytes = match session.send_with_bi_return_response(bytes, msg_id).await {
             Ok(response_bytes) => response_bytes,
             Err(error) => {
                 error!("Failed sending {msg_id:?} to {peer:?}: {error:?}");
@@ -396,10 +396,14 @@ fn send_and_respond_on_stream(
                 return;
             }
         };
+        let response_bytes_len =
+            response_bytes.0.len() + response_bytes.1.len() + response_bytes.2.len();
+        trace!(
+            "{:?}: {msg_id:?} from {peer:?} length {response_bytes_len}",
+            sn_interface::types::log_markers::LogMarker::MsgReceived,
+        );
 
-        debug!("Response from node {peer:?} is in for {msg_id:?}");
-
-        let received = match WireMsg::from(node_response_bytes) {
+        let received = match WireMsg::from(response_bytes) {
             Ok(received) => match received.into_msg() {
                 Ok(msg) => msg,
                 Err(_error) => {
