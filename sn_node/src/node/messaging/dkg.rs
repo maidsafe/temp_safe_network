@@ -705,6 +705,55 @@ impl MyNode {
         }
     }
 
+    /// Force DKG termination for a given session_id
+    /// Either fails and logs errors or saves the keyshare in our section_keys_provider
+    pub(crate) fn force_dkg_termination(
+        &mut self,
+        session_id: &DkgSessionId,
+        expected_pk: &BlsPublicKey,
+    ) {
+        match self.dkg_voter.force_termination(session_id) {
+            Ok(Some((our_id, new_pubs, new_sec))) => {
+                trace!(
+                    "DKG forced termination for s{} successful: generated key_share: {new_pubs:?} with index {our_id:?}",
+                    session_id.sh(),
+                );
+                // If it matches the expected_pk
+                // Adds our new keyshare to our cache, we will then use
+                // it to sign any msg that needs section agreement.
+                if &new_pubs.public_key() == expected_pk {
+                    trace!(
+                        "Matching expected keyshare for s{} saving: {new_pubs:?}",
+                        session_id.sh()
+                    );
+                    let key_share = SectionKeyShare {
+                        public_key_set: new_pubs,
+                        index: our_id.into(),
+                        secret_key_share: new_sec,
+                    };
+                    self.section_keys_provider.insert(key_share);
+                } else {
+                    trace!(
+                        "Mismatch expected keyshare for s{} discarding: {new_pubs:?}",
+                        session_id.sh()
+                    );
+                }
+            }
+            Ok(None) => {
+                error!(
+                    "DKG forced termination for s{} missing outcome",
+                    session_id.sh()
+                );
+            }
+            Err(e) => {
+                error!(
+                    "Failed DKG forced termination for s{}: {e}",
+                    session_id.sh()
+                );
+            }
+        }
+    }
+
     /// For all the ongoing DKG sessions, sends out all the current known votes to all DKG
     /// participants if we don't have any votes yet, sends out our ephemeral key
     pub(crate) fn dkg_gossip_msgs(&self) -> Vec<Cmd> {
