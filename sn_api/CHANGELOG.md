@@ -5,11 +5,61 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.76.1 (2023-02-02)
+
+### Chore
+
+ - <csr-id-e706848522d6c52d6ed5eddf638376996cc947a9/> add clippy check for unused async
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 1 day passed between releases.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Merge #2061 ([`bab8208`](https://github.com/maidsafe/safe_network/commit/bab82087260ac4f1f44e688db2e67ca2387a7175))
+    - add clippy check for unused async ([`e706848`](https://github.com/maidsafe/safe_network/commit/e706848522d6c52d6ed5eddf638376996cc947a9))
+</details>
+
 ## v0.76.0 (2023-02-01)
+
+### Chore
+
+ - <csr-id-69f8ade1ea8bb3e77c169b17ae21a40370bfab58/> sn_interface-0.17.0/sn_comms-0.2.0/sn_client-0.78.0/sn_node-0.73.0/sn_api-0.76.0/sn_cli-0.69.0
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 1 commit contributed to the release.
+ - 5 days passed between releases.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.17.0/sn_comms-0.2.0/sn_client-0.78.0/sn_node-0.73.0/sn_api-0.76.0/sn_cli-0.69.0 ([`69f8ade`](https://github.com/maidsafe/safe_network/commit/69f8ade1ea8bb3e77c169b17ae21a40370bfab58))
+</details>
 
 ## v0.75.5 (2023-01-27)
 
 <csr-id-6b923515f0f0cd1b0d1a4ed51d3ca418e41d9916/>
+<csr-id-01ff2ccf45dfc9d45c5ad540144d7a4a640830fc/>
 
 ### Chore
 
@@ -86,9 +136,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - feat(queries): add happy path feature - This allows clients to default to a lower impact interaction with elders (todo: only expanding the impact on failures). - Adds combined feat for both cmd and query happy path. ([`a77d95b`](https://github.com/maidsafe/safe_network/commit/a77d95b57ff179d1f8fedc00529c69204a8f89e0))
     - feat(cmds): add happy path feature - This allows clients to default to a lower impact interaction with elders, only expanding the impact on failures. ([`21b4167`](https://github.com/maidsafe/safe_network/commit/21b4167f68b7bd145d02dcdf1b5d8f9acb7971a8))
 </details>
-
-<csr-unknown>
-Adding --replicas arg to CLI dog command which allows the user to performa check on several data replicas for the content being targeted by specifying their indexes.<csr-unknown/>
 
 ## v0.75.3 (2022-12-20)
 

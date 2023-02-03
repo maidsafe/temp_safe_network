@@ -123,7 +123,7 @@ impl MyNode {
     /// If this is a store request, and we are an Elder and one of
     /// the `data_copy_count()` nodes, then we will send a wiremsg
     /// to ourselves, among the msgs sent to the other holders.
-    pub(crate) async fn handle_valid_client_msg(
+    pub(crate) fn handle_valid_client_msg(
         mut context: NodeContext,
         msg_id: MsgId,
         msg: ClientMsg,
@@ -146,7 +146,6 @@ impl MyNode {
                     origin,
                     send_stream,
                 )
-                .await
             }
         };
 
@@ -230,7 +229,6 @@ impl MyNode {
             send_stream,
             origin,
         )
-        .await
     }
 
     // helper to extract the contents of the cmd as ReplicatedData

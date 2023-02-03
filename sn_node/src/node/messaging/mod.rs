@@ -119,7 +119,7 @@ impl MyNode {
                     return Err(Error::NoClientResponseStream);
                 };
 
-                MyNode::handle_valid_client_msg(context, msg_id, msg, auth, origin, stream).await
+                MyNode::handle_valid_client_msg(context, msg_id, msg, auth, origin, stream)
             }
             other @ MsgType::ClientDataResponse { .. } => {
                 error!(

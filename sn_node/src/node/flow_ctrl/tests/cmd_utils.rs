@@ -144,8 +144,7 @@ impl<'a> ProcessAndInspectCmds<'a> {
                 ..
             }) => {
                 let cmds =
-                    MyNode::handle_valid_client_msg(context, msg_id, msg, auth, peer, send_stream)
-                        .await?;
+                    MyNode::handle_valid_client_msg(context, msg_id, msg, auth, peer, send_stream)?;
                 Ok(Self::from(cmds, dispatcher))
             }
             _ => Err(crate::node::error::Error::NoClientResponseStream),

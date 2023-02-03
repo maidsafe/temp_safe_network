@@ -83,9 +83,8 @@ impl RegisterStorage {
 
         let mut log_to_write = Vec::new();
         for replicated_cmd in &data.op_log {
-            if let Err(err) = self
-                .try_to_apply_cmd_against_register_state(replicated_cmd, &mut stored_reg)
-                .await
+            if let Err(err) =
+                self.try_to_apply_cmd_against_register_state(replicated_cmd, &mut stored_reg)
             {
                 warn!(
                     "Discarding ReplicatedRegisterLog cmd {:?}: {:?}",
@@ -110,8 +109,7 @@ impl RegisterStorage {
         // we have in local storage, to then try to apply the new command onto it.
         let mut stored_reg = self.try_load_stored_register(&cmd.dst_address()).await?;
 
-        self.try_to_apply_cmd_against_register_state(cmd, &mut stored_reg)
-            .await?;
+        self.try_to_apply_cmd_against_register_state(cmd, &mut stored_reg)?;
 
         // Everything went fine, let's write the single cmd to disk
         self.file_store
@@ -269,7 +267,7 @@ impl RegisterStorage {
     // state. It accumulates the cmd, if valid, into the log so further calls can be made with
     // the same state and log, as used by the `update` function.
     // Note the cmd is always pushed to the log even if it's a duplicated cmd.
-    async fn try_to_apply_cmd_against_register_state(
+    fn try_to_apply_cmd_against_register_state(
         &self,
         cmd: &RegisterCmd,
         stored_reg: &mut StoredRegister,
@@ -281,7 +279,7 @@ impl RegisterStorage {
         // verified untill we have the `Register create` cmd.
         match (stored_reg.state.as_mut(), cmd) {
             (Some(_), RegisterCmd::Create { .. }) => return Ok(()), // no op, since already created
-            (Some(ref mut register), RegisterCmd::Edit(_)) => self.apply(cmd, register).await?,
+            (Some(ref mut register), RegisterCmd::Edit(_)) => self.apply(cmd, register)?,
             (None, RegisterCmd::Create { cmd, .. }) => {
                 // the target Register is not in our store or we don't have the 'Register create',
                 // let's verify the create cmd we received is valid and try to apply stored cmds we may have.
@@ -299,7 +297,7 @@ impl RegisterStorage {
                     Register::new(*op.policy.owner(), op.name, op.tag, op.policy.clone());
 
                 for cmd in &stored_reg.op_log {
-                    self.apply(cmd, &mut register).await?;
+                    self.apply(cmd, &mut register)?;
                 }
 
                 stored_reg.state = Some(register);
@@ -312,7 +310,7 @@ impl RegisterStorage {
     }
 
     // Try to apply the provided cmd to the register state, performing all op validations
-    async fn apply(&self, cmd: &RegisterCmd, register: &mut Register) -> Result<()> {
+    fn apply(&self, cmd: &RegisterCmd, register: &mut Register) -> Result<()> {
         let addr = cmd.dst_address();
         if &addr != register.address() {
             return Err(Error::RegisterAddrMismatch {
@@ -528,9 +526,7 @@ mod test {
         let mut stored_reg = store.try_load_stored_register(&addr).await?;
 
         // apply the create cmd
-        store
-            .try_to_apply_cmd_against_register_state(&cmd_create, &mut stored_reg)
-            .await?;
+        store.try_to_apply_cmd_against_register_state(&cmd_create, &mut stored_reg)?;
         // it should contain the create cmd
         assert_eq!(stored_reg.state.as_ref(), Some(&register));
         assert_eq!(stored_reg.op_log, vec![cmd_create.clone()]);
@@ -538,10 +534,7 @@ mod test {
         assert_eq!(stored_reg.state.as_ref().map(|reg| reg.size()), Some(0));
 
         // apply the create cmd again should change nothing
-        match store
-            .try_to_apply_cmd_against_register_state(&cmd_create, &mut stored_reg)
-            .await
-        {
+        match store.try_to_apply_cmd_against_register_state(&cmd_create, &mut stored_reg) {
             Ok(()) => (),
             Err(err) => bail!(
                 "An error should not occur when applying create cmd again: {:?}",
@@ -551,9 +544,7 @@ mod test {
 
         // let's now apply an edit cmd
         let cmd_edit = edit_register(&mut register, &keypair)?;
-        store
-            .try_to_apply_cmd_against_register_state(&cmd_edit, &mut stored_reg)
-            .await?;
+        store.try_to_apply_cmd_against_register_state(&cmd_edit, &mut stored_reg)?;
         // it should contain the create and edit cmds
         assert_eq!(stored_reg.state.as_ref(), Some(&register));
         assert_eq!(stored_reg.op_log.len(), 2);
@@ -569,9 +560,7 @@ mod test {
 
         // applying the edit cmd again shouldn't fail or alter the register content,
         // although the log will contain the edit cmd duplicated
-        store
-            .try_to_apply_cmd_against_register_state(&cmd_edit, &mut stored_reg)
-            .await?;
+        store.try_to_apply_cmd_against_register_state(&cmd_edit, &mut stored_reg)?;
         assert_eq!(stored_reg.state.as_ref(), Some(&register));
         assert_eq!(stored_reg.op_log.len(), 3);
         assert!(
@@ -599,9 +588,7 @@ mod test {
 
         // apply an edit cmd first
         let cmd_edit = edit_register(&mut register, &keypair)?;
-        store
-            .try_to_apply_cmd_against_register_state(&cmd_edit, &mut stored_reg)
-            .await?;
+        store.try_to_apply_cmd_against_register_state(&cmd_edit, &mut stored_reg)?;
         // it should contain the edit cmd
         assert_eq!(stored_reg.state, None);
         assert_eq!(stored_reg.op_log, vec![cmd_edit.clone()]);
@@ -609,9 +596,7 @@ mod test {
 
         // applying the edit cmd again shouldn't fail,
         // although the log will contain the edit cmd duplicated
-        store
-            .try_to_apply_cmd_against_register_state(&cmd_edit, &mut stored_reg)
-            .await?;
+        store.try_to_apply_cmd_against_register_state(&cmd_edit, &mut stored_reg)?;
         assert_eq!(stored_reg.state, None);
         assert_eq!(stored_reg.op_log.len(), 2);
         assert!(
@@ -621,9 +606,7 @@ mod test {
         assert_eq!(stored_reg.op_log_path, log_path);
 
         // let's apply the create cmd now
-        store
-            .try_to_apply_cmd_against_register_state(&cmd_create, &mut stored_reg)
-            .await?;
+        store.try_to_apply_cmd_against_register_state(&cmd_create, &mut stored_reg)?;
         // it should contain the create and edit cmds
         assert_eq!(stored_reg.state.as_ref(), Some(&register));
         assert_eq!(stored_reg.op_log.len(), 3);
@@ -638,10 +621,7 @@ mod test {
         assert_eq!(stored_reg.state.as_ref().map(|reg| reg.size()), Some(1));
 
         // apply the create cmd again should change nothing
-        match store
-            .try_to_apply_cmd_against_register_state(&cmd_create, &mut stored_reg)
-            .await
-        {
+        match store.try_to_apply_cmd_against_register_state(&cmd_create, &mut stored_reg) {
             Ok(()) => (),
             Err(err) => bail!(
                 "An error should not occur when applying create cmd again: {:?}",

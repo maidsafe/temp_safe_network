@@ -940,7 +940,7 @@ mod tests {
         }
 
         // dkg done, make sure the new key_shares are valid
-        verify_new_key(&new_sk_shares, node_count).await;
+        verify_new_key(&new_sk_shares, node_count);
 
         Ok(())
     }
@@ -1090,7 +1090,7 @@ mod tests {
         }
 
         // dkg done, make sure the new key_shares are valid
-        verify_new_key(&new_sk_shares, node_count).await;
+        verify_new_key(&new_sk_shares, node_count);
 
         Ok(())
     }
@@ -1256,7 +1256,7 @@ mod tests {
         }
 
         // dkg done, make sure the new key_shares are valid
-        verify_new_key(&new_sk_shares, node_count).await;
+        verify_new_key(&new_sk_shares, node_count);
 
         Ok(())
     }
@@ -1331,7 +1331,7 @@ mod tests {
 
     // Verify that the newly generated key is valid. Aggregate the signature shares instead of
     // using `TestKeys::get_sk_set_from_shares`.
-    async fn verify_new_key(new_sk_shares: &BTreeMap<XorName, SectionKeyShare>, node_count: usize) {
+    fn verify_new_key(new_sk_shares: &BTreeMap<XorName, SectionKeyShare>, node_count: usize) {
         let mut pub_key_set = BTreeSet::new();
         let mut sig_shares = Vec::new();
         for key_share in new_sk_shares.values() {

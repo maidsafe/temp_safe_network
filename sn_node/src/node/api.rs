@@ -29,7 +29,7 @@ use std::{path::PathBuf, sync::Arc};
 use tokio::sync::mpsc;
 
 impl MyNode {
-    pub(crate) async fn first_node(
+    pub(crate) fn first_node(
         comm: Comm,
         keypair: Keypair,
         used_space: UsedSpace,
@@ -53,8 +53,7 @@ impl MyNode {
             used_space,
             root_storage_dir,
             fault_cmds_sender,
-        )
-        .await?;
+        )?;
 
         Ok((node, genesis_dbc))
     }

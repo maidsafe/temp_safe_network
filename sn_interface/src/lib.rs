@@ -21,7 +21,8 @@
     unused_import_braces,
     unused_qualifications,
     clippy::unicode_not_nfc,
-    clippy::unwrap_used
+    clippy::unwrap_used,
+    clippy::unused_async
 )]
 
 //! SAFE network data types.
