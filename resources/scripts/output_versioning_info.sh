@@ -43,15 +43,15 @@ function build_release_tag_name() {
 }
 
 function output_version_info() {
-  echo "::set-output name=sn_fault_detection_version::$sn_fault_detection_version"
-  echo "::set-output name=sn_interface_version::$sn_interface_version"
-  echo "::set-output name=sn_comms_version::$sn_comms_version"
-  echo "::set-output name=sn_client_version::$sn_client_version"
-  echo "::set-output name=sn_node_version::$sn_node_version"
-  echo "::set-output name=sn_api_version::$sn_api_version"
-  echo "::set-output name=sn_cli_version::$sn_cli_version"
-  echo "::set-output name=gh_release_name::$gh_release_name"
-  echo "::set-output name=gh_release_tag_name::$gh_release_tag_name"
+  echo "sn_fault_detection_version=$sn_fault_detection_version" >> $GITHUB_OUTPUT
+  echo "sn_interface_version=$sn_interface_version" >> $GITHUB_OUTPUT
+  echo "sn_comms_version=$sn_comms_version" >> $GITHUB_OUTPUT
+  echo "sn_client_version=$sn_client_version" >> $GITHUB_OUTPUT
+  echo "sn_node_version=$sn_node_version" >> $GITHUB_OUTPUT
+  echo "sn_api_version=$sn_api_version" >> $GITHUB_OUTPUT
+  echo "sn_cli_version=$sn_cli_version" >> $GITHUB_OUTPUT
+  echo "gh_release_name=$gh_release_name" >> $GITHUB_OUTPUT
+  echo "gh_release_tag_name=$gh_release_tag_name" >> $GITHUB_OUTPUT
 }
 
 gh_release_name=""
