@@ -18,6 +18,8 @@ use std::{
 };
 use xor_name::XorName;
 
+const PRIMARY_NODE_AGE: u8 = 7;
+
 /// The id of a node is the name, derived from its `PublicKey`, and its address.
 #[derive(Copy, Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct NodeId {
@@ -41,6 +43,13 @@ impl NodeId {
     /// Returns the age.
     pub fn age(&self) -> u8 {
         calc_age(&self.name)
+    }
+
+    /// Returns if this node can be considered primary storage
+    /// (pruimary storage being anything beyond the low age nodes which are much more
+    /// likely to be churning, and so only perform backup operations)
+    pub fn is_primary_node(&self) -> bool {
+        self.age() >= PRIMARY_NODE_AGE
     }
 
     pub fn from(sender: Participant) -> Self {
