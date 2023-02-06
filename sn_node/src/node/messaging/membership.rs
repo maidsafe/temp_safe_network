@@ -201,7 +201,9 @@ impl MyNode {
             cmds.extend(self.handle_node_left(new_info, signature).into_iter());
         }
 
-        cmds.push(self.send_node_approvals(decision.clone()));
+        if !joining_nodes.is_empty() {
+            cmds.push(self.send_node_approvals(decision.clone()));
+        }
 
         // Do not disable node joins in first section.
         if !self.is_startup_joining_allowed() {
