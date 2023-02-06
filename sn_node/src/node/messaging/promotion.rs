@@ -169,7 +169,6 @@ impl MyNode {
         sig_over_them: SectionSig,
     ) -> Result<Vec<Cmd>> {
         trace!("{}", LogMarker::HandlingNewSectionsAgreement);
-        let context = self.context();
 
         // First we snapshot the section chain
         let mut parent_section_chain = self.section_chain();
@@ -192,15 +191,14 @@ impl MyNode {
         let updated = self.network_knowledge.update_knowledge_if_valid(
             section_tree_update,
             None,
-            &context.name,
+            &self.name(),
         )?;
         if updated {
+            let context = self.context();
             info!("Updated our network knowledge for {:?}", their_prefix);
             info!("Writing updated knowledge to disk");
             MyNode::write_section_tree(&context);
-
-            // updates comm with new members and removes connections that are not from our members
-            self.comm.set_comm_targets(self.network_knowledge.members());
+            MyNode::update_comm_target_list(&context);
         }
         Ok(cmds)
     }
@@ -212,7 +210,7 @@ impl MyNode {
         section_sig: SectionSig,
     ) -> Result<Vec<Cmd>> {
         trace!("{}", LogMarker::HandlingNewEldersAgreement);
-        let context = self.context();
+        let old_context = self.context();
         let mut section_chain = self.section_chain();
         let last_key = section_chain.last_key()?;
 
@@ -230,25 +228,24 @@ impl MyNode {
             section_sig.signature,
         )?;
         let update = SectionTreeUpdate::new(signed_sap, section_chain);
-        let name = self.context().name;
+        let name = old_context.name;
         let updated = self
             .network_knowledge
             .update_knowledge_if_valid(update, None, &name)?;
 
         if updated {
+            let cmds = self.update_on_section_change(&old_context).await;
+
+            let latest_context = self.context();
             info!("Updated our network knowledge for {:?}", prefix);
             info!("Writing updated knowledge to disk");
-            MyNode::write_section_tree(&context);
+            MyNode::write_section_tree(&latest_context);
+            MyNode::update_comm_target_list(&latest_context);
 
             info!(
                 "Prefixes we know about: {:?}",
-                self.network_knowledge.section_tree()
+                latest_context.network_knowledge.section_tree()
             );
-
-            let cmds = self.update_on_section_change(&context).await;
-            // updates comm with new members and removes connections that are not from our members
-            self.comm.set_comm_targets(self.network_knowledge.members());
-
             cmds
         } else {
             Ok(vec![])

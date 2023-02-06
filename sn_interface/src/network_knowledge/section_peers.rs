@@ -33,6 +33,11 @@ impl SectionPeers {
         self.members.values().cloned().collect()
     }
 
+    /// Returns set of archived members, i.e those that've left our section
+    pub(super) fn archived_members(&self) -> BTreeSet<SectionSigned<NodeState>> {
+        self.archive.values().cloned().collect()
+    }
+
     /// Returns the number of current members.
     pub(super) fn num_of_members(&self) -> usize {
         self.members.len()

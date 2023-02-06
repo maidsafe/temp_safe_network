@@ -106,6 +106,8 @@ impl MyNode {
 
         // we switch to the new section
         self.switch_section(dst_sap, new_keypair)?;
+        // update the comms
+        MyNode::update_comm_target_list(&self.context());
 
         info!(
             "Relocation of us as {}: switched section to {new_prefix:?} with new name {new_name}. Now trying to join..",
