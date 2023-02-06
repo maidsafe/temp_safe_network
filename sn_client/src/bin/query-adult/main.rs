@@ -9,7 +9,7 @@ use sn_client::{Client, Error};
 use sn_interface::{
     data_copy_count,
     messaging::{
-        data::{ClientMsg, DataQuery, DataQueryVariant, QueryResponse},
+        data::{ClientMsg, DataQuery, QueryResponse},
         WireMsg,
     },
     types::{Chunk, ChunkAddress},
@@ -114,23 +114,16 @@ async fn main() -> Result<()> {
 }
 
 async fn query_chunk(client: &Client, node_index: usize, address: XorName) -> Result<Chunk> {
-    let variant = DataQueryVariant::GetChunk(ChunkAddress(address));
-    let query = DataQuery {
-        node_index,
-        variant: variant.clone(),
-    };
-    let query_response = send_query(client, query).await?;
+    let query = DataQuery::GetChunk(ChunkAddress(address));
+
+    let query_response = send_query(client, query.clone(), node_index).await?;
     match query_response {
         QueryResponse::GetChunk(result) => result.map_err(|e| e.into()),
-        response => Err(Error::UnexpectedQueryResponse {
-            query: variant,
-            response,
-        })
-        .map_err(|e| e.into()),
+        response => Err(Error::UnexpectedQueryResponse { query, response }).map_err(|e| e.into()),
     }
 }
 
-async fn send_query(client: &Client, query: DataQuery) -> Result<QueryResponse> {
+async fn send_query(client: &Client, query: DataQuery, node_index: usize) -> Result<QueryResponse> {
     let client_pk = client.public_key();
     let msg = ClientMsg::Query(query.clone());
     let serialised_query = WireMsg::serialize_msg_payload(&msg)?;
@@ -138,6 +131,7 @@ async fn send_query(client: &Client, query: DataQuery) -> Result<QueryResponse> 
     Ok(client
         .send_signed_query(
             query,
+            node_index,
             client_pk,
             serialised_query.clone(),
             signature.clone(),

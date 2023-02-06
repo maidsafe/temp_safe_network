@@ -10,7 +10,7 @@ use crate::messaging::Dst;
 
 use super::{
     data::{ClientDataResponse, ClientMsg},
-    system::{NodeDataResponse, NodeMsg},
+    system::NodeMsg,
     AuthorityProof, ClientAuth, MsgId,
 };
 use std::fmt::{Display, Formatter};
@@ -48,13 +48,6 @@ pub enum MsgType {
         /// the message
         msg: NodeMsg,
     },
-    /// The response to a NodeDataCmd or NodeDataQuery, containing the result.
-    NodeDataResponse {
-        /// Message ID
-        msg_id: MsgId,
-        /// The message
-        msg: NodeDataResponse,
-    },
 }
 
 impl Display for MsgType {
@@ -65,7 +58,6 @@ impl Display for MsgType {
             Self::ClientDataResponse { msg, .. } => {
                 write!(f, "MsgType::ClientDataResponse({msg})")
             }
-            Self::NodeDataResponse { msg, .. } => write!(f, "MsgType::NodeDataResponse({msg})"),
         }
     }
 }

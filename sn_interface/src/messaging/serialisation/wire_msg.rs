@@ -10,7 +10,7 @@ use super::wire_msg_header::WireMsgHeader;
 
 use crate::messaging::{
     data::{ClientDataResponse, ClientMsg},
-    system::{NodeDataResponse, NodeMsg},
+    system::NodeMsg,
     AuthorityProof, Dst, Error, MsgId, MsgKind, MsgType, Result,
 };
 
@@ -193,7 +193,7 @@ impl WireMsg {
     /// Deserialize the payload from this `WireMsg` returning a `MsgType` instance.
     pub fn into_msg(&self) -> Result<MsgType> {
         match self.header.msg_envelope.kind.clone() {
-            MsgKind::Client(auth) => {
+            MsgKind::Client { auth, .. } => {
                 let msg: ClientMsg = rmp_serde::from_slice(&self.payload).map_err(|err| {
                     Error::FailedToParse(format!("Data message payload as Msgpack: {err}"))
                 })?;
@@ -226,17 +226,6 @@ impl WireMsg {
                 Ok(MsgType::Node {
                     msg_id: self.header.msg_envelope.msg_id,
                     dst: self.dst,
-                    msg,
-                })
-            }
-            MsgKind::NodeDataResponse(_) => {
-                let msg: NodeDataResponse =
-                    rmp_serde::from_slice(&self.payload).map_err(|err| {
-                        Error::FailedToParse(format!("Data message payload as Msgpack: {err}"))
-                    })?;
-
-                Ok(MsgType::NodeDataResponse {
-                    msg_id: self.header.msg_envelope.msg_id,
                     msg,
                 })
             }
@@ -275,7 +264,7 @@ mod tests {
     use super::*;
     use crate::{
         messaging::{
-            data::{ClientMsg, DataQuery, DataQueryVariant},
+            data::{ClientMsg, DataQuery},
             system::NodeMsg,
             AuthorityProof, ClientAuth, MsgId,
         },
@@ -335,10 +324,8 @@ mod tests {
 
         let msg_id = MsgId::new();
 
-        let client_msg = ClientMsg::Query(DataQuery {
-            node_index: 0,
-            variant: DataQueryVariant::GetChunk(ChunkAddress(xor_name::rand::random())),
-        });
+        let client_msg =
+            ClientMsg::Query(DataQuery::GetChunk(ChunkAddress(xor_name::rand::random())));
 
         let payload = WireMsg::serialize_msg_payload(&client_msg)?;
         let auth = ClientAuth {
@@ -346,7 +333,11 @@ mod tests {
             signature: src_client_keypair.sign(&payload),
         };
         let auth_proof = AuthorityProof::verify(auth.clone(), &payload)?;
-        let kind = MsgKind::Client(auth);
+        let kind = MsgKind::Client {
+            auth,
+            is_spend: false,
+            query_index: None,
+        };
 
         let wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
         let serialized = wire_msg.serialize()?;

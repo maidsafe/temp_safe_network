@@ -14,7 +14,7 @@ use crate::errors::{Error, Result};
 use sn_interface::{
     data_copy_count,
     messaging::{
-        data::{ClientMsg, DataQuery, DataQueryVariant, QueryResponse},
+        data::{ClientMsg, DataQuery, QueryResponse},
         ClientAuth, WireMsg,
     },
     types::{Peer, PublicKey, Signature},
@@ -31,14 +31,14 @@ impl Client {
     /// Queries are automatically retried using exponential backoff if the timeout is hit.
     #[cfg(not(feature = "check-replicas"))]
     #[instrument(skip(self), level = "debug")]
-    pub async fn send_query(&self, query: DataQueryVariant) -> Result<QueryResponse> {
+    pub async fn send_query(&self, query: DataQuery) -> Result<QueryResponse> {
         self.send_query_with_retry(query, true).await
     }
 
     /// Send a Query to the network and await a response.
     /// Queries are not retried if the timeout is hit.
     #[instrument(skip(self), level = "debug")]
-    pub async fn send_query_without_retry(&self, query: DataQueryVariant) -> Result<QueryResponse> {
+    pub async fn send_query_without_retry(&self, query: DataQuery) -> Result<QueryResponse> {
         self.send_query_with_retry(query, false).await
     }
 
@@ -46,16 +46,8 @@ impl Client {
     // Queries are automatically retried if the timeout is hit
     // This function is a private helper.
     #[instrument(skip(self), level = "debug")]
-    async fn send_query_with_retry(
-        &self,
-        query: DataQueryVariant,
-        retry: bool,
-    ) -> Result<QueryResponse> {
+    async fn send_query_with_retry(&self, query: DataQuery, retry: bool) -> Result<QueryResponse> {
         let client_pk = self.public_key();
-        let mut query = DataQuery {
-            node_index: 0,
-            variant: query,
-        };
 
         // Add jitter so not all clients retry at the same rate. This divider will knock on to the overall retry window
         // and should help prevent elders from being conseceutively overwhelmed
@@ -63,8 +55,8 @@ impl Client {
 
         let span = info_span!("Attempting a query");
         let _ = span.enter();
-        let dst = query.variant.dst_name();
-
+        let dst = query.dst_name();
+        let mut node_index = 0;
         let max_interval = self.max_backoff_interval;
 
         let mut backoff = ExponentialBackoff {
@@ -82,7 +74,7 @@ impl Client {
             let msg = ClientMsg::Query(query.clone());
             let serialised_query = WireMsg::serialize_msg_payload(&msg)?;
             let signature = self.keypair.sign(&serialised_query);
-            debug!("Attempting {query:?} (node_index #{})", query.node_index);
+            debug!("Attempting {query:?} (node_index #{})", node_index);
 
             // grab up to date destination section from our local network knowledge
             let (section_pk, elders) = self.session.get_query_elders(dst).await?;
@@ -90,6 +82,7 @@ impl Client {
             let res = self
                 .send_signed_query_to_section(
                     query.clone(),
+                    node_index,
                     client_pk,
                     serialised_query.clone(),
                     signature.clone(),
@@ -99,7 +92,7 @@ impl Client {
 
             // There should not be more than a certain number of nodes holding
             // copies of the data. Retry the closest node again.
-            if !retry || query.node_index >= data_copy_count() - 1 {
+            if !retry || node_index >= data_copy_count() - 1 {
                 // we don't want to retry beyond `data_copy_count()` nodes
                 return res;
             }
@@ -119,7 +112,7 @@ impl Client {
                 }
 
                 // In the next attempt, try the next node, further away.
-                query.node_index += 1;
+                node_index += 1;
                 debug!("Sleeping before trying query again: {delay:?} sleep for {query:?}");
                 sleep(delay).await;
             } else {
@@ -136,13 +129,21 @@ impl Client {
     pub async fn send_signed_query(
         &self,
         query: DataQuery,
+        query_index: usize,
         client_pk: PublicKey,
         serialised_query: Bytes,
         signature: Signature,
     ) -> Result<QueryResponse> {
         debug!("Sending Query: {:?}", query);
-        self.send_signed_query_to_section(query, client_pk, serialised_query, signature, None)
-            .await
+        self.send_signed_query_to_section(
+            query,
+            query_index,
+            client_pk,
+            serialised_query,
+            signature,
+            None,
+        )
+        .await
     }
 
     // Private helper to send a signed query, with the option to define the destination section.
@@ -151,6 +152,7 @@ impl Client {
     async fn send_signed_query_to_section(
         &self,
         query: DataQuery,
+        query_index: usize,
         client_pk: PublicKey,
         serialised_query: Bytes,
         signature: Signature,
@@ -162,7 +164,7 @@ impl Client {
         };
 
         self.session
-            .send_query(query, auth, serialised_query, dst_section_info)
+            .send_query(query, query_index, auth, serialised_query, dst_section_info)
             .await
     }
 
@@ -172,7 +174,7 @@ impl Client {
     #[instrument(skip(self), level = "debug")]
     pub async fn send_query_to_replicas(
         &self,
-        query: DataQueryVariant,
+        query: DataQuery,
         replicas: &[usize],
     ) -> Result<Vec<(usize, Result<QueryResponse>)>, Error> {
         let client_pk = self.public_key();
@@ -184,25 +186,27 @@ impl Client {
         // Send queries to the replicas concurrently
         let mut tasks = vec![];
         let unique_indexes = replicas.iter().cloned().collect::<BTreeSet<usize>>();
+
+        let msg = ClientMsg::Query(query.clone());
+        let serialised_query = WireMsg::serialize_msg_payload(&msg)?;
+        let signature = self.keypair.sign(&serialised_query);
+
         for node_index in unique_indexes.into_iter() {
-            let data_query = DataQuery {
-                node_index,
-                variant: query.clone(),
-            };
-            let msg = ClientMsg::Query(data_query.clone());
-            let serialised_query = WireMsg::serialize_msg_payload(&msg)?;
-            let signature = self.keypair.sign(&serialised_query);
-            debug!("Attempting {data_query:?}");
+            let query = query.clone();
+            let sig = signature.clone();
+            let serialised_query = serialised_query.clone();
+            debug!("Attempting {query:?} @ index: {node_index:?}");
 
             let client = self.clone();
             let elders_clone = elders.clone();
             tasks.push(async move {
                 let result = client
                     .send_signed_query_to_section(
-                        data_query,
+                        query,
+                        node_index,
                         client_pk,
                         serialised_query,
-                        signature,
+                        sig,
                         Some((section_pk, elders_clone)),
                     )
                     .await;
@@ -223,7 +227,7 @@ impl Client {
     /// is stored in each and all of the expected data replica nodes in the section.
     #[cfg(feature = "check-replicas")]
     #[instrument(skip(self), level = "debug")]
-    pub async fn send_query(&self, query: DataQueryVariant) -> Result<QueryResponse, Error> {
+    pub async fn send_query(&self, query: DataQuery) -> Result<QueryResponse, Error> {
         match self.query_all_data_replicas(query.clone()).await {
             Err(Error::DataReplicasCheck(
                 error @ crate::errors::DataReplicasCheckError::DifferentResponses { .. },
@@ -240,7 +244,7 @@ impl Client {
 
     #[cfg(feature = "check-replicas")]
     #[instrument(skip(self), level = "debug")]
-    async fn query_all_data_replicas(&self, query: DataQueryVariant) -> Result<QueryResponse> {
+    async fn query_all_data_replicas(&self, query: DataQuery) -> Result<QueryResponse> {
         use crate::errors::DataReplicasCheckError;
         let span = info_span!("Attempting a query");
         let _ = span.enter();

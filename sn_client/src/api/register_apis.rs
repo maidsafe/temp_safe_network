@@ -12,7 +12,7 @@ use crate::{Error, Result};
 
 use sn_interface::{
     messaging::data::{
-        CreateRegister, DataCmd, DataQueryVariant, EditRegister, QueryResponse, RegisterCmd,
+        CreateRegister, DataCmd, DataQuery, EditRegister, QueryResponse, RegisterCmd,
         RegisterQuery, SignedRegisterCreate, SignedRegisterEdit,
     },
     types::{
@@ -132,7 +132,7 @@ impl Client {
     #[instrument(skip(self), level = "debug")]
     pub async fn get_register(&self, address: Address) -> Result<Register> {
         // Let's fetch the Register from the network
-        let query = DataQueryVariant::Register(RegisterQuery::Get(address));
+        let query = DataQuery::Register(RegisterQuery::Get(address));
         let response = self.send_query(query.clone()).await?;
 
         debug!("get_register response is; {response:?}");
@@ -148,7 +148,7 @@ impl Client {
     /// Get the latest entry (or entries if branching)
     #[instrument(skip(self), level = "debug")]
     pub async fn read_register(&self, address: Address) -> Result<BTreeSet<(EntryHash, Entry)>> {
-        let query = DataQueryVariant::Register(RegisterQuery::Read(address));
+        let query = DataQuery::Register(RegisterQuery::Read(address));
         let response = self.send_query(query.clone()).await?;
         match response {
             QueryResponse::ReadRegister(res) => res.map_err(|err| Error::ErrorMsg { source: err }),
@@ -162,7 +162,7 @@ impl Client {
     /// Get an entry from a Register on the Network by its hash
     #[instrument(skip(self), level = "debug")]
     pub async fn get_register_entry(&self, address: Address, hash: EntryHash) -> Result<Entry> {
-        let query = DataQueryVariant::Register(RegisterQuery::GetEntry { address, hash });
+        let query = DataQuery::Register(RegisterQuery::GetEntry { address, hash });
         let response = self.send_query(query.clone()).await?;
         match response {
             QueryResponse::GetRegisterEntry(res) => {
@@ -182,7 +182,7 @@ impl Client {
     /// Get the owner of a Register.
     #[instrument(skip(self), level = "debug")]
     pub async fn get_register_owner(&self, address: Address) -> Result<User> {
-        let query = DataQueryVariant::Register(RegisterQuery::GetOwner(address));
+        let query = DataQuery::Register(RegisterQuery::GetOwner(address));
         let response = self.send_query(query.clone()).await?;
         match response {
             QueryResponse::GetRegisterOwner(res) => {
@@ -206,7 +206,7 @@ impl Client {
         address: Address,
         user: User,
     ) -> Result<Permissions> {
-        let query = DataQueryVariant::Register(RegisterQuery::GetUserPermissions { address, user });
+        let query = DataQuery::Register(RegisterQuery::GetUserPermissions { address, user });
         let response = self.send_query(query.clone()).await?;
         match response {
             QueryResponse::GetRegisterUserPermissions(res) => {
@@ -222,7 +222,7 @@ impl Client {
     /// Get the Policy of a Register.
     #[instrument(skip(self), level = "debug")]
     pub async fn get_register_policy(&self, address: Address) -> Result<Policy> {
-        let query = DataQueryVariant::Register(RegisterQuery::GetPolicy(address));
+        let query = DataQuery::Register(RegisterQuery::GetPolicy(address));
         let response = self.send_query(query.clone()).await?;
         match response {
             QueryResponse::GetRegisterPolicy(res) => {

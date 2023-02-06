@@ -36,9 +36,9 @@ use sn_interface::{
         Dst, MsgType, WireMsg,
     },
     network_knowledge::{
-        recommended_section_size, supermajority, Error as NetworkKnowledgeError, MembershipState,
-        MyNodeInfo, NodeState, RelocationDst, RelocationInfo, RelocationProof, SectionKeysProvider,
-        SectionTreeUpdate, SectionsDAG, MIN_ADULT_AGE,
+        recommended_section_size, section_keys::SectionKeysProvider, supermajority,
+        Error as NetworkKnowledgeError, MembershipState, MyNodeInfo, NodeState, RelocationDst,
+        RelocationInfo, RelocationProof, SectionTreeUpdate, SectionsDAG, MIN_ADULT_AGE,
     },
     test_utils::*,
     types::{keys::ed25519, PublicKey},
@@ -869,20 +869,35 @@ async fn spentbook_spend_client_message_should_replicate_to_adults_and_send_ack(
 
     while let Some(cmd) = cmds.next().await? {
         if let Cmd::SendMsgAwaitResponseAndRespondToClient {
-            msg: NodeMsg::NodeDataCmd(NodeDataCmd::StoreData(data)),
-            targets,
-            ..
+            wire_msg, targets, ..
         } = cmd
         {
-            assert_eq!(targets.len(), replication_count);
-            let spent_proof_share =
-                dbc_utils::get_spent_proof_share_from_replicated_data(data.clone())?;
-            assert_eq!(key_image.to_hex(), spent_proof_share.key_image().to_hex());
-            assert_eq!(Hash::from(tx.hash()), spent_proof_share.transaction_hash());
-            assert_eq!(
-                sk_set.public_keys().public_key().to_hex(),
-                spent_proof_share.spentbook_pks().public_key().to_hex()
-            );
+            let msg = wire_msg.into_msg()?;
+            match msg {
+                MsgType::Node {
+                    msg_id: _,
+                    dst: _,
+                    msg,
+                } => match msg {
+                    NodeMsg::NodeDataCmd(NodeDataCmd::StoreData(data)) => {
+                        assert_eq!(targets.len(), replication_count);
+                        let spent_proof_share =
+                            dbc_utils::get_spent_proof_share_from_replicated_data(data)?;
+                        assert_eq!(key_image.to_hex(), spent_proof_share.key_image().to_hex());
+                        assert_eq!(Hash::from(tx.hash()), spent_proof_share.transaction_hash());
+                        assert_eq!(
+                            sk_set.public_keys().public_key().to_hex(),
+                            spent_proof_share.spentbook_pks().public_key().to_hex()
+                        );
+                    }
+                    _ => {
+                        bail!("Unexpected msg type when processing cmd")
+                    }
+                },
+                _ => {
+                    bail!("Unexpected Cmd type when processing cmd")
+                }
+            }
             return Ok(());
         }
     }

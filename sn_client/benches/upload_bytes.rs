@@ -86,7 +86,7 @@ async fn upload_and_read_bytes(client: &Client, bytes: Bytes) -> Result<(), Erro
 fn criterion_benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("upload-sampling");
     // measure over around 9s in general
-    group.measurement_time(std::time::Duration::from_secs(90));
+    group.measurement_time(std::time::Duration::from_secs(180));
     group.sampling_mode(SamplingMode::Flat);
     let runtime = Runtime::new().unwrap();
     group.sample_size(10);

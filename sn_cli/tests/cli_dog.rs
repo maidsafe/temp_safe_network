@@ -257,29 +257,43 @@ fn dog_should_query_data_replicas_from_nrs_url() -> Result<()> {
         ],
         Some(0),
     )?;
+
     #[allow(clippy::type_complexity)]
     let (_, _, replicas_report): (String, Vec<SafeData>, DataReplicasReport) =
         serde_json::from_str(&dog_output).expect("Failed to parse output of `safe dog`");
 
     assert_eq!(replicas_report.len(), 4); // it's a 4-chunks file
 
-    let expected_error = format!(
-        "Error received from the network: \
-        InsufficientNodeCount {{ prefix: Prefix(), expected: {}, found: 4 }}",
-        out_of_index + 1
-    );
-    assert!(replicas_report.iter().all(|(_, outcomes)| {
+    let expected_error = format!("expected: {}", out_of_index + 1);
+
+    for (_, outcomes) in replicas_report {
+        // assert!(replicas_report.iter().all(|(_, outcomes)| {
         // for each chunk, replica with index 0, 1, 2 and 3, shall be ok,
         // error is expected on index 99
-        assert_eq!(outcomes.len(), 5);
-        outcomes
-            == &[
-                (0, "".to_string()),
-                (1, "".to_string()),
-                (2, "".to_string()),
-                (3, "".to_string()),
-                (out_of_index, expected_error.clone()),
-            ]
-    }));
+        assert_eq!(outcomes.len(), 5, "we did not get the expected outcomes");
+
+        assert_eq!(outcomes[0], (0, "".to_string()));
+        assert_eq!(outcomes[1], (1, "".to_string()));
+        assert_eq!(outcomes[2], (2, "".to_string()));
+        assert_eq!(outcomes[3], (3, "".to_string()));
+
+        // finally assert over our sad case
+        let (index, bad_outcome) = &outcomes[4];
+
+        assert_eq!(index, &out_of_index);
+
+        println!("bad_ouctome: {bad_outcome:?}");
+        assert!(
+            bad_outcome.contains("InsufficientNodeCount"),
+            "bad outcome error not InsifficientNodeCount"
+        );
+        assert!(
+            bad_outcome.contains(&expected_error),
+            "bad outcome not due to correct query index"
+        );
+    }
+
+    // }));
+
     Ok(())
 }

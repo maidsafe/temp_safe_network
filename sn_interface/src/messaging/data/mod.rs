@@ -17,7 +17,7 @@ mod spentbook;
 pub use self::{
     cmd::DataCmd,
     errors::{Error, Result},
-    query::{DataQuery, DataQueryVariant},
+    query::DataQuery,
     register::{
         CreateRegister, EditRegister, RegisterCmd, RegisterQuery, SignedRegisterCreate,
         SignedRegisterEdit,
@@ -76,6 +76,10 @@ impl Display for ClientMsg {
 #[allow(clippy::large_enum_variant)]
 #[derive(Eq, PartialEq, Clone, Serialize, Deserialize, custom_debug::Debug)]
 pub enum ClientDataResponse {
+    /// There was an error in send or receipt of message to storage nodes
+    CommunicationIssues(Error),
+    /// Network Issue
+    NetworkIssue(Error),
     /// The response to a query, containing the query result.
     QueryResponse {
         /// The result of the query.
@@ -120,6 +124,12 @@ impl Display for ClientDataResponse {
             Self::AntiEntropy { .. } => {
                 write!(f, "ClientDataResponse::AntiEntropy")
             }
+            Self::CommunicationIssues(error) => {
+                write!(f, "ClientDataResponse::CommunicationIssues({error:?})")
+            }
+            Self::NetworkIssue(error) => {
+                write!(f, "ClientDataResponse::NetworkIssue({error:?})")
+            }
         }
     }
 }
@@ -133,7 +143,7 @@ pub enum QueryResponse {
     //
     /// Response to [`GetChunk`]
     ///
-    /// [`GetChunk`]: crate::messaging::data::DataQueryVariant::GetChunk
+    /// [`GetChunk`]: crate::messaging::data::DataQuery::GetChunk
     GetChunk(Result<Chunk>),
     //
     // ===== Register Data =====

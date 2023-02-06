@@ -6,11 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::OperationId;
-use crate::messaging::{
-    data::{DataQueryVariant, QueryResponse},
-    ClientAuth,
-};
+use crate::messaging::data::QueryResponse;
 use crate::types::{DataAddress, PublicKey, ReplicatedData};
 
 use serde::{Deserialize, Serialize};
@@ -40,19 +36,6 @@ pub enum NodeEvent {
         /// Whether store failed due to full
         full: bool,
     },
-}
-
-/// Query originating at a node
-#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
-#[allow(clippy::large_enum_variant)]
-pub struct NodeDataQuery {
-    /// Data is handled by Adults
-    /// The query
-    pub query: DataQueryVariant,
-    /// Client signature
-    pub auth: ClientAuth,
-    /// The operation id that recorded in Elders for this query
-    pub operation_id: OperationId,
 }
 
 /// Responses to queries sent from Elders to Adults.

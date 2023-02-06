@@ -14,7 +14,7 @@ use sn_fault_detection::IssueType;
 use sn_interface::{
     messaging::{
         data::{ClientDataResponse, ClientMsg},
-        system::{NodeDataResponse, NodeMsg, SectionSig, SectionSigned},
+        system::{NodeMsg, SectionSig, SectionSigned},
         AuthorityProof, ClientAuth, MsgId, WireMsg,
     },
     network_knowledge::{NodeState, SectionAuthorityProvider, SectionKeyShare, SectionsDAG},
@@ -152,21 +152,10 @@ pub(crate) enum Cmd {
         context: NodeContext,
         source_client: Peer,
     },
-    /// Performs serialisation and sends the response NodeDataResponse msg to the peer
-    /// over the given stream.
-    SendNodeDataResponse {
-        msg: NodeDataResponse,
-        correlation_id: MsgId,
-        send_stream: SendStream,
-        #[debug(skip)]
-        context: NodeContext,
-        requesting_peer: Peer,
-    },
     /// Performs serialisation and sends the msg to the peer node over a new bi-stream,
     /// awaiting for a response which is forwarded to the client.
     SendMsgAwaitResponseAndRespondToClient {
-        msg_id: MsgId,
-        msg: NodeMsg,
+        wire_msg: WireMsg,
         #[debug(skip)]
         context: NodeContext,
         targets: BTreeSet<Peer>,
@@ -195,9 +184,8 @@ impl Cmd {
             Cmd::SendMsg { .. }
             | Cmd::SendMsgEnqueueAnyResponse { .. }
             | Cmd::SendNodeMsgResponse { .. }
-            | Cmd::SendClientResponse { .. }
-            | Cmd::SendNodeDataResponse { .. }
-            | Cmd::SendMsgAwaitResponseAndRespondToClient { .. } => State::Comms,
+            | Cmd::SendMsgAwaitResponseAndRespondToClient { .. }
+            | Cmd::SendClientResponse { .. } => State::Comms,
             Cmd::HandleFailedSendToNode { .. } => State::Comms,
             Cmd::HandleMsg { .. } => State::HandleMsg,
             Cmd::UpdateNetworkAndHandleValidClientMsg { .. } => State::ClientMsg,
@@ -238,11 +226,10 @@ impl fmt::Display for Cmd {
             Cmd::SendMsg { .. } => write!(f, "SendMsg"),
             Cmd::SendMsgEnqueueAnyResponse { .. } => write!(f, "SendMsgEnqueueAnyResponse"),
             Cmd::SendNodeMsgResponse { .. } => write!(f, "SendNodeMsgResponse"),
-            Cmd::SendClientResponse { .. } => write!(f, "SendClientResponse"),
-            Cmd::SendNodeDataResponse { .. } => write!(f, "SendNodeDataResponse"),
             Cmd::SendMsgAwaitResponseAndRespondToClient { .. } => {
                 write!(f, "SendMsgAwaitResponseAndRespondToClient")
             }
+            Cmd::SendClientResponse { .. } => write!(f, "SendClientResponse"),
             Cmd::EnqueueDataForReplication { .. } => write!(f, "EnqueueDataForReplication"),
             Cmd::TrackNodeIssue { name, issue } => {
                 write!(f, "TrackNodeIssue {name:?}, {issue:?}")

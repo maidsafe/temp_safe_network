@@ -13,13 +13,13 @@ use crate::{Error, Result};
 use qp2p::{RecvStream, UsrMsgBytes};
 use sn_interface::{
     messaging::{
-        data::{ClientDataResponse, ClientMsg},
-        AuthorityProof, ClientAuth, Dst, MsgId, MsgKind, MsgType, WireMsg,
+        data::ClientDataResponse, AuthorityProof, ClientAuth, Dst, MsgId, MsgKind, MsgType, WireMsg,
     },
     network_knowledge::SectionTreeUpdate,
     types::{log_markers::LogMarker, Peer},
 };
 
+use bytes::Bytes;
 use itertools::Itertools;
 
 // Maximum number of times we'll re-send a msg upon receiving an AE response for it
@@ -97,6 +97,16 @@ impl Session {
                 };
 
             match resp_msg {
+                ClientDataResponse::CommunicationIssues(err)
+                | ClientDataResponse::NetworkIssue(err) => {
+                    break MsgResponse::Failure(
+                        peer.addr(),
+                        Error::CmdError {
+                            source: err,
+                            msg_id: correlation_id,
+                        },
+                    )
+                }
                 ClientDataResponse::QueryResponse {
                     response,
                     correlation_id,
@@ -185,7 +195,7 @@ impl Session {
         self.update_network_knowledge(section_tree_update, src_peer)
             .await;
 
-        let (msg_id, elders, client_msg, dst, auth) = self
+        let (msg_id, elders, query_index, payload, dst, auth) = self
             .new_target_elders(src_peer, bounced_msg, correlation_id)
             .await?;
 
@@ -203,9 +213,16 @@ impl Session {
 
         // there should always be one
         if let Some(elder) = target_elder {
-            let payload = WireMsg::serialize_msg_payload(&client_msg)?;
-            let wire_msg =
-                WireMsg::new_msg(msg_id, payload, MsgKind::Client(auth.into_inner()), dst);
+            let wire_msg = WireMsg::new_msg(
+                msg_id,
+                payload,
+                MsgKind::Client {
+                    auth: auth.into_inner(),
+                    is_spend: false,
+                    query_index,
+                },
+                dst,
+            );
             let bytes = wire_msg.serialize()?;
 
             debug!("{msg_id:?} AE bounced msg going out again. Resending original message (sent to index {src_peer_index:?} peer: {src_peer:?}) to new section elder {elder:?}");
@@ -270,8 +287,22 @@ impl Session {
         src_peer: Peer,
         bounced_msg: UsrMsgBytes,
         correlation_id: MsgId,
-    ) -> Result<(MsgId, Vec<Peer>, ClientMsg, Dst, AuthorityProof<ClientAuth>), Error> {
-        let (msg_id, client_msg, bounced_msg_dst, auth) = match WireMsg::deserialize(bounced_msg)? {
+    ) -> Result<
+        (
+            MsgId,
+            Vec<Peer>,
+            Option<usize>,
+            Bytes,
+            Dst,
+            AuthorityProof<ClientAuth>,
+        ),
+        Error,
+    > {
+        let wire_msg = WireMsg::from(bounced_msg)?;
+        let msg_kind = wire_msg.kind();
+        let msg_type = wire_msg.into_msg()?;
+        let query_index = *msg_kind.query_index();
+        let (msg_id, client_msg, bounced_msg_dst, auth) = match msg_type {
             MsgType::Client {
                 msg_id,
                 msg,
@@ -315,7 +346,14 @@ impl Session {
                 "Final target elders for resending {msg_id:?}: {client_msg:?} msg \
                 are {target_elders:?}"
             );
-            Ok((msg_id, target_elders, client_msg, dst, auth))
+            Ok((
+                msg_id,
+                target_elders,
+                query_index,
+                wire_msg.payload,
+                dst,
+                auth,
+            ))
         }
     }
 }

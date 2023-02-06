@@ -11,7 +11,7 @@ use crate::{Error, Result};
 
 use sn_interface::{
     messaging::{
-        data::{DataQuery, DataQueryVariant, QueryResponse},
+        data::{DataQuery, QueryResponse},
         ClientAuth, Dst, MsgId, MsgKind, WireMsg,
     },
     network_knowledge::supermajority,
@@ -74,7 +74,7 @@ impl Session {
         dst_address: XorName,
         auth: ClientAuth,
         payload: Bytes,
-        needs_super_majority: bool,
+        is_spend: bool,
     ) -> Result<()> {
         let endpoint = self.endpoint.clone();
         // TODO: Consider other approach: Keep a session per section!
@@ -92,7 +92,12 @@ impl Session {
             name: dst_address,
             section_key: section_pk,
         };
-        let kind = MsgKind::Client(auth);
+
+        let kind = MsgKind::Client {
+            auth,
+            is_spend,
+            query_index: None,
+        };
         let wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
 
         let log_line = |elders_len_s: String| {
@@ -102,7 +107,7 @@ impl Session {
             )
         };
 
-        if needs_super_majority {
+        if is_spend {
             log_line(format!("{elders_len}"));
             self.send_msg_and_check_acks(msg_id, elders.clone(), wire_msg)
                 .await
@@ -318,19 +323,20 @@ impl Session {
     pub(crate) async fn send_query(
         &self,
         query: DataQuery,
+        query_node_index: usize,
         auth: ClientAuth,
         payload: Bytes,
         dst_section_info: Option<(bls::PublicKey, Vec<Peer>)>,
     ) -> Result<QueryResponse> {
         let endpoint = self.endpoint.clone();
 
-        let chunk_addr = if let DataQueryVariant::GetChunk(address) = query.variant {
+        let chunk_addr = if let DataQuery::GetChunk(address) = query {
             Some(address)
         } else {
             None
         };
 
-        let dst = query.variant.dst_name();
+        let dst = query.dst_name();
 
         let (section_pk, elders) = if let Some(section_info) = dst_section_info {
             section_info
@@ -351,7 +357,11 @@ impl Session {
             name: dst,
             section_key: section_pk,
         };
-        let kind = MsgKind::Client(auth);
+        let kind = MsgKind::Client {
+            auth,
+            is_spend: false,
+            query_index: Some(query_node_index),
+        };
         let wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
 
         let send_query_tasks = self.send_msg(elders.clone(), wire_msg).await?;
@@ -379,6 +389,7 @@ impl Session {
     ) -> Result<QueryResponse> {
         let mut discarded_responses: usize = 0;
         let mut error_response = None;
+        let mut last_error_response = None;
         let mut valid_response = None;
         let elders_len = elders.len();
 
@@ -392,6 +403,7 @@ impl Session {
                 }
                 Ok(MsgResponse::Failure(src, error)) => {
                     debug!("Failure occurred with msg {msg_id:?} from {src:?}: {error:?}");
+                    last_error_response = Some(error);
                     discarded_responses += 1;
                     continue;
                 }
@@ -492,10 +504,14 @@ impl Session {
             }
         }
 
-        Err(Error::NoResponse {
-            msg_id,
-            peers: elders,
-        })
+        if let Some(error) = last_error_response {
+            Err(error)
+        } else {
+            Err(Error::NoResponse {
+                msg_id,
+                peers: elders,
+            })
+        }
     }
 
     /// Get DataSection elders details. Resort to own section if DataSection is not available.

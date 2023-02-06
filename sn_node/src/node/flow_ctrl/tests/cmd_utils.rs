@@ -111,7 +111,8 @@ impl<'a> ProcessAndInspectCmds<'a> {
         mut comm_rx: Receiver<MsgFromPeer>,
     ) -> crate::node::error::Result<ProcessAndInspectCmds> {
         let context = dispatcher.node().read().await.context();
-        let (msg_id, serialised_payload, msg_kind, auth) = get_client_msg_parts_for_handling(&msg)?;
+        let (msg_id, serialised_payload, msg_kind, _auth) =
+            get_client_msg_parts_for_handling(&msg)?;
 
         let client_addr: SocketAddr = (Ipv4Addr::LOCALHOST, 0).into();
         let client_endpoint = Endpoint::builder()
@@ -135,7 +136,8 @@ impl<'a> ProcessAndInspectCmds<'a> {
             name: peer.name(),
             section_key: context.network_knowledge.section_key(),
         };
-        let user_msg = WireMsg::new_msg(msg_id, serialised_payload, msg_kind, dst).serialize()?;
+        let wire_msg = WireMsg::new_msg(msg_id, serialised_payload, msg_kind, dst);
+        let user_msg = wire_msg.serialize()?;
         send_stream.send_user_msg(user_msg).await?;
 
         match comm_rx.recv().await {
@@ -143,8 +145,8 @@ impl<'a> ProcessAndInspectCmds<'a> {
                 send_stream: Some(send_stream),
                 ..
             }) => {
-                let cmds =
-                    MyNode::handle_valid_client_msg(context, msg_id, msg, auth, peer, send_stream)?;
+                let cmds = MyNode::handle_msg(dispatcher.node(), peer, wire_msg, Some(send_stream))
+                    .await?;
                 Ok(Self::from(cmds, dispatcher))
             }
             _ => Err(crate::node::error::Error::NoClientResponseStream),
@@ -165,9 +167,7 @@ impl<'a> ProcessAndInspectCmds<'a> {
             if !matches!(
                 cmd,
                 Cmd::SendMsg { .. }
-                    | Cmd::SendMsgAwaitResponseAndRespondToClient { .. }
                     | Cmd::SendClientResponse { .. }
-                    | Cmd::SendNodeDataResponse { .. }
                     | Cmd::SendNodeMsgResponse { .. }
             ) {
                 let new_cmds = self.dispatcher.process_cmd(cmd).await?;
@@ -200,9 +200,13 @@ pub(crate) fn get_client_msg_parts_for_handling(
         signature: src_client_keypair.sign(&payload),
     };
     let auth_proof = AuthorityProof::verify(auth.clone(), &payload)?;
-    let msg_kind = MsgKind::Client(auth);
+    let kind = MsgKind::Client {
+        auth,
+        is_spend: false,
+        query_index: None,
+    };
 
-    Ok((MsgId::new(), payload, msg_kind, auth_proof))
+    Ok((MsgId::new(), payload, kind, auth_proof))
 }
 
 /// Extend the `Cmd` enum with some utilities for testing.

@@ -37,6 +37,7 @@ pub enum LogMarker {
     IgnoredNodeAsOffline,
     VotedOffline,
     // Messaging
+    ClientMsgToBeForwarded,
     ClientMsgToBeHandled,
     NodeMsgToBeHandled,
     // Membership

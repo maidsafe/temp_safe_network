@@ -9,7 +9,6 @@
 use crate::node::{core::NodeContext, flow_ctrl::cmds::Cmd, Error, MyNode, Result};
 
 use bytes::BufMut;
-
 use qp2p::SendStream;
 use sn_dbc::{
     get_public_commitments_from_transaction, Commitment, KeyImage, RingCtTransaction, SpentProof,
@@ -18,10 +17,9 @@ use sn_dbc::{
 use sn_interface::{
     messaging::{
         data::{
-            ClientDataResponse, ClientMsg, DataCmd, DataQueryVariant, EditRegister,
-            SignedRegisterEdit, SpentbookCmd,
+            ClientDataResponse, ClientMsg, DataCmd, DataQuery, EditRegister, SignedRegisterEdit,
+            SpentbookCmd,
         },
-        system::{NodeDataResponse, OperationId},
         AuthorityProof, ClientAuth, MsgId,
     },
     network_knowledge::{section_keys::build_spent_proof_share, SectionTreeUpdate},
@@ -36,43 +34,14 @@ use std::collections::{BTreeMap, BTreeSet};
 use xor_name::XorName;
 
 impl MyNode {
-    /// Forms a `QueryError` msg to send back to the client on a stream
-    pub(crate) fn send_query_error_response_over_stream(
-        context: NodeContext,
-        error: Error,
-        query: &DataQueryVariant,
-        source_client: Peer,
-        correlation_id: MsgId,
-        send_stream: SendStream,
-    ) -> Cmd {
-        let msg = ClientDataResponse::QueryResponse {
-            response: query.to_error_response(error.into()),
-            correlation_id,
-        };
-
-        Cmd::SendClientResponse {
-            msg,
-            correlation_id,
-            send_stream,
-            context,
-            source_client,
-        }
-    }
-
     /// Forms a `CmdError` msg to send back to the client over the response stream
     pub(crate) fn send_cmd_error_response_over_stream(
         context: NodeContext,
-        cmd: DataCmd,
-        error: Error,
+        msg: ClientDataResponse,
         correlation_id: MsgId,
         send_stream: SendStream,
         source_client: Peer,
     ) -> Cmd {
-        let msg = ClientDataResponse::CmdResponse {
-            response: cmd.to_error_response(error.into()),
-            correlation_id,
-        };
-
         debug!("{correlation_id:?} sending cmd response error back to client");
         Cmd::SendClientResponse {
             msg,
@@ -87,43 +56,38 @@ impl MyNode {
     #[allow(clippy::too_many_arguments)]
     pub(crate) async fn handle_data_query_where_stored(
         context: NodeContext,
-        operation_id: OperationId,
-        query: &DataQueryVariant,
+        query: &DataQuery,
         auth: ClientAuth,
-        requesting_peer: Peer,
+        source_client: Peer,
         msg_id: MsgId,
-        send_stream: Option<SendStream>,
+        send_stream: SendStream,
     ) -> Vec<Cmd> {
         let response = context
             .data_storage
             .query(query, User::Key(auth.public_key))
             .await;
 
-        if let Some(send_stream) = send_stream {
-            trace!("{msg_id:?} data query response at node is: {response:?}");
-            let msg = NodeDataResponse::QueryResponse {
-                response,
-                operation_id,
-            };
+        trace!("{msg_id:?} data query response at node is: {response:?}");
 
-            vec![Cmd::SendNodeDataResponse {
-                msg,
-                correlation_id: msg_id,
-                send_stream,
-                context,
-                requesting_peer,
-            }]
-        } else {
-            error!("Send stream missing from {requesting_peer:?}, data request response was not sent out.");
-            vec![]
-        }
+        let msg = ClientDataResponse::QueryResponse {
+            response,
+            correlation_id: msg_id,
+        };
+
+        vec![Cmd::SendClientResponse {
+            msg,
+            correlation_id: msg_id,
+            send_stream,
+            context,
+            source_client,
+        }]
     }
 
     /// Handle incoming client msgs.
     /// If this is a store request, and we are an Elder and one of
     /// the `data_copy_count()` nodes, then we will send a wiremsg
     /// to ourselves, among the msgs sent to the other holders.
-    pub(crate) fn handle_valid_client_msg(
+    pub(crate) async fn handle_client_msg_for_us(
         mut context: NodeContext,
         msg_id: MsgId,
         msg: ClientMsg,
@@ -131,24 +95,33 @@ impl MyNode {
         origin: Peer,
         send_stream: SendStream,
     ) -> Result<Vec<Cmd>> {
-        debug!("Handling client {msg_id:?}");
+        trace!("{:?}: {msg_id:?} {msg:?}", LogMarker::ClientMsgToBeHandled);
 
-        trace!("{:?}: {msg:?} ", LogMarker::ClientMsgToBeHandled);
-
-        let cmd = match msg {
-            ClientMsg::Cmd(cmd) => cmd,
-            ClientMsg::Query(query) => {
-                return MyNode::read_data_and_respond_to_client(
-                    context,
-                    query,
-                    msg_id,
-                    auth,
-                    origin,
-                    send_stream,
-                )
+        match msg {
+            ClientMsg::Cmd(cmd) => {
+                MyNode::handle_data_cmd(&mut context, cmd, msg_id, origin, auth, send_stream).await
             }
-        };
+            ClientMsg::Query(query) => Ok(MyNode::handle_data_query_where_stored(
+                context,
+                &query,
+                auth.into_inner(),
+                origin,
+                msg_id,
+                send_stream,
+            )
+            .await),
+        }
+    }
 
+    /// Handle the DataCmd variant
+    async fn handle_data_cmd(
+        context: &mut NodeContext,
+        cmd: DataCmd,
+        msg_id: MsgId,
+        origin: Peer,
+        auth: AuthorityProof<ClientAuth>,
+        send_stream: SendStream,
+    ) -> Result<Vec<Cmd>> {
         // extract the data from the request
         let data_result = match cmd.clone() {
             DataCmd::StoreChunk(chunk) => Ok(ReplicatedData::Chunk(chunk)),
@@ -191,48 +164,51 @@ impl MyNode {
                             origin,
                             send_stream,
                             auth,
-                            context,
+                            context: context.clone(),
                         };
                         return Ok(vec![update_command]);
                     }
                 }
-                MyNode::extract_contents_as_replicated_data(&context, cmd)
+                // THis is not being forwarded
+                MyNode::extract_spentproof_contents_as_replicated_data(context, cmd)
             }
         };
 
-        let data = match data_result {
-            Ok(data) => data,
+        // here we pull out spentbook writes and forward those as node data cmd
+        match data_result {
+            Ok(data) => {
+                // Spentbook register cmds now need to be sent on to data holders
+                if let ReplicatedData::SpentbookWrite(_) = &data {
+                    return MyNode::forward_on_spentbook_cmd(
+                        data,
+                        context,
+                        msg_id,
+                        origin,
+                        send_stream,
+                    );
+                }
+                // TODO: This would mean all spendbook is at elders...
+                MyNode::store_data_and_respond(context, data, send_stream, origin, msg_id).await
+            }
             Err(error) => {
-                debug!("Will send error response back to client");
+                let data_response = ClientDataResponse::CmdResponse {
+                    response: cmd.to_error_response(error.into()),
+                    correlation_id: msg_id,
+                };
+
                 let cmd = MyNode::send_cmd_error_response_over_stream(
-                    context,
-                    cmd,
-                    error,
+                    context.clone(),
+                    data_response,
                     msg_id,
                     send_stream,
                     origin,
                 );
-                return Ok(vec![cmd]);
+                Ok(vec![cmd])
             }
-        };
-
-        trace!("{:?}: {:?}", LogMarker::DataStoreReceivedAtElder, data);
-
-        // the store msg sent to nodes
-        // cmds here may be fault tracking.
-        // CmdAcks are sent over the send stream herein
-        MyNode::store_data_at_nodes_and_ack_to_client(
-            context,
-            cmd,
-            data,
-            msg_id,
-            send_stream,
-            origin,
-        )
+        }
     }
-
     // helper to extract the contents of the cmd as ReplicatedData
-    fn extract_contents_as_replicated_data(
+    fn extract_spentproof_contents_as_replicated_data(
         context: &NodeContext,
         cmd: SpentbookCmd,
     ) -> Result<ReplicatedData> {

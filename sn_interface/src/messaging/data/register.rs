@@ -89,7 +89,7 @@ pub enum RegisterCmd {
 
 impl RegisterCmd {
     /// Creates a Response containing an error, with the Response variant corresponding to the
-    /// Request variant.
+    /// Request.
     pub fn to_error_response(&self, error: Error) -> CmdResponse {
         match self {
             Self::Create { .. } => CmdResponse::CreateRegister(Err(error)),

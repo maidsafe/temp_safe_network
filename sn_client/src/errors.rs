@@ -10,7 +10,7 @@ use crate::LinkError;
 
 use sn_interface::{
     messaging::{
-        data::{DataQueryVariant, Error as ErrorMsg, QueryResponse},
+        data::{DataQuery, Error as ErrorMsg, QueryResponse},
         system::NodeMsg,
         Error as MessagingError, MsgId, MsgType,
     },
@@ -177,7 +177,7 @@ pub enum Error {
     #[error("Unexpected response received for {query:?}. Received: {response:?}")]
     UnexpectedQueryResponse {
         /// Query sent to Elders
-        query: DataQueryVariant,
+        query: DataQuery,
         /// Unexpected response received
         response: QueryResponse,
     },
@@ -307,7 +307,7 @@ pub enum Error {
 pub enum DataReplicasCheckError {
     /// No response or error received when sending query to data replicas
     #[error("No response or error obtained when sending query to all replicas: {0:?}")]
-    NoResponse(DataQueryVariant),
+    NoResponse(DataQuery),
     /// Errors received when checking data replicas
     #[error("Errors occurred when sending the query to {}/{replicas} of the replicas: {query:?}. \
         Errors received: {errors:?}", errors.len()
@@ -316,7 +316,7 @@ pub enum DataReplicasCheckError {
         /// Number of replicas queried
         replicas: usize,
         /// Query sent to data replicas
-        query: DataQueryVariant,
+        query: DataQuery,
         /// List of errors received with their corresponding replica/Adult index
         errors: Vec<(Error, usize)>,
     },
@@ -329,7 +329,7 @@ pub enum DataReplicasCheckError {
         /// Number of replicas queried
         replicas: usize,
         /// Query sent to data replicas
-        query: DataQueryVariant,
+        query: DataQuery,
         /// List of responses received with their corresponding replica/Adult index
         responses: Vec<(QueryResponse, usize)>,
     },

@@ -16,8 +16,8 @@ use crate::{
 use sn_comms::Error as CommsError;
 use sn_interface::{
     messaging::{
-        data::CmdResponse,
-        system::{JoinResponse, NodeDataCmd, NodeDataQuery, NodeDataResponse, NodeEvent, NodeMsg},
+        data::{ClientDataResponse, CmdResponse},
+        system::{JoinResponse, NodeDataCmd, NodeEvent, NodeMsg},
         Dst, MsgId, WireMsg,
     },
     network_knowledge::{MembershipState, NetworkKnowledge},
@@ -103,8 +103,8 @@ impl MyNode {
     pub(crate) async fn store_data_and_respond(
         context: &NodeContext,
         data: ReplicatedData,
-        response_stream: Option<SendStream>,
-        target: Peer,
+        send_stream: SendStream,
+        source_client: Peer,
         original_msg_id: MsgId,
     ) -> Result<Vec<Cmd>> {
         let mut cmds = vec![];
@@ -159,28 +159,24 @@ impl MyNode {
             }
         };
 
-        if let Some(send_stream) = response_stream {
-            let msg = NodeDataResponse::CmdResponse {
-                response,
-                correlation_id: original_msg_id,
-            };
-            cmds.push(Cmd::SendNodeDataResponse {
-                msg,
-                correlation_id: original_msg_id,
-                send_stream,
-                context: context.clone(),
-                requesting_peer: target,
-            });
-        } else {
-            error!("Cannot respond over stream, none exists after storing! {data_addr:?}");
-        }
+        let msg = ClientDataResponse::CmdResponse {
+            response,
+            correlation_id: original_msg_id,
+        };
+        cmds.push(Cmd::SendClientResponse {
+            msg,
+            correlation_id: original_msg_id,
+            send_stream,
+            context: context.clone(),
+            source_client,
+        });
 
         Ok(cmds)
     }
 
     // Handler for data messages which have successfully
     // passed all signature checks and msg verifications
-    pub(crate) async fn handle_valid_node_msg(
+    pub(crate) async fn handle_node_msg(
         node: Arc<RwLock<MyNode>>,
         context: NodeContext,
         msg_id: MsgId,
@@ -439,9 +435,12 @@ impl MyNode {
             }
             NodeMsg::NodeDataCmd(NodeDataCmd::StoreData(data)) => {
                 debug!("Attempting to store data locally: {:?}", data.address());
-
+                // TODO: proper err
+                let Some(stream) = send_stream else {
+                    return Ok(vec![])
+                };
                 // store data and respond w/ack on the response stream
-                MyNode::store_data_and_respond(&context, data, send_stream, sender, msg_id).await
+                MyNode::store_data_and_respond(&context, data, stream, sender, msg_id).await
             }
             NodeMsg::NodeDataCmd(NodeDataCmd::ReplicateDataBatch(data_collection)) => {
                 info!("ReplicateDataBatch MsgId: {:?}", msg_id);
@@ -460,29 +459,6 @@ impl MyNode {
                         .into_iter()
                         .collect(),
                 )
-            }
-            NodeMsg::NodeDataQuery(NodeDataQuery {
-                query,
-                auth,
-                operation_id,
-            }) => {
-                // A request from EndUser - via Elders - for locally stored data
-                debug!(
-                    "Handle NodeQuery with msg_id {:?}, operation_id {}",
-                    msg_id, operation_id
-                );
-
-                let cmds = MyNode::handle_data_query_where_stored(
-                    context,
-                    operation_id,
-                    &query,
-                    auth,
-                    sender,
-                    msg_id,
-                    send_stream,
-                )
-                .await;
-                Ok(cmds)
             }
             NodeMsg::RequestHandover { sap, sig_share } => {
                 info!("RequestHandover with msg_id {msg_id:?}");
@@ -544,6 +520,7 @@ pub(crate) fn into_msg_bytes(
     for peer in recipients {
         match network_knowledge.generate_dst(&peer.name()) {
             Ok(dst) => {
+                debug!("Dst generated for outgoing msg is: {dst:?}");
                 // TODO log error here isntead of throwing
                 let all_the_bytes = initial_wire_msg.serialize_with_new_dst(&dst)?;
                 msgs.push((peer, all_the_bytes));

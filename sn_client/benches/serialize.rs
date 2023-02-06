@@ -95,7 +95,16 @@ fn criterion_benchmark(c: &mut Criterion) {
         name: xor_name::rand::random(),
         section_key: bls::SecretKey::random().public_key(),
     };
-    let mut the_wire_msg = WireMsg::new_msg(msg_id, payload, messaging::MsgKind::Client(auth), dst);
+    let mut the_wire_msg = WireMsg::new_msg(
+        msg_id,
+        payload,
+        messaging::MsgKind::Client {
+            auth,
+            is_spend: false,
+            query_index: None,
+        },
+        dst,
+    );
     let (header, dst, payload) = match the_wire_msg.serialize_and_cache_bytes() {
         Ok(bytes) => bytes,
         Err(_erorr) => {
