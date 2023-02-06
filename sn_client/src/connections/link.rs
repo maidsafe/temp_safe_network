@@ -8,7 +8,7 @@
 
 use super::Peer;
 
-use qp2p::{Connection, Endpoint, RecvStream, UsrMsgBytes};
+use qp2p::{Connection, Endpoint, RecvStream, StreamError, UsrMsgBytes};
 use sn_interface::{messaging::MsgId, types::log_markers::LogMarker};
 use std::{collections::BTreeMap, sync::Arc};
 use tokio::sync::RwLock;
@@ -62,9 +62,14 @@ impl Link {
         debug!("{msg_id:?} bidi msg sent to {peer:?}");
 
         // Attempt to gracefully terminate the stream.
-        // If this errors it does _not_ necessarily mean our message has not been sent,
-        // but we'll be retrying anyways...
-        send_stream.finish().await.map_err(LinkError::Send)?;
+        match send_stream.finish().await {
+            Ok(_) => Ok(()),
+            // In case we get a `Stopped(0)` error, the other side is signalling it
+            // already succesfully received all bytes. This might happen if we are calling finish late.
+            Err(qp2p::SendError::StreamLost(StreamError::Stopped(0))) => Ok(()),
+            // Propagate any other error, which means we should probably retry on a higher level.
+            Err(err) => Err(LinkError::Send(err)),
+        }?;
         debug!("{msg_id:?} to {peer:?} bidi finished");
 
         Ok(recv_stream)
