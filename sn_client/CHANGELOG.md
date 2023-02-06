@@ -1113,22 +1113,22 @@ needed, as they keypair itself contains the Arcs we need.
     - Self authentication Example
     - Example to demonstrate Storage API
 
-## v0.78.2 (2023-02-02)
+## v0.78.3 (2023-02-06)
 
-### Chore
+### Bug Fixes
 
- - <csr-id-e706848522d6c52d6ed5eddf638376996cc947a9/> add clippy check for unused async
-
-### Refactor
-
- - <csr-id-382236271c4ea283168a02d26a797dd43fdf5c52/> unused async removal
+ - <csr-id-5575f4be90839f7d0b56914aaa259a4b890d0b48/> ignore successfully stopped stream on
+   If we call finish, but the node has already signalled `stop(0)`, then
+   our bytes are already received successfully, so we do not need to error
+   out or retry.
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 3 commits contributed to the release.
- - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 3 commits contributed to the release over the course of 3 calendar days.
+ - 3 days passed between releases.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -1138,14 +1138,54 @@ needed, as they keypair itself contains the Arcs we need.
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #2069 ([`3c75ec0`](https://github.com/maidsafe/safe_network/commit/3c75ec0f0a9f51071ed94723e1125911d525666e))
+    - ignore successfully stopped stream on ([`5575f4b`](https://github.com/maidsafe/safe_network/commit/5575f4be90839f7d0b56914aaa259a4b890d0b48))
+    - Merge branch 'main' into sap_change_force_dkg_termination ([`876d78a`](https://github.com/maidsafe/safe_network/commit/876d78a911e852b8cc1c33b2130e4cf9b28dd510))
+</details>
+
+## v0.78.2 (2023-02-02)
+
+<csr-id-e706848522d6c52d6ed5eddf638376996cc947a9/>
+<csr-id-382236271c4ea283168a02d26a797dd43fdf5c52/>
+
+### Chore
+
+ - <csr-id-e706848522d6c52d6ed5eddf638376996cc947a9/> add clippy check for unused async
+
+### Chore
+
+ - <csr-id-3831dae3e34623ef252298645a43cbafcc923a13/> sn_interface-0.17.1/sn_fault_detection-0.15.3/sn_comms-0.2.1/sn_client-0.78.2/sn_node-0.73.3/sn_api-0.76.1
+
+### Refactor
+
+ - <csr-id-382236271c4ea283168a02d26a797dd43fdf5c52/> unused async removal
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 5 commits contributed to the release.
+ - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.17.1/sn_fault_detection-0.15.3/sn_comms-0.2.1/sn_client-0.78.2/sn_node-0.73.3/sn_api-0.76.1 ([`3831dae`](https://github.com/maidsafe/safe_network/commit/3831dae3e34623ef252298645a43cbafcc923a13))
     - Merge #2061 ([`bab8208`](https://github.com/maidsafe/safe_network/commit/bab82087260ac4f1f44e688db2e67ca2387a7175))
     - add clippy check for unused async ([`e706848`](https://github.com/maidsafe/safe_network/commit/e706848522d6c52d6ed5eddf638376996cc947a9))
     - unused async removal ([`3822362`](https://github.com/maidsafe/safe_network/commit/382236271c4ea283168a02d26a797dd43fdf5c52))
+    - Merge branch 'main' into sap_change_force_dkg_termination ([`7d3665b`](https://github.com/maidsafe/safe_network/commit/7d3665bfe05f61d170229df9f4424c5663b116d5))
 </details>
 
 ## v0.78.1 (2023-02-01)
 
 <csr-id-55acb9be12fc1b0523e598033f1a86408ddd4581/>
+<csr-id-92e7e2b7b7c6fe4d160fe61f6c6db27cf4944ed8/>
 
 ### Refactor
 
