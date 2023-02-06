@@ -1113,22 +1113,14 @@ needed, as they keypair itself contains the Arcs we need.
     - Self authentication Example
     - Example to demonstrate Storage API
 
-## v0.78.3 (2023-02-06)
-
-### Bug Fixes
-
- - <csr-id-5575f4be90839f7d0b56914aaa259a4b890d0b48/> ignore successfully stopped stream on
-   If we call finish, but the node has already signalled `stop(0)`, then
-   our bytes are already received successfully, so we do not need to error
-   out or retry.
+## v0.78.4 (2023-02-06)
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 3 commits contributed to the release over the course of 3 calendar days.
- - 3 days passed between releases.
- - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 1 commit contributed to the release.
+ - 0 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -1138,15 +1130,61 @@ needed, as they keypair itself contains the Arcs we need.
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #2048 ([`ae06c94`](https://github.com/maidsafe/safe_network/commit/ae06c9458ad904863a925f1d2b2e253a67456298))
+</details>
+
+## v0.78.3 (2023-02-06)
+
+### New Features (BREAKING)
+
+ - <csr-id-af38f56c7e76a076f0accca7d44a74c055dd74e1/> remove DataQueryVariant
+
+### New Features
+
+ - <csr-id-7a5d6975153f9d78e742e0a799919852bcfc33ab/> pass client msgs onwards with no deserialisation
+
+### Chore
+
+ - <csr-id-6446eb9695d9d12f7677e79603697c3ee44dbfb8/> sn_client-0.78.3
+
+### Bug Fixes
+
+ - <csr-id-5575f4be90839f7d0b56914aaa259a4b890d0b48/> ignore successfully stopped stream on
+   If we call finish, but the node has already signalled `stop(0)`, then
+   our bytes are already received successfully, so we do not need to error
+   out or retry.
+ - <csr-id-cbced3b621c2900ead79952dcd2f867c2043e560/> readd InsufficientNodeCount error
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 7 commits contributed to the release over the course of 3 calendar days.
+ - 3 days passed between releases.
+ - 5 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_client-0.78.3 ([`6446eb9`](https://github.com/maidsafe/safe_network/commit/6446eb9695d9d12f7677e79603697c3ee44dbfb8))
     - Merge #2069 ([`3c75ec0`](https://github.com/maidsafe/safe_network/commit/3c75ec0f0a9f51071ed94723e1125911d525666e))
     - ignore successfully stopped stream on ([`5575f4b`](https://github.com/maidsafe/safe_network/commit/5575f4be90839f7d0b56914aaa259a4b890d0b48))
     - Merge branch 'main' into sap_change_force_dkg_termination ([`876d78a`](https://github.com/maidsafe/safe_network/commit/876d78a911e852b8cc1c33b2130e4cf9b28dd510))
+    - readd InsufficientNodeCount error ([`cbced3b`](https://github.com/maidsafe/safe_network/commit/cbced3b621c2900ead79952dcd2f867c2043e560))
+    - remove DataQueryVariant ([`af38f56`](https://github.com/maidsafe/safe_network/commit/af38f56c7e76a076f0accca7d44a74c055dd74e1))
+    - pass client msgs onwards with no deserialisation ([`7a5d697`](https://github.com/maidsafe/safe_network/commit/7a5d6975153f9d78e742e0a799919852bcfc33ab))
 </details>
 
 ## v0.78.2 (2023-02-02)
 
 <csr-id-e706848522d6c52d6ed5eddf638376996cc947a9/>
 <csr-id-382236271c4ea283168a02d26a797dd43fdf5c52/>
+<csr-id-3831dae3e34623ef252298645a43cbafcc923a13/>
 
 ### Chore
 

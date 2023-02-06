@@ -6,13 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## v0.17.2 (2023-02-03)
+## v0.17.3 (2023-02-06)
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
+ - 1 commit contributed to the release.
+ - 3 days passed between releases.
  - 0 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
@@ -23,13 +24,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #2048 ([`ae06c94`](https://github.com/maidsafe/safe_network/commit/ae06c9458ad904863a925f1d2b2e253a67456298))
+</details>
+
+## v0.17.2 (2023-02-03)
+
+### New Features (BREAKING)
+
+ - <csr-id-af38f56c7e76a076f0accca7d44a74c055dd74e1/> remove DataQueryVariant
+
+### Chore (BREAKING)
+
+ - <csr-id-58a0608722ca8f4a8363c1f9221ac47f5838d158/> remove unused NodeDataResponse
+
+### Bug Fixes
+
+ - <csr-id-cbced3b621c2900ead79952dcd2f867c2043e560/> readd InsufficientNodeCount error
+
+### New Features
+
+ - <csr-id-7a5d6975153f9d78e742e0a799919852bcfc33ab/> pass client msgs onwards with no deserialisation
+
+### Chore
+
+ - <csr-id-a0f8243596169bbc7a2459b2de441dfd3f0756ae/> sn_interface-0.17.2/sn_node-0.73.5
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 7 commits contributed to the release.
+ - 5 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.17.2/sn_node-0.73.5 ([`a0f8243`](https://github.com/maidsafe/safe_network/commit/a0f8243596169bbc7a2459b2de441dfd3f0756ae))
     - Merge #2055 ([`d43f511`](https://github.com/maidsafe/safe_network/commit/d43f511a58dd34ce7ab1594f5e46beaea066aa10))
     - Merge branch 'main' into sap_change_force_dkg_termination ([`876d78a`](https://github.com/maidsafe/safe_network/commit/876d78a911e852b8cc1c33b2130e4cf9b28dd510))
+    - remove unused NodeDataResponse ([`58a0608`](https://github.com/maidsafe/safe_network/commit/58a0608722ca8f4a8363c1f9221ac47f5838d158))
+    - readd InsufficientNodeCount error ([`cbced3b`](https://github.com/maidsafe/safe_network/commit/cbced3b621c2900ead79952dcd2f867c2043e560))
+    - remove DataQueryVariant ([`af38f56`](https://github.com/maidsafe/safe_network/commit/af38f56c7e76a076f0accca7d44a74c055dd74e1))
+    - pass client msgs onwards with no deserialisation ([`7a5d697`](https://github.com/maidsafe/safe_network/commit/7a5d6975153f9d78e742e0a799919852bcfc33ab))
 </details>
 
 ## v0.17.1 (2023-02-02)
 
 <csr-id-e706848522d6c52d6ed5eddf638376996cc947a9/>
+<csr-id-3831dae3e34623ef252298645a43cbafcc923a13/>
 
 ### Chore
 

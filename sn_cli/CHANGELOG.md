@@ -4,21 +4,15 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
-## v0.69.1 (2023-02-03)
-
-### Bug Fixes
-
- - <csr-id-1c83fd8803fdcc5e269cdbb6539ac44fba13446e/> pull the correct version of sn_node
-   We added a new crate but forgot to account for the new version in the `node install` command, so it
-   was using sn_client's version number.
+## v0.69.2 (2023-02-06)
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
- - 1 day passed between releases.
- - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits contributed to the release over the course of 3 calendar days.
+ - 3 days passed between releases.
+ - 0 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -28,11 +22,49 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #2048 ([`ae06c94`](https://github.com/maidsafe/safe_network/commit/ae06c9458ad904863a925f1d2b2e253a67456298))
+    - Merge branch 'main' into sap_change_force_dkg_termination ([`876d78a`](https://github.com/maidsafe/safe_network/commit/876d78a911e852b8cc1c33b2130e4cf9b28dd510))
+</details>
+
+## v0.69.1 (2023-02-03)
+
+### Chore
+
+ - <csr-id-e5f38d036ecb54f695881efd45c8c8ab8c64adbc/> sn_node-0.73.4/sn_cli-0.69.1
+
+### Bug Fixes
+
+ - <csr-id-1c83fd8803fdcc5e269cdbb6539ac44fba13446e/> pull the correct version of sn_node
+   We added a new crate but forgot to account for the new version in the `node install` command, so it
+   was using sn_client's version number.
+ - <csr-id-cbced3b621c2900ead79952dcd2f867c2043e560/> readd InsufficientNodeCount error
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 5 commits contributed to the release over the course of 1 calendar day.
+ - 1 day passed between releases.
+ - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_node-0.73.4/sn_cli-0.69.1 ([`e5f38d0`](https://github.com/maidsafe/safe_network/commit/e5f38d036ecb54f695881efd45c8c8ab8c64adbc))
     - Merge #2064 ([`eb993b7`](https://github.com/maidsafe/safe_network/commit/eb993b7f5d131f4a34d94920b1e7b0733eecc139))
     - pull the correct version of sn_node ([`1c83fd8`](https://github.com/maidsafe/safe_network/commit/1c83fd8803fdcc5e269cdbb6539ac44fba13446e))
+    - readd InsufficientNodeCount error ([`cbced3b`](https://github.com/maidsafe/safe_network/commit/cbced3b621c2900ead79952dcd2f867c2043e560))
+    - Merge branch 'main' into sap_change_force_dkg_termination ([`7d3665b`](https://github.com/maidsafe/safe_network/commit/7d3665bfe05f61d170229df9f4424c5663b116d5))
 </details>
 
 ## v0.69.0 (2023-02-01)
+
+<csr-id-69f8ade1ea8bb3e77c169b17ae21a40370bfab58/>
 
 ### Chore
 

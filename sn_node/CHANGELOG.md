@@ -5,13 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.73.5 (2023-02-03)
+## v0.74.0 (2023-02-06)
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
+ - 1 commit contributed to the release.
+ - 3 days passed between releases.
  - 0 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
@@ -22,28 +23,76 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
-    - Merge #2055 ([`d43f511`](https://github.com/maidsafe/safe_network/commit/d43f511a58dd34ce7ab1594f5e46beaea066aa10))
-    - Merge branch 'main' into sap_change_force_dkg_termination ([`876d78a`](https://github.com/maidsafe/safe_network/commit/876d78a911e852b8cc1c33b2130e4cf9b28dd510))
+    - Merge #2048 ([`ae06c94`](https://github.com/maidsafe/safe_network/commit/ae06c9458ad904863a925f1d2b2e253a67456298))
 </details>
 
-## v0.73.4 (2023-02-03)
+## v0.73.5 (2023-02-03)
 
 ### Chore
 
- - <csr-id-e5f38d036ecb54f695881efd45c8c8ab8c64adbc/> sn_node-0.73.4/sn_cli-0.69.1
-
-### New Features
-
- - <csr-id-41fc522226945051a14b455ca45f637175b9143f/> only submit traces if environment var is set
-   We will only configure the tracing infrastructure if the `otlp` feature is enabled *and* the
-   `OTEL_EXPORTER_OTLP_ENDPOINT` environment variable is set.
+ - <csr-id-a0f8243596169bbc7a2459b2de441dfd3f0756ae/> sn_interface-0.17.2/sn_node-0.73.5
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
  - 3 commits contributed to the release.
- - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.17.2/sn_node-0.73.5 ([`a0f8243`](https://github.com/maidsafe/safe_network/commit/a0f8243596169bbc7a2459b2de441dfd3f0756ae))
+    - Merge #2055 ([`d43f511`](https://github.com/maidsafe/safe_network/commit/d43f511a58dd34ce7ab1594f5e46beaea066aa10))
+    - Merge branch 'main' into sap_change_force_dkg_termination ([`876d78a`](https://github.com/maidsafe/safe_network/commit/876d78a911e852b8cc1c33b2130e4cf9b28dd510))
+</details>
+
+## v0.73.4 (2023-02-03)
+
+<csr-id-e5f38d036ecb54f695881efd45c8c8ab8c64adbc/>
+
+### Chore
+
+ - <csr-id-e5f38d036ecb54f695881efd45c8c8ab8c64adbc/> sn_node-0.73.4/sn_cli-0.69.1
+
+### New Features (BREAKING)
+
+ - <csr-id-af38f56c7e76a076f0accca7d44a74c055dd74e1/> remove DataQueryVariant
+
+### Chore (BREAKING)
+
+ - <csr-id-58a0608722ca8f4a8363c1f9221ac47f5838d158/> remove unused NodeDataResponse
+
+### Test
+
+ - <csr-id-c9a51ea8938c91124c75b77354338d652aa96ffc/> reenable missed spentbook test
+
+### Bug Fixes
+
+ - <csr-id-cbced3b621c2900ead79952dcd2f867c2043e560/> readd InsufficientNodeCount error
+
+### Chore
+
+ - <csr-id-e370f7da5fb48cb61b700e6c85f9ffa732088014/> update comments and cache wire_msg header
+
+### New Features
+
+ - <csr-id-41fc522226945051a14b455ca45f637175b9143f/> only submit traces if environment var is set
+   We will only configure the tracing infrastructure if the `otlp` feature is enabled *and* the
+   `OTEL_EXPORTER_OTLP_ENDPOINT` environment variable is set.
+ - <csr-id-7a5d6975153f9d78e742e0a799919852bcfc33ab/> pass client msgs onwards with no deserialisation
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 9 commits contributed to the release.
+ - 8 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -56,6 +105,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - sn_node-0.73.4/sn_cli-0.69.1 ([`e5f38d0`](https://github.com/maidsafe/safe_network/commit/e5f38d036ecb54f695881efd45c8c8ab8c64adbc))
     - Merge #2064 ([`eb993b7`](https://github.com/maidsafe/safe_network/commit/eb993b7f5d131f4a34d94920b1e7b0733eecc139))
     - only submit traces if environment var is set ([`41fc522`](https://github.com/maidsafe/safe_network/commit/41fc522226945051a14b455ca45f637175b9143f))
+    - remove unused NodeDataResponse ([`58a0608`](https://github.com/maidsafe/safe_network/commit/58a0608722ca8f4a8363c1f9221ac47f5838d158))
+    - reenable missed spentbook test ([`c9a51ea`](https://github.com/maidsafe/safe_network/commit/c9a51ea8938c91124c75b77354338d652aa96ffc))
+    - update comments and cache wire_msg header ([`e370f7d`](https://github.com/maidsafe/safe_network/commit/e370f7da5fb48cb61b700e6c85f9ffa732088014))
+    - readd InsufficientNodeCount error ([`cbced3b`](https://github.com/maidsafe/safe_network/commit/cbced3b621c2900ead79952dcd2f867c2043e560))
+    - remove DataQueryVariant ([`af38f56`](https://github.com/maidsafe/safe_network/commit/af38f56c7e76a076f0accca7d44a74c055dd74e1))
+    - pass client msgs onwards with no deserialisation ([`7a5d697`](https://github.com/maidsafe/safe_network/commit/7a5d6975153f9d78e742e0a799919852bcfc33ab))
 </details>
 
 ## v0.73.3 (2023-02-02)
