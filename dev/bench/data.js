@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1675687710982,
+  "lastUpdate": 1675704979643,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -64696,6 +64696,150 @@ window.BENCHMARK_DATA = {
             "name": "read-sampling/chunk keys/4000",
             "value": 329504419,
             "range": "± 1794877",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "ae06c9458ad904863a925f1d2b2e253a67456298",
+          "message": "Merge #2048\n\n2048: Pass through client msgs r=joshuef a=joshuef\n\n- Sets elders to simply forward client msgs to their destination (avoiding de/reserialise)\r\n- removes redundant msg types for that\r\n- enables storage nodes to respond to client msgs directly\r\n- adds `query_index` to `MsgKind` so we can forward to data holder targets without deserialising\r\n- removes `DataQueryVariant` as now redundant\n\nCo-authored-by: Josh Wilson <joshuef@gmail.com>",
+          "timestamp": "2023-02-06T15:44:08Z",
+          "tree_id": "8277118f92392b68d2daf92e276e2a2cef1171be",
+          "url": "https://github.com/maidsafe/safe_network/commit/ae06c9458ad904863a925f1d2b2e253a67456298"
+        },
+        "date": 1675704977101,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "serialize/serialize for sending",
+            "value": 2244253,
+            "range": "± 8269",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 82951908,
+            "range": "± 948457",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 101024602,
+            "range": "± 3525383",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 416510040,
+            "range": "± 2312976",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 69055243,
+            "range": "± 1062675",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 82723324,
+            "range": "± 967057",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 336780730,
+            "range": "± 2594306",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "register-edit-sampling/register_edits/1000",
+            "value": 21859975492,
+            "range": "± 211719121",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/100",
+            "value": 43375740,
+            "range": "± 8539717",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/1000",
+            "value": 2373064824,
+            "range": "± 501065372",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/4000",
+            "value": 11323427607,
+            "range": "± 1621453751",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/100",
+            "value": 379168121,
+            "range": "± 10785300",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/1000",
+            "value": 2794624703,
+            "range": "± 370682420",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/4000",
+            "value": 6897410018,
+            "range": "± 402599523",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/100",
+            "value": 40368107,
+            "range": "± 633359",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/1000",
+            "value": 388271879,
+            "range": "± 3143763",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/4000",
+            "value": 1502087814,
+            "range": "± 5879699",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/100",
+            "value": 11119368,
+            "range": "± 215130",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/1000",
+            "value": 98894291,
+            "range": "± 4023649",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/4000",
+            "value": 343044761,
+            "range": "± 3361116",
             "unit": "ns/iter"
           }
         ]
