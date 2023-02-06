@@ -132,7 +132,7 @@ impl MyNode {
             MsgType::Client {
                 msg_id, msg, auth, ..
             } => {
-                info!("Client msg {msg_id:?} reached its destination.");
+                trace!("Client msg {msg_id:?} reached its destination.");
 
                 // TODO: clarify this err w/ peer
                 let Some(stream) = send_stream else {

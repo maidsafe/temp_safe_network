@@ -318,7 +318,7 @@ impl Config {
             }
             Err(error) => {
                 if error.kind() == std::io::ErrorKind::NotFound {
-                    debug!("No config file available at {:?}", path);
+                    warn!("No config file available at {:?}", path);
                     Ok(None)
                 } else {
                     Err(error.into())

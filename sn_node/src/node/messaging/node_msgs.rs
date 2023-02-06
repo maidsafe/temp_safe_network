@@ -40,7 +40,7 @@ impl MyNode {
         recipients: Peers,
         context: NodeContext,
     ) -> Result<Vec<Cmd>> {
-        trace!("Sending msg: {msg_id:?}");
+        debug!("Sending msg: {msg_id:?}");
         let peer_msgs = into_msg_bytes(
             &context.network_knowledge,
             context.name,
@@ -122,7 +122,7 @@ impl MyNode {
             .await
         {
             Ok(storage_level) => {
-                trace!("Data has been stored: {data_addr:?}");
+                info!("{original_msg_id:?} Data has been stored: {data_addr:?}");
                 if matches!(storage_level, StorageLevel::Updated(_level)) {
                     // we add a new node for every level increase of used space
                     cmds.push(Cmd::SetJoinsAllowed(true));
@@ -184,7 +184,7 @@ impl MyNode {
         sender: Peer,
         send_stream: Option<SendStream>,
     ) -> Result<Vec<Cmd>> {
-        trace!("{:?}: {msg_id:?}", LogMarker::NodeMsgToBeHandled);
+        debug!("{:?}: {msg_id:?}", LogMarker::NodeMsgToBeHandled);
 
         match msg {
             NodeMsg::TryJoin(relocation) => {
@@ -195,7 +195,7 @@ impl MyNode {
             }
             NodeMsg::Relocate(signed_relocation) => {
                 let mut node = node.write().await;
-                debug!("[NODE WRITE]: Relocated write gottt...");
+                trace!("[NODE WRITE]: Relocated write gottt...");
                 trace!("Handling relocate msg from {}: {:?}", sender, msg_id);
                 Ok(node.relocate(signed_relocation)?.into_iter().collect())
             }
@@ -213,7 +213,7 @@ impl MyNode {
             // We always respond to probe msgs if we're an elder as health checks use this to see if a node is alive
             // and repsonsive, as well as being a method of keeping nodes up to date.
             NodeMsg::AntiEntropyProbe(section_key) => {
-                debug!("Aeprobe in");
+                trace!("Aeprobe in");
 
                 let mut cmds = vec![];
                 if !context.is_elder {
@@ -258,8 +258,8 @@ impl MyNode {
                             return Ok(vec![]);
                         }
 
-                        trace!(
-                            "=========>> This node has been approved to join the section at {:?}!",
+                        info!(
+                            "=========>> This node ({:?} @ {:?}) has been approved to join the section at {:?}!", context.name, context.info.addr,
                             target_sap.prefix(),
                         );
 
@@ -272,7 +272,7 @@ impl MyNode {
                         {
                             // We could clear the cached relocation proof here,
                             // but we have the periodic check doing it, so no need to duplicate the logic.
-                            trace!("{}", LogMarker::RelocateEnd);
+                            info!("{}", LogMarker::RelocateEnd);
                         }
 
                         Ok(vec![])
@@ -281,13 +281,13 @@ impl MyNode {
             }
             NodeMsg::HandoverVotes(votes) => {
                 let mut node = node.write().await;
-                debug!("[NODE WRITE]: handover votes write gottt...");
+                trace!("[NODE WRITE]: handover votes write gottt...");
                 node.handle_handover_msg(sender, votes)
             }
             NodeMsg::HandoverAE(gen) => {
-                debug!("[NODE READ]: handover ae attempts");
+                trace!("[NODE READ]: handover ae attempts");
                 let node = node.read().await;
-                debug!("[NODE READ]: handover ae got");
+                trace!("[NODE READ]: handover ae got");
 
                 Ok(node
                     .handle_handover_anti_entropy(sender, gen)
@@ -296,16 +296,16 @@ impl MyNode {
             }
             NodeMsg::MembershipVotes(votes) => {
                 let mut node = node.write().await;
-                debug!("[NODE WRITE]: MembershipVotes write gottt...");
+                trace!("[NODE WRITE]: MembershipVotes write gottt...");
                 let mut cmds = vec![];
                 cmds.extend(node.handle_membership_votes(sender, votes)?);
                 Ok(cmds)
             }
             NodeMsg::MembershipAE(gen) => {
                 let (node_context, membership_context) = {
-                    debug!("[NODE READ]: membership ae read ");
+                    trace!("[NODE READ]: membership ae read ");
                     let membership = node.read().await.membership.clone();
-                    debug!("[NODE READ]: membership ae read got");
+                    trace!("[NODE READ]: membership ae read got");
                     (context, membership)
                 };
 
@@ -323,7 +323,7 @@ impl MyNode {
                 sig_share,
             } => {
                 let mut node = node.write().await;
-                debug!("[NODE WRITE]: ProposeSectionState write.");
+                trace!("[NODE WRITE]: ProposeSectionState write.");
                 if node.is_not_elder() {
                     trace!(
                         "Adult handling a ProposeSectionState msg from {}: {:?}",
@@ -350,7 +350,7 @@ impl MyNode {
                 );
 
                 let mut node = node.write().await;
-                debug!("[NODE WRITE]: DKGstart write gottt...");
+                trace!("[NODE WRITE]: DKGstart write gottt...");
                 node.untrack_node_issue(sender.name(), IssueType::Dkg);
                 node.handle_dkg_start(session_id, elder_sig)
             }
@@ -367,7 +367,7 @@ impl MyNode {
                     sender
                 );
                 let mut node = node.write().await;
-                debug!("[NODE WRITE]: DKG Ephemeral write gottt...");
+                trace!("[NODE WRITE]: DKG Ephemeral write gottt...");
                 node.handle_dkg_ephemeral_pubkey(&session_id, section_auth, pub_key, sig, sender)
             }
             NodeMsg::DkgVotes {
@@ -383,17 +383,17 @@ impl MyNode {
                     votes
                 );
                 let mut node = node.write().await;
-                debug!("[NODE WRITE]: DKG Votes write gottt...");
+                trace!("[NODE WRITE]: DKG Votes write gottt...");
 
                 node.untrack_node_issue(sender.name(), IssueType::Dkg);
 
                 node.handle_dkg_votes(&session_id, pub_keys, votes, sender)
             }
             NodeMsg::DkgAE(session_id) => {
-                debug!("[NODE READ]: dkg ae read ");
+                trace!("[NODE READ]: dkg ae read ");
 
                 let node = node.read().await;
-                debug!("[NODE READ]: dkg ae read got");
+                trace!("[NODE READ]: dkg ae read got");
                 trace!("Handling msg: DkgAE s{} from {}", session_id.sh(), sender);
                 node.handle_dkg_anti_entropy(session_id, sender)
             }
@@ -422,7 +422,7 @@ impl MyNode {
                 // only when the node is severely out of sync with the rest, do we vote it off straight away
                 // othwerwise we report it as an issue (see further down)
                 if full && context.data_storage.is_below_half_limit() {
-                    debug!("Node {node_id} prematurely reported full. Voting it off..");
+                    warn!("Node {node_id} prematurely reported full. Voting it off..");
                     let nodes = BTreeSet::from([node_id.into()]);
                     cmds.push(Cmd::ProposeVoteNodesOffline(nodes));
                     return Ok(cmds);
@@ -434,7 +434,7 @@ impl MyNode {
                 Ok(cmds)
             }
             NodeMsg::NodeDataCmd(NodeDataCmd::StoreData(data)) => {
-                debug!("Attempting to store data locally: {:?}", data.address());
+                trace!("Attempting to store data locally: {:?}", data.address());
                 // TODO: proper err
                 let Some(stream) = send_stream else {
                     return Ok(vec![])
@@ -464,14 +464,14 @@ impl MyNode {
                 info!("RequestHandover with msg_id {msg_id:?}");
                 let mut node = node.write().await;
 
-                debug!("[NODE WRITE]: RequestHandover write gottt...");
+                trace!("[NODE WRITE]: RequestHandover write gottt...");
                 node.handle_handover_request(msg_id, sap, sig_share, sender)
             }
             NodeMsg::SectionHandoverPromotion { sap, sig_share } => {
                 info!("SectionHandoverPromotion with msg_id {msg_id:?}");
                 let mut node = node.write().await;
 
-                debug!("[NODE WRITE]: SectionHandoverPromotion write gottt...");
+                trace!("[NODE WRITE]: SectionHandoverPromotion write gottt...");
                 node.handle_handover_promotion(msg_id, sap, sig_share, sender)
             }
             NodeMsg::SectionSplitPromotion {
@@ -483,7 +483,7 @@ impl MyNode {
                 info!("SectionSplitPromotion with msg_id {msg_id:?}");
                 let mut node = node.write().await;
 
-                debug!("[NODE WRITE]: SectionSplitPromotion write gottt...");
+                trace!("[NODE WRITE]: SectionSplitPromotion write gottt...");
                 node.handle_section_split_promotion(
                     msg_id, sap0, sig_share0, sap1, sig_share1, sender,
                 )

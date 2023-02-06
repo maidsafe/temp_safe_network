@@ -90,7 +90,7 @@ pub(crate) fn check_ephemeral_dkg_key(
 
     // check key_sig
     let sender_pubkey = pub_key(&key_owner).map_err(|_| Error::InvalidXorname(key_owner))?;
-    debug!(
+    trace!(
         "Checking dkg ephemeral key s{} from {:?}",
         session_id.sh(),
         key_owner
@@ -200,7 +200,7 @@ impl DkgVoter {
         // check and save key
         let just_completed = self.save_key(session_id, sender, ephemeral_pub_key, key_sig)?;
         if !just_completed {
-            debug!(
+            trace!(
                 "Waiting for more Dkg keys s{} id:{participant_index}...",
                 session_id.sh()
             );
@@ -245,7 +245,7 @@ impl DkgVoter {
                     Box::new(*old_sig),
                 ));
             } else {
-                debug!(
+                trace!(
                     "Ignoring known ephemeral key from {} in s{}",
                     key_owner,
                     session_id.sh()
@@ -261,7 +261,7 @@ impl DkgVoter {
         let what_we_have = our_keys.pub_keys.keys().collect::<BTreeSet<_>>();
         let what_we_need = session_id.elders.keys().collect::<BTreeSet<_>>();
         let just_completed = what_we_have == what_we_need;
-        debug!(
+        trace!(
             "Dkg keys s{}: ours: {:?}, in session_id: {:?}",
             session_id.sh(),
             what_we_have,

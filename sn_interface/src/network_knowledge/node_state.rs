@@ -102,23 +102,23 @@ impl NodeState {
         info!("Validating node state for {name} - {:?}", self.state);
 
         if !prefix.matches(&name) {
-            info!("Membership - rejecting node {name}, name doesn't match our prefix {prefix:?}");
+            warn!("Membership - rejecting node {name}, name doesn't match our prefix {prefix:?}");
             return Err(Error::WrongSection);
         }
 
         match self.state {
             MembershipState::Joined => {
                 if members.contains_key(&name) {
-                    info!("Rejecting join from existing member {name}");
+                    warn!("Rejecting join from existing member {name}");
                     Err(Error::ExistingMemberConflict)
                 } else if !section_has_room_for_node(name, prefix, members.keys().copied()) {
-                    info!("Rejecting join since we are at capacity");
+                    warn!("Rejecting join since we are at capacity");
                     Err(Error::TryJoinLater)
                 } else if let Some(existing_node) = members
                     .values()
                     .find(|n| n.peer().addr() == self.peer().addr())
                 {
-                    info!("Rejecting join since we have an existing node with this address: {existing_node:?}");
+                    warn!("Rejecting join since we have an existing node with this address: {existing_node:?}");
                     Err(Error::ExistingMemberConflict)
                 } else if archived.contains(&name) {
                     Err(Error::ArchivedNodeRejoined)
@@ -132,7 +132,7 @@ impl NodeState {
             }
             MembershipState::Left => {
                 if !members.contains_key(&name) {
-                    info!("Rejecting leave from non-existing member");
+                    warn!("Rejecting leave from non-existing member");
                     Err(Error::NotAMember)
                 } else {
                     Ok(())

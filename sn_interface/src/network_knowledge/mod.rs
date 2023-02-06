@@ -256,10 +256,10 @@ impl NetworkKnowledge {
                 }
             }
             Ok(false) => {
-                debug!("Anti-Entropy: discarded SAP for {sap_prefix:?} since it's the same as the one in our records: {:?}", signed_sap.value);
+                warn!("Anti-Entropy: discarded SAP for {sap_prefix:?} since it's the same as the one in our records: {:?}", signed_sap.value);
             }
             Err(err) => {
-                debug!("Anti-Entropy: discarded SAP for {sap_prefix:?} since we failed to update section tree with: {err:?}");
+                warn!("Anti-Entropy: discarded SAP for {sap_prefix:?} since we failed to update section tree with: {err:?}");
                 return Err(err);
             }
         }

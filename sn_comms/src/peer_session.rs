@@ -275,10 +275,10 @@ impl PeerSessionWorker {
 
             // drain channel to avoid memory leaks.
             while let Some(msg) = channel.recv().await {
-                info!("Draining channel: dropping {:?}", msg);
+                warn!("Draining channel: dropping {:?}", msg);
             }
 
-            info!("Finished peer session shutdown: {peer:?}");
+            warn!("Finished peer session shutdown: {peer:?}");
         });
     }
 

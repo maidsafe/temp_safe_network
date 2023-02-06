@@ -25,7 +25,7 @@ impl MyNode {
         sig_share: SectionSigShare,
         sender: Peer,
     ) -> Result<Vec<Cmd>> {
-        trace!("Handling handover promotion message {msg_id:?} by {sender:?} with sap: {sap:?}");
+        info!("Handling handover promotion message {msg_id:?} by {sender:?} with sap: {sap:?}");
         let our_prefix = self.network_knowledge.prefix();
         let sig_share_pk = &sig_share.public_key_set.public_key();
 

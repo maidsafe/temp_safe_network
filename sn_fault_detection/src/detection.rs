@@ -251,6 +251,7 @@ impl FaultDetection {
             trace!("Score for {name:?} is {score:?}");
 
             if score >= threshold && threshold > 1 {
+                info!("{name:?} exceeded threshold {threshold:?}");
                 let _existed = final_scores.insert(name, score);
             }
         }

@@ -7,7 +7,6 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use sysinfo::{System, SystemExt};
-use tracing::trace;
 use xor_name::Prefix;
 
 pub(super) fn log_system_details(prefix: Prefix) {
@@ -21,7 +20,7 @@ fn initial_log(system: &mut System, prefix: Prefix) {
     let kernel_version: &str = &fmt(system.kernel_version());
     let os_version: &str = &fmt(system.os_version());
     let host_name: &str = &fmt(system.host_name());
-    trace!(prefix, os_name, kernel_version, os_version, host_name);
+    info!(prefix, os_name, kernel_version, os_version, host_name);
 }
 
 fn fmt(string: Option<String>) -> String {

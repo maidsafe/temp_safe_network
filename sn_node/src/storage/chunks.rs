@@ -75,7 +75,7 @@ impl ChunkStorage {
     }
 
     pub(super) async fn remove_chunk(&self, address: &ChunkAddress) -> Result<()> {
-        trace!("Removing chunk, {:?}", address);
+        debug!("Removing chunk, {:?}", address);
         let filepath = self.chunk_addr_to_filepath(address)?;
         let meta = metadata(filepath.clone()).await?;
         remove_file(filepath).await?;
@@ -84,7 +84,7 @@ impl ChunkStorage {
     }
 
     pub(super) async fn get_chunk(&self, address: &ChunkAddress) -> Result<Chunk> {
-        debug!("Getting chunk {:?}", address);
+        trace!("Getting chunk {:?}", address);
 
         let file_path = self.chunk_addr_to_filepath(address)?;
         match read(file_path).await {

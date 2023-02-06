@@ -30,7 +30,7 @@ impl MyNode {
         recipients: Vec<Peer>,
         proposal: SectionStateVote,
     ) -> Result<Vec<Cmd>> {
-        trace!("Sending section state proposal: {proposal:?} to {recipients:?}");
+        info!("Sending section state proposal: {proposal:?} to {recipients:?}");
 
         // sign the proposal
         let serialized_proposal = bincode::serialize(&proposal).map_err(|err| {
@@ -117,7 +117,7 @@ impl MyNode {
         {
             Ok(Some(sig)) => Ok(vec![Cmd::HandleSectionDecisionAgreement { proposal, sig }]),
             Ok(None) => {
-                trace!("Section state proposal {msg_id:?} acknowledged, waiting for more...");
+                info!("Section state proposal {msg_id:?} acknowledged, waiting for more...");
                 Ok(vec![])
             }
             Err(err) => {

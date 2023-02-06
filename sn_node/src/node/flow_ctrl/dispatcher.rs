@@ -106,7 +106,7 @@ impl Dispatcher {
             }
             Cmd::TrackNodeIssue { name, issue } => {
                 let node = self.node.read().await;
-                debug!("[NODE READ]: fault tracking read got");
+                trace!("[NODE READ]: fault tracking read got");
                 node.track_node_issue(name, issue);
                 Ok(vec![])
             }
@@ -130,34 +130,34 @@ impl Dispatcher {
                 let updated = {
                     let mut node = self.node.write().await;
                     let name = node.name();
-                    debug!("[NODE WRITE]: update client write got");
+                    trace!("[NODE WRITE]: update client write got");
                     node.network_knowledge.update_knowledge_if_valid(
                         SectionTreeUpdate::new(signed_sap, proof_chain),
                         None,
                         &name,
                     )?
                 };
-                debug!("Network knowledge was updated: {updated}");
+                info!("Network knowledge was updated: {updated}");
 
                 MyNode::handle_client_msg_for_us(context, msg_id, msg, auth, origin, send_stream)
                     .await
             }
             Cmd::HandleSectionDecisionAgreement { proposal, sig } => {
-                debug!("[NODE WRITE]: section decision agreements node write...");
+                trace!("[NODE WRITE]: section decision agreements node write...");
                 let mut node = self.node.write().await;
-                debug!("[NODE WRITE]: section decision agreements node write got");
+                trace!("[NODE WRITE]: section decision agreements node write got");
                 node.handle_section_decision_agreement(proposal, sig)
             }
             Cmd::HandleMembershipDecision(decision) => {
-                debug!("[NODE WRITE]: membership decision agreements write...");
+                trace!("[NODE WRITE]: membership decision agreements write...");
                 let mut node = self.node.write().await;
-                debug!("[NODE WRITE]: membership decision agreements write got...");
+                trace!("[NODE WRITE]: membership decision agreements write got...");
                 node.handle_membership_decision(decision).await
             }
             Cmd::HandleNewEldersAgreement { new_elders, sig } => {
-                debug!("[NODE WRITE]: new elders decision agreements write...");
+                trace!("[NODE WRITE]: new elders decision agreements write...");
                 let mut node = self.node.write().await;
-                debug!("[NODE WRITE]: new elders decision agreements write got...");
+                trace!("[NODE WRITE]: new elders decision agreements write got...");
                 node.handle_new_elders_agreement(new_elders, sig).await
             }
             Cmd::HandleNewSectionsAgreement {
@@ -166,16 +166,16 @@ impl Dispatcher {
                 sap2,
                 sig2,
             } => {
-                debug!("[NODE WRITE]: new sections decision agreements write...");
+                trace!("[NODE WRITE]: new sections decision agreements write...");
                 let mut node = self.node.write().await;
-                debug!("[NODE WRITE]: new sections decision agreements write got...");
+                trace!("[NODE WRITE]: new sections decision agreements write got...");
                 node.handle_new_sections_agreement(sap1, sig1, sap2, sig2)
                     .await
             }
             Cmd::HandleFailedSendToNode { peer, msg_id } => {
                 warn!("Message sending failed to {peer}, for {msg_id:?}");
                 let node = self.node.read().await;
-                debug!("[NODE READ]: HandleFailedSendToNode agreements read got...");
+                trace!("[NODE READ]: HandleFailedSendToNode agreements read got...");
                 node.handle_failed_send(&peer.addr());
                 Ok(vec![])
             }
@@ -183,9 +183,9 @@ impl Dispatcher {
                 section_auth,
                 outcome,
             } => {
-                debug!("[NODE WRITE]: HandleDKg agreements write...");
+                trace!("[NODE WRITE]: HandleDKg agreements write...");
                 let mut node = self.node.write().await;
-                debug!("[NODE WRITE]: HandleDKg agreements write got...");
+                trace!("[NODE WRITE]: HandleDKg agreements write got...");
                 node.handle_dkg_outcome(section_auth, outcome).await
             }
             Cmd::EnqueueDataForReplication {
@@ -200,18 +200,18 @@ impl Dispatcher {
             }
             Cmd::ProposeVoteNodesOffline(names) => {
                 let mut node = self.node.write().await;
-                debug!("[NODE WRITE]: propose offline write got");
+                trace!("[NODE WRITE]: propose offline write got");
                 node.cast_offline_proposals(&names)
             }
             Cmd::SetJoinsAllowed(joins_allowed) => {
                 let mut node = self.node.write().await;
-                debug!("[NODE WRITE]: Setting joins allowed..");
+                trace!("[NODE WRITE]: Setting joins allowed..");
                 node.joins_allowed = joins_allowed;
                 Ok(vec![])
             }
             Cmd::SetJoinsAllowedUntilSplit(joins_allowed_until_split) => {
                 let mut node = self.node.write().await;
-                debug!("[NODE WRITE]: Setting joins allowed until split..");
+                trace!("[NODE WRITE]: Setting joins allowed until split..");
                 node.joins_allowed = joins_allowed_until_split;
                 node.joins_allowed_until_split = joins_allowed_until_split;
                 Ok(vec![])

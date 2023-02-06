@@ -218,7 +218,7 @@ impl SectionTree {
         let proof_chain = section_tree_update.proof_chain;
 
         if self.sections_dag.has_key(&signed_sap.value.section_key()) {
-            info!(
+            warn!(
                 "Dropping SectionTree update as already have the incoming SAP {:?}",
                 signed_sap.value
             );
@@ -411,7 +411,7 @@ impl SectionTree {
         let prefix = sap.prefix();
         // Don't insert if any descendant is already present in the map.
         if let Some(extension_p) = self.sections.keys().find(|p| p.is_extension_of(&prefix)) {
-            info!("Dropping update since we have a prefix '{extension_p}' that is an extension of '{prefix}'");
+            warn!("Dropping update since we have a prefix '{extension_p}' that is an extension of '{prefix}'");
             return false;
         }
 
