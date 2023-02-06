@@ -48,7 +48,7 @@ jobs:
     needs: [launch-testnet]
     if: ${{ always() && (github.event.inputs.run-client-tests == 'y' || github.event.label.name == 'run-client-tests') }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
@@ -112,7 +112,7 @@ jobs:
       github.repository_owner == 'maidsafe' &&
       !startsWith(github.event.head_commit.message, 'chore(release):')
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           fetch-depth: '0'
           token: ${{ secrets.VERSION_BUMP_COMMIT_PAT }}
