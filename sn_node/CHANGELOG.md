@@ -5,18 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.74.2 (2023-02-07)
+## v0.74.4 (2023-02-07)
 
 ### Chore
 
- - <csr-id-677ef5cc8b1935b94641c61c53429faf2c58c261/> update various log levels
+ - <csr-id-6cb1f9548ce44aaf04c9d6c64364ca1c8b344470/> remove unused async
+
+### Bug Fixes
+
+ - <csr-id-c89336c1e5b68ca4facd9afd4775c2847d8e3e6f/> verify `SectionStateVote` before handling it
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
- - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 3 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -26,11 +30,86 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #2073 ([`732621c`](https://github.com/maidsafe/safe_network/commit/732621c1261dd24eb58f38b49ba25c78af272c69))
+    - verify `SectionStateVote` before handling it ([`c89336c`](https://github.com/maidsafe/safe_network/commit/c89336c1e5b68ca4facd9afd4775c2847d8e3e6f))
+    - remove unused async ([`6cb1f95`](https://github.com/maidsafe/safe_network/commit/6cb1f9548ce44aaf04c9d6c64364ca1c8b344470))
+</details>
+
+## v0.74.3 (2023-02-07)
+
+### Chore
+
+ - <csr-id-bda3aa2106fd2fd8c1e6a320aa6bbefd9e407ee7/> sn_interface-0.17.5/sn_node-0.74.3
+ - <csr-id-6da16b20400b993576cb5f21736c3d447d6e4efa/> send NodeApprovals for the joining nodes only
+
+### New Features
+
+ - <csr-id-15d113ba36b0bab71062e8cddf234321e30d3b82/> use TestMsgCounter to keep track of NodeMsgs
+
+### Test
+
+ - <csr-id-6611b3228df87d3e39c379e13fd9b9d308632881/> relocate adults
+ - <csr-id-a7d42921e4bc5398aba98449433eed83ccc9c12e/> multiple proposals should throw an error
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 7 commits contributed to the release.
+ - 5 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.17.5/sn_node-0.74.3 ([`bda3aa2`](https://github.com/maidsafe/safe_network/commit/bda3aa2106fd2fd8c1e6a320aa6bbefd9e407ee7))
+    - Merge #2072 ([`1b13c86`](https://github.com/maidsafe/safe_network/commit/1b13c86fa18abee9e9fb2c965366dba1afa0d8b3))
+    - relocate adults ([`6611b32`](https://github.com/maidsafe/safe_network/commit/6611b3228df87d3e39c379e13fd9b9d308632881))
+    - use TestMsgCounter to keep track of NodeMsgs ([`15d113b`](https://github.com/maidsafe/safe_network/commit/15d113ba36b0bab71062e8cddf234321e30d3b82))
+    - multiple proposals should throw an error ([`a7d4292`](https://github.com/maidsafe/safe_network/commit/a7d42921e4bc5398aba98449433eed83ccc9c12e))
+    - send NodeApprovals for the joining nodes only ([`6da16b2`](https://github.com/maidsafe/safe_network/commit/6da16b20400b993576cb5f21736c3d447d6e4efa))
+    - fix(relocation): retain comms to members undergoing relocation - We retain comms to the relocating members which are signed by our   current SectionKey ([`8afde20`](https://github.com/maidsafe/safe_network/commit/8afde20480c72f0d36f0bc644f72d764bca4f946))
+</details>
+
+## v0.74.2 (2023-02-07)
+
+<csr-id-677ef5cc8b1935b94641c61c53429faf2c58c261/>
+
+### Chore
+
+ - <csr-id-677ef5cc8b1935b94641c61c53429faf2c58c261/> update various log levels
+
+### Chore
+
+ - <csr-id-3c34a731eca9d5b37d2574e3e16c7f089c7cc8b2/> sn_interface-0.17.4/sn_fault_detection-0.15.4/sn_comms-0.3.1/sn_node-0.74.2
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.17.4/sn_fault_detection-0.15.4/sn_comms-0.3.1/sn_node-0.74.2 ([`3c34a73`](https://github.com/maidsafe/safe_network/commit/3c34a731eca9d5b37d2574e3e16c7f089c7cc8b2))
     - Merge #2066 ([`023ed9b`](https://github.com/maidsafe/safe_network/commit/023ed9b313d050bd43869eb871697716fea888d8))
     - update various log levels ([`677ef5c`](https://github.com/maidsafe/safe_network/commit/677ef5cc8b1935b94641c61c53429faf2c58c261))
 </details>
 
 ## v0.74.1 (2023-02-06)
+
+<csr-id-557881dbef1d096bcb38868eda38f4c7ca704e20/>
 
 ### Chore
 

@@ -5,11 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.3.1 (2023-02-07)
+## v0.3.2 (2023-02-07)
 
 ### Chore
 
- - <csr-id-677ef5cc8b1935b94641c61c53429faf2c58c261/> update various log levels
+ - <csr-id-6cb1f9548ce44aaf04c9d6c64364ca1c8b344470/> remove unused async
 
 ### Commit Statistics
 
@@ -26,28 +26,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
-    - Merge #2066 ([`023ed9b`](https://github.com/maidsafe/safe_network/commit/023ed9b313d050bd43869eb871697716fea888d8))
-    - update various log levels ([`677ef5c`](https://github.com/maidsafe/safe_network/commit/677ef5cc8b1935b94641c61c53429faf2c58c261))
+    - Merge #2073 ([`732621c`](https://github.com/maidsafe/safe_network/commit/732621c1261dd24eb58f38b49ba25c78af272c69))
+    - remove unused async ([`6cb1f95`](https://github.com/maidsafe/safe_network/commit/6cb1f9548ce44aaf04c9d6c64364ca1c8b344470))
 </details>
 
-## v0.2.1 (2023-02-02)
+## v0.3.1 (2023-02-07)
 
-<csr-id-e706848522d6c52d6ed5eddf638376996cc947a9/>
-
-### Chore
-
- - <csr-id-e706848522d6c52d6ed5eddf638376996cc947a9/> add clippy check for unused async
+<csr-id-677ef5cc8b1935b94641c61c53429faf2c58c261/>
 
 ### Chore
 
- - <csr-id-3831dae3e34623ef252298645a43cbafcc923a13/> sn_interface-0.17.1/sn_fault_detection-0.15.3/sn_comms-0.2.1/sn_client-0.78.2/sn_node-0.73.3/sn_api-0.76.1
+ - <csr-id-677ef5cc8b1935b94641c61c53429faf2c58c261/> update various log levels
+
+### Chore
+
+ - <csr-id-3c34a731eca9d5b37d2574e3e16c7f089c7cc8b2/> sn_interface-0.17.4/sn_fault_detection-0.15.4/sn_comms-0.3.1/sn_node-0.74.2
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 4 commits contributed to the release.
- - 1 day passed between releases.
+ - 3 commits contributed to the release.
  - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
@@ -58,13 +57,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
-    - sn_interface-0.17.1/sn_fault_detection-0.15.3/sn_comms-0.2.1/sn_client-0.78.2/sn_node-0.73.3/sn_api-0.76.1 ([`3831dae`](https://github.com/maidsafe/safe_network/commit/3831dae3e34623ef252298645a43cbafcc923a13))
-    - Merge #2061 ([`bab8208`](https://github.com/maidsafe/safe_network/commit/bab82087260ac4f1f44e688db2e67ca2387a7175))
-    - add clippy check for unused async ([`e706848`](https://github.com/maidsafe/safe_network/commit/e706848522d6c52d6ed5eddf638376996cc947a9))
-    - Merge branch 'main' into sap_change_force_dkg_termination ([`7d3665b`](https://github.com/maidsafe/safe_network/commit/7d3665bfe05f61d170229df9f4424c5663b116d5))
+    - sn_interface-0.17.4/sn_fault_detection-0.15.4/sn_comms-0.3.1/sn_node-0.74.2 ([`3c34a73`](https://github.com/maidsafe/safe_network/commit/3c34a731eca9d5b37d2574e3e16c7f089c7cc8b2))
+    - Merge #2066 ([`023ed9b`](https://github.com/maidsafe/safe_network/commit/023ed9b313d050bd43869eb871697716fea888d8))
+    - update various log levels ([`677ef5c`](https://github.com/maidsafe/safe_network/commit/677ef5cc8b1935b94641c61c53429faf2c58c261))
 </details>
 
 ## v0.3.0 (2023-02-06)
+
+<csr-id-e967cc4d827c460bb47748decdf564c9cf7e1e6d/>
+<csr-id-58a0608722ca8f4a8363c1f9221ac47f5838d158/>
 
 ### Chore
 
@@ -104,6 +105,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - remove unused NodeDataResponse ([`58a0608`](https://github.com/maidsafe/safe_network/commit/58a0608722ca8f4a8363c1f9221ac47f5838d158))
     - remove DataQueryVariant ([`af38f56`](https://github.com/maidsafe/safe_network/commit/af38f56c7e76a076f0accca7d44a74c055dd74e1))
     - pass client msgs onwards with no deserialisation ([`7a5d697`](https://github.com/maidsafe/safe_network/commit/7a5d6975153f9d78e742e0a799919852bcfc33ab))
+</details>
+
+## v0.2.1 (2023-02-02)
+
+<csr-id-e706848522d6c52d6ed5eddf638376996cc947a9/>
+<csr-id-3831dae3e34623ef252298645a43cbafcc923a13/>
+
+### Chore
+
+ - <csr-id-e706848522d6c52d6ed5eddf638376996cc947a9/> add clippy check for unused async
+
+### Chore
+
+ - <csr-id-3831dae3e34623ef252298645a43cbafcc923a13/> sn_interface-0.17.1/sn_fault_detection-0.15.3/sn_comms-0.2.1/sn_client-0.78.2/sn_node-0.73.3/sn_api-0.76.1
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 4 commits contributed to the release.
+ - 1 day passed between releases.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.17.1/sn_fault_detection-0.15.3/sn_comms-0.2.1/sn_client-0.78.2/sn_node-0.73.3/sn_api-0.76.1 ([`3831dae`](https://github.com/maidsafe/safe_network/commit/3831dae3e34623ef252298645a43cbafcc923a13))
+    - Merge #2061 ([`bab8208`](https://github.com/maidsafe/safe_network/commit/bab82087260ac4f1f44e688db2e67ca2387a7175))
+    - add clippy check for unused async ([`e706848`](https://github.com/maidsafe/safe_network/commit/e706848522d6c52d6ed5eddf638376996cc947a9))
+    - Merge branch 'main' into sap_change_force_dkg_termination ([`7d3665b`](https://github.com/maidsafe/safe_network/commit/7d3665bfe05f61d170229df9f4424c5663b116d5))
 </details>
 
 ## v0.2.0 (2023-02-01)
