@@ -6,15 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## v0.17.3 (2023-02-06)
+## v0.17.4 (2023-02-07)
+
+### Chore
+
+ - <csr-id-677ef5cc8b1935b94641c61c53429faf2c58c261/> update various log levels
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 1 commit contributed to the release.
- - 3 days passed between releases.
- - 0 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits contributed to the release.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -24,10 +27,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #2066 ([`023ed9b`](https://github.com/maidsafe/safe_network/commit/023ed9b313d050bd43869eb871697716fea888d8))
+    - update various log levels ([`677ef5c`](https://github.com/maidsafe/safe_network/commit/677ef5cc8b1935b94641c61c53429faf2c58c261))
+</details>
+
+## v0.17.3 (2023-02-06)
+
+### Chore
+
+ - <csr-id-e967cc4d827c460bb47748decdf564c9cf7e1e6d/> sn_interface-0.17.3/sn_comms-0.3.0/sn_client-0.78.4/sn_node-0.74.0/sn_cli-0.69.2
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 3 days passed between releases.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.17.3/sn_comms-0.3.0/sn_client-0.78.4/sn_node-0.74.0/sn_cli-0.69.2 ([`e967cc4`](https://github.com/maidsafe/safe_network/commit/e967cc4d827c460bb47748decdf564c9cf7e1e6d))
     - Merge #2048 ([`ae06c94`](https://github.com/maidsafe/safe_network/commit/ae06c9458ad904863a925f1d2b2e253a67456298))
 </details>
 
 ## v0.17.2 (2023-02-03)
+
+<csr-id-58a0608722ca8f4a8363c1f9221ac47f5838d158/>
+<csr-id-a0f8243596169bbc7a2459b2de441dfd3f0756ae/>
 
 ### New Features (BREAKING)
 
