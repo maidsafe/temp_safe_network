@@ -6,18 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## v0.17.4 (2023-02-07)
-
-### Chore
-
- - <csr-id-677ef5cc8b1935b94641c61c53429faf2c58c261/> update various log levels
+## v0.17.5 (2023-02-07)
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
  - 2 commits contributed to the release.
- - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 0 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -27,11 +23,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #2072 ([`1b13c86`](https://github.com/maidsafe/safe_network/commit/1b13c86fa18abee9e9fb2c965366dba1afa0d8b3))
+    - fix(relocation): retain comms to members undergoing relocation - We retain comms to the relocating members which are signed by our   current SectionKey ([`8afde20`](https://github.com/maidsafe/safe_network/commit/8afde20480c72f0d36f0bc644f72d764bca4f946))
+</details>
+
+## v0.17.4 (2023-02-07)
+
+<csr-id-677ef5cc8b1935b94641c61c53429faf2c58c261/>
+
+### Chore
+
+ - <csr-id-677ef5cc8b1935b94641c61c53429faf2c58c261/> update various log levels
+
+### Chore
+
+ - <csr-id-3c34a731eca9d5b37d2574e3e16c7f089c7cc8b2/> sn_interface-0.17.4/sn_fault_detection-0.15.4/sn_comms-0.3.1/sn_node-0.74.2
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.17.4/sn_fault_detection-0.15.4/sn_comms-0.3.1/sn_node-0.74.2 ([`3c34a73`](https://github.com/maidsafe/safe_network/commit/3c34a731eca9d5b37d2574e3e16c7f089c7cc8b2))
     - Merge #2066 ([`023ed9b`](https://github.com/maidsafe/safe_network/commit/023ed9b313d050bd43869eb871697716fea888d8))
     - update various log levels ([`677ef5c`](https://github.com/maidsafe/safe_network/commit/677ef5cc8b1935b94641c61c53429faf2c58c261))
 </details>
 
 ## v0.17.3 (2023-02-06)
+
+<csr-id-e967cc4d827c460bb47748decdf564c9cf7e1e6d/>
 
 ### Chore
 
