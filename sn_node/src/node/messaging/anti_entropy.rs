@@ -183,7 +183,7 @@ impl MyNode {
                         members,
                         &starting_context.name,
                     )?;
-                debug!("net knowledge udpated");
+                debug!("net knowledge updated");
                 // always run this, only changes will trigger events
                 cmds.extend(
                     write_locked_node
@@ -204,14 +204,10 @@ impl MyNode {
 
         // Only trigger reorganize data when there is a membership change happens.
         if updated {
-            // Update comms with these new members or we will not be able to send the msg out
-            latest_context
-                .comm
-                .set_comm_targets(latest_context.network_knowledge.members());
+            MyNode::update_comm_target_list(&latest_context);
+            MyNode::write_section_tree(&latest_context);
 
             cmds.push(MyNode::ask_for_any_new_data_from_whole_section(&latest_context).await);
-
-            MyNode::write_section_tree(&latest_context);
 
             let prefix = sap.prefix();
             info!("SectionTree written to disk with update for prefix {prefix:?}");
@@ -237,7 +233,7 @@ impl MyNode {
             debug!("No update to network knowledge");
         }
 
-        // Check if we need to resend any messsages and who should we send it to.
+        // Check if we need to resend any messages and who should we send it to.
         let (bounced_msg, response_peer) = match kind {
             AntiEntropyKind::Update { .. } => {
                 // log the msg as received. Elders track this for other elders in fault detection
@@ -297,7 +293,7 @@ impl MyNode {
         Ok(cmds)
     }
 
-    /// Generate and return AE commmands for a given wire_msg and section_tree_update
+    /// Generate and return AE commands for a given wire_msg and section_tree_update
     pub(crate) fn generate_anti_entropy_cmds(
         context: &NodeContext,
         wire_msg: &WireMsg,

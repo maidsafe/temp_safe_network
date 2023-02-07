@@ -804,5 +804,27 @@ mod core {
                 }
             });
         }
+
+        // Updates comm with new members and removes connections that are not from our members
+        // Also retains the connections for the nodes undergoing relocation in our current section
+        // `MyNode::Comm.sessions` should be updated as it is behind an `Arc`
+        pub(crate) fn update_comm_target_list(context: &NodeContext) {
+            let relocated_members = context
+                .network_knowledge
+                .section_signed_archived_members()
+                .into_iter()
+                .filter_map(|state| {
+                    if state.is_relocated()
+                        && state.sig.public_key == context.network_knowledge.section_key()
+                    {
+                        Some(*state.peer())
+                    } else {
+                        None
+                    }
+                });
+            let mut members = context.network_knowledge.members();
+            members.extend(relocated_members);
+            context.comm.set_comm_targets(members);
+        }
     }
 }

@@ -459,3 +459,39 @@ impl Membership {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::Error;
+    use crate::node::flow_ctrl::tests::network_builder::TestNetworkBuilder;
+    use assert_matches::assert_matches;
+    use eyre::Result;
+    use rand::thread_rng;
+    use sn_interface::{network_knowledge::NodeState, test_utils::gen_peer};
+    use xor_name::Prefix;
+
+    #[tokio::test]
+    async fn multiple_proposals_in_a_single_generation_should_not_be_possible() -> Result<()> {
+        let prefix = Prefix::default();
+        let env = TestNetworkBuilder::new(thread_rng())
+            .sap(prefix, 7, 0, None, None)
+            .build();
+
+        let mut membership = env
+            .get_nodes(prefix, 1, 0, None)
+            .remove(0)
+            .membership
+            .expect("Membership for the elder should've been initialized");
+
+        let state1 = NodeState::joined(gen_peer(5), None);
+        let state2 = NodeState::joined(gen_peer(5), None);
+
+        let _ = membership.propose(state1, &prefix)?;
+        assert_matches!(
+            membership.propose(state2, &prefix),
+            Err(Error::InvalidProposal)
+        );
+
+        Ok(())
+    }
+}

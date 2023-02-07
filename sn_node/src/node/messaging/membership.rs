@@ -201,7 +201,9 @@ impl MyNode {
             cmds.extend(self.handle_node_left(new_info, signature).into_iter());
         }
 
-        cmds.push(self.send_node_approvals(decision.clone()));
+        if !joining_nodes.is_empty() {
+            cmds.push(self.send_node_approvals(decision.clone()));
+        }
 
         // Do not disable node joins in first section.
         if !self.is_startup_joining_allowed() {
@@ -264,8 +266,7 @@ impl MyNode {
         self.log_section_stats();
         self.log_network_stats();
 
-        // updates comm with new members and removes connections that are not from our members
-        self.comm.set_comm_targets(self.network_knowledge.members());
+        MyNode::update_comm_target_list(&self.context());
 
         // lets check that we have the correct data now we're changing membership
         cmds.push(MyNode::ask_for_any_new_data_from_whole_section(&self.context()).await);

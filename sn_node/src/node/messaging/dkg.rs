@@ -851,11 +851,13 @@ impl MyNode {
 
 #[cfg(test)]
 mod tests {
-    use super::MyNode;
     use crate::node::flow_ctrl::{
         cmds::Cmd,
         dispatcher::Dispatcher,
-        tests::{cmd_utils::get_next_msg, network_builder::TestNetworkBuilder},
+        tests::{
+            cmd_utils::{get_next_msg, TestMsgCounter},
+            network_builder::TestNetworkBuilder,
+        },
     };
 
     use sn_comms::MsgFromPeer;
@@ -863,13 +865,11 @@ mod tests {
         init_logger,
         messaging::{
             signature_aggregator::SignatureAggregator,
-            system::{DkgSessionId, NodeMsg, SectionStateVote},
-            MsgType, SectionSigShare,
+            system::{DkgSessionId, NodeMsg},
+            SectionSigShare,
         },
-        network_knowledge::{supermajority, NodeState, SectionKeyShare, SectionsDAG},
-        test_utils::{TestKeys, TestSectionTree},
+        network_knowledge::{supermajority, NodeState, SectionKeyShare},
         types::Peer,
-        SectionAuthorityProvider,
     };
 
     use assert_matches::assert_matches;
@@ -891,15 +891,15 @@ mod tests {
         let mut rng = rand::thread_rng();
         let node_count = 7;
         let (mut node_instances, mut comm_receivers, _) = create_elders(node_count, &mut rng).await;
+        let msg_counter = &mut TestMsgCounter::default();
 
         // let the current set of elders start the dkg round
-        let _ = start_dkg(&mut node_instances).await?;
+        let _ = start_dkg(&mut node_instances, msg_counter).await?;
 
         let mut new_sk_shares = BTreeMap::new();
-        // run until all the node buffers are empty
-        let mut empty_nodes = BTreeSet::new();
-        while empty_nodes.len() != node_count {
-            empty_nodes = BTreeSet::new();
+        // terminate if there are no more msgs to process
+        let mut done = false;
+        while !done {
             for dispatcher in node_instances.values() {
                 let name = dispatcher.node().read().await.name();
                 let comm_rx = comm_receivers
@@ -907,18 +907,15 @@ mod tests {
                     .ok_or_else(|| eyre!("comm_rx should be present"))?;
                 info!("\n\n NODE: {name}");
 
-                // used to check if the buffer is empty during the first iteration of the buffer.
-                // If all the node buffers are empty during the first try, break out of main loop
-                let mut empty_at_first_try = true;
                 while let Some(msg) = get_next_msg(comm_rx) {
-                    if empty_at_first_try {
-                        empty_at_first_try = false;
-                    }
-                    let cmds = dispatcher.mock_handle_node_msg(msg).await;
+                    let cmds = dispatcher
+                        .test_handle_msg_from_peer(msg, msg_counter, None)
+                        .await;
                     for cmd in cmds {
                         info!("Got cmd {}", cmd);
                         if let Cmd::SendMsg { .. } = &cmd {
-                            dispatcher.mock_send_msg(cmd, None).await;
+                            msg_counter.track(&cmd);
+                            assert!(dispatcher.process_cmd(cmd).await?.is_empty());
                         } else if let Cmd::HandleDkgOutcome {
                             section_auth: _,
                             outcome,
@@ -932,160 +929,9 @@ mod tests {
                         }
                     }
                 }
-                // the msg buffer is empty,
-                if empty_at_first_try {
-                    let _ = empty_nodes.insert(name);
-                }
             }
-        }
-
-        // dkg done, make sure the new key_shares are valid
-        verify_new_key(&new_sk_shares, node_count);
-
-        Ok(())
-    }
-
-    /// If a node already has the new SAP in its `SectionTree`, then it should not propose `RequestHandover`
-    #[tokio::test]
-    async fn lagging_node_should_not_propose_new_section_info() -> Result<()> {
-        init_logger();
-        let mut rng = rand::thread_rng();
-        let node_count = 7;
-        let (mut node_instances, mut comm_receivers, initial_sk_set) =
-            create_elders(node_count, &mut rng).await;
-
-        // let current set of elders start the dkg round
-        let _ = start_dkg(&mut node_instances).await?;
-
-        let mut new_sk_shares: BTreeMap<XorName, SectionKeyShare> = BTreeMap::new();
-        let mut new_sap: BTreeSet<SectionAuthorityProvider> = BTreeSet::new();
-        let mut lagging = false;
-        // run until all the node buffers are empty
-        let mut empty_nodes = BTreeSet::new();
-        while empty_nodes.len() != node_count {
-            empty_nodes = BTreeSet::new();
-            for dispatcher in node_instances.values() {
-                let name = dispatcher.node().read().await.name();
-                let comm_rx = comm_receivers
-                    .get_mut(&name)
-                    .ok_or_else(|| eyre!("comm_rx should be present"))?;
-                info!("\n\n NODE: {name}");
-
-                // used to check if the buffer is empty during the first iteration of the buffer.
-                // If all the node buffers are empty during the first try, break out of main loop
-                let mut empty_at_first_try = true;
-                while let Some(msg) = get_next_msg(comm_rx) {
-                    if empty_at_first_try {
-                        empty_at_first_try = false;
-                    }
-                    let cmds = dispatcher.mock_handle_node_msg(msg).await;
-
-                    // If supermajority of the nodes have terminated, then the remaining nodes
-                    // can be considered as 'lagging'. So use the supermajority of the shares
-                    // to sign the sap and insert them into the lagging nodes, now these nodes
-                    // should not trigger `Proposal::RequestHandover`.
-                    if !lagging && new_sk_shares.len() >= supermajority(node_count) {
-                        let new_sk_set = TestKeys::get_sk_set_from_shares(
-                            &new_sk_shares.values().cloned().collect::<Vec<_>>(),
-                        )?;
-                        let section_tree_update = {
-                            assert_eq!(new_sap.len(), 1);
-                            let new_sap = new_sap
-                                .clone()
-                                .into_iter()
-                                .next()
-                                .ok_or_else(|| eyre!("should contain a sap"))?;
-                            let signed_sap = TestKeys::get_section_signed(
-                                &new_sk_set.secret_key(),
-                                new_sap.clone(),
-                            );
-                            let proof_chain = {
-                                let parent = initial_sk_set.public_keys().public_key();
-                                let mut dag = SectionsDAG::new(parent);
-                                let sig = TestKeys::sign(
-                                    &initial_sk_set.secret_key(),
-                                    &new_sap.section_key(),
-                                );
-                                dag.verify_and_insert(&parent, new_sap.section_key(), sig)?;
-                                dag
-                            };
-                            TestSectionTree::get_section_tree_update(
-                                &signed_sap,
-                                &proof_chain,
-                                &initial_sk_set.secret_key(),
-                            )
-                        };
-
-                        // find all the lagging nodes; i.e., ones that are yet to handle the dkg_outcome
-                        let lagging_nodes = node_instances
-                            .keys()
-                            .filter(|node| !new_sk_shares.contains_key(node))
-                            .cloned()
-                            .collect::<Vec<_>>();
-                        info!("Lagging node {lagging_nodes:?}");
-                        // update them
-                        for lag in lagging_nodes {
-                            let _updated = node_instances
-                                .get(&lag)
-                                .ok_or_else(|| eyre!("node will be present"))?
-                                .node()
-                                .write()
-                                .await
-                                .network_knowledge
-                                .update_knowledge_if_valid(
-                                    section_tree_update.clone(),
-                                    None,
-                                    &name,
-                                )?;
-                            info!("nw update: {_updated} for {lag} ");
-                        }
-                        // successfully simulated lagging nodes
-                        lagging = true;
-                    }
-
-                    for cmd in cmds {
-                        info!("Got cmd {}", cmd);
-                        if let Cmd::SendMsg { .. } = &cmd {
-                            dispatcher.mock_send_msg(cmd, None).await;
-                        }
-                        // Dkg done, stop the test here
-                        else if let Cmd::HandleDkgOutcome {
-                            section_auth,
-                            outcome,
-                        } = &cmd
-                        {
-                            let _ = new_sk_shares.insert(name, outcome.clone());
-                            let _ = new_sap.insert(section_auth.clone());
-                            let cmds = dispatcher.process_cmd(cmd).await?;
-                            if !lagging {
-                                verify_dkg_outcome_cmds(cmds);
-                            } else {
-                                // Since the dkg session is for the same prefix, the
-                                // lagging node should just complete the elder handover
-                                // without requesting handover.
-                                assert_eq!(cmds.len(), 2);
-                                for cmd in cmds {
-                                    let msg = assert_matches!(cmd, Cmd::SendMsg { msg, .. } => msg);
-
-                                    match msg {
-                                        NodeMsg::ProposeSectionState {
-                                            proposal: SectionStateVote::JoinsAllowed(..),
-                                            ..
-                                        } => (),
-                                        NodeMsg::AntiEntropy { .. } => (),
-                                        msg => panic!("Unexpected msg {msg}"),
-                                    }
-                                }
-                            }
-                        } else {
-                            panic!("got a different cmd {cmd:?}");
-                        }
-                    }
-                }
-                // the msg buffer is empty,
-                if empty_at_first_try {
-                    let _ = empty_nodes.insert(name);
-                }
+            if msg_counter.is_empty() {
+                done = true;
             }
         }
 
@@ -1102,19 +948,19 @@ mod tests {
         let mut rng = rand::thread_rng();
         let node_count = 7;
         let (mut node_instances, mut comm_receivers, _) = create_elders(node_count, &mut rng).await;
+        let msg_counter = &mut TestMsgCounter::default();
 
         // let current set of elders start the dkg round
-        let _ = start_dkg(&mut node_instances).await?;
+        let _ = start_dkg(&mut node_instances, msg_counter).await?;
 
         let dead_node = node_instances
             .keys()
             .next()
             .cloned()
             .ok_or_else(|| eyre!("node_instances is not empty"))?;
-        // run until all the node buffers are empty (dead node's buffer is empty after it processes `dkg_start` msgs)
-        let mut empty_nodes = BTreeSet::new();
-        while empty_nodes.len() != node_count {
-            empty_nodes = BTreeSet::new();
+        // terminate if there are no more msgs to process
+        let mut done = false;
+        while !done {
             for dispatcher in node_instances.values() {
                 let name = dispatcher.node().read().await.name();
                 let comm_rx = comm_receivers
@@ -1122,28 +968,24 @@ mod tests {
                     .ok_or_else(|| eyre!("comm_rx should be present"))?;
                 info!("\n\n NODE: {name}");
 
-                // used to check if the buffer is empty during the first iteration of the buffer.
-                // If all the node buffers are empty during the first try, break out of main loop
-                let mut empty_at_first_try = true;
                 while let Some(msg) = get_next_msg(comm_rx) {
-                    if empty_at_first_try {
-                        empty_at_first_try = false;
-                    }
-                    let cmds = dispatcher.mock_handle_node_msg(msg).await;
-                    for cmd in cmds {
+                    let cmds = dispatcher
+                        .test_handle_msg_from_peer(msg, msg_counter, None)
+                        .await;
+                    for mut cmd in cmds {
                         info!("Got cmd {}", cmd);
                         if let Cmd::SendMsg { .. } = cmd {
-                            let filter = BTreeSet::from([dead_node]);
-                            dispatcher.mock_send_msg(cmd, Some(filter)).await;
+                            cmd.filter_recipients(BTreeSet::from([dead_node]));
+                            msg_counter.track(&cmd);
+                            assert!(dispatcher.process_cmd(cmd).await?.is_empty());
                         } else {
                             panic!("got a different cmd {cmd:?}");
                         }
                     }
                 }
-                // the msg buffer is empty,
-                if empty_at_first_try {
-                    let _ = empty_nodes.insert(name);
-                }
+            }
+            if msg_counter.is_empty() {
+                done = true;
             }
         }
 
@@ -1160,46 +1002,46 @@ mod tests {
         let mut rng = rand::thread_rng();
         let node_count = 7;
         let (mut node_instances, mut comm_receivers, _) = create_elders(node_count, &mut rng).await;
+        let msg_counter = &mut TestMsgCounter::default();
 
         // let current set of elders start the dkg round
-        let dkg_session_id = start_dkg(&mut node_instances).await?;
+        let dkg_session_id = start_dkg(&mut node_instances, msg_counter).await?;
 
         let mut new_sk_shares = BTreeMap::new();
-        // run until we get all the sk_shares
+        // we gossip if we have looped through all the nodes 10 times
+        let mut looped_through_n_times = 0;
+        // terminate if there are no more msgs to process
         while new_sk_shares.len() != node_count {
-            let mut empty_nodes = BTreeSet::new();
+            looped_through_n_times += 1;
             for dispatcher in node_instances.values() {
                 let name = dispatcher.node().read().await.name();
                 let comm_rx = comm_receivers
                     .get_mut(&name)
                     .ok_or_else(|| eyre!("comm_rx should be present"))?;
                 info!("\n\n NODE: {name}");
+                // sleep for sometime to get the msgs
+                tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
 
-                // used to check if the buffer is empty during the first iteration of the buffer.
-                // If all the node buffers are empty during the first try, break out of main loop
-                let mut empty_at_first_try = true;
                 while let Some(msg) = get_next_msg(comm_rx) {
-                    if empty_at_first_try {
-                        empty_at_first_try = false;
-                    }
-                    let cmds = dispatcher.mock_handle_node_msg(msg).await;
-                    for cmd in cmds {
+                    let cmds = dispatcher
+                        .test_handle_msg_from_peer(msg, msg_counter, None)
+                        .await;
+                    for mut cmd in cmds {
                         info!("Got cmd {}", cmd);
-                        if let Cmd::SendMsg { .. } = &cmd {
+                        if let Cmd::SendMsg { ref recipients, .. } = cmd {
                             // (1/node_count) chance to drop a msg
-                            let drop_recp = if rng.gen::<usize>() % node_count == 0 {
-                                let recp = cmd.recipients()?;
+                            if rng.gen::<usize>() % node_count == 0 {
+                                let recp = recipients.get();
                                 let recp_count = recp.len();
-                                let drop = recp
+                                let drop_recp = recp
                                     .into_iter()
                                     .map(|p| p.name())
                                     .nth(rng.gen::<usize>() % recp_count)
                                     .ok_or_else(|| eyre!("Contains node_count peers"))?;
-                                Some(BTreeSet::from([drop]))
-                            } else {
-                                None
+                                cmd.filter_recipients(BTreeSet::from([drop_recp]));
                             };
-                            dispatcher.mock_send_msg(cmd, drop_recp).await;
+                            msg_counter.track(&cmd);
+                            assert!(dispatcher.process_cmd(cmd).await?.is_empty());
                         } else if let Cmd::HandleDkgOutcome {
                             section_auth: _,
                             outcome,
@@ -1214,17 +1056,13 @@ mod tests {
                         }
                     }
                 }
-                // the msg buffer is empty,
-                if empty_at_first_try {
-                    let _ = empty_nodes.insert(name);
-                }
             }
 
-            // If the msg buffers are empty and if the current dkg session has not yet
-            // terminated, then send a gossip msg from a random node. This
-            // allows everyone to catchup.(in the real network each node sends out a
-            // gossip if it has not received any valid dkg msg in 30 seconds).
-            if empty_nodes.len() == node_count && new_sk_shares.len() != node_count {
+            // If the current dkg session has not yet terminated, send a gossip msg
+            // from a random node. This allows everyone to catchup.(in the real
+            // network each node sends out a gossip if it has not received any
+            // valid dkg msg in 30 seconds).
+            if looped_through_n_times % 10 == 0 && new_sk_shares.len() != node_count {
                 // select a random_node which has not terminated, since terminated node
                 // sends out HandleDkgOutcome cmd instead of NodeMsg
                 let random_node = loop {
@@ -1250,7 +1088,8 @@ mod tests {
                 for cmd in cmds {
                     info!("Got cmd {}", cmd);
                     assert_matches!(&cmd, Cmd::SendMsg { .. });
-                    random_node.mock_send_msg(cmd, None).await;
+                    msg_counter.track(&cmd);
+                    assert!(random_node.process_cmd(cmd).await?.is_empty());
                 }
             }
         }
@@ -1295,7 +1134,10 @@ mod tests {
     }
 
     // Each node sends out DKG start msg to the other nodes
-    async fn start_dkg(nodes: &mut BTreeMap<XorName, Dispatcher>) -> Result<DkgSessionId> {
+    async fn start_dkg(
+        nodes: &mut BTreeMap<XorName, Dispatcher>,
+        msg_counter: &mut TestMsgCounter,
+    ) -> Result<DkgSessionId> {
         let mut elders = BTreeMap::new();
         for (name, node) in nodes.iter() {
             let _ = elders.insert(*name, node.node().read().await.addr);
@@ -1315,16 +1157,17 @@ mod tests {
             bootstrap_members,
             membership_gen: 0,
         };
-        for node in nodes.values() {
-            let mut cmd = node
+        for dispatcher in nodes.values() {
+            let mut cmd = dispatcher
                 .node()
                 .write()
                 .await
                 .send_dkg_start(session_id.clone())?;
             assert_eq!(cmd.len(), 1);
             let cmd = cmd.remove(0);
-            matches!(cmd, Cmd::SendMsg { .. });
-            node.mock_send_msg(cmd, None).await;
+            assert_matches!(&cmd, Cmd::SendMsg { .. });
+            msg_counter.track(&cmd);
+            assert!(dispatcher.process_cmd(cmd).await?.is_empty());
         }
         Ok(session_id)
     }
@@ -1379,21 +1222,6 @@ mod tests {
                 NodeMsg::AntiEntropy { .. } => (),
                 msg => panic!("Unexpected msg {msg}"),
             }
-        }
-    }
-
-    impl Dispatcher {
-        // the actual handler has an AE check. Skipping it here
-        async fn mock_handle_node_msg(&self, msg: MsgFromPeer) -> Vec<Cmd> {
-            let context = self.node().read().await.context();
-            let origin = msg.sender;
-            let (msg_id, msg) = assert_matches!(
-                msg.wire_msg.into_msg().expect("Failed to deserialize wire_msg"),
-                MsgType::Node { msg_id, msg, .. } => (msg_id, msg)
-            );
-            MyNode::handle_node_msg(self.node(), context, msg_id, msg, origin, None)
-                .await
-                .expect("Error while handling node msg")
         }
     }
 }

@@ -6,19 +6,14 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{
-    flow_ctrl::dispatcher::Dispatcher,
-    messaging::{node_msgs::into_msg_bytes, Peers},
-    Cmd, MyNode,
-};
-
+use crate::node::{flow_ctrl::dispatcher::Dispatcher, messaging::Peers, Cmd, MyNode};
 use sn_comms::MsgFromPeer;
 use sn_interface::{
     messaging::{
         data::ClientMsg,
         serialisation::WireMsg,
         system::{JoinResponse, NodeMsg},
-        AuthorityProof, ClientAuth, Dst, MsgId, MsgKind,
+        AuthorityProof, ClientAuth, Dst, MsgId, MsgKind, MsgType,
     },
     network_knowledge::{test_utils::*, NodeState},
     types::{Keypair, Peer},
@@ -26,10 +21,10 @@ use sn_interface::{
 
 use assert_matches::assert_matches;
 use bytes::Bytes;
-use eyre::{eyre, Result};
+use eyre::Result;
 use qp2p::Endpoint;
 use std::{
-    collections::{BTreeSet, VecDeque},
+    collections::{btree_map::Entry, BTreeMap, BTreeSet, VecDeque},
     net::{Ipv4Addr, SocketAddr},
 };
 use tokio::sync::mpsc::{error::TryRecvError, Receiver};
@@ -209,57 +204,133 @@ pub(crate) fn get_client_msg_parts_for_handling(
     Ok((MsgId::new(), payload, kind, auth_proof))
 }
 
+// A test utility to keep track of the Msgs that has been sent and received
+#[derive(Debug, Default)]
+pub(crate) struct TestMsgCounter {
+    pub(crate) counter: BTreeMap<MsgId, BTreeSet<XorName>>,
+}
+
+impl TestMsgCounter {
+    /// Tracks the msgs during SendMsg Cmd
+    pub(crate) fn track(&mut self, cmd: &Cmd) {
+        if let Cmd::SendMsg {
+            msg_id, recipients, ..
+        } = cmd
+        {
+            let recp = recipients.get().into_iter().map(|p| p.name()).collect();
+            info!("Tracking {msg_id:?} for {recp:?}");
+            let _ = self.counter.insert(*msg_id, recp);
+        } else if let Cmd::SendMsgEnqueueAnyResponse {
+            msg_id, recipients, ..
+        } = cmd
+        {
+            let recp = recipients.iter().map(|p| p.name()).collect();
+            info!("Tracking {msg_id:?} for {recp:?}");
+            let _ = self.counter.insert(*msg_id, recp);
+        } else {
+            panic!("A Cmd::SendMsg variant was expected")
+        }
+    }
+
+    // Untrack the msg when we receive a MsgFromPeer
+    pub(crate) fn untrack(&mut self, msg_id: MsgId, our_name: &XorName) -> bool {
+        info!("Untracking {msg_id:?} for {our_name:?}");
+        let removed;
+        if let Entry::Occupied(mut entry) = self.counter.entry(msg_id) {
+            let peers = entry.get_mut();
+            removed = peers.remove(our_name);
+            if peers.is_empty() {
+                let _ = entry.remove();
+            }
+        } else {
+            panic!("msg_id {msg_id:?} is not found")
+        }
+        removed
+    }
+
+    /// When the counter is empty we are sure that all the msgs are processed
+    pub(crate) fn is_empty(&self) -> bool {
+        self.counter.is_empty()
+    }
+}
+
 /// Extend the `Cmd` enum with some utilities for testing.
 ///
 /// Since this is in a module marked as #[test], this functionality will only be present in the
 /// testing context.
 impl Cmd {
-    /// Get the recipients for a `SendMsg` command.
-    pub(crate) fn recipients(&self) -> Result<BTreeSet<Peer>> {
-        match self {
-            Cmd::SendMsg { recipients, .. } => match recipients {
-                Peers::Single(peer) => Ok(BTreeSet::from([*peer])),
-                Peers::Multiple(peers) => Ok(peers.clone()),
-            },
-            _ => Err(eyre!("A Cmd::SendMsg variant was expected")),
-        }
+    // Filters the list of recipients in a `SendCmd`
+    pub(crate) fn filter_recipients(&mut self, filter_list: BTreeSet<XorName>) {
+        if let Cmd::SendMsg {
+            ref mut recipients, ..
+        } = self
+        {
+            let new_recipients = match recipients {
+                Peers::Single(peer) => {
+                    if filter_list.contains(&peer.name()) {
+                        Peers::Multiple(BTreeSet::new())
+                    } else {
+                        Peers::Single(*peer)
+                    }
+                }
+                Peers::Multiple(peers) => {
+                    let peers = peers
+                        .iter()
+                        .filter(|peer| !filter_list.contains(&peer.name()))
+                        .cloned()
+                        .collect();
+                    Peers::Multiple(peers)
+                }
+            };
+            *recipients = new_recipients;
+        } else {
+            panic!("A Cmd::SendMsg variant was expected")
+        };
     }
 }
 
+/// Extend the `Dispatcher` with some utilities for testing.
+///
+/// Since this is in a module marked as #[test], this functionality will only be present in the
+/// testing context.
 impl Dispatcher {
-    // Sends out `NodeMsgs` to others synchronously, (process_cmd() spawns tasks to do it).
-    // Optionally drop the msgs to the provided set of peers.
-    pub(crate) async fn mock_send_msg(&self, cmd: Cmd, filter_recp: Option<BTreeSet<XorName>>) {
-        if let Cmd::SendMsg {
-            msg,
-            msg_id,
-            recipients,
-            context,
-        } = cmd
-        {
-            let peer_msgs = into_msg_bytes(
-                &context.network_knowledge,
-                context.name,
-                msg.clone(),
-                msg_id,
-                recipients,
-            )
-            .expect("cannot convert msg into bytes");
-
-            for (peer, msg_bytes) in peer_msgs {
-                if let Some(filter) = &filter_recp {
-                    if filter.contains(&peer.name()) {
-                        continue;
-                    }
-                }
-
-                if let Err(err) = context.comm.send_out_bytes(peer, msg_id, msg_bytes).await {
-                    info!("Failed to send {msg} to {}: {err:?}", peer.name());
-                }
+    // Handle and keep track of Msg from Peers
+    // Contains optional relocation_old_name to deal with name change during relocation
+    pub(crate) async fn test_handle_msg_from_peer(
+        &self,
+        msg: MsgFromPeer,
+        msg_counter: &mut TestMsgCounter,
+        relocation_old_name: Option<XorName>,
+    ) -> Vec<Cmd> {
+        let msg_id = {
+            let msg_type = msg
+                .wire_msg
+                .into_msg()
+                .expect("Failed to convert wire_msg to MsgType");
+            match msg_type {
+                MsgType::Client { msg_id, .. } => msg_id,
+                MsgType::ClientDataResponse { msg_id, .. } => msg_id,
+                MsgType::Node { msg_id, .. } => msg_id,
             }
-        } else {
-            panic!("mock_send_msg expects Cmd::SendMsg, got {cmd:?}");
+        };
+
+        // check if we have successfully untracked the msg
+        let mut untracked = false;
+        if let Some(old_name) = relocation_old_name {
+            untracked = untracked || msg_counter.untrack(msg_id, &old_name);
         }
+        let our_name = self.node().read().await.name();
+        untracked = untracked || msg_counter.untrack(msg_id, &our_name);
+        assert!(untracked);
+
+        let handle_node_msg_cmd = Cmd::HandleMsg {
+            origin: msg.sender,
+            wire_msg: msg.wire_msg,
+            send_stream: msg.send_stream,
+        };
+        self.process_cmd(handle_node_msg_cmd)
+            .await
+            .expect("Error while handling node msg")
     }
 }
 
