@@ -145,10 +145,7 @@ impl FlowCtrl {
             let read_locked_node = self.node.read().await;
 
             trace!(" ----> vote periodics start");
-            for cmd in self
-                .check_for_missed_votes(context, &read_locked_node.membership)
-                .await
-            {
+            for cmd in self.check_for_missed_votes(context, &read_locked_node.membership) {
                 cmds.push(cmd);
             }
             trace!(" ----> vote periodics done");
@@ -280,7 +277,7 @@ impl FlowCtrl {
     // }
 
     /// Checks the interval since last vote received during a generation
-    async fn check_for_missed_votes(
+    fn check_for_missed_votes(
         &self,
         context: &NodeContext,
         membership_context: &Option<Membership>,
@@ -294,8 +291,7 @@ impl FlowCtrl {
                 // we want to resend the prev vote
                 if time.elapsed() >= MISSING_VOTE_INTERVAL {
                     debug!("Vote consensus appears stalled...");
-                    if let Some(cmd) =
-                        MyNode::membership_gossip_votes(context, membership_context).await
+                    if let Some(cmd) = MyNode::membership_gossip_votes(context, membership_context)
                     {
                         trace!("Vote resending cmd: {cmd:?}");
 

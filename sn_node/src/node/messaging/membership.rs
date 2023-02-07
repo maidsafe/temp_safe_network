@@ -57,7 +57,7 @@ impl MyNode {
     /// Get our latest vote if any at this generation, and get cmds to resend to all elders
     /// (which should in turn trigger them to resend their votes)
     #[instrument(skip_all)]
-    pub(crate) async fn membership_gossip_votes(
+    pub(crate) fn membership_gossip_votes(
         context: &NodeContext,
         membership_context: &Option<Membership>,
     ) -> Option<Cmd> {

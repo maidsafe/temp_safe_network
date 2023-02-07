@@ -6,7 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, MyNode, Result, SectionStateVote};
+use crate::node::{
+    flow_ctrl::cmds::Cmd, messaging::Peers, Error, MyNode, Result, SectionStateVote,
+};
 use sn_fault_detection::IssueType;
 use sn_interface::{
     messaging::{
@@ -135,11 +137,19 @@ impl MyNode {
         proposal: SectionStateVote,
         sig: SectionSig,
     ) -> Result<Vec<Cmd>> {
+        let serialized_proposal = bincode::serialize(&proposal).map_err(|err| {
+            error!("Failed to serialise SectionStateVote {proposal:?}: {err:?}");
+            err
+        })?;
+        if !sig.verify(&serialized_proposal) {
+            return Err(Error::InvalidSignature);
+        }
+
         debug!("{:?} {:?}", LogMarker::ProposalAgreed, proposal);
         let mut cmds = Vec::new();
         match proposal {
             SectionStateVote::NodeIsOffline(node_state) => {
-                cmds.extend(self.handle_offline_agreement(node_state, sig));
+                cmds.extend(self.handle_offline_agreement(node_state));
             }
             SectionStateVote::JoinsAllowed(joins_allowed) => {
                 info!("Section reached agreement to set joins_allowed to: {joins_allowed:?}");
@@ -150,7 +160,7 @@ impl MyNode {
     }
 
     #[instrument(skip(self))]
-    fn handle_offline_agreement(&mut self, node_state: NodeState, sig: SectionSig) -> Option<Cmd> {
+    fn handle_offline_agreement(&mut self, node_state: NodeState) -> Option<Cmd> {
         info!(
             "Agreement - proposing membership change with node offline: {}",
             node_state.peer()
