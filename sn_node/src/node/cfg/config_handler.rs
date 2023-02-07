@@ -99,12 +99,6 @@ pub struct Config {
     /// non-local nodes).
     #[clap(long)]
     pub local_addr: Option<SocketAddr>,
-    /// DEPRECATED (to be removed)
-    /// This flag can be used to skip automated port forwarding using IGD. This is used when running
-    /// a network on a LAN or when a node is connected to the internet directly, without a router,
-    /// e.g. Digital Ocean droplets.
-    #[clap(long)]
-    pub skip_auto_port_forwarding: bool,
 }
 
 impl Config {
