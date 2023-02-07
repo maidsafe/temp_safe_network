@@ -460,7 +460,7 @@ jobs:
       - name: Upload Node Logs
         uses: actions/upload-artifact@main
         with:
-          name: sn_node_logs_e2e_${{matrix.os}}
+          name: sn_node_logs_e2e_msg_happy_path${{matrix.os}}
           path: log_files.tar.gz
         if: failure()
         continue-on-error: true
