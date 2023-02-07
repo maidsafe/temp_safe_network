@@ -94,16 +94,12 @@ pub fn node_join(
     public_addr: Option<SocketAddr>,
     clear_data: bool,
     local: bool,
-    disable_port_forwarding: bool,
     network_contacts_file: PathBuf,
 ) -> Result<()> {
     let mut sn_launch_tool_args =
         get_initial_sn_launch_args(node_directory_path, node_data_dir_name)?;
     if local {
         sn_launch_tool_args.push("--local".to_string());
-    }
-    if disable_port_forwarding {
-        sn_launch_tool_args.push("--skip-auto-port-forwarding".to_string());
     }
     if let Some(local_ip) = local_addr.map(|addr| addr.to_string()) {
         sn_launch_tool_args.push("--local-addr".to_string());

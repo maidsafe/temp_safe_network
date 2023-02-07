@@ -82,17 +82,9 @@ pub enum NodeSubCommands {
         #[clap(long = "clear-data")]
         clear_data: bool,
         /// Set this flag if you're connecting to a network where all the nodes are running
-        /// locally. This will launch the node and skip any port forwarding.
+        /// locally.
         #[clap(short = 'l', long)]
         local: bool,
-        /// Use this flag to skip the automated, software-based port forwarding on the node binary.
-        ///
-        /// This option can also be used when you're trying to join a remote network, but your join
-        /// request was rejected because the other nodes were unable to reach your node. In this
-        /// case, you can setup 'manual' port forwarding on your router, then use this option to set
-        /// disable the software-based port forwarding in the node binary.
-        #[clap(long)]
-        skip_auto_port_forwarding: bool,
     },
     #[clap(name = "run-baby-fleming")]
     /// Run nodes to form a local single-section Safe network
@@ -158,7 +150,6 @@ pub async fn node_commander(
             public_addr,
             clear_data,
             local,
-            skip_auto_port_forwarding: disable_port_forwarding,
         }) => {
             config.switch_to_network(network_name.as_str()).await?;
             let node_directory_path = if let Some(path) = node_dir_path {
@@ -183,7 +174,6 @@ pub async fn node_commander(
                 public_addr,
                 clear_data,
                 local,
-                disable_port_forwarding,
                 default_network_contacts_path,
             )
         }
@@ -614,7 +604,6 @@ mod join_command {
             public_addr: None,
             clear_data: false,
             local: false,
-            skip_auto_port_forwarding: false,
         };
 
         let result = node_commander(Some(cmd), &mut config, &mut launcher).await;
@@ -664,7 +653,6 @@ mod join_command {
             public_addr: None,
             clear_data: false,
             local: false,
-            skip_auto_port_forwarding: false,
         };
 
         let result = node_commander(Some(cmd), &mut config, &mut launcher).await;
@@ -716,7 +704,6 @@ mod join_command {
             public_addr: None,
             clear_data: false,
             local: false,
-            skip_auto_port_forwarding: false,
         };
 
         let result = node_commander(Some(cmd), &mut config, &mut launcher).await;
@@ -769,7 +756,6 @@ mod join_command {
             public_addr: None,
             clear_data: false,
             local: false,
-            skip_auto_port_forwarding: false,
         };
 
         let result = node_commander(Some(cmd), &mut config, &mut launcher).await;
@@ -780,57 +766,6 @@ mod join_command {
             .launch_args
             .iter()
             .any(|x| PathBuf::from(x) == custom_node_dir.path().join(LOCAL_NODE_DIR_NAME)));
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn should_pass_the_skip_auto_port_forwarding_flag() -> Result<()> {
-        let tmp_dir = assert_fs::TempDir::new()?;
-        let node_dir = tmp_dir.child(".safe/node");
-        node_dir.create_dir_all()?;
-        let mut config = Config::create_config(&tmp_dir, None).await?;
-
-        let network_contacts = config
-            .store_dummy_network_contacts_and_set_default(None, 1)
-            .await?
-            .pop()
-            .ok_or_else(|| {
-                eyre!(
-                    "There must be at least one set of contacts in the dummy_network_contacts \
-                        list"
-                )
-            })?;
-        let baby_fleming = NetworkInfo::Local(
-            config
-                .network_contacts_dir
-                .join(format!("{:?}", network_contacts.genesis_key())),
-            None,
-        );
-        config.add_network("baby-fleming", baby_fleming).await?;
-
-        let mut launcher = Box::new(FakeNetworkLauncher {
-            launch_args: Vec::new(),
-            config: config.clone(),
-        });
-
-        let cmd = NodeSubCommands::Join {
-            network_name: String::from("baby-fleming"),
-            node_dir_path: None,
-            verbosity: 0,
-            local_addr: None,
-            public_addr: None,
-            clear_data: false,
-            local: false,
-            skip_auto_port_forwarding: true,
-        };
-
-        let result = node_commander(Some(cmd), &mut config, &mut launcher).await;
-
-        assert!(result.is_ok());
-        assert!(launcher
-            .launch_args
-            .iter()
-            .any(|x| x == "--skip-auto-port-forwarding"));
         Ok(())
     }
 
@@ -872,7 +807,6 @@ mod join_command {
             public_addr: None,
             clear_data: false,
             local: false,
-            skip_auto_port_forwarding: false,
         };
 
         let result = node_commander(Some(cmd), &mut config, &mut launcher).await;
@@ -924,7 +858,6 @@ mod join_command {
             )),
             clear_data: false,
             local: false,
-            skip_auto_port_forwarding: false,
         };
 
         let result = node_commander(Some(cmd), &mut config, &mut launcher).await;
@@ -973,7 +906,6 @@ mod join_command {
             public_addr: None,
             clear_data: true,
             local: true,
-            skip_auto_port_forwarding: false,
         };
 
         let result = node_commander(Some(cmd), &mut config, &mut launcher).await;
@@ -1021,7 +953,6 @@ mod join_command {
             public_addr: None,
             clear_data: false,
             local: true,
-            skip_auto_port_forwarding: false,
         };
 
         let result = node_commander(Some(cmd), &mut config, &mut launcher).await;
@@ -1070,7 +1001,6 @@ mod join_command {
             public_addr: None,
             clear_data: false,
             local: true,
-            skip_auto_port_forwarding: false,
         };
 
         let result = node_commander(Some(cmd), &mut config, &mut launcher).await;

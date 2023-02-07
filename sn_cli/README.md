@@ -325,7 +325,7 @@ With the remote networks added, we have the opportunity to launch our own node a
 
 Successfully joining a remote network depends on your networking and routing configuration. Make sure the node is externally reachable by forwarding the neccessary ports on your router.
 
-Try the `safe node join` command and see what happens. If this command runs without error and the node starts, you've sent a join request. If there's an error, it's likely to be related to UPnP port forwarding. If so, run `safe node join --skip-auto-port-forwarding`. Again, this may successfully start the node and send a join request, but the request could be rejected.
+Try the `safe node join` command and see what happens. If this command runs without error and the node starts, you've sent a join request. If there's an error, it's likely to be related to port forwarding.
 
 We need to inspect the node log to see the status of the join request. The CLI will tell you the location of the log, but it's usually under the `~/.safe/node/local-node` directory. If the join request is rejected, you would see something similar to the following:
 ```
@@ -344,7 +344,7 @@ The Xs will be your internet public IP address. If this is the case, you most li
 
 With this configuration in place, you can try joining the network using the following command:
 ```
-$ safe node join --public-addr <internet public IP>:12000 --local-addr <node device IP>:12000 --skip-auto-port-forwarding
+$ safe node join --local-addr <node device IP>:12000
 
 ```
 
