@@ -90,10 +90,7 @@ impl Comm {
     /// Creates a new instance of Comm with an endpoint
     /// and starts listening to the incoming messages from other nodes.
     #[tracing::instrument(skip_all)]
-    pub async fn new(
-        local_addr: SocketAddr,
-        incoming_msg_pipe: Sender<MsgFromPeer>,
-    ) -> Result<Self> {
+    pub fn new(local_addr: SocketAddr, incoming_msg_pipe: Sender<MsgFromPeer>) -> Result<Self> {
         let (our_endpoint, incoming_connections) = Endpoint::builder()
             .addr(local_addr)
             .idle_timeout(70_000)
@@ -148,7 +145,7 @@ impl Comm {
         let bytes_len = h.len() + d.len() + p.len();
         trace!("Sending message bytes ({bytes_len} bytes) w/ {msg_id:?} to {peer:?}");
 
-        let peer_session = self.get_session(&peer).await?;
+        let peer_session = self.get_session(&peer)?;
         debug!("Peer session retrieved: {peer:?}");
 
         let sessions = self.sessions.clone();
@@ -177,7 +174,7 @@ impl Comm {
         // TODO: tweak messaging to just allow passthrough
         debug!("Trying to get {peer:?} session in order to send: {msg_id:?}");
 
-        let mut session = self.get_session(&peer).await?;
+        let mut session = self.get_session(&peer)?;
         debug!("Session of {peer:?} retrieved for {msg_id:?}");
         let adult_response_bytes = session
             .send_with_bi_return_response(bytes, msg_id)
@@ -192,7 +189,7 @@ impl Comm {
 
     /// Get a PeerSession
     #[instrument(skip(self))]
-    async fn get_session(&self, peer: &Peer) -> Result<PeerSession> {
+    fn get_session(&self, peer: &Peer) -> Result<PeerSession> {
         debug!("Attempting to get or create peer session to member: {peer:?}");
         if let Some(entry) = self.sessions.get(peer) {
             debug!("Session to {peer:?} exists");
@@ -231,7 +228,7 @@ mod tests {
     #[tokio::test]
     async fn successful_send() -> Result<()> {
         let (tx, _rx) = mpsc::channel(1);
-        let comm = Comm::new(local_addr(), tx).await?;
+        let comm = Comm::new(local_addr(), tx)?;
 
         let (peer0, mut rx0) = new_peer().await?;
         let (peer1, mut rx1) = new_peer().await?;
@@ -261,7 +258,7 @@ mod tests {
     #[tokio::test]
     async fn failed_send() -> Result<()> {
         let (tx, _rx) = mpsc::channel(1);
-        let comm = Comm::new(local_addr(), tx).await?;
+        let comm = Comm::new(local_addr(), tx)?;
 
         let invalid_peer = get_invalid_peer().await?;
         let invalid_addr = invalid_peer.addr();
@@ -287,7 +284,7 @@ mod tests {
     #[tokio::test]
     async fn send_after_reconnect() -> Result<()> {
         let (tx, _rx) = mpsc::channel(1);
-        let send_comm = Comm::new(local_addr(), tx).await?;
+        let send_comm = Comm::new(local_addr(), tx)?;
 
         let (recv_endpoint, mut incoming_connections) = Endpoint::builder()
             .addr(local_addr())
@@ -341,10 +338,10 @@ mod tests {
     #[tokio::test]
     async fn incoming_connection_lost() -> Result<()> {
         let (tx, mut rx0) = mpsc::channel(1);
-        let comm0 = Comm::new(local_addr(), tx.clone()).await?;
+        let comm0 = Comm::new(local_addr(), tx.clone())?;
         let addr0 = comm0.socket_addr();
 
-        let comm1 = Comm::new(local_addr(), tx).await?;
+        let comm1 = Comm::new(local_addr(), tx)?;
 
         let peer = Peer::new(xor_name::rand::random(), addr0);
         let msg = new_test_msg(dst(peer))?;
