@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1675781127808,
+  "lastUpdate": 1675813480885,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -66280,6 +66280,114 @@ window.BENCHMARK_DATA = {
             "name": "read-sampling/chunk keys/4000",
             "value": 338731854,
             "range": "± 5041803",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "34ac71ab7a0e80f83f9e21dda3d493296ca7c4a8",
+          "message": "Merge #2078\n\n2078: fix(ci): set different name for node logs on `e2e-msg-happy-path` action run r=jacderida a=bochaco\n\nWhen `e2e-msg-happy-path` tests fails, the uploaded log filename clashes with the one uploaded by a failed `e2e` action loosing them.\n\nCo-authored-by: bochaco <gabrielviganotti@gmail.com>",
+          "timestamp": "2023-02-07T21:24:49Z",
+          "tree_id": "4e2b43bd1cd48f4b89a75ccb7648f0799d7da817",
+          "url": "https://github.com/maidsafe/safe_network/commit/34ac71ab7a0e80f83f9e21dda3d493296ca7c4a8"
+        },
+        "date": 1675813478985,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "serialize/serialize for sending",
+            "value": 2282888,
+            "range": "± 69554",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "register-edit-sampling/register_edits/1000",
+            "value": 22777123348,
+            "range": "± 129348425",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/100",
+            "value": 56035751,
+            "range": "± 32851849",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/1000",
+            "value": 2289765785,
+            "range": "± 173337222",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/4000",
+            "value": 9064170643,
+            "range": "± 600978726",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/100",
+            "value": 213298304,
+            "range": "± 13599258",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/1000",
+            "value": 2083247523,
+            "range": "± 152471628",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/4000",
+            "value": 8012783835,
+            "range": "± 505192749",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/100",
+            "value": 40735774,
+            "range": "± 257733",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/1000",
+            "value": 386884156,
+            "range": "± 8161558",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/4000",
+            "value": 1501412301,
+            "range": "± 6340069",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/100",
+            "value": 11617274,
+            "range": "± 324095",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/1000",
+            "value": 98169994,
+            "range": "± 3416867",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/4000",
+            "value": 330810408,
+            "range": "± 1409922",
             "unit": "ns/iter"
           }
         ]
