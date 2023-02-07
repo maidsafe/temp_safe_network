@@ -231,7 +231,7 @@ impl MyNode {
             error!("Request to holder node/s was not completely successful for {msg_id:?}");
             if let Some(error) = last_error {
                 debug!("Error error being returned to client {source_client:?}: {error:?}");
-                let msg = ClientDataResponse::CommunicationIssues(
+                let msg = ClientDataResponse::NetworkIssue(
                     sn_interface::types::DataError::CouldNotContactAllStorageNodes(msg_id),
                 );
                 output_cmds.push(Cmd::SendClientResponse {

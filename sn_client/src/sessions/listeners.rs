@@ -97,8 +97,7 @@ impl Session {
                 };
 
             match resp_msg {
-                ClientDataResponse::CommunicationIssues(err)
-                | ClientDataResponse::NetworkIssue(err) => {
+                ClientDataResponse::NetworkIssue(err) => {
                     break MsgResponse::Failure(
                         peer.addr(),
                         Error::CmdError {

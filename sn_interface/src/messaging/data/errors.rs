@@ -26,7 +26,7 @@ pub type Result<T, E = Error> = result::Result<T, E>;
 #[derive(Error, Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum Error {
-    /// Failture to contact one or more storage nodes
+    /// Failure to contact one or more storage nodes (send or receipt of msg).
     #[error("Msg: {0:?} failed as contact to one or more storage nodes failed.")]
     CouldNotContactAllStorageNodes(MsgId),
     /// Access denied for user

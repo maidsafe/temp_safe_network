@@ -76,8 +76,6 @@ impl Display for ClientMsg {
 #[allow(clippy::large_enum_variant)]
 #[derive(Eq, PartialEq, Clone, Serialize, Deserialize, custom_debug::Debug)]
 pub enum ClientDataResponse {
-    /// There was an error in send or receipt of message to storage nodes
-    CommunicationIssues(Error),
     /// Network Issue
     NetworkIssue(Error),
     /// The response to a query, containing the query result.
@@ -123,9 +121,6 @@ impl Display for ClientDataResponse {
             }
             Self::AntiEntropy { .. } => {
                 write!(f, "ClientDataResponse::AntiEntropy")
-            }
-            Self::CommunicationIssues(error) => {
-                write!(f, "ClientDataResponse::CommunicationIssues({error:?})")
             }
             Self::NetworkIssue(error) => {
                 write!(f, "ClientDataResponse::NetworkIssue({error:?})")
