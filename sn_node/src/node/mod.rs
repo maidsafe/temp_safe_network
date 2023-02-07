@@ -476,17 +476,20 @@ mod core {
             // IDEMPOTENCY CHECK: Check if this membership instance has already been
             // initialized for the current SAP, this allows this function to be
             // safely called everytime we process an AE update.
-            if let Some(m) = self.membership.as_ref() {
+            let prev_members = if let Some(m) = self.membership.as_ref() {
                 if m.section_key_set().public_key() == sap.section_key() {
                     return false;
                 }
-            }
+                BTreeSet::from_iter(m.current_section_members().values().cloned())
+            } else {
+                BTreeSet::new()
+            };
 
             self.membership = Some(Membership::from(
                 (key.index as u8, key.secret_key_share),
                 key.public_key_set,
                 sap.elders().count(),
-                BTreeSet::from_iter(sap.members().cloned()),
+                prev_members,
             ));
 
             true

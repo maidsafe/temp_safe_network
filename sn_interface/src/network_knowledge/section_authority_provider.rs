@@ -181,7 +181,7 @@ impl SectionAuthorityProvider {
         self.elders.iter()
     }
 
-    pub fn members(&self) -> impl Iterator<Item = &NodeState> + '_ {
+    fn members(&self) -> impl Iterator<Item = &NodeState> + '_ {
         self.members.iter()
     }
 

@@ -521,7 +521,7 @@ impl TestNetwork {
             "elder_count should be <= {}",
             sap_details.0.elder_count()
         );
-        let sap_adult_count = sap_details.0.members().count() - sap_details.0.elder_count();
+        let sap_adult_count = nodes.len() - sap_details.0.elder_count();
         assert!(
             adult_count <= sap_adult_count,
             "adult_count should be <= {sap_adult_count}",
@@ -661,7 +661,7 @@ impl TestNetwork {
             "elder_count should be <= {}",
             sap_details.0.elder_count()
         );
-        let sap_adult_count = sap_details.0.members().count() - sap_details.0.elder_count();
+        let sap_adult_count = nodes.len() - sap_details.0.elder_count();
         assert!(
             adult_count <= sap_adult_count,
             "adult_count should be <= {sap_adult_count}"
@@ -936,7 +936,21 @@ impl TestNetwork {
         let mut nw =
             NetworkKnowledge::new(sap.prefix(), tree).expect("Failed to create NetworkKnowledge");
 
-        for node_state in sap.members().cloned() {
+        let all_nodes_history = if let Some(all_history) = self.nodes.get(&sap.prefix()) {
+            all_history.clone()
+        } else {
+            Vec::new()
+        };
+        // select the last churn
+        let churn_idx = all_nodes_history.len() - 1;
+        let nodes = if let Some(last_history) = all_nodes_history.get(churn_idx) {
+            last_history.clone()
+        } else {
+            Vec::new()
+        };
+
+        for (node_info, _, _) in nodes.iter() {
+            let node_state = NodeState::joined(node_info.peer(), None);
             let sig = TestKeys::get_section_sig(&sk_set.secret_key(), &node_state);
             let _updated = nw.update_member(SectionSigned {
                 value: node_state,

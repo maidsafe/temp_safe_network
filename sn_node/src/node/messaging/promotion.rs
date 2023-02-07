@@ -146,18 +146,10 @@ impl MyNode {
         sap2: SectionSigned<SectionAuthorityProvider>,
         sig2: SectionSig,
     ) -> Result<Vec<Cmd>> {
-        if sap1.members().any(|m| m.name() == self.name()) {
+        if sap1.prefix().matches(&self.name()) {
             self.update_us(sap1, sig1, sap2, sig2).await
-        } else if sap2.members().any(|m| m.name() == self.name()) {
-            self.update_us(sap2, sig2, sap1, sig1).await
         } else {
-            // Should not be possible..
-            error!(
-                "Error handling sections agreement, we are not a member in either section {}, {}",
-                sap1.prefix(),
-                sap2.prefix()
-            );
-            Ok(vec![])
+            self.update_us(sap2, sig2, sap1, sig1).await
         }
     }
 
