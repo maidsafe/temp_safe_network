@@ -6,7 +6,7 @@ name: Version Bump
 # this means that we should _not_ run this flow if a bors/staging flow is underway
 # (but we can run if a `bors try` is underway)
 concurrency:
-  group: "main-refs/heads/staging-workflow"
+  group: "blocking-main-merge"
 
 on:
   push:
