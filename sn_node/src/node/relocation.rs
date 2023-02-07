@@ -42,7 +42,7 @@ pub(super) fn find_nodes_to_relocate(
     // relocating too many nodes at the same time.
     // Capped by criteria that cannot relocate too many node at once.
     let section_size = network_knowledge.section_members().len();
-    debug!(
+    info!(
         "Finding relocation candidates, having {:?} members, recommended section_size {:?}",
         section_size,
         recommended_section_size(),
@@ -71,7 +71,7 @@ pub(super) fn find_nodes_to_relocate(
     let target_name = XorName::from_content(&churn_id.0);
     candidates.sort_by(|lhs, rhs| target_name.cmp_distance(&lhs.name(), &rhs.name()));
 
-    debug!("Finding relocation candidates {candidates:?}");
+    info!("Finding relocation candidates {candidates:?}");
 
     let max_age = if let Some(age) = candidates.iter().map(|info| info.age()).max() {
         age

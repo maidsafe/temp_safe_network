@@ -78,7 +78,7 @@ impl MyNode {
         peer: Peer,
         signed_votes: Vec<SignedVote<NodeState>>,
     ) -> Result<Vec<Cmd>> {
-        debug!(
+        trace!(
             "{:?} {signed_votes:?} from {peer}",
             LogMarker::MembershipVotesBeingHandled
         );
@@ -154,7 +154,7 @@ impl MyNode {
         if let Some(membership) = membership_context.as_ref() {
             match membership.anti_entropy(gen) {
                 Ok(catchup_votes) => {
-                    debug!("Sending catchup votes to {peer:?}");
+                    trace!("Sending catchup votes to {peer:?}");
                     Some(Cmd::send_msg(
                         NodeMsg::MembershipVotes(catchup_votes),
                         Peers::Single(peer),
@@ -178,7 +178,7 @@ impl MyNode {
         &mut self,
         decision: Decision<NodeState>,
     ) -> Result<Vec<Cmd>> {
-        debug!("{}", LogMarker::AgreementOfMembership);
+        info!("{}", LogMarker::AgreementOfMembership);
         let mut cmds = vec![];
 
         let (joining_nodes, leaving_nodes): (Vec<_>, Vec<_>) = decision

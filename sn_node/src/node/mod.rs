@@ -159,7 +159,7 @@ mod core {
         /// Spawns a process to send this incase the channel may be full, we don't hold up
         /// processing around this (as this can be called during dkg eg)
         pub(crate) fn track_node_issue(&self, name: XorName, issue: IssueType) {
-            trace!("Logging issue {issue:?} in dysfunction for {name}");
+            debug!("Logging issue {issue:?} in dysfunction for {name}");
             let dysf_sender = self.fault_cmds_sender.clone();
             // TODO: do we need to kill the node if we fail tracking dysf?
             let _handle = tokio::spawn(async move {
@@ -174,7 +174,7 @@ mod core {
         /// Spawns a process to send this incase the channel may be full, we don't hold up
         /// processing around this (as this can be called during dkg eg)
         pub(crate) fn untrack_node_issue(&self, name: XorName, issue: IssueType) {
-            trace!("UnTracking issue {issue:?} in fault detection for {name}");
+            debug!("UnTracking issue {issue:?} in fault detection for {name}");
             let fault_sender = self.fault_cmds_sender.clone();
             // TODO: do we need to kill the node if we fail tracking faults?
             let _handle = tokio::spawn(async move {
@@ -378,7 +378,7 @@ mod core {
             };
 
             // Try splitting
-            trace!("{}", LogMarker::SplitAttempt);
+            info!("{}", LogMarker::SplitAttempt);
             if let Some((zero_dkg_id, one_dkg_id)) =
                 try_split_dkg(&members, &sap, chain_len, membership_gen)
             {
@@ -665,7 +665,7 @@ mod core {
                 )
                 .await;
 
-                debug!(
+                info!(
                     "Section has been split, new_prefix: {:?}, section_key {:?}, remaining elders\
                     in our section {:?}, new elders {:?} removed elders {:?}",
                     new_prefix,
@@ -677,7 +677,7 @@ mod core {
             };
 
             if !section_split && elders_changed {
-                debug!(
+                info!(
                     "Elders has been changed. prefix: {:?}, section_key {:?},  remaining elders\
                     in our section {:?}, new elders {:?} removed elders {:?}",
                     new_prefix,
@@ -703,10 +703,10 @@ mod core {
         /// Spawns a process to send this incase the channel may be full, we don't hold up
         /// processing around this (as this can be called during dkg eg)
         pub(crate) fn track_node_issue(&self, name: XorName, issue: IssueType) {
-            trace!("Tracking issue {issue:?} in fault detection for {name}");
+            debug!("Tracking issue {issue:?} in fault detection for {name}");
             let our_name = self.name();
             if our_name == name {
-                debug!("Not tracking issue against ourself");
+                trace!("Not tracking issue against ourself");
                 return;
             }
             let fault_sender = self.fault_cmds_sender.clone();
@@ -723,7 +723,7 @@ mod core {
         /// Spawns a process to send this incase the channel may be full, we don't hold up
         /// processing around this (as this can be called during dkg eg)
         pub(crate) fn untrack_node_issue(&self, name: XorName, issue: IssueType) {
-            trace!("UnTracking issue {issue:?} in fault detection for {name}");
+            debug!("UnTracking issue {issue:?} in fault detection for {name}");
             let fault_sender = self.fault_cmds_sender.clone();
             // TODO: do we need to kill the node if we fail tracking faults?
             let _handle = tokio::spawn(async move {
@@ -781,7 +781,7 @@ mod core {
                 let membership_adults = m.current_section_members().len() - elders;
                 let prefix = self.network_knowledge.prefix();
 
-                debug!("{prefix:?}: {elders} Elders, {adults}~{membership_adults} Adults.");
+                info!("{prefix:?}: {elders} Elders, {adults}~{membership_adults} Adults.");
             } else {
                 debug!("log_section_stats: No membership instance");
             };

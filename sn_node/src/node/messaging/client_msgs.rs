@@ -135,7 +135,7 @@ impl MyNode {
                     spent_transactions,
                 } = cmd.clone();
                 if let Some((proof_chain, signed_sap)) = network_knowledge {
-                    debug!(
+                    info!(
                         "Received updated network knowledge with the request. Will return new command \
                         to update the node network knowledge before processing the spend."
                     );
@@ -252,7 +252,7 @@ impl MyNode {
                     "Spent proof signature {:?} is invalid",
                     proof.spentbook_pub_key
                 );
-                debug!("Dropping spend request: {msg}");
+                warn!("Dropping spend request: {msg}");
                 return Err(Error::SpentbookError(msg));
             }
             let _ = spent_proofs_keys.insert(proof.spentbook_pub_key);
@@ -281,7 +281,7 @@ impl MyNode {
             .collect();
 
         if let Err(err) = tx.verify(&tx_public_commitments) {
-            debug!("Dropping spend request: {:?}", err.to_string());
+            warn!("Dropping spend request: {:?}", err.to_string());
             return Err(Error::SpentbookError(err.to_string()));
         }
 
@@ -295,7 +295,7 @@ impl MyNode {
             .collect();
         if public_commitments.is_empty() {
             let msg = format!("There are no commitments for the given key image {key_image:?}",);
-            debug!("Dropping spend request: {msg}");
+            warn!("Dropping spend request: {msg}");
             return Err(Error::SpentbookError(msg));
         }
         let spent_proof_share = build_spent_proof_share(

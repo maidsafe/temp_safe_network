@@ -54,7 +54,7 @@ impl RegisterStorage {
 
     #[allow(dead_code)]
     pub(super) async fn remove_register(&self, address: &RegisterAddress) -> Result<()> {
-        trace!("Removing register, {:?}", address);
+        debug!("Removing register, {:?}", address);
         self.file_store.delete_data(address).await
     }
 
@@ -78,7 +78,7 @@ impl RegisterStorage {
 
     /// Update our Register's replica on receiving data from other nodes.
     pub(super) async fn update(&self, data: &ReplicatedRegisterLog) -> Result<StorageLevel> {
-        debug!("Updating Register store: {:?}", data.address);
+        trace!("Updating Register store: {:?}", data.address);
         let mut stored_reg = self.try_load_stored_register(&data.address).await?;
 
         let mut log_to_write = Vec::new();
@@ -246,7 +246,7 @@ impl RegisterStorage {
         node_keypair: Keypair,
     ) -> Result<StorageLevel> {
         let address = cmd.dst_address();
-        trace!("Creating new spentbook register: {:?}", address);
+        debug!("Creating new spentbook register: {:?}", address);
 
         let mut permissions = BTreeMap::new();
         let _ = permissions.insert(User::Anyone, Permissions::new(true));

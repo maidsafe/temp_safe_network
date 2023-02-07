@@ -144,22 +144,22 @@ impl FlowCtrl {
             self.timestamps.last_vote_check = now;
             let read_locked_node = self.node.read().await;
 
-            debug!(" ----> vote periodics start");
+            trace!(" ----> vote periodics start");
             for cmd in self
                 .check_for_missed_votes(context, &read_locked_node.membership)
                 .await
             {
                 cmds.push(cmd);
             }
-            debug!(" ----> vote periodics done");
+            trace!(" ----> vote periodics done");
         }
 
         if self.timestamps.last_dkg_msg_check.elapsed() > MISSING_DKG_MSG_INTERVAL {
-            debug!(" ----> dkg msg periodics start");
+            trace!(" ----> dkg msg periodics start");
             self.timestamps.last_dkg_msg_check = now;
             Self::check_for_missed_dkg_messages(self.node.clone(), self.cmd_sender_channel.clone())
                 .await;
-            debug!(" ----> dkg msg periodics done");
+            trace!(" ----> dkg msg periodics done");
         }
 
         if self.timestamps.last_fault_check.elapsed() > FAULT_CHECK_INTERVAL {
@@ -178,10 +178,10 @@ impl FlowCtrl {
                     ));
                 }
             } else {
-                trace!("{}", LogMarker::RelocateEnd);
-                debug!("We've joined a section, dropping the relocation proof.");
+                info!("{}", LogMarker::RelocateEnd);
+                info!("We've joined a section, dropping the relocation proof.");
                 let mut node = self.node.write().await;
-                debug!("[NODE WRITE]: handling relocation periodic check write gottt...");
+                trace!("[NODE WRITE]: handling relocation periodic check write gottt...");
                 node.relocation_proof = None;
             }
         }
@@ -316,9 +316,9 @@ impl FlowCtrl {
 
         // DKG checks can be long running, move off thread to unblock the main loop
         let _handle = tokio::task::spawn(async move {
-            debug!("[NODE READ]: dkg msg lock attempt");
+            trace!("[NODE READ]: dkg msg lock attempt");
             let node = node.read().await;
-            debug!("[NODE READ]: dkg msg lock got");
+            trace!("[NODE READ]: dkg msg lock got");
 
             let dkg_voter = &node.dkg_voter;
 
@@ -347,7 +347,7 @@ impl FlowCtrl {
         let faulty_nodes = self.get_faulty_node_names().await;
 
         if !faulty_nodes.is_empty() {
-            debug!("{:?} : {faulty_nodes:?}", LogMarker::ProposeOffline);
+            info!("{:?} : {faulty_nodes:?}", LogMarker::ProposeOffline);
             let mut fault_set = BTreeSet::new();
             for node in faulty_nodes {
                 let _prev = fault_set.insert(node);

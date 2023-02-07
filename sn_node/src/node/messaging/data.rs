@@ -186,7 +186,7 @@ impl MyNode {
         // TODO: reuse our_members_sorted_by_distance_to API when core is merged into upper layer
         let members = context.network_knowledge.members();
 
-        trace!("Total members known about: {:?}", members.len());
+        debug!("Total members known about: {:?}", members.len());
 
         let candidates = members
             .into_iter()
@@ -204,7 +204,7 @@ impl MyNode {
             .map(|(_i, p)| p)
             .collect::<BTreeSet<_>>();
 
-        trace!("Target holders of {:?} are : {:?}", target, candidates,);
+        debug!("Target holders of {:?} are : {:?}", target, candidates,);
 
         candidates
     }
@@ -236,9 +236,9 @@ impl MyNode {
             // This may return a DatabaseFull error... but we should have reported StorageError::NotEnoughSpace
             // well before this
             match store_result {
-                Ok(StorageLevel::NoChange) => debug!("Data item stored."),
+                Ok(StorageLevel::NoChange) => trace!("Data item stored."),
                 Ok(StorageLevel::Updated(_level)) => {
-                    debug!("Data item stored.");
+                    trace!("Data item stored.");
                     // we add a new node for every level of used space increment
                     if !new_storage_level_passed && !context.joins_allowed {
                         new_storage_level_passed = true;

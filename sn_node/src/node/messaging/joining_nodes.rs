@@ -27,7 +27,7 @@ impl MyNode {
         peer: Peer,
         relocation: Option<RelocationProof>,
     ) -> Result<Option<Cmd>> {
-        debug!("Handling join from {peer:?}");
+        trace!("Handling join from {peer:?}");
 
         // Ignore a join request if we are not elder.
         if !context.is_elder {
@@ -73,7 +73,7 @@ impl MyNode {
             }
 
             if !context.joins_allowed {
-                debug!("Rejecting join request from {peer} - joins currently not allowed.");
+                trace!("Rejecting join request from {peer} - joins currently not allowed.");
                 let msg = NodeMsg::JoinResponse(JoinResponse::Rejected(
                     JoinRejectReason::JoinsDisallowed,
                 ));
@@ -92,9 +92,9 @@ impl MyNode {
         // We propose membership
         let node_state = NodeState::joined(peer, previous_name);
 
-        debug!("[NODE WRITE]: join propose membership write...");
+        trace!("[NODE WRITE]: join propose membership write...");
         let mut node = node.write().await;
-        debug!("[NODE WRITE]: join propose membership write gottt...");
+        trace!("[NODE WRITE]: join propose membership write gottt...");
         Ok(node.propose_membership_change(node_state))
     }
 

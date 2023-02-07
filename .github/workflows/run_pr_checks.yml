@@ -26,7 +26,7 @@ jobs:
   #   if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
   #   runs-on: ubuntu-latest
   #   steps:
-  #   - uses: actions/checkout@v2
+  #   - uses: actions/checkout@v3
 
   #   - shell: bash
   #     run: wget https://raw.githubusercontent.com/maidsafe/QA/master/misc-scripts/deny.toml
@@ -38,7 +38,7 @@ jobs:
     name: Unused dependency check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - uses: actions-rs/toolchain@v1
         with:
@@ -58,7 +58,7 @@ jobs:
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           fetch-depth: 0
       - uses: wagoid/commitlint-github-action@v5
@@ -89,7 +89,7 @@ jobs:
     name: Unit Tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Install Rust
         id: toolchain
@@ -150,7 +150,7 @@ jobs:
       CARGO_HOME: /mnt/data/cargo
       TMPDIR: /mnt/data/tmp
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: build sn_node and testnet
         run: |
           cargo build --release --bin sn_node
@@ -170,7 +170,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Install Rust
         id: toolchain
@@ -256,19 +256,19 @@ jobs:
           pkill sn_node
           echo "$(pgrep sn_node | wc -l) nodes still running"
 
-      - name: Generate StateMap
-        shell: bash
-        continue-on-error: true
-        run: |
-          cargo install --git https://github.com/TritonDataCenter/statemap.git
-          ./resources/scripts/statemap-preprocess.sh --run-statemap > safe_statemap.svg
+      # - name: Generate StateMap
+      #   shell: bash
+      #   continue-on-error: true
+      #   run: |
+      #     cargo install --git https://github.com/TritonDataCenter/statemap.git
+      #     ./resources/scripts/statemap-preprocess.sh --run-statemap > safe_statemap.svg
 
-      - name: Upload StateMap
-        uses: actions/upload-artifact@main
-        with:
-          name: statemap_e2e_${{matrix.os}}.svg
-          path: safe_statemap.svg
-        continue-on-error: true
+      # - name: Upload StateMap
+      #   uses: actions/upload-artifact@main
+      #   with:
+      #     name: statemap_e2e_${{matrix.os}}.svg
+      #     path: safe_statemap.svg
+      #   continue-on-error: true
 
       - name: Tar log files
         shell: bash
@@ -290,7 +290,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Install Rust
         id: toolchain
@@ -370,19 +370,19 @@ jobs:
           pkill sn_node
           echo "$(pgrep sn_node | wc -l) nodes still running"
 
-      - name: Generate StateMap
-        shell: bash
-        continue-on-error: true
-        run: |
-          cargo install --git https://github.com/TritonDataCenter/statemap.git
-          ./resources/scripts/statemap-preprocess.sh --run-statemap > safe_statemap.svg
+      # - name: Generate StateMap
+      #   shell: bash
+      #   continue-on-error: true
+      #   run: |
+      #     cargo install --git https://github.com/TritonDataCenter/statemap.git
+      #     ./resources/scripts/statemap-preprocess.sh --run-statemap > safe_statemap.svg
 
-      - name: Upload StateMap
-        uses: actions/upload-artifact@main
-        with:
-          name: statemap_e2e_${{matrix.os}}.svg
-          path: safe_statemap.svg
-        continue-on-error: true
+      # - name: Upload StateMap
+      #   uses: actions/upload-artifact@main
+      #   with:
+      #     name: statemap_e2e_${{matrix.os}}.svg
+      #     path: safe_statemap.svg
+      #   continue-on-error: true
 
       - name: Tar log files
         shell: bash
@@ -403,7 +403,7 @@ jobs:
     name: E2E Churn test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - uses: Swatinem/rust-cache@v1
         continue-on-error: true
@@ -440,21 +440,21 @@ jobs:
           pkill sn_node
           echo "$(pgrep sn_node | wc -l) nodes still running"
 
-      - name: Generate StateMap
-        shell: bash
-        if: failure()
-        continue-on-error: true
-        run: |
-          cargo install --git https://github.com/TritonDataCenter/statemap.git
-          ./resources/scripts/statemap-preprocess.sh --run-statemap > safe_statemap.svg
+      # - name: Generate StateMap
+      #   shell: bash
+      #   if: failure()
+      #   continue-on-error: true
+      #   run: |
+      #     cargo install --git https://github.com/TritonDataCenter/statemap.git
+      #     ./resources/scripts/statemap-preprocess.sh --run-statemap > safe_statemap.svg
 
-      - name: Upload StateMap
-        uses: actions/upload-artifact@main
-        if: failure()
-        with:
-          name: statemap_e2e_split_self_hosted_ubuntu.svg
-          path: safe_statemap.svg
-        continue-on-error: true
+      # - name: Upload StateMap
+      #   uses: actions/upload-artifact@main
+      #   if: failure()
+      #   with:
+      #     name: statemap_e2e_split_self_hosted_ubuntu.svg
+      #     path: safe_statemap.svg
+      #   continue-on-error: true
 
       - name: Tar log files
         shell: bash
@@ -476,7 +476,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Install Rust
         id: toolchain
@@ -547,19 +547,19 @@ jobs:
         # we just want to print out the info. If there is none, an exit code of 1 is returned, so here we return true
         run: rg "Membership - decided" $HOME/.safe/node/local-test-network | rg Left || true
 
-      - name: Generate StateMap
-        shell: bash
-        continue-on-error: true
-        run: |
-          cargo install --git https://github.com/TritonDataCenter/statemap.git
-          ./resources/scripts/statemap-preprocess.sh --run-statemap > safe_statemap.svg
+      # - name: Generate StateMap
+      #   shell: bash
+      #   continue-on-error: true
+      #   run: |
+      #     cargo install --git https://github.com/TritonDataCenter/statemap.git
+      #     ./resources/scripts/statemap-preprocess.sh --run-statemap > safe_statemap.svg
 
-      - name: Upload StateMap
-        uses: actions/upload-artifact@main
-        with:
-          name: statemap_api_${{matrix.os}}.svg
-          path: safe_statemap.svg
-        continue-on-error: true
+      # - name: Upload StateMap
+      #   uses: actions/upload-artifact@main
+      #   with:
+      #     name: statemap_api_${{matrix.os}}.svg
+      #     path: safe_statemap.svg
+      #   continue-on-error: true
 
       - name: Tar log files
         shell: bash
@@ -581,7 +581,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Install Rust
         id: toolchain
@@ -649,19 +649,19 @@ jobs:
         # we just want to print out the info. If there is none, an exit code of 1 is returned, so here we return true
         run: rg "Membership - decided" $HOME/.safe/node/local-test-network | rg Left || true
 
-      - name: Generate StateMap
-        shell: bash
-        continue-on-error: true
-        run: |
-          cargo install --git https://github.com/TritonDataCenter/statemap.git
-          ./resources/scripts/statemap-preprocess.sh --run-statemap > safe_statemap.svg
+      # - name: Generate StateMap
+      #   shell: bash
+      #   continue-on-error: true
+      #   run: |
+      #     cargo install --git https://github.com/TritonDataCenter/statemap.git
+      #     ./resources/scripts/statemap-preprocess.sh --run-statemap > safe_statemap.svg
 
-      - name: Upload StateMap
-        uses: actions/upload-artifact@main
-        with:
-          name: statemap_cli_${{matrix.os}}.svg
-          path: safe_statemap.svg
-        continue-on-error: true
+      # - name: Upload StateMap
+      #   uses: actions/upload-artifact@main
+      #   with:
+      #     name: statemap_cli_${{matrix.os}}.svg
+      #     path: safe_statemap.svg
+      #   continue-on-error: true
 
       - name: Tar log files
         shell: bash

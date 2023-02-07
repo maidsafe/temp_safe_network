@@ -62,7 +62,7 @@ impl MyNode {
         send_stream: SendStream,
     ) -> Result<Vec<Cmd>> {
         let stream_id = send_stream.id();
-        trace!("Sending response msg {msg_id:?} over {stream_id}");
+        info!("Sending response msg {msg_id:?} over {stream_id}");
         let (kind, payload) = MyNode::serialize_node_msg(context.name, &msg)?;
 
         match send_msg_on_stream(
@@ -100,7 +100,7 @@ impl MyNode {
         context: NodeContext,
         source_client: Peer,
     ) -> Result<()> {
-        trace!("Sending client response msg for {correlation_id:?}");
+        info!("Sending client response msg for {correlation_id:?}");
         let (kind, payload) = MyNode::serialize_client_msg_response(context.name, &msg)?;
         send_msg_on_stream(
             context.network_knowledge.section_key(),
@@ -122,7 +122,7 @@ impl MyNode {
         recipients: BTreeSet<Peer>,
     ) -> Result<Vec<Cmd>> {
         let targets_len = recipients.len();
-        debug!("Sending out + awaiting response of {msg_id:?} to {targets_len} holder node/s {recipients:?}");
+        trace!("Sending out + awaiting response of {msg_id:?} to {targets_len} holder node/s {recipients:?}");
 
         // TODO: Should we change this func to just return the futures and handlers can decide to wait on all
         // or process as they come in
@@ -143,7 +143,7 @@ impl MyNode {
                 output_cmds.push(Cmd::HandleMsg { origin: peer, wire_msg, send_stream: None });
             }
             Ok(Err(comms_err)) => {
-                error!("{msg_id:?} Error when sending request to node {peer:?}, marking node as faulty: {comms_err:?}");
+                error!("{msg_id:?} Error when sending request to node {peer:?}, tracking node as fault: {comms_err:?}");
                 output_cmds.push(Cmd::TrackNodeIssue {
                     name: peer.name(),
                     issue: IssueType::Communication,
@@ -181,7 +181,7 @@ impl MyNode {
         results.into_iter().for_each(|(peer, result)| match result {
             Err(_elapsed) => {
                 error!(
-                    "{msg_id:?}: No response from {peer:?} after {:?} timeout. Marking node as faulty",
+                    "{msg_id:?}: No response from {peer:?} after {:?} timeout. Tracking node fault",
                     *NODE_RESPONSE_TIMEOUT
                 );
                 output_cmds.push(Cmd::TrackNodeIssue {
@@ -196,7 +196,7 @@ impl MyNode {
                 last_success_response = Some(response);
             }
             Ok(Err(comms_err)) => {
-                error!("{msg_id:?} Error when sending request to holder node {peer:?}, marking node as faulty: {comms_err:?}");
+                error!("{msg_id:?} Error when sending request to holder node {peer:?}, tracking node as fault: {comms_err:?}");
                 if let CommsError::FailedSend(peer) = comms_err {
                     output_cmds.push(Cmd::TrackNodeIssue {
                         name: peer.name(),
@@ -264,7 +264,7 @@ async fn send_wiremsg_to_target_peers_and_await_responses(
         let bytes_to_node = wire_msg.serialize_with_new_dst(&dst)?;
 
         let comm = context.comm.clone();
-        info!("About to send {msg_id:?} to holder node: {target:?}");
+        debug!("About to send {msg_id:?} to holder node: {target:?}");
 
         send_tasks.push(
             async move {
@@ -342,7 +342,7 @@ async fn send_msg_on_stream(
     let bytes = wire_msg.serialize().map_err(|_| Error::InvalidMessage)?;
 
     let stream_id = send_stream.id();
-    trace!("Sending response {correlation_id:?} to {target_peer:?} over {stream_id}");
+    info!("Sending response {correlation_id:?} to {target_peer:?} over {stream_id}");
 
     let stream_prio = 10;
     send_stream.set_priority(stream_prio);
@@ -367,7 +367,7 @@ async fn send_msg_on_stream(
         trace!("Response {correlation_id:?} sent to {target_peer:?} over {stream_id_clone}. Stream finished with result: {result:?}");
     });
 
-    debug!("Sent the msg {correlation_id:?} to {target_peer:?} over {stream_id}");
+    trace!("Sent the msg {correlation_id:?} to {target_peer:?} over {stream_id}");
 
     Ok(())
 }

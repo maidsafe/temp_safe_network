@@ -108,7 +108,7 @@ impl MyNode {
     // excluding the ones in the provided list. And if the outcome list of candidates
     // differs from the current elders, trigger a DKG.
     pub(crate) fn trigger_dkg(&mut self) -> Result<Vec<Cmd>> {
-        debug!("{}", LogMarker::TriggeringPromotionAndDemotion);
+        info!("{}", LogMarker::TriggeringPromotionAndDemotion);
         let mut cmds = vec![];
         for session_id in self.best_elder_candidates() {
             cmds.extend(self.send_dkg_start(session_id)?);

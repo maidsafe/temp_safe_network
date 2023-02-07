@@ -89,7 +89,7 @@ impl MyNode {
         &self,
         prev_context: &NodeContext,
     ) -> Result<Vec<Cmd>> {
-        debug!("{}", LogMarker::AeSendUpdateToSiblings);
+        info!("{}", LogMarker::AeSendUpdateToSiblings);
         let sibling_prefix = prev_context.network_knowledge.prefix().sibling();
         if let Some(sibling_sap) = prev_context
             .network_knowledge
@@ -151,7 +151,7 @@ impl MyNode {
         kind: AntiEntropyKind,
         sender: Peer,
     ) -> Result<Vec<Cmd>> {
-        debug!("[NODE READ]: handling AE read gottt...");
+        trace!("[NODE READ]: handling AE read gottt...");
         let sap = section_tree_update.signed_sap.value.clone();
 
         let members = if let AntiEntropyKind::Update { members } = &kind {
@@ -175,7 +175,7 @@ impl MyNode {
 
             if should_update {
                 let mut write_locked_node = node.write().await;
-                debug!("[NODE WRITE]: handling AE write gottt...");
+                trace!("[NODE WRITE]: handling AE write gottt...");
                 let updated = write_locked_node
                     .network_knowledge
                     .update_knowledge_if_valid(
@@ -190,17 +190,17 @@ impl MyNode {
                         .update_on_section_change(&starting_context)
                         .await?,
                 );
-                debug!("updated for section change");
+                trace!("updated for section change");
                 updated
             } else {
                 false
             }
         };
 
-        debug!("[NODE READ] Latest context read");
+        trace!("[NODE READ] Latest context read");
         // mut here to update comms
         let latest_context = node.read().await.context();
-        debug!("[NODE READ] Latest context got.");
+        trace!("[NODE READ] Latest context got.");
 
         // Only trigger reorganize data when there is a membership change happens.
         if updated {
@@ -333,7 +333,7 @@ impl MyNode {
                     issue: sn_fault_detection::IssueType::NetworkKnowledge,
                 };
                 if let Some(stream) = send_stream {
-                    debug!("Sending AE response over send_stream for {msg_id:?}");
+                    trace!("Sending AE response over send_stream for {msg_id:?}");
                     Ok(vec![
                         track_node_cmd,
                         Cmd::SendNodeMsgResponse {
@@ -348,7 +348,7 @@ impl MyNode {
                         },
                     ])
                 } else {
-                    debug!("Attempting to send AE response over fresh conn for {msg_id:?}");
+                    trace!("Attempting to send AE response over fresh conn for {msg_id:?}");
                     Ok(vec![
                         track_node_cmd,
                         Cmd::send_msg(
@@ -386,14 +386,14 @@ impl MyNode {
         let our_prefix = network_knowledge.prefix();
         // Let's try to find a section closer to the destination, if it's not for us.
         if !our_prefix.matches(&dst.name) {
-            debug!(
+            trace!(
                 "AE: {msg_id:?} prefix not matching. We are: {our_prefix:?}, they sent to: {:?}",
                 dst.name
             );
             let closest_sap = network_knowledge.closest_signed_sap_with_chain(&dst.name);
             return match closest_sap {
                 Some((signed_sap, proof_chain)) => {
-                    info!(
+                    debug!(
                         "{msg_id:?} Found a better matching prefix {:?}: {signed_sap:?}",
                         signed_sap.prefix()
                     );

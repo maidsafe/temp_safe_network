@@ -81,7 +81,7 @@ impl MyNode {
         if !equal_prefix && !is_extension_prefix {
             // Other section. We shouldn't be receiving or updating a SAP for
             // a remote section here, that is done with a AE msg response.
-            debug!(
+            trace!(
                 "Ignoring handover request since prefix doesn't match ours: {:?}",
                 sap
             );
@@ -153,13 +153,13 @@ impl MyNode {
                 let vote = vs.propose(sap_candidates.clone())?;
                 self.handover_voting = Some(vs.clone());
 
-                debug!("{}: {:?}", LogMarker::HandoverConsensusTrigger, &vote);
+                info!("{}: {:?}", LogMarker::HandoverConsensusTrigger, &vote);
                 cmds.push(MyNode::broadcast_handover_vote_msg(context, vote));
 
                 // For handover 2 elders sap, only the handover vote from genesis is required.
                 // Which make the vote state reached consensus when initialized.
                 if vs.consensus_value().is_some() {
-                    debug!(
+                    info!(
                         "{}: {:?}",
                         LogMarker::HandoverConsensusTermination,
                         sap_candidates
@@ -337,7 +337,7 @@ impl MyNode {
                 .collect();
         let expected_candidates: BTreeSet<&Peer> = expected_peers.iter().collect();
         if received_candidates != expected_candidates {
-            debug!("InvalidElderCandidates: received SAP at gen {} with candidates {:#?}, expected candidates {:#?}", sap.membership_gen(), received_candidates, expected_candidates);
+            trace!("InvalidElderCandidates: received SAP at gen {} with candidates {:#?}, expected candidates {:#?}", sap.membership_gen(), received_candidates, expected_candidates);
             return Err(Error::InvalidElderCandidates);
         }
         Ok(())
@@ -376,8 +376,8 @@ impl MyNode {
                 && (received_candidates2 != expected_candidates1
                     || received_candidates1 != expected_candidates2)
             {
-                debug!("InvalidElderCandidates: received SAP1 at gen {} with candidates {:#?}, expected candidates {:#?}", sap1.membership_gen(), received_candidates1, expected_candidates1);
-                debug!("InvalidElderCandidates: received SAP2 at gen {} with candidates {:#?}, expected candidates {:#?}", sap2.membership_gen(), received_candidates2, expected_candidates2);
+                trace!("InvalidElderCandidates: received SAP1 at gen {} with candidates {:#?}, expected candidates {:#?}", sap1.membership_gen(), received_candidates1, expected_candidates1);
+                trace!("InvalidElderCandidates: received SAP2 at gen {} with candidates {:#?}, expected candidates {:#?}", sap2.membership_gen(), received_candidates2, expected_candidates2);
                 return Err(Error::InvalidElderCandidates);
             }
             Ok(())
@@ -490,7 +490,7 @@ impl MyNode {
         peer: Peer,
         signed_votes: Vec<SignedVote<SapCandidate>>,
     ) -> Result<Vec<Cmd>> {
-        debug!("{}", LogMarker::HandoverMsgBeingHandled);
+        trace!("{}", LogMarker::HandoverMsgBeingHandled);
 
         let mut cmds = vec![];
 
@@ -522,7 +522,7 @@ impl MyNode {
     }
 
     pub(crate) fn handle_handover_anti_entropy(&self, peer: Peer, gen: Generation) -> Option<Cmd> {
-        debug!(
+        trace!(
             "{:?} handover anti-entropy request for gen {:?} from {}",
             LogMarker::HandoverAeRequestReceived,
             gen,

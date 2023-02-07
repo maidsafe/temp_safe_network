@@ -79,7 +79,7 @@ impl CmdCtrl {
                     }
                 }
                 Err(error) => {
-                    debug!("Error when processing cmd: {:?}", error);
+                    warn!("Error when processing cmd: {:?}", error);
                     if let Error::RejoinRequired(reason) = error {
                         if rejoin_network_sender.send(reason).await.is_err() {
                             error!("Could not send rejoin reason through channel.");

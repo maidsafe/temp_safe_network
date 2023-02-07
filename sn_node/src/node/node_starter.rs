@@ -98,9 +98,9 @@ async fn new_node(
         bootstrap_node(config, used_space, root_dir, join_timeout).await?;
 
     {
-        debug!("[NODE WRITE]: new node...");
+        trace!("[NODE WRITE]: new node...");
         let context = node.read().await.context();
-        debug!("[NODE WRITE]: new node write got");
+        trace!("[NODE WRITE]: new node write got");
 
         // Network keypair may have to be changed due to naming criteria or network requirements.
         let keypair_as_bytes = context.keypair.to_bytes();

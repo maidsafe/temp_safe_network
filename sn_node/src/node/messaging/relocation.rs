@@ -29,10 +29,10 @@ impl MyNode {
         churn_id: ChurnId,
         excluded: BTreeSet<XorName>,
     ) -> Result<Vec<Cmd>> {
-        debug!("Try to find relocate peers, excluded {excluded:?}");
+        info!("Try to find relocate peers, excluded {excluded:?}");
         // Do not carry out relocation when there is not enough elder nodes.
         if self.network_knowledge.section_auth().elder_count() < elder_count() {
-            debug!(
+            warn!(
                 "Not enough elders current {:?} vs. expected {:?}",
                 self.network_knowledge.section_auth().elder_count(),
                 elder_count()
@@ -44,7 +44,7 @@ impl MyNode {
         for (node_state, relocation_dst) in
             find_nodes_to_relocate(&self.network_knowledge, &churn_id, excluded)
         {
-            debug!(
+            info!(
                 "Relocating {:?} to {} (on churn of {churn_id})",
                 node_state.peer(),
                 relocation_dst.name(),
@@ -76,14 +76,14 @@ impl MyNode {
             if let MembershipState::Relocated(relocation_dst) = signed_relocation.state() {
                 *relocation_dst.name()
             } else {
-                debug!(
+                warn!(
                     "Relocate: Ignoring msg containing invalid NodeState: {:?}",
                     signed_relocation.state()
                 );
                 return Ok(None);
             };
 
-        trace!("{}", LogMarker::RelocateStart);
+        info!("{}", LogMarker::RelocateStart);
         debug!("Relocate: Received decision to relocate to other section at {dst_section}");
 
         let original_info = self.info();

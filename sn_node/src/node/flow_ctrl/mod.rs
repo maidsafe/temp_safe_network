@@ -83,7 +83,7 @@ impl FlowCtrl {
         mpsc::Sender<(Cmd, Vec<usize>)>,
         mpsc::Receiver<RejoinReason>,
     ) {
-        debug!("[NODE READ]: flowctrl node context lock got");
+        trace!("[NODE READ]: flowctrl node context lock got");
         let node_context = cmd_ctrl.node().read().await.context();
         let (cmd_sender_channel, mut incoming_cmds_from_apis) =
             mpsc::channel(STANDARD_CHANNEL_SIZE);

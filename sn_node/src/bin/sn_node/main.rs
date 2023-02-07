@@ -38,7 +38,7 @@ use self_update::{cargo_crate_version, Status};
 use std::{io::Write, process::exit};
 use tokio::runtime::Runtime;
 use tokio::time::Duration;
-use tracing::{self, error, info, trace, warn};
+use tracing::{self, error, info, warn};
 
 const JOIN_TIMEOUT_SEC: u64 = 60;
 const JOIN_TIMEOUT_RETRY_TIME_SEC: u64 = 30;
@@ -123,7 +123,7 @@ fn create_runtime_and_node(config: &Config) -> Result<()> {
         info!("\n{}\n{}", message, "=".repeat(message.len()));
 
         let outcome = rt.block_on(async {
-            trace!("Initial node config: {config:?}");
+            info!("Initial node config: {config:?}");
             Ok::<_, ErrReport>(start_new_node(config, join_timeout).await)
         })?;
 

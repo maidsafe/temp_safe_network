@@ -30,7 +30,7 @@ impl MyNode {
         sender: Peer,
         data_sender_has: Vec<DataAddress>,
     ) -> Option<Cmd> {
-        trace!("Getting missing data for node");
+        debug!("Getting missing data for node");
         // TODO: can cache this data stored per churn event?
         let mut data_i_have = context.data_storage.data_addrs().await;
         trace!("Our data got");
