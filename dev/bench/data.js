@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1675771593341,
+  "lastUpdate": 1675771812198,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -65704,6 +65704,150 @@ window.BENCHMARK_DATA = {
             "name": "read-sampling/chunk keys/4000",
             "value": 329238081,
             "range": "± 3385440",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "1b13c86fa18abee9e9fb2c965366dba1afa0d8b3",
+          "message": "Merge #2072\n\n2072: relocation: tests + comm fixes r=joshuef a=RolandSherwin\n\n- fix(relocation): retain comms to members undergoing relocation\r\n  - We retain comms to the relocating members which are signed by our current SectionKey\r\n  - This should allow us to send the `Relocate` msg to the relocating node\r\n- chore(membership): send NodeApprovals for the joining nodes only\r\n  - Produced approval messages with empty recipients\r\n- feat(test): use TestMsgCounter to keep track of NodeMsgs\r\n  - Make the Comms in the tests to be asynchronous. Hence we cannot rely on empty buffers to terminate the tests.\r\n  - Instead, use `MsgId` to terminate the tests if the peers receive all the sent messages.\r\n  - This commit also makes the tests more accurate and hence removes a dkg test which was invalid.\n\nCo-authored-by: RolandSherwin <RolandSherwin@protonmail.com>",
+          "timestamp": "2023-02-07T10:08:40Z",
+          "tree_id": "457c926181f6daf9dc194761923b762d09376012",
+          "url": "https://github.com/maidsafe/safe_network/commit/1b13c86fa18abee9e9fb2c965366dba1afa0d8b3"
+        },
+        "date": 1675771809183,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "serialize/serialize for sending",
+            "value": 2598782,
+            "range": "± 143320",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 114588305,
+            "range": "± 1539858",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 140883693,
+            "range": "± 3833197",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 539413827,
+            "range": "± 6247024",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 95716437,
+            "range": "± 525186",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 117178711,
+            "range": "± 782802",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 443233737,
+            "range": "± 2607867",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "register-edit-sampling/register_edits/1000",
+            "value": 30363105672,
+            "range": "± 1408876375",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/100",
+            "value": 75593496,
+            "range": "± 33909368",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/1000",
+            "value": 2955807405,
+            "range": "± 342576357",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/4000",
+            "value": 12382305252,
+            "range": "± 1033801552",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/100",
+            "value": 313161021,
+            "range": "± 25652378",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/1000",
+            "value": 2718647596,
+            "range": "± 183195520",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/4000",
+            "value": 10388586707,
+            "range": "± 480501390",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/100",
+            "value": 60287302,
+            "range": "± 2236409",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/1000",
+            "value": 565781459,
+            "range": "± 29947470",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/4000",
+            "value": 2243454894,
+            "range": "± 47590437",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/100",
+            "value": 13533828,
+            "range": "± 488125",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/1000",
+            "value": 116169447,
+            "range": "± 7293323",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/4000",
+            "value": 401838780,
+            "range": "± 6635813",
             "unit": "ns/iter"
           }
         ]
