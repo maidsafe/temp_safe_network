@@ -41,7 +41,11 @@ use crate::{
 use bls::PublicKey as BlsPublicKey;
 use section_peers::SectionPeers;
 use serde::Serialize;
-use std::{collections::BTreeSet, iter, net::SocketAddr};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    iter,
+    net::SocketAddr,
+};
 use xor_name::{Prefix, XorName};
 
 /// The secret key for the genesis DBC.
@@ -200,8 +204,8 @@ impl NetworkKnowledge {
         Ok((network_knowledge, section_key_share))
     }
 
-    /// Switches to use the provided section
-    /// as the section where our node belongs.
+    /// Switches to use the provided section as the section where our node belongs.
+    /// TODO: shall the `self.section_peers` got updated as well?
     pub fn switch_section(
         &mut self,
         dst_sap: SectionSigned<SectionAuthorityProvider>,
@@ -459,6 +463,15 @@ impl NetworkKnowledge {
         trace!("Section member state, name: {node_name:?}, updated: {updated}");
 
         updated
+    }
+
+    /// Returns the members of our section
+    pub fn current_section_members(&self) -> BTreeMap<XorName, NodeState> {
+        self.section_peers
+            .members()
+            .iter()
+            .map(|node_state| (node_state.name(), node_state.value.clone()))
+            .collect()
     }
 
     /// Returns the members of our section

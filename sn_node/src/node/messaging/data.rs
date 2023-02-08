@@ -11,6 +11,7 @@ use crate::node::{
 };
 use crate::storage::{Error as StorageError, StorageLevel};
 
+use itertools::Itertools;
 use sn_interface::{
     data_copy_count,
     messaging::{
@@ -24,7 +25,6 @@ use sn_interface::{
 use qp2p::SendStream;
 use xor_name::XorName;
 
-use itertools::Itertools;
 use std::collections::BTreeSet;
 use tracing::info;
 
@@ -89,7 +89,7 @@ impl MyNode {
                 let error = DataError::InsufficientNodeCount {
                     prefix: context.network_knowledge.prefix(),
                     expected: index as u8 + 1, // plus one here as we're 0 index
-                    found: context.network_knowledge.members().len() as u8,
+                    found: context.section_signed_members().len() as u8,
                 };
 
                 let data_response = ClientDataResponse::NetworkIssue(error);
@@ -184,7 +184,7 @@ impl MyNode {
         query_index: Option<usize>,
     ) -> BTreeSet<Peer> {
         // TODO: reuse our_members_sorted_by_distance_to API when core is merged into upper layer
-        let members = context.network_knowledge.members();
+        let members = context.section_peers();
 
         debug!("Total members known about: {:?}", members.len());
 

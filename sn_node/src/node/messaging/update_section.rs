@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{core::NodeContext, flow_ctrl::cmds::Cmd, messaging::Peers, MyNode};
+use itertools::Itertools;
 use rand::{rngs::OsRng, seq::SliceRandom};
 use sn_interface::{
     data_copy_count,
@@ -14,7 +15,6 @@ use sn_interface::{
     types::{log_markers::LogMarker, DataAddress, Peer},
 };
 
-use itertools::Itertools;
 use std::collections::BTreeSet;
 
 // This data will all be replicated into one message, as such we want to keep size
@@ -43,7 +43,7 @@ impl MyNode {
         // overall queries can be reduced, the data names are scrambled.
         data_i_have.shuffle(&mut OsRng);
 
-        let members = context.network_knowledge.members();
+        let members = context.section_peers();
         let members_names = members.iter().map(|p2p_node| p2p_node.name());
 
         let mut data_for_sender = vec![];
@@ -96,7 +96,7 @@ impl MyNode {
 
         // ask the entire section.
         // they will only send over relevant things they have, in small + randomized batches
-        let members = context.network_knowledge.members();
+        let members = context.section_peers();
 
         trace!(
             "section neighbours for data req: {}: {:?}",

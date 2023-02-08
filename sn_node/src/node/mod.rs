@@ -74,7 +74,7 @@ mod core {
             supermajority, MyNodeInfo, NetworkKnowledge, NodeState, RelocationProof,
             SectionAuthorityProvider, SectionKeyShare, SectionKeysProvider,
         },
-        types::{keys::ed25519::Digest256, log_markers::LogMarker},
+        types::{keys::ed25519::Digest256, log_markers::LogMarker, Peer},
     };
 
     use ed25519_dalek::Keypair;
@@ -134,6 +134,7 @@ mod core {
         pub(crate) info: MyNodeInfo,
         pub(crate) keypair: Arc<Keypair>,
         pub(crate) network_knowledge: NetworkKnowledge,
+        pub(crate) section_members: BTreeMap<XorName, NodeState>,
         pub(crate) section_keys_provider: SectionKeysProvider,
         #[debug(skip)]
         pub(crate) comm: Comm,
@@ -153,6 +154,19 @@ mod core {
             self.network_knowledge
                 .section_auth_by_name(name)
                 .map_err(Error::from)
+        }
+
+        /// Returns the list of Peer of the current section.
+        pub(crate) fn section_peers(&self) -> BTreeSet<Peer> {
+            self.section_members
+                .values()
+                .map(|node_state| *node_state.peer())
+                .collect()
+        }
+
+        /// Returns the list of signed NodeState of the current section
+        pub(crate) fn section_signed_members(&self) -> BTreeSet<SectionSigned<NodeState>> {
+            self.network_knowledge.section_signed_members()
         }
 
         /// Log an issue in dysfunction
@@ -193,13 +207,20 @@ mod core {
         /// Useful for longer running processes to avoid having to acquire
         /// read locks eg.
         pub(crate) fn context(&self) -> NodeContext {
+            let is_elder = self.is_elder();
+            let section_members = if let Some(m) = &self.membership {
+                m.current_section_members()
+            } else {
+                self.network_knowledge().current_section_members()
+            };
             NodeContext {
                 root_storage_dir: self.root_storage_dir.clone(),
-                is_elder: self.is_elder(),
+                is_elder,
                 name: self.name(),
                 info: self.info(),
                 keypair: self.keypair.clone(),
                 network_knowledge: self.network_knowledge().clone(),
+                section_members,
                 section_keys_provider: self.section_keys_provider.clone(),
                 comm: self.comm.clone(),
                 joins_allowed: self.joins_allowed || self.joins_allowed_until_split,
@@ -825,7 +846,7 @@ mod core {
                         None
                     }
                 });
-            let mut members = context.network_knowledge.members();
+            let mut members = context.section_peers();
             members.extend(relocated_members);
             context.comm.set_comm_targets(members);
         }
