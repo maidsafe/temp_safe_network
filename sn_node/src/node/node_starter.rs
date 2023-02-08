@@ -43,8 +43,11 @@ const GENESIS_DBC_FILENAME: &str = "genesis_dbc";
 pub(crate) type CmdChannel = mpsc::Sender<(Cmd, Vec<usize>)>;
 
 /// Test only
-pub async fn new_test_api(config: &Config, join_timeout: Duration) -> Result<super::NodeTestApi> {
-    let (node, cmd_channel, _) = new_node(config, join_timeout).await?;
+pub async fn new_test_api(
+    config: &Config,
+    join_retry_timeout: Duration,
+) -> Result<super::NodeTestApi> {
+    let (node, cmd_channel, _) = new_node(config, join_retry_timeout).await?;
     Ok(super::NodeTestApi::new(node, cmd_channel))
 }
 
@@ -62,9 +65,9 @@ pub struct NodeRef {
 /// Start a new node.
 pub async fn start_new_node(
     config: &Config,
-    join_timeout: Duration,
+    join_retry_timeout: Duration,
 ) -> Result<(NodeRef, mpsc::Receiver<RejoinReason>)> {
-    let (node, cmd_channel, rejoin_network_rx) = new_node(config, join_timeout).await?;
+    let (node, cmd_channel, rejoin_network_rx) = new_node(config, join_retry_timeout).await?;
 
     Ok((NodeRef { node, cmd_channel }, rejoin_network_rx))
 }
@@ -72,7 +75,7 @@ pub async fn start_new_node(
 // Private helper to create a new node using the given config and bootstraps it to the network.
 async fn new_node(
     config: &Config,
-    join_timeout: Duration,
+    join_retry_timeout: Duration,
 ) -> Result<(
     Arc<RwLock<MyNode>>,
     CmdChannel,
@@ -95,7 +98,7 @@ async fn new_node(
     let used_space = UsedSpace::new(config.min_capacity(), config.max_capacity());
 
     let (node, cmd_channel, rejoin_network_rx) =
-        bootstrap_node(config, used_space, root_dir, join_timeout).await?;
+        bootstrap_node(config, used_space, root_dir, join_retry_timeout).await?;
 
     {
         trace!("[NODE WRITE]: new node...");
@@ -133,7 +136,7 @@ async fn bootstrap_node(
     config: &Config,
     used_space: UsedSpace,
     root_storage_dir: &Path,
-    join_timeout: Duration,
+    join_retry_timeout: Duration,
 ) -> Result<(
     Arc<RwLock<MyNode>>,
     CmdChannel,
@@ -164,6 +167,7 @@ async fn bootstrap_node(
         .await?
     };
 
+    let node_name = node.name();
     let node = Arc::new(RwLock::new(node));
     let (dispatcher, data_replication_receiver) = Dispatcher::new(node.clone());
     let cmd_ctrl = CmdCtrl::new(dispatcher);
@@ -175,20 +179,29 @@ async fn bootstrap_node(
     )
     .await;
 
-    cmd_channel
-        .send((Cmd::TryJoinNetwork, vec![]))
-        .await
-        .map_err(|e| {
-            error!("Failed join: {:?}", e);
-            Error::JoinTimeout
-        })?;
+    // keep trying to join as this node
+    loop {
+        // send the join message...
+        cmd_channel
+            .send((Cmd::TryJoinNetwork, vec![]))
+            .await
+            .map_err(|e| {
+                error!("Failed join: {:?}", e);
+                Error::JoinTimeout
+            })?;
 
-    tokio::time::timeout(join_timeout, await_join(node.clone()))
-        .await
-        .map_err(|e| {
-            error!("Failed join: {:?}", e);
-            Error::JoinTimeout
-        })?;
+        // await for join retry time
+        let result = tokio::time::timeout(join_retry_timeout, await_join(node.clone())).await;
+
+        if result.is_err() {
+            error!("Join not accepted in {join_retry_timeout:?}. Will try and join again. Error was: {:?}", result);
+            continue;
+        } else {
+            break;
+        }
+    }
+
+    info!("Node {:?} join has been accepted.", node_name);
 
     Ok((node, cmd_channel, rejoin_network_rx))
 }
