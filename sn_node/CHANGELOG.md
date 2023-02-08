@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.74.6 (2023-02-08)
+## v0.74.7 (2023-02-08)
 
 ### Commit Statistics
 
@@ -22,10 +22,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #2082 ([`1e9d591`](https://github.com/maidsafe/safe_network/commit/1e9d5911ed9320e4db632e72f05e89059f6f0d48))
+</details>
+
+## v0.74.6 (2023-02-08)
+
+### Chore
+
+ - <csr-id-2c1b51affbc89cbee181039ce01a28d901d49e72/> sn_node-0.74.6
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_node-0.74.6 ([`2c1b51a`](https://github.com/maidsafe/safe_network/commit/2c1b51affbc89cbee181039ce01a28d901d49e72))
     - Merge #2083 ([`39470f4`](https://github.com/maidsafe/safe_network/commit/39470f4e0293231b9e065e33061f52b5d3a7fdea))
 </details>
 
 ## v0.74.5 (2023-02-08)
+
+<csr-id-c8bbc738158c35020c0a7c4c5108aceb744a0247/>
 
 ### New Features
 
@@ -35,12 +62,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  - <csr-id-c8bbc738158c35020c0a7c4c5108aceb744a0247/> sn_interface-0.17.6/sn_client-0.78.5/sn_node-0.74.5
 
+### Documentation
+
+ - <csr-id-42441bee59ce493cb81a80662d3b0aac62ebbdeb/> update Jaeger in README.md
+
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 4 commits contributed to the release.
- - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 5 commits contributed to the release.
+ - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -54,6 +85,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - retry as same node when joining ([`bb1e371`](https://github.com/maidsafe/safe_network/commit/bb1e3718e42e42ca02ecc00bbd529953a380928e))
     - Merge #2079 ([`acca5f3`](https://github.com/maidsafe/safe_network/commit/acca5f30d7ce2080e0cd8ef38f4039412b201e06))
     - chore: remove redundant enum variant - `ClientDataResponse` variant `CommunicationIssues` was not differentiated on client, and was carrying the exact same error enum as the variant `NetworkIssue`. ([`a34243e`](https://github.com/maidsafe/safe_network/commit/a34243e89d735512a7eee2b6bf3a96d2a9cbea59))
+    - update Jaeger in README.md ([`42441be`](https://github.com/maidsafe/safe_network/commit/42441bee59ce493cb81a80662d3b0aac62ebbdeb))
 </details>
 
 ## v0.74.4 (2023-02-07)
