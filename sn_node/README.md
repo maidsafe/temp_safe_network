@@ -17,15 +17,22 @@ export RUST_LOG_OTLP=sn_node=trace # This filters what is sent to OTLP endpoint
 cargo run --release --bin sn_node --features otlp -- --first --skip-auto-port-forwarding --local-addr=127.0.0.1:0
 ```
 
-Before running the node, an OTLP endpoint should be available. An example of an OTLP-supporting endpoint is Jaeger, which can be launched with Docker like this (see [documentation](https://www.jaegertracing.io/docs/1.36/getting-started/#all-in-one)):
+Before running the node, an OTLP endpoint should be available. An example of an OTLP-supporting endpoint is Jaeger, which can be launched with Docker like this (see [documentation](https://www.jaegertracing.io/docs/1.42/getting-started/#all-in-one)):
 ```
-docker run --name jaeger \
+docker run -d --name jaeger \
+  -e COLLECTOR_ZIPKIN_HOST_PORT=:9411 \
   -e COLLECTOR_OTLP_ENABLED=true \
-  -p 16685:16685 \
+  -p 6831:6831/udp \
+  -p 6832:6832/udp \
+  -p 5778:5778 \
   -p 16686:16686 \
   -p 4317:4317 \
   -p 4318:4318 \
-  jaegertracing/all-in-one:1.36
+  -p 14250:14250 \
+  -p 14268:14268 \
+  -p 14269:14269 \
+  -p 9411:9411 \
+  jaegertracing/all-in-one:1.41
 ```
 
 In the web interface of Jaeger (http://localhost:16686) one can filter several things, e.g. the tag `service.instance.id=<PID>`, where PID is the process ID of the node. The service name is `sn_node`.
