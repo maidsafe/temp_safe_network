@@ -5,22 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.74.4 (2023-02-07)
-
-### Chore
-
- - <csr-id-6cb1f9548ce44aaf04c9d6c64364ca1c8b344470/> remove unused async
-
-### Bug Fixes
-
- - <csr-id-c89336c1e5b68ca4facd9afd4775c2847d8e3e6f/> verify `SectionStateVote` before handling it
+## v0.74.5 (2023-02-08)
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 3 commits contributed to the release.
- - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits contributed to the release.
+ - 0 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -30,12 +22,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #2079 ([`acca5f3`](https://github.com/maidsafe/safe_network/commit/acca5f30d7ce2080e0cd8ef38f4039412b201e06))
+    - chore: remove redundant enum variant - `ClientDataResponse` variant `CommunicationIssues` was not differentiated on client, and was carrying the exact same error enum as the variant `NetworkIssue`. ([`a34243e`](https://github.com/maidsafe/safe_network/commit/a34243e89d735512a7eee2b6bf3a96d2a9cbea59))
+</details>
+
+## v0.74.4 (2023-02-07)
+
+<csr-id-6cb1f9548ce44aaf04c9d6c64364ca1c8b344470/>
+
+### Chore
+
+ - <csr-id-6cb1f9548ce44aaf04c9d6c64364ca1c8b344470/> remove unused async
+
+### Chore
+
+ - <csr-id-b7a6024af9e777473615cddfd5940f84fda4bb6b/> sn_comms-0.3.2/sn_node-0.74.4
+
+### Bug Fixes
+
+ - <csr-id-c89336c1e5b68ca4facd9afd4775c2847d8e3e6f/> verify `SectionStateVote` before handling it
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 4 commits contributed to the release.
+ - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_comms-0.3.2/sn_node-0.74.4 ([`b7a6024`](https://github.com/maidsafe/safe_network/commit/b7a6024af9e777473615cddfd5940f84fda4bb6b))
     - Merge #2073 ([`732621c`](https://github.com/maidsafe/safe_network/commit/732621c1261dd24eb58f38b49ba25c78af272c69))
     - verify `SectionStateVote` before handling it ([`c89336c`](https://github.com/maidsafe/safe_network/commit/c89336c1e5b68ca4facd9afd4775c2847d8e3e6f))
     - remove unused async ([`6cb1f95`](https://github.com/maidsafe/safe_network/commit/6cb1f9548ce44aaf04c9d6c64364ca1c8b344470))
 </details>
 
 ## v0.74.3 (2023-02-07)
+
+<csr-id-bda3aa2106fd2fd8c1e6a320aa6bbefd9e407ee7/>
+<csr-id-6da16b20400b993576cb5f21736c3d447d6e4efa/>
+<csr-id-6611b3228df87d3e39c379e13fd9b9d308632881/>
+<csr-id-a7d42921e4bc5398aba98449433eed83ccc9c12e/>
 
 ### Chore
 
@@ -78,6 +111,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## v0.74.2 (2023-02-07)
 
 <csr-id-677ef5cc8b1935b94641c61c53429faf2c58c261/>
+<csr-id-3c34a731eca9d5b37d2574e3e16c7f089c7cc8b2/>
 
 ### Chore
 

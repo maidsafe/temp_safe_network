@@ -1113,13 +1113,14 @@ needed, as they keypair itself contains the Arcs we need.
     - Self authentication Example
     - Example to demonstrate Storage API
 
-## v0.78.4 (2023-02-06)
+## v0.78.5 (2023-02-08)
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 1 commit contributed to the release.
+ - 2 commits contributed to the release.
+ - 1 day passed between releases.
  - 0 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
@@ -1130,10 +1131,38 @@ needed, as they keypair itself contains the Arcs we need.
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #2079 ([`acca5f3`](https://github.com/maidsafe/safe_network/commit/acca5f30d7ce2080e0cd8ef38f4039412b201e06))
+    - chore: remove redundant enum variant - `ClientDataResponse` variant `CommunicationIssues` was not differentiated on client, and was carrying the exact same error enum as the variant `NetworkIssue`. ([`a34243e`](https://github.com/maidsafe/safe_network/commit/a34243e89d735512a7eee2b6bf3a96d2a9cbea59))
+</details>
+
+## v0.78.4 (2023-02-06)
+
+### Chore
+
+ - <csr-id-e967cc4d827c460bb47748decdf564c9cf7e1e6d/> sn_interface-0.17.3/sn_comms-0.3.0/sn_client-0.78.4/sn_node-0.74.0/sn_cli-0.69.2
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.17.3/sn_comms-0.3.0/sn_client-0.78.4/sn_node-0.74.0/sn_cli-0.69.2 ([`e967cc4`](https://github.com/maidsafe/safe_network/commit/e967cc4d827c460bb47748decdf564c9cf7e1e6d))
     - Merge #2048 ([`ae06c94`](https://github.com/maidsafe/safe_network/commit/ae06c9458ad904863a925f1d2b2e253a67456298))
 </details>
 
 ## v0.78.3 (2023-02-06)
+
+<csr-id-6446eb9695d9d12f7677e79603697c3ee44dbfb8/>
 
 ### New Features (BREAKING)
 

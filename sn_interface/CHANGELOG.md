@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## v0.17.5 (2023-02-07)
+## v0.17.6 (2023-02-08)
 
 ### Commit Statistics
 
@@ -23,6 +23,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #2079 ([`acca5f3`](https://github.com/maidsafe/safe_network/commit/acca5f30d7ce2080e0cd8ef38f4039412b201e06))
+    - chore: remove redundant enum variant - `ClientDataResponse` variant `CommunicationIssues` was not differentiated on client, and was carrying the exact same error enum as the variant `NetworkIssue`. ([`a34243e`](https://github.com/maidsafe/safe_network/commit/a34243e89d735512a7eee2b6bf3a96d2a9cbea59))
+</details>
+
+## v0.17.5 (2023-02-07)
+
+### Chore
+
+ - <csr-id-bda3aa2106fd2fd8c1e6a320aa6bbefd9e407ee7/> sn_interface-0.17.5/sn_node-0.74.3
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.17.5/sn_node-0.74.3 ([`bda3aa2`](https://github.com/maidsafe/safe_network/commit/bda3aa2106fd2fd8c1e6a320aa6bbefd9e407ee7))
     - Merge #2072 ([`1b13c86`](https://github.com/maidsafe/safe_network/commit/1b13c86fa18abee9e9fb2c965366dba1afa0d8b3))
     - fix(relocation): retain comms to members undergoing relocation - We retain comms to the relocating members which are signed by our   current SectionKey ([`8afde20`](https://github.com/maidsafe/safe_network/commit/8afde20480c72f0d36f0bc644f72d764bca4f946))
 </details>
@@ -30,6 +56,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## v0.17.4 (2023-02-07)
 
 <csr-id-677ef5cc8b1935b94641c61c53429faf2c58c261/>
+<csr-id-3c34a731eca9d5b37d2574e3e16c7f089c7cc8b2/>
 
 ### Chore
 
