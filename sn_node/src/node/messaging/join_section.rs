@@ -98,10 +98,13 @@ mod tests {
         let elder = Arc::new(RwLock::new(elder));
 
         let joiner_peer = joining_node.info().peer();
-        let some_cmd = MyNode::handle_join(elder, &elder_context, joiner_peer, None)
+        let some_cmd = MyNode::handle_join(elder, &elder_context, joiner_peer, None, None)
             .await
             .expect("An error was not expected.");
 
+        let some_cmd = some_cmd
+            .iter()
+            .find(|cmd| matches!(cmd, Cmd::SendMsg { .. }));
         assert_matches!(some_cmd, Some(Cmd::SendMsg {
             msg,
             recipients,
@@ -158,10 +161,11 @@ mod tests {
         let adult = Arc::new(RwLock::new(adult));
 
         let joiner_peer = joining_node.info().peer();
-        let cmd = MyNode::handle_join(adult, &adult_context, joiner_peer, None)
+        let cmd = MyNode::handle_join(adult, &adult_context, joiner_peer, None, None)
             .await
             .expect("An error was not expected.");
 
+        let cmd = cmd.iter().find(|cmd| matches!(cmd, Cmd::SendMsg { .. }));
         assert_matches!(cmd, None);
 
         Ok(())
@@ -194,10 +198,11 @@ mod tests {
         let elder = Arc::new(RwLock::new(elder));
 
         let joiner_peer = joining_node.info().peer();
-        let cmd = MyNode::handle_join(elder, &elder_context, joiner_peer, None)
+        let cmd = MyNode::handle_join(elder, &elder_context, joiner_peer, None, None)
             .await
             .expect("An error was not expected.");
 
+        let cmd = cmd.iter().find(|cmd| matches!(cmd, Cmd::SendMsg { .. }));
         assert_matches!(cmd, None);
 
         Ok(())
@@ -228,10 +233,11 @@ mod tests {
         let elder = Arc::new(RwLock::new(elder));
 
         let joiner_peer = joining_node.info().peer();
-        let cmd = MyNode::handle_join(elder, &elder_context, joiner_peer, None)
+        let cmd = MyNode::handle_join(elder, &elder_context, joiner_peer, None, None)
             .await
             .expect("An error was not expected.");
 
+        let cmd = cmd.iter().find(|cmd| matches!(cmd, Cmd::SendMsg { .. }));
         assert_matches!(cmd, None);
 
         Ok(())
@@ -265,9 +271,13 @@ mod tests {
         let elder = Arc::new(RwLock::new(elder));
 
         let joiner_peer = joining_node.info().peer();
-        let some_cmd = MyNode::handle_join(elder, &elder_context, joiner_peer, None)
+        let some_cmd = MyNode::handle_join(elder, &elder_context, joiner_peer, None, None)
             .await
             .expect("An error was not expected.");
+
+        let some_cmd = some_cmd
+            .iter()
+            .find(|cmd| matches!(cmd, Cmd::SendMsg { .. }));
 
         assert_matches!(some_cmd, Some(Cmd::SendMsg {
             msg,

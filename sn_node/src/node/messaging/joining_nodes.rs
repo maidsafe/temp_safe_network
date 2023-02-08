@@ -10,8 +10,12 @@ use crate::node::{
     core::NodeContext, flow_ctrl::cmds::Cmd, messaging::Peers, Error, MyNode, Result,
 };
 
+use qp2p::SendStream;
 use sn_interface::{
-    messaging::system::{JoinRejectReason, JoinResponse, NodeMsg},
+    messaging::{
+        system::{JoinRejectReason, JoinResponse, NodeMsg},
+        MsgId,
+    },
     network_knowledge::{NodeState, RelocationProof, MIN_ADULT_AGE},
     types::{log_markers::LogMarker, Peer},
 };
@@ -26,7 +30,8 @@ impl MyNode {
         context: &NodeContext,
         peer: Peer,
         relocation: Option<RelocationProof>,
-    ) -> Result<Option<Cmd>> {
+        send_stream: Option<SendStream>,
+    ) -> Result<Vec<Cmd>> {
         trace!("Handling join from {peer:?}");
 
         // Ignore a join request if we are not elder.
@@ -37,12 +42,12 @@ impl MyNode {
             // properly handling this message.
             // This is OK because in the worst case the join request just timeouts and the
             // joining node sends it again.
-            return Ok(None);
+            return Ok(vec![]);
         }
         let our_prefix = context.network_knowledge.prefix();
         if !our_prefix.matches(&peer.name()) {
             debug!("Unreachable path; {peer} name doesn't match our prefix. Should be covered by AE. Dropping the msg.");
-            return Ok(None);
+            return Ok(vec![]);
         }
 
         let previous_name = if let Some(proof) = relocation {
@@ -54,7 +59,7 @@ impl MyNode {
                 .verify_section_key_is_known(src_key)
             {
                 warn!("Peer {} is trying to join with signature by unknown source section key {src_key:?}. Message is dropped.", peer.name());
-                return Ok(None);
+                return Ok(vec![]);
             }
 
             // Verify the signatures..
@@ -69,7 +74,7 @@ impl MyNode {
             // New node ->
             if !MyNode::is_infant_node(&peer) {
                 debug!("Unreachable path; {peer} age is invalid: {}. This should be a hard coded value in join logic. Dropping the msg.", peer.age());
-                return Ok(None);
+                return Ok(vec![]);
             }
 
             if !context.joins_allowed {
@@ -79,15 +84,40 @@ impl MyNode {
                 ));
                 trace!("{}", LogMarker::SendJoinRejected);
                 trace!("Sending {msg:?} to {peer}");
-                return Ok(Some(Cmd::send_msg(
+
+                // Send it over response stream if we have one
+                if let Some(stream) = send_stream {
+                    return Ok(vec![Cmd::SendNodeMsgResponse {
+                        msg,
+                        msg_id: MsgId::new(),
+                        send_stream: stream,
+                        recipient: peer,
+                        context: context.clone(),
+                    }]);
+                }
+
+                return Ok(vec![Cmd::send_msg(
                     msg,
                     Peers::Single(peer),
                     context.clone(),
-                )));
+                )]);
             }
 
             None
         };
+
+        let mut cmds = vec![];
+
+        // Let the joiner know we are considering.
+        if let Some(send_stream) = send_stream {
+            cmds.push(Cmd::SendNodeMsgResponse {
+                msg: NodeMsg::JoinResponse(JoinResponse::UnderConsideration),
+                msg_id: MsgId::new(),
+                send_stream,
+                recipient: peer,
+                context: context.clone(),
+            });
+        }
 
         // We propose membership
         let node_state = NodeState::joined(peer, previous_name);
@@ -95,7 +125,11 @@ impl MyNode {
         trace!("[NODE WRITE]: join propose membership write...");
         let mut node = node.write().await;
         trace!("[NODE WRITE]: join propose membership write gottt...");
-        Ok(node.propose_membership_change(node_state))
+
+        if let Some(cmd) = node.propose_membership_change(node_state) {
+            cmds.push(cmd);
+        }
+        Ok(cmds)
     }
 
     pub(crate) fn is_infant_node(peer: &Peer) -> bool {

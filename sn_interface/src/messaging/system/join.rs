@@ -37,6 +37,8 @@ pub enum JoinResponse {
     Approved(Decision<NodeState>),
     /// Join was rejected
     Rejected(JoinRejectReason),
+    /// Join is being considered
+    UnderConsideration,
 }
 
 /// Reason of a join request being rejected
