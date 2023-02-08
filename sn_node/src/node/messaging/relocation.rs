@@ -518,6 +518,12 @@ mod tests {
                             });
                         } else if let Cmd::TrackNodeIssue { .. } = &cmd {
                             // skip
+                        } else if let Cmd::SendNodeMsgResponse {
+                            msg: NodeMsg::JoinResponse(JoinResponse::UnderConsideration),
+                            ..
+                        } = &cmd
+                        {
+                            // skip
                         } else {
                             panic!("got a different cmd {cmd:?}");
                         }
