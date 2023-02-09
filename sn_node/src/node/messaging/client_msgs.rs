@@ -55,12 +55,12 @@ impl MyNode {
     /// Handle data query
     #[allow(clippy::too_many_arguments)]
     pub(crate) async fn handle_data_query_where_stored(
-        context: NodeContext,
+        msg_id: MsgId,
         query: &DataQuery,
         auth: ClientAuth,
         source_client: Peer,
-        msg_id: MsgId,
         send_stream: SendStream,
+        context: NodeContext,
     ) -> Vec<Cmd> {
         let response = context
             .data_storage
@@ -102,12 +102,12 @@ impl MyNode {
                 MyNode::handle_data_cmd(&mut context, cmd, msg_id, origin, auth, send_stream).await
             }
             ClientMsg::Query(query) => Ok(MyNode::handle_data_query_where_stored(
-                context,
+                msg_id,
                 &query,
                 auth.into_inner(),
                 origin,
-                msg_id,
                 send_stream,
+                context,
             )
             .await),
         }

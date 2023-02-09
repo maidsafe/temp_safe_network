@@ -105,14 +105,14 @@ impl MyNode {
         data: ReplicatedData,
         send_stream: SendStream,
         source_client: Peer,
-        original_msg_id: MsgId,
+        correlation_id: MsgId,
     ) -> Result<Vec<Cmd>> {
         let mut cmds = vec![];
         let section_pk = PublicKey::Bls(context.network_knowledge.section_key());
         let node_keypair = Keypair::Ed25519(context.keypair.clone());
         let data_addr = data.address();
 
-        trace!("About to store data from {original_msg_id:?}: {data_addr:?}");
+        trace!("About to store data from {correlation_id:?}: {data_addr:?}");
 
         // This may return a DatabaseFull error... but we should have
         // reported StorageError::NotEnoughSpace well before this
@@ -122,7 +122,7 @@ impl MyNode {
             .await
         {
             Ok(storage_level) => {
-                info!("{original_msg_id:?} Data has been stored: {data_addr:?}");
+                info!("{correlation_id:?} Data has been stored: {data_addr:?}");
                 if matches!(storage_level, StorageLevel::Updated(_level)) {
                     // we add a new node for every level increase of used space
                     cmds.push(Cmd::SetJoinsAllowed(true));
@@ -161,11 +161,11 @@ impl MyNode {
 
         let msg = ClientDataResponse::CmdResponse {
             response,
-            correlation_id: original_msg_id,
+            correlation_id,
         };
         cmds.push(Cmd::SendClientResponse {
             msg,
-            correlation_id: original_msg_id,
+            correlation_id,
             send_stream,
             context: context.clone(),
             source_client,

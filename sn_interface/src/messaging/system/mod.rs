@@ -9,7 +9,6 @@
 mod dkg;
 mod join;
 mod node_msgs;
-mod op_id;
 mod section_sig;
 
 use crate::messaging::AuthorityProof;
@@ -19,7 +18,6 @@ use crate::SectionAuthorityProvider;
 pub use dkg::DkgSessionId;
 pub use join::{JoinRejectReason, JoinRequest, JoinResponse};
 pub use node_msgs::{NodeDataCmd, NodeEvent, NodeQueryResponse};
-pub use op_id::OperationId;
 pub use section_sig::{SectionSig, SectionSigShare, SectionSigned};
 
 use bls::PublicKey as BlsPublicKey;
