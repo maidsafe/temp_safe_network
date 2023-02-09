@@ -5,14 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.74.8 (2023-02-09)
+## v0.74.9 (2023-02-09)
+
+### Bug Fixes
+
+ - <csr-id-731a0606276f3e693215f185b31f6c85fd7a5d89/> prevent endlessly forwarding client msg if we're data holder
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 1 commit contributed to the release.
- - 0 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits contributed to the release.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -22,10 +26,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #2086 ([`a72fe3a`](https://github.com/maidsafe/safe_network/commit/a72fe3af64f431c86ece24b05d6f1e7fe3068ed5))
+    - prevent endlessly forwarding client msg if we're data holder ([`731a060`](https://github.com/maidsafe/safe_network/commit/731a0606276f3e693215f185b31f6c85fd7a5d89))
+</details>
+
+## v0.74.8 (2023-02-09)
+
+### Chore
+
+ - <csr-id-c55911eb6e0fe38c5547cf5b9b9cefeea9ac4ce1/> sn_interface-0.17.7/sn_node-0.74.8
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.17.7/sn_node-0.74.8 ([`c55911e`](https://github.com/maidsafe/safe_network/commit/c55911eb6e0fe38c5547cf5b9b9cefeea9ac4ce1))
     - Merge #2084 ([`1200f09`](https://github.com/maidsafe/safe_network/commit/1200f098a721d8f330ae45e45b9fc23324d2db8c))
 </details>
 
 ## v0.74.7 (2023-02-08)
+
+<csr-id-d22af7554548426c8aa54d39bb50fceebfc5929e/>
+<csr-id-becb95e9023e984809d403a5f36a114d1644205b/>
 
 ### Test
 
@@ -58,6 +91,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## v0.74.6 (2023-02-08)
 
 <csr-id-2c1b51affbc89cbee181039ce01a28d901d49e72/>
+<csr-id-c7817b32486a527c111839eb9c74ad45416ed385/>
 
 ### Chore
 
