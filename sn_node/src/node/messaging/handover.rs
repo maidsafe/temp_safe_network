@@ -185,7 +185,7 @@ impl MyNode {
         // Deliver each SignedVote to all current Elders
         trace!("Broadcasting Vote msg: {:?}", signed_vote);
 
-        MyNode::send_msg_to_our_elders(context, NodeMsg::HandoverVotes(vec![signed_vote]))
+        MyNode::send_to_elders(context, NodeMsg::HandoverVotes(vec![signed_vote]))
     }
 
     /// Broadcast the decision of the terminated handover consensus by proposing the HandoverCompleted SAP(s)

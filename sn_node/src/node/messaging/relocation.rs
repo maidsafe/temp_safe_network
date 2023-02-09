@@ -132,7 +132,7 @@ mod tests {
             network_builder::TestNetworkBuilder,
         },
     };
-    use sn_comms::MsgFromPeer;
+    use sn_comms::CommEvent;
     use sn_interface::{
         init_logger,
         messaging::system::{
@@ -410,7 +410,7 @@ mod tests {
     /// Main loop that sends and processes Cmds
     async fn relocation_loop(
         node_instances: &BTreeMap<(Prefix, XorName), Arc<Dispatcher>>,
-        comm_receivers: &mut BTreeMap<(Prefix, XorName), Receiver<MsgFromPeer>>,
+        comm_receivers: &mut BTreeMap<(Prefix, XorName), Receiver<CommEvent>>,
         from_section_n_elders: usize,
         msg_counter: &mut TestMsgCounter,
     ) -> Result<()> {
@@ -442,7 +442,7 @@ mod tests {
                 // Allow the node to receive msgs from others
                 tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
 
-                while let Some(msg) = get_next_msg(comm_rx) {
+                while let Some(msg) = get_next_msg(comm_rx).await {
                     let cmds = dispatcher
                         .test_handle_msg_from_peer(msg, msg_counter, Some(name))
                         .await;

@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{flow_ctrl::dispatcher::Dispatcher, messaging::Peers, Cmd, MyNode};
-use sn_comms::MsgFromPeer;
+use sn_comms::{CommEvent, MsgFromPeer};
 use sn_interface::{
     messaging::{
         data::ClientMsg,
@@ -103,7 +103,7 @@ impl<'a> ProcessAndInspectCmds<'a> {
     pub(crate) async fn new_from_client_msg(
         msg: ClientMsg,
         dispatcher: &'a Dispatcher,
-        mut comm_rx: Receiver<MsgFromPeer>,
+        mut comm_rx: Receiver<CommEvent>,
     ) -> crate::node::error::Result<ProcessAndInspectCmds> {
         let context = dispatcher.node().read().await.context();
         let (msg_id, serialised_payload, msg_kind, _auth) =
@@ -136,10 +136,10 @@ impl<'a> ProcessAndInspectCmds<'a> {
         send_stream.send_user_msg(user_msg).await?;
 
         match comm_rx.recv().await {
-            Some(MsgFromPeer {
+            Some(CommEvent::Msg(MsgFromPeer {
                 send_stream: Some(send_stream),
                 ..
-            }) => {
+            })) => {
                 let cmds = MyNode::handle_msg(dispatcher.node(), peer, wire_msg, Some(send_stream))
                     .await?;
                 Ok(Self::from(cmds, dispatcher))
@@ -162,6 +162,7 @@ impl<'a> ProcessAndInspectCmds<'a> {
             if !matches!(
                 cmd,
                 Cmd::SendMsg { .. }
+                    | Cmd::SendAndForwardResponseToClient { .. }
                     | Cmd::SendClientResponse { .. }
                     | Cmd::SendNodeMsgResponse { .. }
             ) {
@@ -335,9 +336,11 @@ impl Dispatcher {
 }
 
 // Receive the next `MsgFromPeer` if the buffer is not empty. Returns None if the buffer is currently empty
-pub(crate) fn get_next_msg(comm_rx: &mut Receiver<MsgFromPeer>) -> Option<MsgFromPeer> {
+pub(crate) async fn get_next_msg(comm_rx: &mut Receiver<CommEvent>) -> Option<MsgFromPeer> {
+    tokio::time::sleep(std::time::Duration::from_millis(10)).await;
     match comm_rx.try_recv() {
-        Ok(msg) => Some(msg),
+        Ok(CommEvent::Msg(msg)) => Some(msg),
+        Ok(_) => None,
         Err(TryRecvError::Empty) => None,
         Err(TryRecvError::Disconnected) => panic!("the comm_rx channel is closed"),
     }

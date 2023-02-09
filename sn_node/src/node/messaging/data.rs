@@ -104,7 +104,7 @@ impl MyNode {
             }
         }
 
-        Cmd::SendMsgAwaitResponseAndRespondToClient {
+        Cmd::SendAndForwardResponseToClient {
             wire_msg,
             context,
             targets,
@@ -167,7 +167,7 @@ impl MyNode {
 
         let context = context.clone();
 
-        Ok(vec![Cmd::SendMsgAwaitResponseAndRespondToClient {
+        Ok(vec![Cmd::SendAndForwardResponseToClient {
             wire_msg,
             context,
             targets,
@@ -257,7 +257,7 @@ impl MyNode {
                     });
                     is_full = true;
 
-                    cmds.push(MyNode::send_msg_to_our_elders(context, msg))
+                    cmds.push(MyNode::send_to_elders(context, msg))
                 }
                 Err(error) => {
                     // the rest seem to be non-problematic errors.. (?)

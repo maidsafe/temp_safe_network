@@ -169,7 +169,7 @@ impl FlowCtrl {
             if !context.network_knowledge.is_section_member(&context.name) {
                 if self.timestamps.last_relocation_retry_check.elapsed() > RELOCATION_TIMEOUT_SECS {
                     self.timestamps.last_relocation_retry_check = Instant::now();
-                    cmds.push(MyNode::send_msg_to_our_elders_await_responses(
+                    cmds.push(MyNode::send_to_elders_await_responses(
                         context.clone(),
                         NodeMsg::TryJoin(Some(proof.clone())),
                     ));
@@ -299,7 +299,7 @@ impl FlowCtrl {
                     }
                     // we may also be behind, so lets request AE incase that is the case!
                     let msg = NodeMsg::MembershipAE(membership.generation());
-                    cmds.push(MyNode::send_msg_to_our_elders(context, msg));
+                    cmds.push(MyNode::send_to_elders(context, msg));
                 }
             }
         }

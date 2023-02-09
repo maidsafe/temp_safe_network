@@ -860,7 +860,7 @@ mod tests {
         },
     };
 
-    use sn_comms::MsgFromPeer;
+    use sn_comms::CommEvent;
     use sn_interface::{
         init_logger,
         messaging::{
@@ -907,7 +907,7 @@ mod tests {
                     .ok_or_else(|| eyre!("comm_rx should be present"))?;
                 info!("\n\n NODE: {name}");
 
-                while let Some(msg) = get_next_msg(comm_rx) {
+                while let Some(msg) = get_next_msg(comm_rx).await {
                     let cmds = dispatcher
                         .test_handle_msg_from_peer(msg, msg_counter, None)
                         .await;
@@ -968,7 +968,7 @@ mod tests {
                     .ok_or_else(|| eyre!("comm_rx should be present"))?;
                 info!("\n\n NODE: {name}");
 
-                while let Some(msg) = get_next_msg(comm_rx) {
+                while let Some(msg) = get_next_msg(comm_rx).await {
                     let cmds = dispatcher
                         .test_handle_msg_from_peer(msg, msg_counter, None)
                         .await;
@@ -1022,7 +1022,7 @@ mod tests {
                 // sleep for sometime to get the msgs
                 tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
 
-                while let Some(msg) = get_next_msg(comm_rx) {
+                while let Some(msg) = get_next_msg(comm_rx).await {
                     let cmds = dispatcher
                         .test_handle_msg_from_peer(msg, msg_counter, None)
                         .await;
@@ -1108,7 +1108,7 @@ mod tests {
         rng: impl RngCore,
     ) -> (
         BTreeMap<XorName, Dispatcher>,
-        BTreeMap<XorName, mpsc::Receiver<MsgFromPeer>>,
+        BTreeMap<XorName, mpsc::Receiver<CommEvent>>,
         SecretKeySet,
     ) {
         let mut env = TestNetworkBuilder::new(rng)

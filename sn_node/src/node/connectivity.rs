@@ -7,22 +7,41 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{flow_ctrl::cmds::Cmd, MyNode, Result, SectionStateVote};
+
 use sn_fault_detection::IssueType;
-use std::{collections::BTreeSet, net::SocketAddr};
+use sn_interface::types::Peer;
+
+use std::collections::BTreeSet;
 use xor_name::XorName;
 
 impl MyNode {
-    /// Track comms issue if this is a peer we know and care about
-    pub(crate) fn handle_failed_send(&self, addr: &SocketAddr) {
-        let name = if let Some(peer) = self.network_knowledge.find_member_by_addr(addr) {
-            debug!("Lost known peer {}", peer);
-            peer.name()
-        } else {
-            trace!("Lost unknown peer {}", addr);
-            return;
-        };
-
-        self.track_node_issue(name, IssueType::Communication);
+    /// Handle error in communication with peer.
+    pub(crate) fn handle_comms_error(&self, peer: Peer, error: sn_comms::Error) {
+        use sn_comms::Error::*;
+        match error {
+            ConnectingToUnknownNode(msg_id) => {
+                trace!(
+                    "Tried to send msg {msg_id:?} to unknown peer {}. No connection made.",
+                    peer
+                );
+            }
+            CannotConnectEndpoint(_err) => {
+                trace!("Cannot connect to endpoint: {}", peer);
+            }
+            AddressNotReachable(_err) => {
+                trace!("Address not reachable: {}", peer);
+            }
+            FailedSend(msg_id) => {
+                trace!("Could not send {msg_id:?}, lost known peer: {}", peer);
+            }
+            InvalidMsgReceived(msg_id) => {
+                trace!("Invalid msg {msg_id:?} received from {}.", peer);
+            }
+        }
+        // Track comms issue if this is a peer we know and care about
+        if self.network_knowledge.is_section_member(&peer.name()) {
+            self.track_node_issue(peer.name(), IssueType::Communication);
+        }
     }
 
     pub(crate) fn cast_offline_proposals(&mut self, names: &BTreeSet<XorName>) -> Result<Vec<Cmd>> {
