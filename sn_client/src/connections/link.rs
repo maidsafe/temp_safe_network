@@ -53,13 +53,14 @@ impl Link {
         );
         let (mut send_stream, recv_stream) = conn.open_bi().await.map_err(LinkError::Connection)?;
 
-        debug!("{msg_id:?} to {peer:?} bidi opened");
+        let stream_id = send_stream.id();
+        debug!("{msg_id:?} to {peer:?} bidi opened: {stream_id}");
         send_stream.set_priority(10);
         send_stream
             .send_user_msg(bytes.clone())
             .await
             .map_err(LinkError::Send)?;
-        debug!("{msg_id:?} bidi msg sent to {peer:?}");
+        debug!("{msg_id:?} bidi msg sent to {peer:?} over {stream_id}");
 
         // Attempt to gracefully terminate the stream.
         match send_stream.finish().await {
@@ -70,7 +71,7 @@ impl Link {
             // Propagate any other error, which means we should probably retry on a higher level.
             Err(err) => Err(LinkError::Send(err)),
         }?;
-        debug!("{msg_id:?} to {peer:?} bidi finished");
+        debug!("{msg_id:?} to {peer:?} bidi finished: {stream_id}");
 
         Ok(recv_stream)
     }

@@ -19,6 +19,7 @@ use sn_interface::{
 use ed25519::Signature;
 use std::{io, net::SocketAddr};
 use thiserror::Error;
+use tokio::time::Duration;
 use xor_name::XorName;
 
 /// The type returned by the `sn_routing` message handling methods.
@@ -39,6 +40,9 @@ pub enum Error {
     /// This peer has no connections, and none will be created
     #[error("Peer link has no connections ")]
     NoConnectionsForPeer,
+    /// No response received from data holder peer
+    #[error("No response received from data holder peer after {0:?}.")]
+    PeerResponseTimeout(Duration),
     /// This should not be possible as the channel is stored in node, and used to process child commands
     #[error("No more Cmds will be received or processed. CmdChannel senders have been dropped. ")]
     CmdCtrlChannelDropped,

@@ -188,7 +188,7 @@ impl MyNode {
                     name: peer.name(),
                     issue: IssueType::Communication,
                 });
-                // TODO: report timeout error to client?
+                last_error = Some(Error::PeerResponseTimeout(*NODE_RESPONSE_TIMEOUT));
             }
             Ok(Ok(response)) => {
                 debug!("Expected response in from {peer:?} for {msg_id:?}: {response:?}");
