@@ -20,12 +20,11 @@ pub mod test_utils;
 #[cfg(any(test, feature = "test-utils"))]
 pub use section_tree::test_utils as test_utils_st;
 
+use self::node_state::ChurnId;
 pub use self::{
     errors::{Error, Result},
     node_info::MyNodeInfo,
-    node_state::{
-        MembershipState, NodeState, RelocationDst, RelocationInfo, RelocationProof, RelocationState,
-    },
+    node_state::{MembershipState, NodeState, RelocationInfo, RelocationProof, RelocationState},
     section_authority_provider::{SapCandidate, SectionAuthUtils, SectionAuthorityProvider},
     section_keys::{SectionKeyShare, SectionKeysProvider},
     section_tree::{SectionTree, SectionTreeUpdate},
@@ -585,10 +584,35 @@ fn create_first_sig<T: Serialize>(
     })
 }
 
+// Returns the number of trailing zero bits of the bytes slice.
+pub fn trailing_zeros(bytes: &[u8]) -> u32 {
+    let mut output = 0;
+
+    for &byte in bytes.iter().rev() {
+        if byte == 0 {
+            output += 8;
+        } else {
+            output += byte.trailing_zeros();
+            break;
+        }
+    }
+
+    output
+}
+
+// Relocation check - returns whether a member with the given age is a candidate for relocation on
+// a churn event with the given churn id.
+pub fn relocation_check(age: u8, churn_id: &ChurnId) -> bool {
+    // Evaluate the formula: `churn_id % 2^age == 0` Which is the same as checking the churn_id
+    // has at least `age` trailing zero bits.
+    trailing_zeros(&churn_id.0) >= age as u32
+}
+
 #[cfg(test)]
 mod tests {
     use super::{supermajority, NetworkKnowledge};
     use crate::{
+        network_knowledge::trailing_zeros,
         test_utils::{gen_addr, prefix, TestKeys, TestSapBuilder, TestSectionTree},
         types::NodeId,
     };
@@ -598,6 +622,18 @@ mod tests {
     use proptest::prelude::*;
     use rand::thread_rng;
     use xor_name::XorName;
+
+    #[test]
+    fn byte_slice_trailing_zeros() {
+        assert_eq!(trailing_zeros(&[0]), 8);
+        assert_eq!(trailing_zeros(&[1]), 0);
+        assert_eq!(trailing_zeros(&[2]), 1);
+        assert_eq!(trailing_zeros(&[4]), 2);
+        assert_eq!(trailing_zeros(&[8]), 3);
+        assert_eq!(trailing_zeros(&[0, 0]), 16);
+        assert_eq!(trailing_zeros(&[1, 0]), 8);
+        assert_eq!(trailing_zeros(&[2, 0]), 9);
+    }
 
     #[test]
     fn supermajority_of_small_group() {

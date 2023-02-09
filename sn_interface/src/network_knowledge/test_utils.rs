@@ -1,4 +1,4 @@
-use super::SectionKeysProvider;
+use super::{node_state::RelocationTrigger, NodeState, SectionKeysProvider};
 use crate::{
     network_knowledge::{section_keys::build_spent_proof_share, Error, MyNodeInfo, MIN_ADULT_AGE},
     types::{keys::ed25519, NodeId},
@@ -275,4 +275,30 @@ where
     }
 
     assert_eq!(vec2.len(), 0);
+}
+
+/// Create a decision for the testing purpose with the given age.
+///
+/// NOTE: recommended to call this with low `age` (4 or 5), otherwise it might take very long time
+/// to complete because it needs to generate a signature with the number of trailing zeroes equal
+/// to (or greater that) `age`.
+///
+// TODO: Rename it to create_test_relocation_trigger.
+pub fn create_relocation_trigger(
+    sk_set: &bls::SecretKeySet,
+    age: u8,
+) -> Result<(RelocationTrigger, Decision<NodeState>)> {
+    use super::relocation_check;
+
+    loop {
+        let node_state =
+            NodeState::joined(gen_node_id(MIN_ADULT_AGE), Some(xor_name::rand::random()));
+        let decision = section_decision(sk_set, node_state.clone())?;
+        let relocation_trigger = RelocationTrigger::new(decision.clone());
+        let churn_id = relocation_trigger.churn_id();
+
+        if relocation_check(age, &churn_id) && !relocation_check(age + 1, &churn_id) {
+            return Ok((relocation_trigger, decision));
+        }
+    }
 }

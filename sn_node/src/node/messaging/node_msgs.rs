@@ -167,7 +167,7 @@ impl MyNode {
             }
             NodeMsg::PrepareToRelocate(relocation_trigger) => {
                 trace!("Handling PrepareToRelocate msg from {node_id}: {msg_id:?}");
-                Ok(node.prepare_to_relocate(relocation_trigger, context.name))
+                Ok(node.prepare_to_relocate(relocation_trigger))
             }
             NodeMsg::ProceedRelocation(dst) => {
                 trace!("Handling ProceedRelocation msg from {node_id}: {msg_id:?}");

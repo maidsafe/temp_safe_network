@@ -20,6 +20,7 @@ use crate::node::{
 use cmd_utils::{handle_online_cmd, ProcessAndInspectCmds};
 
 use sn_comms::{CommEvent, MsgReceived};
+
 use sn_dbc::Hash;
 use sn_interface::{
     dbcs::gen_genesis_dbc,
@@ -34,8 +35,7 @@ use sn_interface::{
     },
     network_knowledge::{
         section_keys::SectionKeysProvider, Error as NetworkKnowledgeError, MyNodeInfo, NodeState,
-        RelocationDst, RelocationInfo, RelocationProof, SectionTreeUpdate, SectionsDAG,
-        MIN_ADULT_AGE,
+        RelocationInfo, RelocationProof, SectionTreeUpdate, SectionsDAG, MIN_ADULT_AGE,
     },
     test_utils::*,
     types::{keys::ed25519, Participant, PublicKey},
@@ -73,8 +73,8 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
         gen_addr(),
     );
 
-    let relocation_dst = RelocationDst::new(xor_name::rand::random());
-    let relocated_state = NodeState::relocated(old_info.id(), Some(old_name), relocation_dst);
+    let (relocation_trigger, _) = create_relocation_trigger(&sk_set, old_info.age() + 1)?;
+    let relocated_state = NodeState::relocated(old_info.id(), Some(old_name), relocation_trigger);
     let section_signed_state = TestKeys::get_section_signed(&sk_set.secret_key(), relocated_state)?;
 
     let info = RelocationInfo::new(section_signed_state, new_info.name());

@@ -7,19 +7,16 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{
-    flow_ctrl::cmds::Cmd,
-    messaging::Recipients,
-    relocation::{find_nodes_to_relocate, ChurnId},
-    MyNode, Result,
+    flow_ctrl::cmds::Cmd, messaging::Recipients, relocation::find_nodes_to_relocate, MyNode, Result,
 };
 
 use sn_interface::{
     elder_count,
     messaging::system::{NodeMsg, SectionSigned},
     network_knowledge::{
-        node_state::{RelocationDst, RelocationInfo},
-        Error, MembershipState, NodeState, RelocationProof, RelocationState,
+        node_state::RelocationInfo, Error, MembershipState, NodeState, RelocationProof,
     },
+    network_knowledge::{node_state::RelocationTrigger, RelocationState},
     types::{keys::ed25519, log_markers::LogMarker, Participant},
 };
 
@@ -30,7 +27,7 @@ use xor_name::XorName;
 impl MyNode {
     pub(crate) fn try_relocate_nodes(
         &mut self,
-        churn_id: ChurnId,
+        trigger: RelocationTrigger,
         excluded: BTreeSet<XorName>,
     ) -> Result<Vec<Cmd>> {
         info!("Try to find relocate nodes, excluded {excluded:?}");
@@ -46,16 +43,15 @@ impl MyNode {
 
         let mut cmds = vec![];
 
-        for (node_state, relocation_dst) in
-            find_nodes_to_relocate(&self.network_knowledge, &churn_id, excluded)
-        {
+        for node_state in find_nodes_to_relocate(&self.network_knowledge, &trigger, excluded) {
             info!(
-                "Begin relocation flow for {:?} to {relocation_dst:?} (on churn of {churn_id})",
+                "Begin relocation flow for {:?} to {:?} (on churn of {})",
                 node_state.node_id(),
+                trigger.dst_section(node_state.node_id().name()),
+                trigger.churn_id(),
             );
-
             let cmd = Cmd::send_msg(
-                NodeMsg::PrepareToRelocate(RelocationDst::new(relocation_dst)),
+                NodeMsg::PrepareToRelocate(trigger.clone()),
                 Recipients::Single(Participant::from_node(*node_state.node_id())),
             );
             cmds.push(cmd);
@@ -66,32 +62,32 @@ impl MyNode {
 
     /// On receiving the relocation trigger from the elders, the relocating node can
     /// request the section to do the relocation membership change.
-    pub(crate) fn prepare_to_relocate(
-        &mut self,
-        dst: RelocationDst,
-        current_name: XorName,
-    ) -> Vec<Cmd> {
+    pub(crate) fn prepare_to_relocate(&mut self, trigger: RelocationTrigger) -> Vec<Cmd> {
         // store the `RelocationDst` to start polling the elders
         if self.relocation_state.is_none() {
             debug!(
-                "Started trying to relocate our node {:?} to {:?}",
-                current_name, dst
+                "Started trying to relocate our node. (on churn of {})",
+                trigger.churn_id(),
             );
 
             // store the `RelocationState` locally to periodically request the elders
-            self.relocation_state = Some(RelocationState::PreparingToRelocate(dst));
+            self.relocation_state = Some(RelocationState::PreparingToRelocate(trigger.clone()));
         } else {
             warn!(
-                "Already trying to init relocation, so ignoring new relocation msg to dst: {dst:?}"
+                "Already trying to init relocation, so ignoring new relocation msg to trigger: {trigger:?}"
             );
             return vec![];
         }
 
         info!("{}", LogMarker::RelocateStart);
-        info!("Sending request to proceed relocation of us to {:?}", dst);
+        info!(
+            "Sending request to relocate our node. (on churn of {})",
+            trigger.churn_id(),
+        );
+
         vec![MyNode::send_to_elders(
             &self.context(),
-            NodeMsg::ProceedRelocation(dst),
+            NodeMsg::ProceedRelocation(trigger),
         )]
     }
 
@@ -100,7 +96,7 @@ impl MyNode {
     pub(crate) fn proceed_relocation(
         &mut self,
         relocation_node: XorName,
-        relocation_dst: RelocationDst,
+        relocation_trigger: RelocationTrigger,
     ) -> Result<Vec<Cmd>> {
         // Todo: Verify the relocation trigger here
         let node_state = self
@@ -109,7 +105,7 @@ impl MyNode {
             .ok_or(Error::NotAMember)?;
 
         Ok(self
-            .propose_membership_change(node_state.relocate(relocation_dst))
+            .propose_membership_change(node_state.relocate(relocation_trigger))
             .map_or_else(Vec::new, |cmd| vec![cmd]))
     }
 
@@ -131,8 +127,8 @@ impl MyNode {
         }
 
         let dst_section =
-            if let MembershipState::Relocated(relocation_dst) = signed_relocation.state() {
-                *relocation_dst.name()
+            if let MembershipState::Relocated(relocation_trigger) = signed_relocation.state() {
+                relocation_trigger.dst_section(self.name())
             } else {
                 warn!(
                     "Relocate: Ignoring msg containing invalid NodeState: {:?}",
@@ -181,26 +177,25 @@ impl MyNode {
 
 #[cfg(test)]
 mod tests {
-    use crate::node::{
-        flow_ctrl::{
-            cmds::Cmd,
-            tests::{
-                cmd_utils::{get_next_msg, ProcessAndInspectCmds, TestMsgTracker, TestNode},
-                network_builder::TestNetworkBuilder,
-            },
+    use crate::node::flow_ctrl::{
+        cmds::Cmd,
+        tests::{
+            cmd_utils::{get_next_msg, ProcessAndInspectCmds, TestMsgTracker, TestNode},
+            network_builder::TestNetworkBuilder,
         },
-        relocation_check, ChurnId,
     };
     use sn_comms::CommEvent;
-    use sn_consensus::Decision;
     use sn_interface::{
         elder_count, init_logger,
         messaging::{
             system::{JoinResponse, NodeDataCmd, NodeMsg},
             AntiEntropyKind, AntiEntropyMsg, NetworkMsg,
         },
-        network_knowledge::{recommended_section_size, NodeState, RelocationDst, MIN_ADULT_AGE},
-        test_utils::{gen_node_id, gen_node_id_in_prefix, prefix, section_decision, TestKeys},
+        network_knowledge::{
+            node_state::RelocationTrigger, recommended_section_size, NodeState, MIN_ADULT_AGE,
+        },
+        test_utils::{create_relocation_trigger, gen_node_id_in_prefix, prefix, TestKeys},
+        types::utils::calc_age,
     };
 
     use assert_matches::assert_matches;
@@ -214,29 +209,6 @@ mod tests {
         task::JoinHandle,
     };
     use xor_name::{Prefix, XorName};
-
-    /// Create a `SectionStateVote::Online` whose agreement handling triggers relocation of a node with the
-    /// given age.
-    ///
-    /// NOTE: recommended to call this with low `age` (4 or 5), otherwise it might take very long time
-    /// to complete because it needs to generate a signature with the number of trailing zeroes equal
-    /// to (or greater that) `age`.
-    fn create_relocation_trigger(
-        sk_set: &bls::SecretKeySet,
-        age: u8,
-    ) -> Result<Decision<NodeState>> {
-        loop {
-            let node_state = NodeState::joined(gen_node_id(MIN_ADULT_AGE), None);
-            let decision = section_decision(sk_set, node_state.clone())?;
-
-            let sig: bls::Signature = decision.proposals[&node_state].clone();
-            let churn_id = ChurnId(sig.to_bytes());
-
-            if relocation_check(age, &churn_id) && !relocation_check(age + 1, &churn_id) {
-                return Ok(decision);
-            }
-        }
-    }
 
     #[tokio::test]
     async fn relocation_trigger_is_sent() -> Result<()> {
@@ -253,12 +225,13 @@ mod tests {
 
         let relocated_node = gen_node_id_in_prefix(MIN_ADULT_AGE - 1, prefix);
         let node_state = NodeState::joined(relocated_node, None);
-        let node_state = TestKeys::get_section_signed(&sk_set.secret_key(), node_state)?;
-        assert!(section.update_member(node_state));
+        let signed_node_state =
+            TestKeys::get_section_signed(&sk_set.secret_key(), node_state.clone())?;
+        assert!(section.update_member(signed_node_state));
         // update our node with the new network_knowledge
         node.network_knowledge = section.clone();
 
-        let membership_decision = create_relocation_trigger(&sk_set, relocated_node.age())?;
+        let (_, membership_decision) = create_relocation_trigger(&sk_set, relocated_node.age())?;
 
         let mut cmds =
             ProcessAndInspectCmds::new(Cmd::HandleMembershipDecision(membership_decision));
@@ -288,11 +261,12 @@ mod tests {
         init_logger();
         let elder_count = 7;
         let adult_count = 1;
+        let prefix = Prefix::default();
 
         // Test environment setup
         let msg_tracker = Arc::new(RwLock::new(TestMsgTracker::default()));
         let mut env = TestNetworkBuilder::new(rand::thread_rng())
-            .sap(Prefix::default(), elder_count, adult_count, None, None)
+            .sap(prefix, elder_count, adult_count, None, None)
             .build()?;
         let node_instances = env
             .get_nodes(Prefix::default(), elder_count, adult_count, None)?
@@ -314,10 +288,11 @@ mod tests {
         tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
 
         // Initialize relocation manually without using ChurnIds
-        let relocation_node_old_name = env
-            .get_node_ids(Prefix::default(), 0, 1, None)?
-            .remove(0)
-            .name();
+        let relocation_node_old_name = env.get_node_ids(prefix, 0, 1, None)?.remove(0).name();
+        let sk_set = env.get_secret_key_set(prefix, None)?;
+        let age = calc_age(&relocation_node_old_name);
+        let (relocation_trigger, _) = create_relocation_trigger(&sk_set, age)?;
+
         for node in node_instances.iter().filter_map(|((_, name), node)| {
             if name != &relocation_node_old_name {
                 Some(node)
@@ -325,8 +300,12 @@ mod tests {
                 None
             }
         }) {
-            initialize_relocation(node.clone(), relocation_node_old_name, Prefix::default())
-                .await?;
+            initialize_relocation(
+                node.clone(),
+                relocation_trigger.clone(),
+                relocation_node_old_name,
+            )
+            .await?;
         }
 
         relocation_loop(
@@ -429,6 +408,14 @@ mod tests {
         // to be relocated to prefix1
         let relocation_node_old_name = env.get_node_ids(prefix0, 0, 1, None)?.remove(0).name();
 
+        let sk_set = env.get_secret_key_set(prefix1, None)?;
+        let age = calc_age(&relocation_node_old_name);
+        let (_relocation_trigger, _) = create_relocation_trigger(&sk_set, age)?;
+
+        let sk_set = env.get_secret_key_set(prefix1, None)?;
+        let age = calc_age(&relocation_node_old_name);
+        let (relocation_trigger, _) = create_relocation_trigger(&sk_set, age)?;
+
         // Only the elders in prefix0 should propose the SectionStateVote
         for test_node in node_instances
             .iter()
@@ -440,7 +427,12 @@ mod tests {
                 }
             })
         {
-            initialize_relocation(test_node.clone(), relocation_node_old_name, prefix1).await?;
+            initialize_relocation(
+                test_node.clone(),
+                relocation_trigger.clone(),
+                relocation_node_old_name,
+            )
+            .await?;
         }
 
         relocation_loop(
@@ -498,8 +490,8 @@ mod tests {
     // Propose NodeIsOffline(relocation) for the provided node
     async fn initialize_relocation(
         node: Arc<RwLock<TestNode>>,
+        trigger: RelocationTrigger,
         relocation_node_name: XorName,
-        dst_prefix: Prefix,
     ) -> Result<()> {
         info!(
             "Initialize relocation from {:?}",
@@ -520,8 +512,7 @@ mod tests {
             .network_knowledge()
             .section_auth()
             .elders_vec();
-        let relocation_dst = RelocationDst::new(dst_prefix.name());
-        let relocation_node_state = relocation_node_state.relocate(relocation_dst);
+        let relocation_node_state = relocation_node_state.relocate(trigger);
         let mut relocation_send_msg = node
             .write()
             .await

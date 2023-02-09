@@ -150,8 +150,9 @@ impl SectionMemberHistory {
 mod tests {
     use super::{SectionMemberHistory, SectionsDAG};
     use crate::{
-        network_knowledge::{MembershipState, NodeState, RelocationDst, SectionSigned},
-        test_utils::{assert_lists, gen_addr, TestKeys},
+        messaging::system::SectionSigned,
+        network_knowledge::{MembershipState, NodeState},
+        test_utils::{assert_lists, create_relocation_trigger, gen_addr, TestKeys},
         types::NodeId,
     };
     use eyre::Result;
@@ -162,7 +163,7 @@ mod tests {
 
     #[test]
     fn retain_archived_members_of_the_latest_sections_while_pruning() -> Result<()> {
-        let mut rng = thread_rng();
+        let _rng = thread_rng();
         let mut section_members = SectionMemberHistory::default();
 
         // adding node set 1
@@ -177,10 +178,11 @@ mod tests {
         assert_lists(section_members.archive.values(), &nodes_1);
 
         // adding node set 2 as MembershipState::Relocated
-        let sk_2 = bls::SecretKeySet::random(0, &mut thread_rng()).secret_key();
-        let dst = RelocationDst::new(XorName::random(&mut rng));
+        let sk_set_2 = bls::SecretKeySet::random(0, &mut thread_rng());
+        let sk_2 = sk_set_2.secret_key();
+        let (trigger, _) = create_relocation_trigger(&sk_set_2, 4)?;
 
-        let nodes_2 = gen_random_signed_node_states(1, MembershipState::Relocated(dst), &sk_2)?;
+        let nodes_2 = gen_random_signed_node_states(1, MembershipState::Relocated(trigger), &sk_2)?;
         nodes_2.iter().for_each(|node| {
             section_members.update(node.clone());
         });
@@ -246,13 +248,14 @@ mod tests {
 
     #[test]
     fn archived_members_should_not_be_moved_to_members_list() -> Result<()> {
-        let mut rng = thread_rng();
+        let _rng = thread_rng();
         let mut section_members = SectionMemberHistory::default();
-        let sk = bls::SecretKeySet::random(0, &mut thread_rng()).secret_key();
+        let sk_set = bls::SecretKeySet::random(0, &mut thread_rng());
+        let sk = sk_set.secret_key();
         let node_left = gen_random_signed_node_states(1, MembershipState::Left, &sk)?[0].clone();
-        let dst = RelocationDst::new(XorName::random(&mut rng));
+        let (trigger, _) = create_relocation_trigger(&sk_set, 4)?;
         let node_relocated =
-            gen_random_signed_node_states(1, MembershipState::Relocated(dst), &sk)?[0].clone();
+            gen_random_signed_node_states(1, MembershipState::Relocated(trigger), &sk)?[0].clone();
 
         assert!(section_members.update(node_left.clone()));
         assert!(section_members.update(node_relocated.clone()));
@@ -290,14 +293,15 @@ mod tests {
 
     #[test]
     fn members_should_be_archived_if_they_leave_or_relocate() -> Result<()> {
-        let mut rng = thread_rng();
+        let _rng = thread_rng();
         let mut section_members = SectionMemberHistory::default();
-        let sk = bls::SecretKeySet::random(0, &mut thread_rng()).secret_key();
+        let sk_set = bls::SecretKeySet::random(0, &mut thread_rng());
+        let sk = sk_set.secret_key();
 
         let node_1 = gen_random_signed_node_states(1, MembershipState::Joined, &sk)?[0].clone();
-        let dst = RelocationDst::new(XorName::random(&mut rng));
+        let (trigger, _) = create_relocation_trigger(&sk_set, 4)?;
         let node_2 =
-            gen_random_signed_node_states(1, MembershipState::Relocated(dst), &sk)?[0].clone();
+            gen_random_signed_node_states(1, MembershipState::Relocated(trigger), &sk)?[0].clone();
         assert!(section_members.update(node_1.clone()));
         assert!(section_members.update(node_2.clone()));
 
@@ -341,10 +345,12 @@ mod tests {
             let node_state = match membership_state {
                 MembershipState::Joined => NodeState::joined(node_id, None),
                 MembershipState::Left => NodeState::left(node_id, None),
-                MembershipState::Relocated(ref dst) => NodeState::relocated(node_id, None, *dst),
+                MembershipState::Relocated(ref trigger) => {
+                    NodeState::relocated(node_id, None, trigger.clone())
+                }
             };
-            let sectioin_signed_node_state = TestKeys::get_section_signed(secret_key, node_state)?;
-            decisions.push(section_signed_to_decision(sectioin_signed_node_state));
+            let section_signed_node_state = TestKeys::get_section_signed(secret_key, node_state)?;
+            decisions.push(section_signed_to_decision(section_signed_node_state));
         }
         Ok(decisions)
     }

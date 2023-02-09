@@ -8,12 +8,15 @@
 
 mod relocation;
 
-pub use relocation::{RelocationDst, RelocationInfo, RelocationProof, RelocationState};
+pub use relocation::{
+    ChurnId, RelocationInfo, RelocationProof, RelocationState, RelocationTrigger,
+};
 
 use crate::network_knowledge::{section_has_room_for_node, Error, Result};
 use crate::types::NodeId;
 
 use serde::{Deserialize, Serialize};
+
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::{self, Debug, Formatter},
@@ -29,7 +32,7 @@ pub enum MembershipState {
     /// Node went offline.
     Left,
     /// Node was relocated to a different section.
-    Relocated(RelocationDst),
+    Relocated(RelocationTrigger),
 }
 
 /// Information about a member of our section.
@@ -84,11 +87,11 @@ impl NodeState {
     pub fn relocated(
         node_id: NodeId,
         previous_name: Option<XorName>,
-        relocation_dst: RelocationDst,
+        relocation_trigger: RelocationTrigger,
     ) -> Self {
         Self {
             node_id,
-            state: MembershipState::Relocated(relocation_dst),
+            state: MembershipState::Relocated(relocation_trigger),
             previous_name,
         }
     }
@@ -186,9 +189,9 @@ impl NodeState {
     }
 
     // Convert this info into one with the state changed to `Relocated`.
-    pub fn relocate(self, relocation_dst: RelocationDst) -> Self {
+    pub fn relocate(self, relocation_trigger: RelocationTrigger) -> Self {
         Self {
-            state: MembershipState::Relocated(relocation_dst),
+            state: MembershipState::Relocated(relocation_trigger),
             ..self
         }
     }
