@@ -523,7 +523,9 @@ mod tests {
                             ..
                         } = &cmd
                         {
-                            // skip
+                            msg_counter.track(&cmd);
+                            // Send out the `UnderConsideration` as stream response.
+                            let _ = dispatcher.process_cmd(cmd).await?;
                         } else {
                             panic!("got a different cmd {cmd:?}");
                         }
