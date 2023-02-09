@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## v0.17.8 (2023-02-09)
+## v0.17.9 (2023-02-09)
 
 ### Commit Statistics
 
@@ -23,10 +23,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #2043 ([`bef44e5`](https://github.com/maidsafe/safe_network/commit/bef44e53b55ddbe957b77755ad97f561b35f69e7))
+</details>
+
+## v0.17.8 (2023-02-09)
+
+### Chore
+
+ - <csr-id-4e81468ab91571c9a7f36fc720256c297445225f/> sn_interface-0.17.8/sn_node-0.74.10
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 4 commits contributed to the release.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.17.8/sn_node-0.74.10 ([`4e81468`](https://github.com/maidsafe/safe_network/commit/4e81468ab91571c9a7f36fc720256c297445225f))
     - Merge #2060 ([`17a91a9`](https://github.com/maidsafe/safe_network/commit/17a91a91472e92c69a06a5e224a708f0a5b0e741))
+    - refactor(comms): send single response to client - All results from storage nodes are awaited, and a single response returned to client. ([`39d5574`](https://github.com/maidsafe/safe_network/commit/39d55747512fc233a92c1e8ab310f984aebc1d4f))
+    - refactor(comms): don't use dashmap for sessions - This allows a lockfree access to sessions in comms. ([`15670eb`](https://github.com/maidsafe/safe_network/commit/15670eba1ab9afeaebd5abd91551834e59b4c14d))
 </details>
 
 ## v0.17.7 (2023-02-09)
+
+<csr-id-c55911eb6e0fe38c5547cf5b9b9cefeea9ac4ce1/>
+<csr-id-c7817b32486a527c111839eb9c74ad45416ed385/>
 
 ### Chore
 
@@ -59,6 +89,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.17.6 (2023-02-08)
+
+<csr-id-c8bbc738158c35020c0a7c4c5108aceb744a0247/>
 
 ### Chore
 

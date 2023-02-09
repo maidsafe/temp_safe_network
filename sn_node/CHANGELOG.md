@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.74.10 (2023-02-09)
+## v0.74.11 (2023-02-09)
 
 ### Commit Statistics
 
@@ -22,14 +22,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #2043 ([`bef44e5`](https://github.com/maidsafe/safe_network/commit/bef44e53b55ddbe957b77755ad97f561b35f69e7))
+</details>
+
+## v0.74.10 (2023-02-09)
+
+### Chore
+
+ - <csr-id-4e81468ab91571c9a7f36fc720256c297445225f/> sn_interface-0.17.8/sn_node-0.74.10
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.17.8/sn_node-0.74.10 ([`4e81468`](https://github.com/maidsafe/safe_network/commit/4e81468ab91571c9a7f36fc720256c297445225f))
     - Merge #2060 ([`17a91a9`](https://github.com/maidsafe/safe_network/commit/17a91a91472e92c69a06a5e224a708f0a5b0e741))
+    - refactor(comms): send single response to client - All results from storage nodes are awaited, and a single response returned to client. ([`39d5574`](https://github.com/maidsafe/safe_network/commit/39d55747512fc233a92c1e8ab310f984aebc1d4f))
 </details>
 
 ## v0.74.9 (2023-02-09)
 
+<csr-id-e2191c16a710fb335fcb1750f4f3d0ab0b735afd/>
+
 ### Chore
 
  - <csr-id-e2191c16a710fb335fcb1750f4f3d0ab0b735afd/> sn_node-0.74.9
+
+### Chore
+
+ - <csr-id-23903c3e7ee462676bd25e3618a4b313c7b5cf3b/> minor cleanup, docs and log fixes
 
 ### Bug Fixes
 
@@ -39,8 +71,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 3 commits contributed to the release.
- - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 7 commits contributed to the release.
+ - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -53,6 +85,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - sn_node-0.74.9 ([`e2191c1`](https://github.com/maidsafe/safe_network/commit/e2191c16a710fb335fcb1750f4f3d0ab0b735afd))
     - Merge #2086 ([`a72fe3a`](https://github.com/maidsafe/safe_network/commit/a72fe3af64f431c86ece24b05d6f1e7fe3068ed5))
     - prevent endlessly forwarding client msg if we're data holder ([`731a060`](https://github.com/maidsafe/safe_network/commit/731a0606276f3e693215f185b31f6c85fd7a5d89))
+    - minor cleanup, docs and log fixes ([`23903c3`](https://github.com/maidsafe/safe_network/commit/23903c3e7ee462676bd25e3618a4b313c7b5cf3b))
+    - fix(tests): add small delay to loop - The test setup may have been wrong, but remains to be seen. - The dkg tests looped to hard, possibly due to previously having been slowed down by comms. - A small delay before polling the channel fixed it. ([`023ab48`](https://github.com/maidsafe/safe_network/commit/023ab4870d90de8ad0726bb7dfe910a1e0cc20ee))
+    - refactor(comms): send to nodes in parallel - Previous commit had the msgs go out sequentially to the nodes. - Also, we didn't send any response to client until all nodes had responded. ([`e4318d1`](https://github.com/maidsafe/safe_network/commit/e4318d14381f71ea7b46957f99dde4ba736774c9))
+    - refactor(comms): don't use dashmap for sessions - This allows a lockfree access to sessions in comms. ([`15670eb`](https://github.com/maidsafe/safe_network/commit/15670eba1ab9afeaebd5abd91551834e59b4c14d))
 </details>
 
 ## v0.74.8 (2023-02-09)
