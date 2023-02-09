@@ -189,7 +189,7 @@ impl MyNode {
         match msg {
             NodeMsg::TryJoin(relocation) => {
                 trace!("Handling msg {:?}: TryJoin from {}", msg_id, sender);
-                MyNode::handle_join(node, &context, sender, relocation)
+                MyNode::handle_join(node, &context, sender, relocation, send_stream)
                     .await
                     .map(|c| c.into_iter().collect())
             }
@@ -275,6 +275,10 @@ impl MyNode {
                             info!("{}", LogMarker::RelocateEnd);
                         }
 
+                        Ok(vec![])
+                    }
+                    JoinResponse::UnderConsideration => {
+                        info!("Our join request is being considered by the network");
                         Ok(vec![])
                     }
                 }
