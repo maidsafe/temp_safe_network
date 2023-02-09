@@ -11,14 +11,14 @@ repository = "https://github.com/maidsafe/safe_network"
 version = "0.19.7"
 
 [features]
-test-utils=["proptest"]
+test-utils = ["proptest"]
 
 [dependencies]
 base64 = "~0.13.0"
 bincode = "1.3.1"
 bls = { package = "blsttc", version = "8.0.1" }
 bytes = { version = "1.0.1", features = ["serde"] }
-crdts = { version = "7.2", default-features=false, features = ["merkle"] }
+crdts = { version = "7.2", default-features = false, features = ["merkle"] }
 custom_debug = "~0.5.0"
 ed25519 = { version = "1.2.0", features = ["serde_bytes"] }
 ed25519-dalek = { version = "1.0.0", features = ["serde"] }
@@ -30,10 +30,10 @@ itertools = "~0.10.0"
 lazy_static = "1"
 multibase = "~0.9.1"
 num_cpus = "1.13.0"
-proptest = { version ="1.0.0", optional =true }
+proptest = { version = "1.0.0", optional = true }
 qp2p = "~0.36.2"
 rand = "~0.8.5"
-rand-07 = { package = "rand", version = "0.7.3" } # required till ed25519-dalek upgrades to rand v0.8
+rand-07 = { package = "rand", version = "0.7.3" }                                    # required till ed25519-dalek upgrades to rand v0.8
 rayon = "1.5.1"
 rmp-serde = "1.0.0"
 self_encryption = "~0.28.0"
@@ -52,7 +52,7 @@ tiny-keccak = { version = "2.0.2", features = ["sha3"] }
 tracing = "~0.1.26"
 tracing-core = "~0.1.21"
 tracing-subscriber = { version = "0.3.1", features = ["env-filter", "json"] }
-uluru="3.0.0"
+uluru = "3.0.0"
 xor_name = "~5.0.0"
 
 [dependencies.tokio]
@@ -66,7 +66,7 @@ proptest = { version = "1.0.0" }
 
 [dev-dependencies.cargo-husky]
 version = "1.5.0"
-default-features = false # Disable features which are enabled by default
+default-features = false                                           # Disable features which are enabled by default
 features = ["precommit-hook", "run-cargo-clippy", "run-cargo-fmt"]
 
 [package.metadata.cargo-udeps.ignore]

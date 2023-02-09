@@ -6,8 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use std::fmt::{self, Formatter};
-
 use super::NodeState;
 use crate::messaging::system::SectionSigned;
 use crate::network_knowledge::{Error, Result};
@@ -16,24 +14,58 @@ use crate::types::utils::calc_age;
 use ed25519_dalek::{PublicKey, Signature, Verifier};
 use hex_fmt::HexFmt;
 use serde::{Deserialize, Serialize};
+use sn_consensus::Decision;
 use xor_name::XorName;
 
-/// A node relocates to the section that matches the contained `XorName`.
-/// The `RelocationDst` is sent by the elders to a node that has been selected for relocation.
-/// This is then used by the node to poll the elders asking them to run the relocation request through consensus.
-/// It will continue to poll until it receives the AE Update showing that relocation was decided (i.e. they are no longer members)
-/// and that it can start the join process at the target section, providing the decision as part of a proof that the relocation is valid.
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Debug)]
-pub struct RelocationDst(XorName);
+use std::fmt::{self, Display, Formatter};
 
-impl RelocationDst {
+// Unique identifier for a churn event, which is used to select nodes to relocate.
+pub struct ChurnId(pub XorName);
+
+impl Display for ChurnId {
+    fn fmt(&self, fmt: &mut Formatter) -> fmt::Result {
+        write!(
+            fmt,
+            "Churn-{:02x}{:02x}{:02x}..",
+            self.0[0], self.0[1], self.0[2]
+        )
+    }
+}
+
+/// The relocation trigger is sent by the elder nodes to the relocating nodes.
+/// This is then used by the relocating nodes to request the Section to propose a relocation membership change.
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Debug)]
+pub struct RelocationTrigger(Decision<NodeState>);
+
+impl RelocationTrigger {
     /// We are relocating to the section that matches `dst_name`.
-    pub fn new(dst_name: XorName) -> Self {
-        Self(dst_name)
+    pub fn new(decision: Decision<NodeState>) -> Self {
+        Self(decision)
     }
 
-    pub fn name(&self) -> &XorName {
-        &self.0
+    /// calculates the destination section for the given `peer_name`.
+    pub fn dst_section(&self, peer_name: XorName) -> XorName {
+        let mut content_parts = Vec::new();
+        content_parts.push(peer_name.0.to_vec());
+        for sig in self.0.proposals.values() {
+            content_parts.push(sig.to_bytes().to_vec());
+        }
+
+        XorName::from_content_parts(
+            Vec::from_iter(content_parts.iter().map(|v| v.as_slice())).as_slice(),
+        )
+    }
+
+    /// calculates the churn_id for the given proposals.
+    pub fn churn_id(&self) -> ChurnId {
+        let mut content_parts = Vec::new();
+        for sig in self.0.proposals.values() {
+            content_parts.push(sig.to_bytes().to_vec());
+        }
+
+        ChurnId(XorName::from_content_parts(
+            Vec::from_iter(content_parts.iter().map(|v| v.as_slice())).as_slice(),
+        ))
     }
 }
 
@@ -44,15 +76,6 @@ impl RelocationDst {
 pub struct RelocationInfo {
     signed_relocation: SectionSigned<NodeState>,
     new_name: XorName,
-}
-
-impl RelocationInfo {
-    pub fn new(signed_relocation: SectionSigned<NodeState>, new_name: XorName) -> Self {
-        Self {
-            signed_relocation,
-            new_name,
-        }
-    }
 }
 
 /// A relocation proof proves that a section started a relocation
@@ -69,6 +92,15 @@ pub struct RelocationProof {
     self_sig: Signature,
     /// The old key that identified the node in the source section.
     self_old_key: PublicKey,
+}
+
+impl RelocationInfo {
+    pub fn new(signed_relocation: SectionSigned<NodeState>, new_name: XorName) -> Self {
+        Self {
+            signed_relocation,
+            new_name,
+        }
+    }
 }
 
 impl RelocationProof {
@@ -144,7 +176,7 @@ pub enum RelocationState {
     /// the node matching the trigger.
     /// This is the elders asking the node to start polling
     /// them for the decision to remove it from members as being relocated.
-    PreparingToRelocate(RelocationDst),
+    PreparingToRelocate(RelocationTrigger),
     /// When the node has a `RelocationProof` it can join the dst section with the provided proof.
     ReadyToJoinNewSection(RelocationProof),
 }

@@ -11,7 +11,6 @@ use crate::node::{
     flow_ctrl::cmds::Cmd,
     membership::{self, Membership},
     messaging::Recipients,
-    relocation::ChurnId,
     MyNode, Result,
 };
 
@@ -19,7 +18,7 @@ use bls::Signature;
 use sn_consensus::{Decision, Generation, SignedVote, VoteResponse};
 use sn_interface::{
     messaging::system::{JoinResponse, NodeMsg, SectionSig, SectionSigned},
-    network_knowledge::{MembershipState, NodeState},
+    network_knowledge::{node_state::RelocationTrigger, MembershipState, NodeState},
     types::{log_markers::LogMarker, NodeId, Participant},
 };
 
@@ -210,12 +209,12 @@ impl MyNode {
             self.joins_allowed = false;
         }
 
-        if let Some((_, sig)) = decision.proposals.iter().max_by_key(|(_, sig)| *sig) {
-            let churn_id = ChurnId(sig.to_bytes());
+        if !decision.proposals.is_empty() {
+            let relocation_trigger = RelocationTrigger::new(decision);
             let excluded_from_relocation =
                 BTreeSet::from_iter(joining_nodes.iter().map(|(n, _)| n.name()));
 
-            cmds.extend(self.try_relocate_nodes(churn_id, excluded_from_relocation)?);
+            cmds.extend(self.try_relocate_nodes(relocation_trigger, excluded_from_relocation)?);
         }
 
         cmds.extend(self.trigger_dkg()?);

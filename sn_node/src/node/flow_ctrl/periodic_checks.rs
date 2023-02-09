@@ -118,18 +118,18 @@ impl FlowCtrl {
         // check if we can request for relocation
         // The relocation_state will be changed into `JoinAsRelocated` once the request has been
         // approved by the section
-        if let Some(RelocationState::PreparingToRelocate(dst)) = &context.relocation_state {
+        if let Some(RelocationState::PreparingToRelocate(trigger)) = &context.relocation_state {
             if self.timestamps.request_to_relocate_check.elapsed() > REQUEST_TO_RELOCATE_TIMEOUT_SEC
             {
                 info!(
-                    "Periodic check: sending request to relocate our node to {:?}",
-                    dst
+                    "Periodic check: sending request to relocate our node. churn_id: {}",
+                    trigger.churn_id()
                 );
 
                 self.timestamps.request_to_relocate_check = Instant::now();
                 cmds.push(MyNode::send_to_elders(
                     context,
-                    NodeMsg::ProceedRelocation(*dst),
+                    NodeMsg::ProceedRelocation(trigger.clone()),
                 ));
             }
         }

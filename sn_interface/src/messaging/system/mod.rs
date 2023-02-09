@@ -12,7 +12,8 @@ mod node_msgs;
 mod section_sig;
 
 use crate::messaging::AuthorityProof;
-use crate::network_knowledge::{NodeState, RelocationDst, RelocationProof, SapCandidate};
+use crate::network_knowledge::node_state::RelocationTrigger;
+use crate::network_knowledge::{NodeState, RelocationProof, SapCandidate};
 use crate::SectionAuthorityProvider;
 
 pub use dkg::DkgSessionId;
@@ -45,10 +46,10 @@ pub enum NodeMsg {
     /// successfully decided for it to be relocated, at which point the node can start the join
     /// process at the target section, including the necessary proof from src section for it to
     /// be handled as a relocation.
-    PrepareToRelocate(RelocationDst),
+    PrepareToRelocate(RelocationTrigger),
     /// Sent by the relocating node to its section to proceed the relocation process by initiating a
     /// membership change, where the node is considered `Relocated`.
-    ProceedRelocation(RelocationDst),
+    ProceedRelocation(RelocationTrigger),
     /// Sent from the section of a node that is undergoing the relocation process, containing the
     /// signed membership change. This is used by the node to complete the relocation by including
     /// it in a `proof` when joining the new section.
