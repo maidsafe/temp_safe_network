@@ -44,7 +44,12 @@ use crate::{
 use bls::PublicKey as BlsPublicKey;
 use section_peers::SectionPeers;
 use serde::Serialize;
-use std::{collections::BTreeSet, iter, net::SocketAddr};
+use sn_consensus::Decision;
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    iter,
+    net::SocketAddr,
+};
 use xor_name::{Prefix, XorName};
 
 /// The secret key for the genesis DBC.
@@ -154,6 +159,17 @@ pub struct NetworkKnowledge {
     section_tree: SectionTree,
 }
 
+// Convert SectionSigned to Decision
+fn section_signed_to_decision(section_signed: SectionSigned<NodeState>) -> Decision<NodeState> {
+    let mut proposals = BTreeMap::new();
+    let _ = proposals.insert(section_signed.value, section_signed.sig.signature);
+    Decision::<NodeState> {
+        votes: BTreeSet::new(),
+        proposals,
+        faults: BTreeSet::new(),
+    }
+}
+
 impl NetworkKnowledge {
     /// Creates a new `NetworkKnowledge` instance. The prefix is used to choose the
     /// `signed_sap` from the provided SectionTree
@@ -188,10 +204,12 @@ impl NetworkKnowledge {
         for peer in network_knowledge.signed_sap.elders() {
             let node_state = NodeState::joined(*peer, None);
             let sig = create_first_sig(&public_key_set, &secret_key_share, &node_state)?;
-            let _changed = network_knowledge.section_peers.update(SectionSigned {
-                value: node_state,
-                sig,
-            });
+            let _changed = network_knowledge
+                .section_peers
+                .update(section_signed_to_decision(SectionSigned {
+                    value: node_state,
+                    sig,
+                }));
         }
 
         let section_key_share = SectionKeyShare {
@@ -411,29 +429,19 @@ impl NetworkKnowledge {
 
     /// Try to merge this `NetworkKnowledge` members with `peers`.
     /// Checks if we're already up to date before attempting to verify and merge members
-    pub fn merge_members(&mut self, peers: BTreeSet<SectionSigned<NodeState>>) -> Result<bool> {
+    pub fn merge_members(&mut self, peers: BTreeSet<Decision<NodeState>>) -> Result<bool> {
         let mut there_was_an_update = false;
-        let our_current_members = self.section_peers.members();
 
-        for node_state in &peers {
-            if our_current_members.contains(node_state) {
-                // we already know of this one, so nothing to do here.
-                continue;
-            }
-            trace!(
-                "Attempting to update section members. Name: {:?}, new state: {:?}",
-                node_state.name(),
-                node_state.state()
-            );
-            if !node_state.verify(&self.section_chain()) {
-                error!(
-                    "Can't update section member, name: {:?}, new state: {:?}",
-                    node_state.name(),
-                    node_state.state()
-                );
-            } else if self.section_peers.update(node_state.clone()) {
-                there_was_an_update = true;
-            }
+        for decision in &peers {
+            // TODO: Decisioin requires the PublicKeySet to validate,
+            //       however NetworkKnowledge only retains the PublicKey info
+            // if !decision.validate(&self.section_chain()).is_ok() {
+            //     error!("Can't update decision {decision:?}");
+            //     continue;
+            // }
+
+            trace!("Updating decision {decision:?}",);
+            there_was_an_update |= self.section_peers.update(decision.clone());
         }
 
         self.section_peers.retain(&self.prefix());
@@ -458,7 +466,9 @@ impl NetworkKnowledge {
             return false;
         }
 
-        let updated = self.section_peers.update(node_state);
+        let updated = self
+            .section_peers
+            .update(section_signed_to_decision(node_state));
         trace!("Section member state, name: {node_name:?}, updated: {updated}");
 
         updated
@@ -507,21 +517,17 @@ impl NetworkKnowledge {
 
     /// Returns members that are joined.
     pub fn section_members(&self) -> BTreeSet<NodeState> {
-        self.section_peers
-            .members()
-            .into_iter()
-            .map(|state| state.value)
-            .collect()
+        self.section_peers.members()
+    }
+
+    /// Returns joined members with Decision info.
+    pub fn section_members_with_decision(&self) -> BTreeSet<Decision<NodeState>> {
+        self.section_peers.section_members_with_decision()
     }
 
     /// Returns the list of members that have left our section
-    pub fn section_signed_archived_members(&self) -> BTreeSet<SectionSigned<NodeState>> {
+    pub fn archived_members(&self) -> BTreeSet<NodeState> {
         self.section_peers.archived_members()
-    }
-
-    /// Returns current list of section signed members.
-    pub fn section_signed_members(&self) -> BTreeSet<SectionSigned<NodeState>> {
-        self.section_peers.members()
     }
 
     /// Returns current section size, i.e. number of peers in the section.
@@ -536,7 +542,7 @@ impl NetworkKnowledge {
 
     /// Get info for the member with the given name either from current members list,
     /// or from the archive of left/relocated members
-    pub fn is_either_member_or_archived(&self, name: &XorName) -> Option<SectionSigned<NodeState>> {
+    pub fn is_either_member_or_archived(&self, name: &XorName) -> Option<NodeState> {
         self.section_peers.is_either_member_or_archived(name)
     }
 

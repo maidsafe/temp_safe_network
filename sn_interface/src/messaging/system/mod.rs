@@ -20,7 +20,7 @@ pub use join::{JoinRejectReason, JoinRequest, JoinResponse};
 pub use node_msgs::{NodeDataCmd, NodeEvent, NodeQueryResponse};
 pub use section_sig::{SectionSig, SectionSigShare, SectionSigned};
 
-use sn_consensus::{Generation, SignedVote};
+use sn_consensus::{Decision, Generation, SignedVote};
 use sn_sdkg::DkgSignedVote;
 
 use bls::PublicKey as BlsPublicKey;
@@ -33,7 +33,7 @@ use std::{
 use xor_name::XorName;
 
 /// List of peers of a section
-pub type SectionPeers = BTreeSet<SectionSigned<NodeState>>;
+pub type SectionPeers = BTreeSet<Decision<NodeState>>;
 
 /// A vote about the state of the section
 /// This can be a result of seeing a node go offline or deciding wether we want to accept new nodes
