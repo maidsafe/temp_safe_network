@@ -4183,9 +4183,9 @@ dependencies = [
 
 [[package]]
 name = "sn_launch_tool"
-version = "0.12.1"
+version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "75b26a1d1e66d075d93e1be3d042366eb97dde9b308ad8c3263b359715487794"
+checksum = "17c4e0297134de4c10e3be4a7305619a5948cc4751fdbfd70e3ee58e4455c8dc"
 dependencies = [
  "clap",
  "color-eyre",
