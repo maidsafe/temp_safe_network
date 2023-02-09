@@ -5,18 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.74.9 (2023-02-09)
-
-### Bug Fixes
-
- - <csr-id-731a0606276f3e693215f185b31f6c85fd7a5d89/> prevent endlessly forwarding client msg if we're data holder
+## v0.74.10 (2023-02-09)
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
- - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 1 commit contributed to the release.
+ - 0 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -26,11 +22,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #2060 ([`17a91a9`](https://github.com/maidsafe/safe_network/commit/17a91a91472e92c69a06a5e224a708f0a5b0e741))
+</details>
+
+## v0.74.9 (2023-02-09)
+
+### Chore
+
+ - <csr-id-e2191c16a710fb335fcb1750f4f3d0ab0b735afd/> sn_node-0.74.9
+
+### Bug Fixes
+
+ - <csr-id-731a0606276f3e693215f185b31f6c85fd7a5d89/> prevent endlessly forwarding client msg if we're data holder
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_node-0.74.9 ([`e2191c1`](https://github.com/maidsafe/safe_network/commit/e2191c16a710fb335fcb1750f4f3d0ab0b735afd))
     - Merge #2086 ([`a72fe3a`](https://github.com/maidsafe/safe_network/commit/a72fe3af64f431c86ece24b05d6f1e7fe3068ed5))
     - prevent endlessly forwarding client msg if we're data holder ([`731a060`](https://github.com/maidsafe/safe_network/commit/731a0606276f3e693215f185b31f6c85fd7a5d89))
 </details>
 
 ## v0.74.8 (2023-02-09)
+
+<csr-id-c55911eb6e0fe38c5547cf5b9b9cefeea9ac4ce1/>
 
 ### Chore
 
@@ -143,7 +170,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 5 commits contributed to the release.
+ - 6 commits contributed to the release.
  - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
@@ -158,6 +185,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - retry as same node when joining ([`bb1e371`](https://github.com/maidsafe/safe_network/commit/bb1e3718e42e42ca02ecc00bbd529953a380928e))
     - Merge #2079 ([`acca5f3`](https://github.com/maidsafe/safe_network/commit/acca5f30d7ce2080e0cd8ef38f4039412b201e06))
     - chore: remove redundant enum variant - `ClientDataResponse` variant `CommunicationIssues` was not differentiated on client, and was carrying the exact same error enum as the variant `NetworkIssue`. ([`a34243e`](https://github.com/maidsafe/safe_network/commit/a34243e89d735512a7eee2b6bf3a96d2a9cbea59))
+    - chore: remove redundant opid type - It was based on msg_id so it served no purpose. ([`2f0b754`](https://github.com/maidsafe/safe_network/commit/2f0b7540b5c93621f99e80af8c0d241872b0053e))
     - update Jaeger in README.md ([`42441be`](https://github.com/maidsafe/safe_network/commit/42441bee59ce493cb81a80662d3b0aac62ebbdeb))
 </details>
 

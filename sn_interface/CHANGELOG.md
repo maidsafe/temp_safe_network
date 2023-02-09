@@ -6,13 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## v0.17.6 (2023-02-08)
+## v0.17.8 (2023-02-09)
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
+ - 1 commit contributed to the release.
  - 0 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
@@ -23,11 +23,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #2060 ([`17a91a9`](https://github.com/maidsafe/safe_network/commit/17a91a91472e92c69a06a5e224a708f0a5b0e741))
+</details>
+
+## v0.17.7 (2023-02-09)
+
+### Chore
+
+ - <csr-id-c55911eb6e0fe38c5547cf5b9b9cefeea9ac4ce1/> sn_interface-0.17.7/sn_node-0.74.8
+
+### Refactor
+
+ - <csr-id-c7817b32486a527c111839eb9c74ad45416ed385/> send response to joiner
+   TryJoin wasn't previously answered over the bi-stream. This adds a
+   'Considering' response that is sent back over the same stream.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.17.7/sn_node-0.74.8 ([`c55911e`](https://github.com/maidsafe/safe_network/commit/c55911eb6e0fe38c5547cf5b9b9cefeea9ac4ce1))
+    - Merge #2084 ([`1200f09`](https://github.com/maidsafe/safe_network/commit/1200f098a721d8f330ae45e45b9fc23324d2db8c))
+    - send response to joiner ([`c7817b3`](https://github.com/maidsafe/safe_network/commit/c7817b32486a527c111839eb9c74ad45416ed385))
+</details>
+
+## v0.17.6 (2023-02-08)
+
+### Chore
+
+ - <csr-id-c8bbc738158c35020c0a7c4c5108aceb744a0247/> sn_interface-0.17.6/sn_client-0.78.5/sn_node-0.74.5
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 4 commits contributed to the release.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.17.6/sn_client-0.78.5/sn_node-0.74.5 ([`c8bbc73`](https://github.com/maidsafe/safe_network/commit/c8bbc738158c35020c0a7c4c5108aceb744a0247))
     - Merge #2079 ([`acca5f3`](https://github.com/maidsafe/safe_network/commit/acca5f30d7ce2080e0cd8ef38f4039412b201e06))
     - chore: remove redundant enum variant - `ClientDataResponse` variant `CommunicationIssues` was not differentiated on client, and was carrying the exact same error enum as the variant `NetworkIssue`. ([`a34243e`](https://github.com/maidsafe/safe_network/commit/a34243e89d735512a7eee2b6bf3a96d2a9cbea59))
+    - chore: remove redundant opid type - It was based on msg_id so it served no purpose. ([`2f0b754`](https://github.com/maidsafe/safe_network/commit/2f0b7540b5c93621f99e80af8c0d241872b0053e))
 </details>
 
 ## v0.17.5 (2023-02-07)
+
+<csr-id-bda3aa2106fd2fd8c1e6a320aa6bbefd9e407ee7/>
 
 ### Chore
 
