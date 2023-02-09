@@ -6,14 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{
-    messaging::msg_id,
-    types::{
-        register::{EntryHash, User},
-        DataAddress,
-    },
+use crate::types::{
+    register::{EntryHash, User},
+    DataAddress,
 };
-use msg_id::MsgId;
 use serde::{Deserialize, Serialize};
 use std::result;
 use thiserror::Error;
@@ -26,9 +22,9 @@ pub type Result<T, E = Error> = result::Result<T, E>;
 #[derive(Error, Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum Error {
-    /// Failure to contact one or more storage nodes (send or receipt of msg).
-    #[error("Msg: {0:?} failed as contact to one or more storage nodes failed.")]
-    CouldNotContactAllStorageNodes(MsgId),
+    /// Inconsistent responses from one or more storage nodes.
+    #[error("Msg failed: One or more of the storage nodes failed to respond or returned inconsistent responses.")]
+    InconsistentStorageNodeResponses,
     /// Access denied for user
     #[error("Access denied for user: {0:?}")]
     AccessDenied(User),

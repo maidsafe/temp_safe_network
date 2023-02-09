@@ -54,24 +54,21 @@ use self::peer_session::PeerSession;
 
 use sn_interface::{
     messaging::{
-        data::ClientDataResponse as ClientResponse, system::NodeMsgType, Dst, MsgId, MsgKind,
-        MsgType, WireMsg,
+        data::{ClientDataResponse as ClientResponse, Error as MsgError},
+        Dst, MsgId, MsgKind, WireMsg,
     },
     types::Peer,
 };
 
 use qp2p::{Endpoint, SendStream, UsrMsgBytes};
 
+use futures::future::join_all;
 use std::{
     collections::{BTreeMap, BTreeSet},
     net::SocketAddr,
-    sync::Arc,
 };
 use tokio::{
-    sync::{
-        mpsc::{self, Receiver, Sender},
-        RwLock,
-    },
+    sync::mpsc::{self, Receiver, Sender},
     task,
 };
 
@@ -182,20 +179,18 @@ impl Comm {
     }
 
     /// Sends the payload on new bidi-stream to noe and sends the response on the dst stream.
-    #[tracing::instrument(skip(self, bytes))]
+    #[tracing::instrument(skip(self, peer_bytes))]
     pub fn send_and_respond_on_stream(
         &self,
         msg_id: MsgId,
-        msg_type: NodeMsgType,
-        peer: Peer,
-        bytes: UsrMsgBytes,
-        dst_stream: (Dst, Arc<RwLock<SendStream>>),
+        peer_bytes: BTreeMap<Peer, UsrMsgBytes>,
+        expected_targets: usize,
+        dst_stream: (Dst, SendStream),
     ) {
         self.send_cmd(CommCmd::SendAndRespondOnStream {
             msg_id,
-            msg_type,
-            peer,
-            bytes,
+            peer_bytes,
+            expected_targets,
             dst_stream,
         })
     }
@@ -229,11 +224,10 @@ enum CommCmd {
     },
     SendAndRespondOnStream {
         msg_id: MsgId,
-        msg_type: NodeMsgType,
-        peer: Peer,
         #[debug(skip)]
-        bytes: UsrMsgBytes,
-        dst_stream: (Dst, Arc<RwLock<SendStream>>),
+        peer_bytes: BTreeMap<Peer, UsrMsgBytes>,
+        expected_targets: usize,
+        dst_stream: (Dst, SendStream),
     },
 }
 
@@ -281,22 +275,25 @@ fn process_cmds(
                 }
                 CommCmd::SendAndRespondOnStream {
                     msg_id,
-                    msg_type,
-                    peer,
-                    bytes,
+                    peer_bytes,
+                    expected_targets,
                     dst_stream,
                 } => {
-                    if let Some(session) = get_session(msg_id, peer, &sessions, comm_events.clone())
-                    {
-                        send_and_respond_on_stream(
-                            msg_id,
-                            msg_type,
-                            session,
-                            bytes,
-                            dst_stream,
-                            comm_events.clone(),
-                        )
-                    }
+                    let peer_bytes = peer_bytes
+                        .into_iter()
+                        .map(|(peer, bytes)| {
+                            let session = get_session(msg_id, peer, &sessions, comm_events.clone());
+                            (peer, (session, bytes))
+                        })
+                        .collect();
+
+                    send_and_respond_on_stream(
+                        msg_id,
+                        peer_bytes,
+                        expected_targets,
+                        dst_stream,
+                        comm_events.clone(),
+                    )
                 }
             }
         }
@@ -351,7 +348,7 @@ fn send_and_return_response(
         let bytes_len = h.len() + d.len() + p.len();
         let peer = session.peer();
         trace!("Sending message bytes ({bytes_len} bytes) w/ {msg_id:?} to {peer:?}");
-        // do we need to use `NODE_RESPONSE_TIMEOUT`?
+
         let node_response_bytes = match session.send_with_bi_return_response(bytes, msg_id).await {
             Ok(response_bytes) => {
                 debug!("Peer response from {peer:?} is in for {msg_id:?}");
@@ -378,119 +375,77 @@ fn send_and_return_response(
 #[tracing::instrument(skip_all)]
 fn send_and_respond_on_stream(
     msg_id: MsgId,
-    msg_type: NodeMsgType,
-    session: PeerSession,
-    bytes: UsrMsgBytes,
-    dst_stream: (Dst, Arc<RwLock<SendStream>>),
+    peer_bytes: BTreeMap<Peer, (Option<PeerSession>, UsrMsgBytes)>,
+    expected_targets: usize,
+    dst_stream: (Dst, SendStream),
     comm_events: Sender<CommEvent>,
 ) {
     let _handle = task::spawn(async move {
-        let peer = session.peer();
         let (dst, stream) = dst_stream;
 
-        // do we need to use `NODE_RESPONSE_TIMEOUT`?
-        let node_response_bytes = match session.send_with_bi_return_response(bytes, msg_id).await {
-            Ok(response_bytes) => response_bytes,
-            Err(error) => {
-                error!("Failed sending {msg_id:?} to {peer:?}: {error:?}");
-                send_error(peer, Error::FailedSend(msg_id), comm_events.clone());
-                return;
-            }
-        };
+        let tasks = peer_bytes
+            .into_iter()
+            .map(|pb| (pb, comm_events.clone()))
+            .map(|((peer, (session, bytes)), comm_events)| async move {
+                let session = match session {
+                    Some(session) => session,
+                    None => return (peer, Err(Error::ConnectingToUnknownNode(msg_id))),
+                };
 
-        debug!("Response from node {peer:?} is in for {msg_id:?}");
+                let node_response_bytes =
+                    match session.send_with_bi_return_response(bytes, msg_id).await {
+                        Ok(response_bytes) => response_bytes,
+                        Err(error) => {
+                            error!("Failed sending {msg_id:?} to {peer:?}: {error:?}");
+                            send_error(peer, Error::FailedSend(msg_id), comm_events);
+                            return (peer, Err(Error::FailedSend(msg_id)));
+                        }
+                    };
 
-        let received = match WireMsg::from(node_response_bytes) {
-            Ok(received) => match received.into_msg() {
-                Ok(msg) => msg,
-                Err(_error) => {
-                    send_error(peer, Error::InvalidMsgReceived(msg_id), comm_events.clone());
+                debug!("Response from node {peer:?} is in for {msg_id:?}");
+                (peer, Ok(node_response_bytes))
+            });
+
+        let peer_results: Vec<(Peer, Result<UsrMsgBytes>)> = join_all(tasks).await;
+
+        let succeeded: Vec<_> = peer_results
+            .into_iter()
+            .filter_map(|(peer, res)| match res {
+                Ok(bytes) => Some((peer, bytes)),
+                Err(error) => {
+                    error!("Failed sending {msg_id:?} to {peer:?}: {error:?}");
+                    send_error(peer, Error::FailedSend(msg_id), comm_events.clone());
+                    None
+                }
+            })
+            .collect();
+
+        let some_failed = expected_targets > succeeded.len();
+        let all_ok_equal = || succeeded.windows(2).all(|w| are_equal(&w[0].1, &w[1].1));
+
+        let response_bytes = if some_failed || !all_ok_equal() {
+            match error_response(dst) {
+                None => {
+                    error!("Could not send the error response to client!");
                     return;
                 }
-            },
-            Err(error) => {
-                error!("Failed sending {msg_id:?} to {peer:?}: {error:?}");
-                send_error(peer, Error::InvalidMsgReceived(msg_id), comm_events.clone());
-                return;
+                Some(bytes) => bytes,
+            }
+        } else {
+            match succeeded.last() {
+                Some((_, bytes)) => bytes.clone(),
+                _ => {
+                    error!("Could not send the response to client!");
+                    return;
+                }
             }
         };
 
-        match map_to_client_response(msg_type, msg_id, received, dst) {
-            Some(bytes) => {
-                let mut stream = stream.write().await;
-                match stream.send_user_msg(bytes).await {
-                    Ok(()) => trace!("Response from node {peer:?} for {msg_id:?} sent to client."),
-                    Err(error) => {
-                        send_error(peer, Error::from(error), comm_events.clone());
-                    }
-                }
-            }
-            None => {
-                send_error(peer, Error::InvalidMsgReceived(msg_id), comm_events.clone());
-            }
-        }
+        send_on_stream(msg_id, response_bytes, stream).await;
     });
 }
 
-/// Verify what kind of response was received, and if that's the expected type based on
-/// the type of msg sent to the nodes, then return the corresponding response to the client.
 #[tracing::instrument(skip_all)]
-fn map_to_client_response(
-    sent: NodeMsgType,
-    correlation_id: MsgId,
-    received: MsgType,
-    dst: Dst,
-) -> Option<UsrMsgBytes> {
-    let response = match sent {
-        NodeMsgType::DataQuery => {
-            match received {
-                MsgType::ClientDataResponse {
-                    msg: ClientResponse::QueryResponse { response, .. },
-                    ..
-                } => {
-                    // We sent a data query and we received a query response,
-                    // so let's forward it to the client
-                    debug!("{correlation_id:?} sending query response back to client");
-                    ClientResponse::QueryResponse {
-                        response,
-                        correlation_id,
-                    }
-                }
-                other_resp => {
-                    error!("Unexpected response to query from node for {correlation_id:?}: {other_resp:?}");
-                    return None;
-                }
-            }
-        }
-        NodeMsgType::StoreData => {
-            match received {
-                MsgType::ClientDataResponse {
-                    msg: ClientResponse::CmdResponse { response, .. },
-                    ..
-                } => {
-                    // We sent a data cmd to store client data and we received a
-                    // cmd response, so let's forward it to the client
-                    debug!("{correlation_id:?} sending cmd response ACK back to client");
-                    ClientResponse::CmdResponse {
-                        response,
-                        correlation_id,
-                    }
-                }
-                other_resp => {
-                    error!("Unexpected response to cmd from node for {correlation_id:?}: {other_resp:?}");
-                    return None;
-                }
-            }
-        }
-    };
-
-    let kind = MsgKind::ClientDataResponse(dst.name);
-    let payload = WireMsg::serialize_msg_payload(&response).ok()?;
-    let wire_msg = WireMsg::new_msg(correlation_id, payload, kind, dst);
-
-    wire_msg.serialize().ok()
-}
-
 fn send_error(peer: Peer, error: Error, comm_events: Sender<CommEvent>) {
     let _handle = task::spawn(async move {
         let error_msg =
@@ -499,6 +454,45 @@ fn send_error(peer: Peer, error: Error, comm_events: Sender<CommEvent>) {
             error!("{error_msg} due to {err}.")
         }
     });
+}
+
+#[tracing::instrument(skip_all)]
+async fn send_on_stream(msg_id: MsgId, bytes: UsrMsgBytes, mut stream: SendStream) {
+    match stream.send_user_msg(bytes).await {
+        Ok(()) => trace!("Response to {msg_id:?} sent to client."),
+        Err(error) => error!("Could not send the response to {msg_id:?} to client due to {error}!"),
+    }
+}
+
+fn error_response(dst: Dst) -> Option<UsrMsgBytes> {
+    let kind = MsgKind::ClientDataResponse(dst.name);
+    let response = ClientResponse::NetworkIssue(MsgError::InconsistentStorageNodeResponses);
+    let payload = WireMsg::serialize_msg_payload(&response).ok()?;
+    let wire_msg = WireMsg::new_msg(MsgId::new(), payload, kind, dst);
+    wire_msg.serialize().ok()
+}
+
+#[tracing::instrument(skip_all)]
+fn are_equal(a: &UsrMsgBytes, b: &UsrMsgBytes) -> bool {
+    let (_, _, a_payload) = a;
+    let (_, _, b_payload) = b;
+    if !are_bytes_equal(a_payload.to_vec(), b_payload.to_vec()) {
+        return false;
+    }
+    true
+}
+
+#[tracing::instrument(skip_all)]
+fn are_bytes_equal(one: Vec<u8>, other: Vec<u8>) -> bool {
+    if one.len() != other.len() {
+        return false;
+    }
+    for (a, b) in one.into_iter().zip(other) {
+        if a != b {
+            return false;
+        }
+    }
+    true
 }
 
 #[cfg(test)]

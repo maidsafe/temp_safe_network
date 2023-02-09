@@ -9,11 +9,7 @@
 use crate::node::{core::NodeContext, Cmd, Error, MyNode, Result};
 
 use sn_interface::{
-    messaging::{
-        data::ClientDataResponse,
-        system::{NodeMsg, NodeMsgType},
-        Dst, MsgId, MsgKind, WireMsg,
-    },
+    messaging::{data::ClientDataResponse, system::NodeMsg, Dst, MsgId, MsgKind, WireMsg},
     types::Peer,
 };
 
@@ -21,8 +17,12 @@ use bytes::Bytes;
 use lazy_static::lazy_static;
 use qp2p::SendStream;
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
-use std::{collections::BTreeSet, env::var, str::FromStr, sync::Arc};
-use tokio::{sync::RwLock, time::Duration};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    env::var,
+    str::FromStr,
+};
+use tokio::time::Duration;
 use xor_name::XorName;
 
 /// Environment variable to set timeout value (in seconds) for data queries
@@ -141,48 +141,34 @@ impl MyNode {
 
         debug!("Sending out {msg_id:?} to {targets_len} holder node/s {targets:?}");
 
-        let node_bytes: Vec<_> = targets
+        let node_bytes: BTreeMap<_, _> = targets
             .into_par_iter()
             .filter_map(|target| {
                 let dst = Dst {
                     name: target.name(),
                     section_key: context.network_knowledge.section_key(),
                 };
-                wire_msg
-                    .serialize_with_new_dst(&dst)
-                    .ok()
-                    .map(|bytes_to_node| (target, bytes_to_node))
+                match wire_msg.serialize_with_new_dst(&dst) {
+                    Ok(bytes_to_node) => Some((target, bytes_to_node)),
+                    Err(error) => {
+                        error!("Sending out {msg_id:?} to {target} failed due to {error}.");
+                        None
+                    }
+                }
             })
             .collect();
-
-        let msg_type = match wire_msg.kind() {
-            MsgKind::Client {
-                query_index: Some(_),
-                ..
-            } => NodeMsgType::DataQuery,
-            MsgKind::Client {
-                query_index: None, ..
-            } => NodeMsgType::StoreData,
-            _ => return Err(Error::InvalidMessage),
-        };
 
         let dst_stream = (
             Dst {
                 name: source_client.name(),
                 section_key: context.network_knowledge.section_key(),
             },
-            Arc::new(RwLock::new(client_stream)),
+            client_stream,
         );
 
-        for (peer, bytes) in node_bytes {
-            context.comm.send_and_respond_on_stream(
-                msg_id,
-                msg_type,
-                peer,
-                bytes,
-                dst_stream.clone(),
-            );
-        }
+        context
+            .comm
+            .send_and_respond_on_stream(msg_id, node_bytes, targets_len, dst_stream);
 
         Ok(())
     }
