@@ -136,7 +136,7 @@ async fn bootstrap_node(
     config: &Config,
     used_space: UsedSpace,
     root_storage_dir: &Path,
-    join_retry_timeout: Duration,
+    mut join_retry_timeout: Duration,
 ) -> Result<(
     Arc<RwLock<MyNode>>,
     CmdChannel,
@@ -181,6 +181,7 @@ async fn bootstrap_node(
 
     // keep trying to join as this node
     loop {
+        let time = tokio::time::Instant::now();
         // send the join message...
         cmd_channel
             .send((Cmd::TryJoinNetwork, vec![]))
@@ -195,6 +196,7 @@ async fn bootstrap_node(
 
         if result.is_err() {
             error!("Join not accepted in {join_retry_timeout:?}. Will try and join again. Error was: {:?}", result);
+            join_retry_timeout -= time.elapsed();
             continue;
         } else {
             break;
