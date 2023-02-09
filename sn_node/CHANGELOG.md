@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.74.7 (2023-02-08)
+## v0.74.8 (2023-02-09)
 
 ### Commit Statistics
 
@@ -22,21 +22,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
-    - Merge #2082 ([`1e9d591`](https://github.com/maidsafe/safe_network/commit/1e9d5911ed9320e4db632e72f05e89059f6f0d48))
+    - Merge #2084 ([`1200f09`](https://github.com/maidsafe/safe_network/commit/1200f098a721d8f330ae45e45b9fc23324d2db8c))
 </details>
 
-## v0.74.6 (2023-02-08)
+## v0.74.7 (2023-02-08)
+
+### Test
+
+ - <csr-id-d22af7554548426c8aa54d39bb50fceebfc5929e/> fix to account for join try response
 
 ### Chore
 
- - <csr-id-2c1b51affbc89cbee181039ce01a28d901d49e72/> sn_node-0.74.6
+ - <csr-id-becb95e9023e984809d403a5f36a114d1644205b/> sn_node-0.74.7
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
- - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 3 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_node-0.74.7 ([`becb95e`](https://github.com/maidsafe/safe_network/commit/becb95e9023e984809d403a5f36a114d1644205b))
+    - Merge #2082 ([`1e9d591`](https://github.com/maidsafe/safe_network/commit/1e9d5911ed9320e4db632e72f05e89059f6f0d48))
+    - fix to account for join try response ([`d22af75`](https://github.com/maidsafe/safe_network/commit/d22af7554548426c8aa54d39bb50fceebfc5929e))
+</details>
+
+## v0.74.6 (2023-02-08)
+
+<csr-id-2c1b51affbc89cbee181039ce01a28d901d49e72/>
+
+### Chore
+
+ - <csr-id-2c1b51affbc89cbee181039ce01a28d901d49e72/> sn_node-0.74.6
+
+### Refactor
+
+ - <csr-id-c7817b32486a527c111839eb9c74ad45416ed385/> send response to joiner
+   TryJoin wasn't previously answered over the bi-stream. This adds a
+   'Considering' response that is sent back over the same stream.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -47,6 +85,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  * **Uncategorized**
     - sn_node-0.74.6 ([`2c1b51a`](https://github.com/maidsafe/safe_network/commit/2c1b51affbc89cbee181039ce01a28d901d49e72))
+    - send response to joiner ([`c7817b3`](https://github.com/maidsafe/safe_network/commit/c7817b32486a527c111839eb9c74ad45416ed385))
     - Merge #2083 ([`39470f4`](https://github.com/maidsafe/safe_network/commit/39470f4e0293231b9e065e33061f52b5d3a7fdea))
 </details>
 
