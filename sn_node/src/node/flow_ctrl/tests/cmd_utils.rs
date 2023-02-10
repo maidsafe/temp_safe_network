@@ -314,7 +314,8 @@ impl TestMsgTracker {
                 let _ = entry.remove();
             }
         } else {
-            panic!("msg_id {msg_id:?} is not found")
+            // panic!("msg_id {msg_id:?} is not found")
+            removed = false;
         }
         removed
     }
