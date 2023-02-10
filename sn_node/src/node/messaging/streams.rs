@@ -14,44 +14,10 @@ use sn_interface::{
 };
 
 use bytes::Bytes;
-use lazy_static::lazy_static;
 use qp2p::SendStream;
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    env::var,
-    str::FromStr,
-};
-use tokio::time::Duration;
+use std::collections::{BTreeMap, BTreeSet};
 use xor_name::XorName;
-
-/// Environment variable to set timeout value (in seconds) for data queries
-/// forwarded to Adults. Default value (`NODE_RESPONSE_DEFAULT_TIMEOUT`) is otherwise used.
-const ENV_NODE_RESPONSE_TIMEOUT: &str = "SN_NODE_RESPONSE_TIMEOUT";
-
-// Default timeout period set for data queries forwarded to Adult.
-// TODO: how to determine this time properly?
-const NODE_RESPONSE_DEFAULT_TIMEOUT: Duration = Duration::from_secs(70);
-
-lazy_static! {
-    static ref NODE_RESPONSE_TIMEOUT: Duration = match var(ENV_NODE_RESPONSE_TIMEOUT)
-        .map(|v| u64::from_str(&v))
-    {
-        Ok(Ok(secs)) => {
-            let timeout = Duration::from_secs(secs);
-            info!("{ENV_NODE_RESPONSE_TIMEOUT} env var set, Node data query response timeout set to {timeout:?}");
-            timeout
-        }
-        Ok(Err(err)) => {
-            warn!(
-                "Failed to parse {ENV_NODE_RESPONSE_TIMEOUT} value, using \
-                default value ({NODE_RESPONSE_DEFAULT_TIMEOUT:?}): {err:?}"
-            );
-            NODE_RESPONSE_DEFAULT_TIMEOUT
-        }
-        Err(_) => NODE_RESPONSE_DEFAULT_TIMEOUT,
-    };
-}
 
 // Message handling over streams
 impl MyNode {
