@@ -318,7 +318,12 @@ fn get_session(
 }
 
 #[tracing::instrument(skip_all)]
-fn send(msg_id: MsgId, session: PeerSession, bytes: UsrMsgBytes, comm_events: Sender<CommEvent>) {
+fn send(
+    msg_id: MsgId,
+    mut session: PeerSession,
+    bytes: UsrMsgBytes,
+    comm_events: Sender<CommEvent>,
+) {
     let _handle = task::spawn(async move {
         let (h, d, p) = &bytes;
         let bytes_len = h.len() + d.len() + p.len();

@@ -6,22 +6,20 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{Result, STANDARD_CHANNEL_SIZE};
+use super::Result;
+
+use sn_interface::{
+    messaging::MsgId,
+    types::{log_markers::LogMarker, Peer},
+};
 
 use qp2p::{Connection, Endpoint, UsrMsgBytes};
 
 use custom_debug::Debug;
 use dashmap::DashMap;
-use sn_interface::{
-    messaging::MsgId,
-    types::{log_markers::LogMarker, Peer},
-};
 use std::sync::Arc;
 use thiserror::Error;
-use tokio::{
-    sync::mpsc,
-    time::{sleep, Duration},
-};
+use tokio::time::{sleep, Duration};
 
 type ConnId = String;
 
@@ -44,26 +42,16 @@ pub(crate) struct PeerSession {
     peer: Peer,
     endpoint: Endpoint,
     connections: PeerConnections,
-    queue: mpsc::Sender<SendJob>,
 }
 
 type PeerConnections = Arc<DashMap<ConnId, Arc<Connection>>>;
 
 impl PeerSession {
     pub(crate) fn new(peer: Peer, endpoint: Endpoint) -> Self {
-        let (sender, receiver) = mpsc::channel(STANDARD_CHANNEL_SIZE);
-        let connections = PeerConnections::default();
-
-        // Spawn the peer session worker, which will stop automatically when
-        // the PeerSession is dropped as the channel will be dropped too.
-        PeerSessionWorker::new(peer, connections.clone(), endpoint.clone(), sender.clone())
-            .run(receiver);
-
         Self {
             peer,
             endpoint,
-            connections,
-            queue: sender,
+            connections: PeerConnections::default(),
         }
     }
 
@@ -180,195 +168,81 @@ impl PeerSession {
 
     #[instrument(skip(self, bytes))]
     pub(crate) async fn send(
-        &self,
+        &mut self,
         msg_id: MsgId,
         bytes: UsrMsgBytes,
     ) -> Result<(), PeerSessionError> {
-        let (sender, mut receiver) = mpsc::channel(1);
-
-        let job = SendJob {
-            msg_id,
-            bytes,
-            connection_retries: 0,
-            reporter: sender,
-        };
-
-        self.queue.send(job).await.map_err(|err| {
-            error!("Failed to enqueue send job for {msg_id:?}: {err:?}");
-            PeerSessionError::PeerSessionJobsQueue
-        })?;
+        let mut connection_retries = 0;
 
         trace!("Send job sent to PeerSessionWorker: {msg_id:?}");
         let peer = self.peer;
-        match receiver.recv().await {
-            Some(Ok(())) => Ok(()),
-            Some(Err(err)) => {
-                error!("Sending message {msg_id:?} to {peer:?}, possibly failed: {err:?}");
-                Err(err)
-            }
-            None => {
-                // the result sharing channel is closed for some unknown reason,
-                error!("Sending message {msg_id:?} to {peer:?} possibly failed, as monitoring of the send job was aborted");
-                Err(PeerSessionError::UnknownSendJobOutcome)
-            }
-        }
-    }
-}
 
-async fn create_connection(
-    peer: Peer,
-    endpoint: &Endpoint,
-    connections: PeerConnections,
-    msg_id: MsgId,
-) -> Result<Arc<Connection>, PeerSessionError> {
-    debug!("{msg_id:?} create conn attempt to {peer:?}");
-    let (conn, _) = endpoint
-        .connect_to(&peer.addr())
-        .await
-        .map_err(PeerSessionError::Connection)?;
+        loop {
+            trace!("Sending to peer over connection: {msg_id:?}");
 
-    trace!(
-        "{msg_id:?}: {} to {} (id: {})",
-        LogMarker::ConnectionOpened,
-        conn.remote_address(),
-        conn.id()
-    );
-
-    let conn_id = conn.id();
-    debug!("Inserting connection into peer session: {conn_id}");
-
-    let conn = Arc::new(conn);
-    let _ = connections.insert(conn_id.clone(), conn.clone());
-    debug!("Connection INSERTED into peer session: {conn_id}");
-
-    Ok(conn)
-}
-
-struct PeerSessionWorker {
-    peer: Peer,
-    connections: PeerConnections,
-    endpoint: Endpoint,
-    queue: mpsc::Sender<SendJob>,
-}
-
-impl PeerSessionWorker {
-    fn new(
-        peer: Peer,
-        connections: PeerConnections,
-        endpoint: Endpoint,
-        queue: mpsc::Sender<SendJob>,
-    ) -> Self {
-        Self {
-            peer,
-            connections,
-            endpoint,
-            queue,
-        }
-    }
-
-    fn run(mut self, mut channel: mpsc::Receiver<SendJob>) {
-        let _handle = tokio::task::spawn(async move {
-            let peer = self.peer;
-            while let Some(job) = channel.recv().await {
-                trace!("Processing session {peer:?} send job: {job:?}");
-                self.send_over_peer_connection(job).await;
+            if connection_retries > MAX_SENDJOB_RETRIES {
+                let error_to_report = PeerSessionError::MaxRetriesReached(MAX_SENDJOB_RETRIES);
+                debug!("{error_to_report}: {msg_id:?}");
+                return Err(error_to_report);
             }
 
-            // close the channel to prevent senders adding more messages.
-            channel.close();
+            // Keep this connection creation/retrieval as blocking.
+            // This avoids us making many many connection attempts to the same node.
+            //
+            // If a valid connection exists, retrieval is fast.
+            //
+            // Attempt to get a connection or make one to another node.
+            // if there's no successful connection, we requeue the job after a wait
+            // incase there's been a delay adding the connection to Comms
+            let conn = match self.get_or_connect(msg_id).await {
+                Ok(conn) => conn,
+                Err(error) => {
+                    error!("Error when attempting to send {msg_id:?} to peer. Job will be reenqueued for another attempt after a small timeout: {error:?}");
 
-            // drain channel to avoid memory leaks.
-            while let Some(msg) = channel.recv().await {
-                warn!("Draining channel: dropping {:?}", msg);
-            }
+                    // only increment connection attempts if our connections set is empty
+                    // and so we'll be trying to create a fresh connection
+                    if self.connections.is_empty() {
+                        connection_retries += 1;
+                    }
 
-            warn!("Finished peer session shutdown: {peer:?}");
-        });
-    }
-
-    async fn send_over_peer_connection(&mut self, mut job: SendJob) {
-        let msg_id = job.msg_id;
-        trace!("Sending to peer over connection: {msg_id:?}");
-
-        if job.connection_retries > MAX_SENDJOB_RETRIES {
-            let error_to_report = PeerSessionError::MaxRetriesReached(MAX_SENDJOB_RETRIES);
-            debug!("{error_to_report}: {msg_id:?}");
-            if let Err(err) = job.reporter.try_send(Err(error_to_report)) {
-                error!("Couldn't report max retries failure for {msg_id:?}: {err:?}");
-            }
-            return;
-        }
-
-        // Keep this connection creation/retrieval as blocking.
-        // This avoids us making many many connection attempts to the same node.
-        //
-        // If a valid connection exists, retrieval is fast.
-        //
-        // Attempt to get a connection or make one to another node.
-        // if there's no successful connection, we requeue the job after a wait
-        // incase there's been a delay adding the connection to Comms
-        let conn = match self.get_or_connect(msg_id).await {
-            Ok(conn) => conn,
-            Err(error) => {
-                error!("Error when attempting to send {msg_id:?} to peer. Job will be reenqueued for another attempt after a small timeout: {error:?}");
-
-                // only increment connection attempts if our connections set is empty
-                // and so we'll be trying to create a fresh connection
-                if self.connections.is_empty() {
-                    job.connection_retries += 1;
+                    // we await here in case the connection is fresh and has not yet been added
+                    sleep(CONN_RETRY_WAIT).await;
+                    continue;
                 }
+            };
 
-                // we await here in case the connection is fresh and has not yet been added
-                sleep(CONN_RETRY_WAIT).await;
-                if let Err(e) = self.queue.send(job).await {
-                    warn!("Failed to re-enqueue job {msg_id:?} after failed connection retrieval error {e:?}");
-                }
-
-                return;
-            }
-        };
-
-        let connections = self.connections.clone();
-        let conns_count = connections.len();
-        let peer = self.peer;
-        let queue = self.queue.clone();
-        let _handle = tokio::spawn(async move {
             let conn_id = conn.id();
-            debug!("Connection exists for sendjob: {msg_id:?}, and has conn_id: {conn_id:?}");
+            debug!("Connection got for sendjob: {msg_id:?}, with conn_id: {conn_id:?}");
 
-            let send_resp = Self::send_with_connection(conn, job.bytes.clone(), connections).await;
+            let send_resp =
+                Self::send_with_connection(conn, bytes.clone(), self.connections.clone()).await;
 
             match send_resp {
                 Ok(()) => {
-                    if let Err(err) = job.reporter.try_send(Ok(())) {
-                        error!("Couldn't report sucessful sent to {peer:?}: {err:?}");
-                    }
+                    return Ok(());
                 }
                 Err(err) => {
                     if err.is_local_close() {
+                        let conns_count = self.connections.len();
                         error!("Peer connection dropped when trying to send {msg_id:?} (we still have {conns_count:?} connections): {err:?}");
                         // we can retry if we've more connections!
                         if conns_count <= 1 {
                             debug!(
                                 "No connections left on this session to {peer:?}, terminating session.",
                             );
-                            job.connection_retries += 1;
+                            connection_retries += 1;
                         }
                     }
 
                     warn!(
-                        "Transient error while attempting to send, re-enqueing job {msg_id:?} {err:?}. Connection id was {:?}",conn_id
+                        "Transient error while attempting to send, re-trying job {msg_id:?} {err:?}. Connection id was {:?}",conn_id
                     );
 
                     // we await here in case the connection is fresh and has not yet been added
                     sleep(CONN_RETRY_WAIT).await;
-
-                    if let Err(e) = queue.send(job).await {
-                        warn!("Failed to re-enqueue job {msg_id:?} after transient error {e:?}");
-                    }
                 }
             }
-        });
+        }
     }
 
     // Gets an existing connection or creates a new one
@@ -418,13 +292,33 @@ impl PeerSessionWorker {
     }
 }
 
-#[derive(Debug)]
-pub(crate) struct SendJob {
+async fn create_connection(
+    peer: Peer,
+    endpoint: &Endpoint,
+    connections: PeerConnections,
     msg_id: MsgId,
-    #[debug(skip)]
-    bytes: UsrMsgBytes,
-    connection_retries: usize, // TAI: Do we need this if we are using QP2P's retry
-    reporter: mpsc::Sender<Result<(), PeerSessionError>>,
+) -> Result<Arc<Connection>, PeerSessionError> {
+    debug!("{msg_id:?} create conn attempt to {peer:?}");
+    let (conn, _) = endpoint
+        .connect_to(&peer.addr())
+        .await
+        .map_err(PeerSessionError::Connection)?;
+
+    trace!(
+        "{msg_id:?}: {} to {} (id: {})",
+        LogMarker::ConnectionOpened,
+        conn.remote_address(),
+        conn.id()
+    );
+
+    let conn_id = conn.id();
+    debug!("Inserting connection into peer session: {conn_id}");
+
+    let conn = Arc::new(conn);
+    let _ = connections.insert(conn_id.clone(), conn.clone());
+    debug!("Connection INSERTED into peer session: {conn_id}");
+
+    Ok(conn)
 }
 
 /// Errors that can be returned from `Comm::send_to_one`.
@@ -439,10 +333,6 @@ pub(super) enum PeerSessionError {
     Recv(qp2p::RecvError),
     #[error("Max number of attempts ({0}) to send msg to the peer has been reached")]
     MaxRetriesReached(usize),
-    #[error("Status of sending the msg is unknown")]
-    UnknownSendJobOutcome,
-    #[error("Peer session job sending channel errored")]
-    PeerSessionJobsQueue,
 }
 
 impl PeerSessionError {
