@@ -431,7 +431,7 @@ mod tests {
                         let (_, handle) = join_handle_for_relocating_node
                             .take()
                             .expect("join_handle is present");
-                        let _issue_tracker = handle.await??;
+                        assert!(handle.await??.is_empty());
                     }
                 }
 
@@ -511,7 +511,7 @@ mod tests {
                             ..
                         } = &cmd
                         {
-                            // skip
+                            assert!(dispatcher.process_cmd(cmd).await?.is_empty());
                         } else {
                             panic!("got a different cmd {cmd:?}");
                         }
