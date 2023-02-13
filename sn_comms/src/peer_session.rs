@@ -424,6 +424,7 @@ pub(crate) struct SendJob {
     #[debug(skip)]
     bytes: UsrMsgBytes,
     connection_retries: usize, // TAI: Do we need this if we are using QP2P's retry
+    #[debug(skip)]
     reporter: mpsc::Sender<Result<(), PeerSessionError>>,
 }
 
