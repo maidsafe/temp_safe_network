@@ -855,7 +855,7 @@ mod tests {
         cmds::Cmd,
         dispatcher::Dispatcher,
         tests::{
-            cmd_utils::{get_next_msg, TestMsgCounter},
+            cmd_utils::{get_next_msg, TestDispatcher, TestMsgTracker},
             network_builder::TestNetworkBuilder,
         },
     };
@@ -890,11 +890,12 @@ mod tests {
         init_logger();
         let mut rng = rand::thread_rng();
         let node_count = 7;
-        let (mut node_instances, mut comm_receivers, _) = create_elders(node_count, &mut rng).await;
-        let msg_counter = &mut TestMsgCounter::default();
+        let msg_tracker = Arc::new(RwLock::new(TestMsgTracker::default()));
+        let (mut node_instances, mut comm_receivers, _) =
+            create_elders(node_count, msg_tracker.clone(), &mut rng).await;
 
         // let the current set of elders start the dkg round
-        let _ = start_dkg(&mut node_instances, msg_counter).await?;
+        let _ = start_dkg(&mut node_instances).await?;
 
         let mut new_sk_shares = BTreeMap::new();
         // terminate if there are no more msgs to process
@@ -908,13 +909,10 @@ mod tests {
                 info!("\n\n NODE: {name}");
 
                 while let Some(msg) = get_next_msg(comm_rx).await {
-                    let cmds = dispatcher
-                        .test_handle_msg_from_peer(msg, msg_counter, None)
-                        .await;
+                    let cmds = dispatcher.test_handle_msg_from_peer(msg, None).await;
                     for cmd in cmds {
                         info!("Got cmd {}", cmd);
                         if let Cmd::SendMsg { .. } = &cmd {
-                            msg_counter.track(&cmd);
                             assert!(dispatcher.process_cmd(cmd).await?.is_empty());
                         } else if let Cmd::HandleDkgOutcome {
                             section_auth: _,
@@ -930,7 +928,7 @@ mod tests {
                     }
                 }
             }
-            if msg_counter.is_empty() {
+            if msg_tracker.read().await.is_empty() {
                 done = true;
             }
         }
@@ -947,11 +945,12 @@ mod tests {
         init_logger();
         let mut rng = rand::thread_rng();
         let node_count = 7;
-        let (mut node_instances, mut comm_receivers, _) = create_elders(node_count, &mut rng).await;
-        let msg_counter = &mut TestMsgCounter::default();
+        let msg_tracker = Arc::new(RwLock::new(TestMsgTracker::default()));
+        let (mut node_instances, mut comm_receivers, _) =
+            create_elders(node_count, msg_tracker.clone(), &mut rng).await;
 
         // let current set of elders start the dkg round
-        let _ = start_dkg(&mut node_instances, msg_counter).await?;
+        let _ = start_dkg(&mut node_instances).await?;
 
         let dead_node = node_instances
             .keys()
@@ -969,14 +968,11 @@ mod tests {
                 info!("\n\n NODE: {name}");
 
                 while let Some(msg) = get_next_msg(comm_rx).await {
-                    let cmds = dispatcher
-                        .test_handle_msg_from_peer(msg, msg_counter, None)
-                        .await;
+                    let cmds = dispatcher.test_handle_msg_from_peer(msg, None).await;
                     for mut cmd in cmds {
                         info!("Got cmd {}", cmd);
                         if let Cmd::SendMsg { .. } = cmd {
                             cmd.filter_recipients(BTreeSet::from([dead_node]));
-                            msg_counter.track(&cmd);
                             assert!(dispatcher.process_cmd(cmd).await?.is_empty());
                         } else {
                             panic!("got a different cmd {cmd:?}");
@@ -984,7 +980,7 @@ mod tests {
                     }
                 }
             }
-            if msg_counter.is_empty() {
+            if msg_tracker.read().await.is_empty() {
                 done = true;
             }
         }
@@ -1001,11 +997,12 @@ mod tests {
         init_logger();
         let mut rng = rand::thread_rng();
         let node_count = 7;
-        let (mut node_instances, mut comm_receivers, _) = create_elders(node_count, &mut rng).await;
-        let msg_counter = &mut TestMsgCounter::default();
+        let msg_tracker = Arc::new(RwLock::new(TestMsgTracker::default()));
+        let (mut node_instances, mut comm_receivers, _) =
+            create_elders(node_count, msg_tracker.clone(), &mut rng).await;
 
         // let current set of elders start the dkg round
-        let dkg_session_id = start_dkg(&mut node_instances, msg_counter).await?;
+        let dkg_session_id = start_dkg(&mut node_instances).await?;
 
         let mut new_sk_shares = BTreeMap::new();
         // we gossip if we have looped through all the nodes 10 times
@@ -1023,9 +1020,7 @@ mod tests {
                 tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
 
                 while let Some(msg) = get_next_msg(comm_rx).await {
-                    let cmds = dispatcher
-                        .test_handle_msg_from_peer(msg, msg_counter, None)
-                        .await;
+                    let cmds = dispatcher.test_handle_msg_from_peer(msg, None).await;
                     for mut cmd in cmds {
                         info!("Got cmd {}", cmd);
                         if let Cmd::SendMsg { ref recipients, .. } = cmd {
@@ -1040,7 +1035,6 @@ mod tests {
                                     .ok_or_else(|| eyre!("Contains node_count peers"))?;
                                 cmd.filter_recipients(BTreeSet::from([drop_recp]));
                             };
-                            msg_counter.track(&cmd);
                             assert!(dispatcher.process_cmd(cmd).await?.is_empty());
                         } else if let Cmd::HandleDkgOutcome {
                             section_auth: _,
@@ -1088,7 +1082,6 @@ mod tests {
                 for cmd in cmds {
                     info!("Got cmd {}", cmd);
                     assert_matches!(&cmd, Cmd::SendMsg { .. });
-                    msg_counter.track(&cmd);
                     assert!(random_node.process_cmd(cmd).await?.is_empty());
                 }
             }
@@ -1105,9 +1098,10 @@ mod tests {
     /// Generate a set of `MyNode` instances
     async fn create_elders(
         elder_count: usize,
+        msg_tracker: Arc<RwLock<TestMsgTracker>>,
         rng: impl RngCore,
     ) -> (
-        BTreeMap<XorName, Dispatcher>,
+        BTreeMap<XorName, TestDispatcher>,
         BTreeMap<XorName, mpsc::Receiver<CommEvent>>,
         SecretKeySet,
     ) {
@@ -1121,12 +1115,13 @@ mod tests {
             .map(|node| {
                 let name = node.name();
                 let (dispatcher, _) = Dispatcher::new(Arc::new(RwLock::new(node)));
+                let dispatcher = TestDispatcher::new(dispatcher, msg_tracker.clone());
                 (name, dispatcher)
             })
-            .collect::<BTreeMap<XorName, Dispatcher>>();
+            .collect::<BTreeMap<XorName, TestDispatcher>>();
         let mut comm_receivers = BTreeMap::new();
-        for (name, node) in node_instances.iter() {
-            let pk = node.node().read().await.info().public_key();
+        for (name, dispatcher) in node_instances.iter() {
+            let pk = dispatcher.node().read().await.info().public_key();
             let comm = env.take_comm_rx(pk);
             let _ = comm_receivers.insert(*name, comm);
         }
@@ -1134,10 +1129,7 @@ mod tests {
     }
 
     // Each node sends out DKG start msg to the other nodes
-    async fn start_dkg(
-        nodes: &mut BTreeMap<XorName, Dispatcher>,
-        msg_counter: &mut TestMsgCounter,
-    ) -> Result<DkgSessionId> {
+    async fn start_dkg(nodes: &mut BTreeMap<XorName, TestDispatcher>) -> Result<DkgSessionId> {
         let mut elders = BTreeMap::new();
         for (name, node) in nodes.iter() {
             let _ = elders.insert(*name, node.node().read().await.addr);
@@ -1166,7 +1158,6 @@ mod tests {
             assert_eq!(cmd.len(), 1);
             let cmd = cmd.remove(0);
             assert_matches!(&cmd, Cmd::SendMsg { .. });
-            msg_counter.track(&cmd);
             assert!(dispatcher.process_cmd(cmd).await?.is_empty());
         }
         Ok(session_id)

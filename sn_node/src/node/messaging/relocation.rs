@@ -128,7 +128,7 @@ mod tests {
         cmds::Cmd,
         dispatcher::Dispatcher,
         tests::{
-            cmd_utils::{get_next_msg, TestMsgCounter},
+            cmd_utils::{get_next_msg, TestDispatcher, TestMsgTracker},
             network_builder::TestNetworkBuilder,
         },
     };
@@ -161,6 +161,7 @@ mod tests {
         let adult_count = 1;
 
         // Test environment setup
+        let msg_tracker = Arc::new(RwLock::new(TestMsgTracker::default()));
         let mut env = TestNetworkBuilder::new(rand::thread_rng())
             .sap(Prefix::default(), elder_count, adult_count, None, None)
             .build();
@@ -171,16 +172,16 @@ mod tests {
                 let prefix = node.network_knowledge().prefix();
                 let name = node.name();
                 let (dispatcher, _) = Dispatcher::new(Arc::new(RwLock::new(node)));
-                ((prefix, name), Arc::new(dispatcher))
+                let dispatcher = Arc::new(TestDispatcher::new(dispatcher, msg_tracker.clone()));
+                ((prefix, name), dispatcher)
             })
-            .collect::<BTreeMap<(Prefix, XorName), Arc<Dispatcher>>>();
+            .collect::<BTreeMap<(Prefix, XorName), Arc<TestDispatcher>>>();
         let mut comm_receivers = BTreeMap::new();
         for (name, node) in node_instances.iter() {
             let pk = node.node().read().await.info().public_key();
             let comm = env.take_comm_rx(pk);
             let _ = comm_receivers.insert(*name, comm);
         }
-        let msg_counter = &mut TestMsgCounter::default();
         // allow time to create the nodes and write section tree to disk
         tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
 
@@ -197,10 +198,9 @@ mod tests {
             }
         }) {
             initialize_relocation(
-                dispatcher,
+                dispatcher.clone(),
                 relocation_node_old_name,
                 Prefix::default(),
-                msg_counter,
             )
             .await?;
         }
@@ -209,7 +209,7 @@ mod tests {
             &node_instances,
             &mut comm_receivers,
             elder_count,
-            msg_counter,
+            msg_tracker.clone(),
         )
         .await?;
 
@@ -252,6 +252,7 @@ mod tests {
         let prefix1 = prefix("1");
 
         // Test environment setup
+        let msg_tracker = Arc::new(RwLock::new(TestMsgTracker::default()));
         let mut env = TestNetworkBuilder::new(rand::thread_rng())
             .sap(prefix0, elder_count_0, adult_count_0, None, None)
             .sap(prefix1, elder_count_1, adult_count_1, None, None)
@@ -288,16 +289,16 @@ mod tests {
                         .expect("Section tree update failed");
                 }
                 let (dispatcher, _) = Dispatcher::new(Arc::new(RwLock::new(node)));
-                ((prefix, name), Arc::new(dispatcher))
+                let dispatcher = Arc::new(TestDispatcher::new(dispatcher, msg_tracker.clone()));
+                ((prefix, name), dispatcher)
             })
-            .collect::<BTreeMap<(Prefix, XorName), Arc<Dispatcher>>>();
+            .collect::<BTreeMap<(Prefix, XorName), Arc<TestDispatcher>>>();
         let mut comm_receivers = BTreeMap::new();
         for (name, node) in node_instances.iter() {
             let pk = node.node().read().await.info().public_key();
             let comm = env.take_comm_rx(pk);
             let _ = comm_receivers.insert(*name, comm);
         }
-        let msg_counter = &mut TestMsgCounter::default();
         // allow time to create the nodes and write section tree to disk
         tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
 
@@ -316,15 +317,14 @@ mod tests {
                 }
             })
         {
-            initialize_relocation(dispatcher, relocation_node_old_name, prefix1, msg_counter)
-                .await?;
+            initialize_relocation(dispatcher.clone(), relocation_node_old_name, prefix1).await?;
         }
 
         relocation_loop(
             &node_instances,
             &mut comm_receivers,
             elder_count_0,
-            msg_counter,
+            msg_tracker.clone(),
         )
         .await?;
 
@@ -374,10 +374,9 @@ mod tests {
 
     // Propose NodeIsOffline(relocation) for the provided node
     async fn initialize_relocation(
-        dispatcher: &Dispatcher,
+        dispatcher: Arc<TestDispatcher>,
         relocation_node_name: XorName,
         dst_prefix: Prefix,
-        msg_counter: &mut TestMsgCounter,
     ) -> Result<()> {
         info!(
             "Initialize relocation from {:?}",
@@ -398,7 +397,6 @@ mod tests {
         )?;
         assert_eq!(relocation_send_msg.len(), 1);
         let relocation_send_msg = relocation_send_msg.remove(0);
-        msg_counter.track(&relocation_send_msg);
         assert!(dispatcher
             .process_cmd(relocation_send_msg)
             .await?
@@ -409,17 +407,15 @@ mod tests {
 
     /// Main loop that sends and processes Cmds
     async fn relocation_loop(
-        node_instances: &BTreeMap<(Prefix, XorName), Arc<Dispatcher>>,
+        node_instances: &BTreeMap<(Prefix, XorName), Arc<TestDispatcher>>,
         comm_receivers: &mut BTreeMap<(Prefix, XorName), Receiver<CommEvent>>,
         from_section_n_elders: usize,
-        msg_counter: &mut TestMsgCounter,
+        msg_tracker: Arc<RwLock<TestMsgTracker>>,
     ) -> Result<()> {
         let mut relocation_membership_decision_done = BTreeSet::new();
         // Handler for the bidi stream task
-        let mut join_handle_for_relocating_node: Option<(
-            XorName,
-            JoinHandle<crate::node::Result<Vec<Cmd>>>,
-        )> = None;
+        let mut join_handle_for_relocating_node: Option<(XorName, JoinHandle<Result<Vec<Cmd>>>)> =
+            None;
         // terminate if there are no more msgs to process
         let mut done = false;
         while !done {
@@ -443,19 +439,15 @@ mod tests {
                 tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
 
                 while let Some(msg) = get_next_msg(comm_rx).await {
-                    let cmds = dispatcher
-                        .test_handle_msg_from_peer(msg, msg_counter, Some(name))
-                        .await;
+                    let cmds = dispatcher.test_handle_msg_from_peer(msg, Some(name)).await;
                     for cmd in cmds {
                         info!("Got cmd {}", cmd);
                         if let Cmd::SendMsg { .. } = &cmd {
-                            msg_counter.track(&cmd);
                             assert!(dispatcher.process_cmd(cmd).await?.is_empty());
                         } else if let Cmd::SendMsgEnqueueAnyResponse { .. } = &cmd {
                             // The relocating node waits for the elders to allow it to join the
                             // section. It happens through a bidi stream and hence spawn it as a
                             // separate task.
-                            msg_counter.track(&cmd);
                             let dis = dispatcher.clone();
                             join_handle_for_relocating_node = Some((
                                 name,
@@ -468,7 +460,6 @@ mod tests {
                             assert_matches!(&send_cmd, Cmd::SendMsg { msg, .. } => {
                                 assert_matches!(msg, NodeMsg::MembershipVotes(_));
                             });
-                            msg_counter.track(&send_cmd);
                             assert!(dispatcher.process_cmd(send_cmd).await?.is_empty());
                         }
                         // There are 2 Membership changes here, one to relocate the
@@ -485,7 +476,6 @@ mod tests {
                                 assert_matches!(&send_cmd, Cmd::SendMsg { msg, .. } => {
                                     assert_matches!(msg, NodeMsg::Relocate(_));
                                 });
-                                msg_counter.track(&send_cmd);
                                 assert!(dispatcher.process_cmd(send_cmd).await?.is_empty());
 
                                 let _ = relocation_membership_decision_done.insert(name);
@@ -495,7 +485,6 @@ mod tests {
                                 assert_matches!(&send_cmd, Cmd::SendMsg { msg, .. } => {
                                     assert_matches!(msg,  NodeMsg::JoinResponse(JoinResponse::Approved { .. }));
                                 });
-                                msg_counter.track(&send_cmd);
                                 assert!(dispatcher.process_cmd(send_cmd).await?.is_empty());
                             }
 
@@ -506,7 +495,6 @@ mod tests {
                                     assert_matches!(kind, AntiEntropyKind::Update { .. });
                                 });
                             });
-                            msg_counter.track(&send_cmd);
                             assert!(dispatcher.process_cmd(send_cmd).await?.is_empty());
 
                             // Skip NodeDataCmd as we don't have any data
@@ -531,12 +519,12 @@ mod tests {
                 }
             }
 
-            if msg_counter.is_empty() {
+            if msg_tracker.read().await.is_empty() {
                 done = true;
             } else {
                 debug!(
                     "remaining msgs {:?}",
-                    msg_counter.counter.keys().collect::<Vec<_>>()
+                    msg_tracker.read().await.tracker.keys().collect::<Vec<_>>()
                 );
             }
         }
