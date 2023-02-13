@@ -1113,14 +1113,14 @@ needed, as they keypair itself contains the Arcs we need.
     - Self authentication Example
     - Example to demonstrate Storage API
 
-## v0.78.5 (2023-02-08)
+## v0.78.6 (2023-02-13)
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
- - 1 day passed between releases.
+ - 1 commit contributed to the release.
+ - 4 days passed between releases.
  - 0 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
@@ -1131,11 +1131,44 @@ needed, as they keypair itself contains the Arcs we need.
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #1886 ([`6082509`](https://github.com/maidsafe/safe_network/commit/6082509275b3813bc7e5ffe8da5f93bc3ce5fded))
+</details>
+
+## v0.78.5 (2023-02-08)
+
+### Other
+
+ - <csr-id-b09329be395afc79c01c8276a83db02fbd8feded/> enable 40/100mb tests
+
+### Chore
+
+ - <csr-id-c8bbc738158c35020c0a7c4c5108aceb744a0247/> sn_interface-0.17.6/sn_client-0.78.5/sn_node-0.74.5
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 4 commits contributed to the release over the course of 1 calendar day.
+ - 1 day passed between releases.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.17.6/sn_client-0.78.5/sn_node-0.74.5 ([`c8bbc73`](https://github.com/maidsafe/safe_network/commit/c8bbc738158c35020c0a7c4c5108aceb744a0247))
     - Merge #2079 ([`acca5f3`](https://github.com/maidsafe/safe_network/commit/acca5f30d7ce2080e0cd8ef38f4039412b201e06))
     - chore: remove redundant enum variant - `ClientDataResponse` variant `CommunicationIssues` was not differentiated on client, and was carrying the exact same error enum as the variant `NetworkIssue`. ([`a34243e`](https://github.com/maidsafe/safe_network/commit/a34243e89d735512a7eee2b6bf3a96d2a9cbea59))
+    - enable 40/100mb tests ([`b09329b`](https://github.com/maidsafe/safe_network/commit/b09329be395afc79c01c8276a83db02fbd8feded))
 </details>
 
 ## v0.78.4 (2023-02-06)
+
+<csr-id-e967cc4d827c460bb47748decdf564c9cf7e1e6d/>
 
 ### Chore
 
