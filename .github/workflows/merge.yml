@@ -269,8 +269,6 @@ jobs:
 
       - name: Run client tests
         env:
-          SN_CMD_TIMEOUT: 90
-          SN_QUERY_TIMEOUT: 90
           RUST_LOG: "sn_client=trace,qp2p=debug"
         run: cd sn_client && cargo test --release --features check-replicas
         timeout-minutes: 10
@@ -399,10 +397,8 @@ jobs:
 
       - name: Run client tests
         env:
-          SN_CMD_TIMEOUT: 90
-          SN_QUERY_TIMEOUT: 90
           RUST_LOG: "sn_client=trace,qp2p=debug"
-        run: cd sn_client && cargo test --release --features msg-happy-path -- --test-threads=1
+        run: cd sn_client && cargo test --release --features msg-happy-path
         timeout-minutes: 10
 
       - name: Run example app for file API against local network
@@ -636,7 +632,7 @@ jobs:
   #     - name: Run client tests
   #       env:
   #         RUST_LOG: "sn_client=trace,qp2p=debug"
-  #       run: cargo test --release -p sn_client -- --test-threads=1
+  #       run: cargo test --release -p sn_client
   #       timeout-minutes: 25
 
   #     - name: Run example app for file API against local network

@@ -75,13 +75,13 @@ impl Session {
         auth: ClientAuth,
         payload: Bytes,
         is_spend: bool,
+        msg_id: MsgId,
     ) -> Result<()> {
         let endpoint = self.endpoint.clone();
         // TODO: Consider other approach: Keep a session per section!
         let (section_pk, elders) = self.get_cmd_elders(dst_address).await?;
 
         let elders_len = elders.len();
-        let msg_id = MsgId::new();
         debug!(
             "Sending cmd with {msg_id:?}, dst: {dst_address:?}, from {}, \
             to {elders_len} Elders: {elders:?}",

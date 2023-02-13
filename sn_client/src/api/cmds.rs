@@ -12,7 +12,7 @@ use crate::{Error, Result};
 use sn_interface::{
     messaging::{
         data::{ClientMsg, DataCmd},
-        ClientAuth, WireMsg,
+        ClientAuth, MsgId, WireMsg,
     },
     types::{PublicKey, Signature},
 };
@@ -42,13 +42,15 @@ impl Client {
             signature,
         };
 
+        let msg_id = MsgId::new();
         tokio::time::timeout(self.cmd_timeout, async {
             self.session
-                .send_cmd(dst_address, auth, serialised_cmd, is_spend_cmd)
+                .send_cmd(dst_address, auth, serialised_cmd, is_spend_cmd, msg_id)
                 .await
         })
         .await
         .map_err(|_| Error::CmdAckValidationTimeout {
+            msg_id,
             elapsed: self.cmd_timeout,
             dst_address,
         })?

@@ -105,7 +105,10 @@ impl MyNode {
         let msg_id = wire_msg.msg_id();
         let targets_len = targets.len();
 
-        debug!("Sending out {msg_id:?} to {targets_len} holder node/s {targets:?}");
+        debug!(
+            "Sending out {msg_id:?}, coming from {}, to {targets_len} holder node/s {targets:?}",
+            source_client.addr()
+        );
 
         let node_bytes: BTreeMap<_, _> = targets
             .into_par_iter()
