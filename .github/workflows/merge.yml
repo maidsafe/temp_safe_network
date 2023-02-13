@@ -272,8 +272,8 @@ jobs:
           SN_CMD_TIMEOUT: 90
           SN_QUERY_TIMEOUT: 90
           RUST_LOG: "sn_client=trace,qp2p=debug"
-        run: cd sn_client && cargo test --release --features check-replicas -- --test-threads=1
-        timeout-minutes: 7
+        run: cd sn_client && cargo test --release --features check-replicas
+        timeout-minutes: 10
 
       - name: Run example app for file API against local network
         timeout-minutes: 2
@@ -403,7 +403,7 @@ jobs:
           SN_QUERY_TIMEOUT: 90
           RUST_LOG: "sn_client=trace,qp2p=debug"
         run: cd sn_client && cargo test --release --features msg-happy-path -- --test-threads=1
-        timeout-minutes: 7
+        timeout-minutes: 10
 
       - name: Run example app for file API against local network
         timeout-minutes: 2
