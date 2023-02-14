@@ -4,15 +4,23 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
-## v0.69.2 (2023-02-06)
+## v0.69.3 (2023-02-14)
+
+### Chore
+
+ - <csr-id-b50fa2c502915fbca752354f271ee0d370f5b06e/> update sn_launch_tool
+
+### Refactor
+
+ - <csr-id-933164e253fb43ec1177ddc56a576b35c3d85bfa/> remove skip port forward flag
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release over the course of 3 calendar days.
- - 3 days passed between releases.
- - 0 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits contributed to the release.
+ - 7 days passed between releases.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -22,11 +30,40 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - update sn_launch_tool ([`b50fa2c`](https://github.com/maidsafe/safe_network/commit/b50fa2c502915fbca752354f271ee0d370f5b06e))
+    - remove skip port forward flag ([`933164e`](https://github.com/maidsafe/safe_network/commit/933164e253fb43ec1177ddc56a576b35c3d85bfa))
+</details>
+
+## v0.69.2 (2023-02-06)
+
+### Chore
+
+ - <csr-id-e967cc4d827c460bb47748decdf564c9cf7e1e6d/> sn_interface-0.17.3/sn_comms-0.3.0/sn_client-0.78.4/sn_node-0.74.0/sn_cli-0.69.2
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release over the course of 3 calendar days.
+ - 3 days passed between releases.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.17.3/sn_comms-0.3.0/sn_client-0.78.4/sn_node-0.74.0/sn_cli-0.69.2 ([`e967cc4`](https://github.com/maidsafe/safe_network/commit/e967cc4d827c460bb47748decdf564c9cf7e1e6d))
     - Merge #2048 ([`ae06c94`](https://github.com/maidsafe/safe_network/commit/ae06c9458ad904863a925f1d2b2e253a67456298))
     - Merge branch 'main' into sap_change_force_dkg_termination ([`876d78a`](https://github.com/maidsafe/safe_network/commit/876d78a911e852b8cc1c33b2130e4cf9b28dd510))
 </details>
 
 ## v0.69.1 (2023-02-03)
+
+<csr-id-e5f38d036ecb54f695881efd45c8c8ab8c64adbc/>
 
 ### Chore
 
