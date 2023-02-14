@@ -6,9 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{Cmd, Error, MyNode, Result, STANDARD_CHANNEL_SIZE};
+use crate::node::{messaging::Peers, Cmd, Error, MyNode, Result, STANDARD_CHANNEL_SIZE};
 
 use sn_interface::{
+    messaging::{AntiEntropyMsg, MsgType},
     network_knowledge::SectionTreeUpdate,
     types::{DataAddress, Peer},
 };
@@ -52,6 +53,45 @@ impl Dispatcher {
                     .into_iter()
                     .collect())
             }
+            Cmd::UpdateCaller {
+                caller,
+                correlation_id,
+                kind,
+                section_tree_update,
+                context,
+            } => {
+                info!("Sending ae response msg for {correlation_id:?}");
+                Ok(vec![Cmd::send_network_msg(
+                    MsgType::AntiEntropy(AntiEntropyMsg::AntiEntropy {
+                        section_tree_update,
+                        kind,
+                    }),
+                    Peers::Single(caller),
+                    context,
+                )])
+            }
+            Cmd::UpdateCallerOnStream {
+                caller,
+                msg_id,
+                kind,
+                section_tree_update,
+                correlation_id,
+                stream,
+                context,
+            } => Ok(MyNode::send_ae_response(
+                AntiEntropyMsg::AntiEntropy {
+                    kind,
+                    section_tree_update,
+                },
+                msg_id,
+                caller,
+                correlation_id,
+                stream,
+                context,
+            )
+            .await?
+            .into_iter()
+            .collect()),
             Cmd::SendMsg {
                 msg,
                 msg_id,

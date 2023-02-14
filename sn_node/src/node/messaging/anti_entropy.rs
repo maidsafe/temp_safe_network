@@ -15,18 +15,14 @@ use crate::node::{
 
 use sn_fault_detection::IssueType;
 use sn_interface::{
-    messaging::{
-        data::ClientDataResponse,
-        system::{AntiEntropyKind, NodeMsg},
-        MsgId, MsgKind, MsgType, WireMsg,
-    },
+    messaging::{AntiEntropyKind, AntiEntropyMsg, MsgId, MsgKind, MsgType, WireMsg},
     network_knowledge::{NetworkKnowledge, SectionTreeUpdate},
     types::{log_markers::LogMarker, Peer, PublicKey},
 };
 
 use bls::PublicKey as BlsPublicKey;
 use itertools::Itertools;
-use qp2p::{SendStream, UsrMsgBytes};
+use qp2p::SendStream;
 use std::{collections::BTreeSet, sync::Arc};
 use tokio::sync::RwLock;
 use xor_name::XorName;
@@ -75,12 +71,12 @@ impl MyNode {
     ) -> Cmd {
         let members = context.network_knowledge.section_signed_members();
 
-        let ae_msg = NodeMsg::AntiEntropy {
+        let ae_msg = MsgType::AntiEntropy(AntiEntropyMsg::AntiEntropy {
             section_tree_update: MyNode::generate_ae_section_tree_update(context, Some(section_pk)),
             kind: AntiEntropyKind::Update { members },
-        };
+        });
 
-        Cmd::send_msg(ae_msg, recipients, context.clone())
+        Cmd::send_network_msg(ae_msg, recipients, context.clone())
     }
 
     #[instrument(skip_all)]
@@ -265,10 +261,11 @@ impl MyNode {
             }
         };
 
-        let (msg_to_resend, msg_id, dst) = match WireMsg::deserialize(bounced_msg)? {
-            MsgType::Node {
-                msg, msg_id, dst, ..
-            } => (msg, msg_id, dst),
+        let wire_msg = WireMsg::from(bounced_msg)?;
+        let dst = wire_msg.dst;
+        let msg_id = wire_msg.msg_id();
+        let msg_to_resend = match wire_msg.into_msg()? {
+            MsgType::Node(msg) => msg,
             _ => {
                 warn!("Non System MsgType received in AE response. We do not handle any other type in AE msgs yet.");
                 return Ok(cmds);
@@ -302,69 +299,50 @@ impl MyNode {
         kind: AntiEntropyKind,
         send_stream: Option<SendStream>,
     ) -> Result<Vec<Cmd>> {
-        let msg_id = wire_msg.msg_id();
-        match wire_msg.kind() {
-            MsgKind::Client { .. } => {
-                if let Some(stream) = send_stream {
-                    let original_msg = wire_msg.serialize()?;
-                    Ok(vec![MyNode::gen_ae_response_cmd_to_client(
-                        msg_id,
-                        context.clone(),
-                        origin,
-                        stream,
-                        original_msg,
-                        section_tree_update,
-                    )])
-                } else {
-                    // TODO: error
-                    error!("No response stream from client. Dropping message");
-                    Ok(vec![])
-                }
-            }
-            MsgKind::Node { .. } => {
-                // If we need to log, here's a cmd ready for us...
-                // we may want to log issues with any node repeatedly out of sync here...
-                let track_node_cmd = Cmd::TrackNodeIssue {
-                    name: origin.name(),
-                    issue: sn_fault_detection::IssueType::NetworkKnowledge,
-                };
-                if let Some(stream) = send_stream {
-                    trace!("Sending AE response over send_stream for {msg_id:?}");
-                    Ok(vec![
-                        track_node_cmd,
-                        Cmd::send_node_response(
-                            NodeMsg::AntiEntropy {
-                                section_tree_update,
-                                kind,
-                            },
-                            msg_id,
-                            origin,
-                            stream,
-                            context.clone(),
-                        ),
-                    ])
-                } else {
-                    trace!("Attempting to send AE response over fresh conn for {msg_id:?}");
-                    Ok(vec![
-                        track_node_cmd,
-                        Cmd::send_msg(
-                            NodeMsg::AntiEntropy {
-                                section_tree_update,
-                                kind,
-                            },
-                            Peers::Single(origin),
-                            context.clone(),
-                        ),
-                    ])
-                }
-            }
-            MsgKind::ClientDataResponse(_) => {
-                // should be unreachable at node
-                error!("ClientDataResponse goes out from us. There should be no AE needed here...");
-                // TODO: error
-                Ok(vec![])
-            }
+        if matches!(
+            wire_msg.kind(),
+            MsgKind::AntiEntropy(_) | MsgKind::ClientDataResponse(_)
+        ) {
+            // TODO: error
+            error!("Should be unreachable. Dropping message.");
+            return Ok(vec![]);
         }
+
+        let msg_id = wire_msg.msg_id();
+        let mut cmds = vec![];
+        if matches!(wire_msg.kind(), MsgKind::Node { .. }) {
+            cmds.push(Cmd::TrackNodeIssue {
+                name: origin.name(),
+                issue: sn_fault_detection::IssueType::NetworkKnowledge,
+            });
+        }
+
+        if let Some(stream) = send_stream {
+            cmds.push(Cmd::UpdateCallerOnStream {
+                caller: origin,
+                msg_id: MsgId::new(),
+                correlation_id: msg_id,
+                kind,
+                section_tree_update,
+                stream,
+                context: context.clone(),
+            });
+            return Ok(cmds);
+        } else if matches!(wire_msg.kind(), MsgKind::Client { .. }) {
+            // TODO: error
+            error!("No response stream from client. Dropping message");
+            return Ok(vec![]);
+        }
+
+        trace!("Attempting to send AE response over fresh conn for {msg_id:?}");
+        cmds.push(Cmd::UpdateCaller {
+            caller: origin,
+            correlation_id: msg_id,
+            kind,
+            section_tree_update,
+            context: context.clone(),
+        });
+        Ok(cmds)
     }
 
     // If entropy is found, determine the `SectionTreeUpdate` and kind of AE response
@@ -439,32 +417,6 @@ impl MyNode {
 
         Ok(Some((section_tree_update, kind)))
     }
-
-    // Generate an AE response msg for the given message and send it to the client
-    pub(crate) fn gen_ae_response_cmd_to_client(
-        correlation_id: MsgId,
-        context: NodeContext,
-        source_client: Peer,
-        response_stream: SendStream,
-        bounced_msg: UsrMsgBytes,
-        section_tree_update: SectionTreeUpdate,
-    ) -> Cmd {
-        trace!(
-            "{} in send_ae_response_to_client {source_client:?} in response to {correlation_id:?}",
-            LogMarker::AeSendRetryAsOutdated
-        );
-
-        Cmd::send_client_response(
-            ClientDataResponse::AntiEntropy {
-                section_tree_update,
-                bounced_msg,
-            },
-            correlation_id,
-            source_client,
-            response_stream,
-            context,
-        )
-    }
 }
 
 // Private helper to generate a SectionTreeUpdate to update
@@ -492,7 +444,7 @@ mod tests {
     use crate::node::{flow_ctrl::tests::network_builder::TestNetworkBuilder, MIN_ADULT_AGE};
     use sn_interface::{
         elder_count,
-        messaging::{Dst, MsgId, MsgKind},
+        messaging::{AntiEntropyMsg, Dst, MsgId, MsgKind},
         network_knowledge::MyNodeInfo,
         test_utils::{gen_addr, prefix},
         types::keys::ed25519,
@@ -671,7 +623,7 @@ mod tests {
         );
 
         // just some message we can construct easily
-        let payload_msg = NodeMsg::AntiEntropyProbe(src_section_pk);
+        let payload_msg = AntiEntropyMsg::Probe(src_section_pk);
         let payload = WireMsg::serialize_msg_payload(&payload_msg)?;
 
         let dst = Dst {
@@ -681,11 +633,7 @@ mod tests {
         Ok(WireMsg::new_msg(
             MsgId::new(),
             payload,
-            MsgKind::Node {
-                name: sender.name(),
-                is_join: payload_msg.is_join(),
-                is_ae: payload_msg.is_ae(),
-            },
+            MsgKind::AntiEntropy(sender.name()),
             dst,
         ))
     }

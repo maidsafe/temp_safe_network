@@ -348,7 +348,7 @@ mod core {
             let probe = context.network_knowledge.anti_entropy_probe();
             info!("ProbeMsg targets {:?}: {probe:?}", recipients);
 
-            Ok(Cmd::send_msg(
+            Ok(Cmd::send_network_msg(
                 probe,
                 Peers::Multiple(recipients),
                 context.clone(),

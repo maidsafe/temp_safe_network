@@ -12,9 +12,7 @@ mod node_msgs;
 mod section_sig;
 
 use crate::messaging::AuthorityProof;
-use crate::network_knowledge::{
-    NodeState, RelocationProof, RelocationTrigger, SapCandidate, SectionTreeUpdate,
-};
+use crate::network_knowledge::{NodeState, RelocationProof, RelocationTrigger, SapCandidate};
 use crate::SectionAuthorityProvider;
 
 pub use dkg::DkgSessionId;
@@ -24,7 +22,6 @@ pub use section_sig::{SectionSig, SectionSigShare, SectionSigned};
 
 use bls::PublicKey as BlsPublicKey;
 use ed25519::Signature;
-use qp2p::UsrMsgBytes;
 use serde::{Deserialize, Serialize};
 use sn_consensus::{Generation, SignedVote};
 use sn_sdkg::DkgSignedVote;
@@ -34,26 +31,6 @@ use xor_name::XorName;
 
 /// List of peers of a section
 pub type SectionPeers = BTreeSet<SectionSigned<NodeState>>;
-
-#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, custom_debug::Debug)]
-pub enum AntiEntropyKind {
-    /// This AE message is sent to a peer when a message with outdated section
-    /// information was received, attaching the bounced message so
-    /// the peer can resend it with up to date destination information.
-    Retry {
-        #[debug(skip)]
-        bounced_msg: UsrMsgBytes,
-    },
-    /// This AE message is sent to a peer when a message needs to be sent to a
-    /// different and/or closest section, attaching the bounced message so the peer
-    /// can resend it to the correct section with up to date destination information.
-    Redirect {
-        #[debug(skip)]
-        bounced_msg: UsrMsgBytes,
-    },
-    /// This AE message is sent to update a peer when we notice they are behind
-    Update { members: SectionPeers },
-}
 
 /// A vote about the state of the section
 /// This can be a result of seeing a node go offline or deciding wether we want to accept new nodes
@@ -71,18 +48,6 @@ pub enum SectionStateVote {
 #[allow(clippy::large_enum_variant, clippy::derive_partial_eq_without_eq)]
 /// Message sent over the among nodes
 pub enum NodeMsg {
-    AntiEntropy {
-        /// The update to our NetworkKnowledge containing the current `SectionAuthorityProvider`
-        /// and the section chain truncated from the triggering msg's dst section_key or genesis_key
-        /// if the the dst section_key is not a direct ancestor to our section_key
-        section_tree_update: SectionTreeUpdate,
-        /// The kind of anti-entropy response.
-        kind: AntiEntropyKind,
-    },
-    /// Probes the network by sending a message to a random or chosen dst triggering an AE flow.
-    /// Sends the current section key of target section which we know
-    /// This expects a response, even if we're up to date.
-    AntiEntropyProbe(BlsPublicKey),
     /// Sent to the relocating node to begin the relocation process. The `RelocationTrigger` is used
     /// by the relocating nodes to request the Section for the relocation membership change.
     BeginRelocating(RelocationTrigger),
@@ -176,17 +141,12 @@ impl NodeMsg {
         // we could also differentiate, say if it's a relocation
         matches!(self, NodeMsg::TryJoin(_))
     }
-    pub fn is_ae(&self) -> bool {
-        matches!(self, NodeMsg::AntiEntropy { .. })
-    }
 }
 
 impl NodeMsg {
     pub fn statemap_states(&self) -> crate::statemap::State {
         use crate::statemap::State;
         match self {
-            Self::AntiEntropy { .. } => State::AntiEntropy,
-            Self::AntiEntropyProbe { .. } => State::AntiEntropy,
             Self::Relocate(_) => State::Relocate,
             Self::BeginRelocating(_) => State::Relocate,
             Self::RelocationRequest { .. } => State::Relocate,
@@ -213,8 +173,6 @@ impl NodeMsg {
 impl Display for NodeMsg {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::AntiEntropy { .. } => write!(f, "NodeMsg::AntiEntropy"),
-            Self::AntiEntropyProbe { .. } => write!(f, "NodeMsg::AntiEntropyProbe"),
             Self::Relocate { .. } => write!(f, "NodeMsg::Relocate"),
             Self::BeginRelocating { .. } => write!(f, "NodeMsg::BeginRelocating"),
             Self::RelocationRequest { .. } => write!(f, "NodeMsg::RequestRelocation"),

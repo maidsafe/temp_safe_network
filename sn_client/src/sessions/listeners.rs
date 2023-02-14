@@ -10,17 +10,18 @@ use super::{MsgResponse, Session};
 
 use crate::{Error, Result};
 
+use itertools::Itertools;
 use qp2p::{RecvStream, UsrMsgBytes};
 use sn_interface::{
     messaging::{
-        data::ClientDataResponse, AuthorityProof, ClientAuth, Dst, MsgId, MsgKind, MsgType, WireMsg,
+        data::ClientDataResponse, AntiEntropyKind, AntiEntropyMsg, AuthorityProof, ClientAuth, Dst,
+        MsgId, MsgKind, MsgType, WireMsg,
     },
     network_knowledge::SectionTreeUpdate,
     types::{log_markers::LogMarker, Peer},
 };
 
 use bytes::Bytes;
-use itertools::Itertools;
 
 // Maximum number of times we'll re-send a msg upon receiving an AE response for it
 const MAX_AE_RETRIES_TO_ATTEMPT: u8 = 5;
@@ -34,78 +35,105 @@ struct MsgResent {
 
 impl Session {
     #[instrument(skip_all, level = "debug")]
-    async fn read_resp_from_recvstream(
+    async fn receive_with_ae(
+        &self,
         recv_stream: &mut RecvStream,
-        peer: Peer,
-        correlation_id: MsgId,
+        mut peer: Peer,
+        peer_index: usize,
+        msg_id: MsgId,
     ) -> Result<(MsgId, ClientDataResponse), Error> {
-        let bytes = recv_stream.read().await?;
-        match WireMsg::deserialize(bytes)? {
-            MsgType::ClientDataResponse { msg_id, msg } => Ok((msg_id, msg)),
-            msg => {
-                warn!(
-                    "Unexpected msg type received on {} from {peer:?} in response \
-                    to {correlation_id:?}: {msg:?}",
-                    recv_stream.id()
-                );
-                Err(Error::UnexpectedMsgType {
-                    correlation_id,
-                    peer,
-                    msg,
-                })
+        // Unless we receive AntiEntropy responses, which require re-sending the
+        // message, the first msg received is the response we expect and return
+        let mut attempt = 0;
+        loop {
+            let stream_id = recv_stream.id();
+            debug!("Waiting for response msg on {stream_id} from {peer:?} @ index: {peer_index} for {msg_id:?}, attempt #{attempt}");
+            let addr = peer.addr();
+            if attempt > MAX_AE_RETRIES_TO_ATTEMPT {
+                return Err(Error::AntiEntropyMaxRetries {
+                    msg_id,
+                    retries: attempt - 1,
+                });
+            }
+
+            let bytes = recv_stream.read().await?;
+
+            match WireMsg::deserialize(bytes)? {
+                (response_id, MsgType::ClientDataResponse(msg)) => return Ok((response_id, msg)),
+                (
+                    _,
+                    MsgType::AntiEntropy(AntiEntropyMsg::AntiEntropy {
+                        section_tree_update,
+                        kind:
+                            AntiEntropyKind::Retry { bounced_msg }
+                            | AntiEntropyKind::Redirect { bounced_msg },
+                    }),
+                ) => {
+                    debug!(
+                        "AntiEntropy msg received for {msg_id:?} \
+                        from {peer:?}"
+                    );
+
+                    let ae_resp_outcome = self
+                        .handle_ae_msg(section_tree_update, bounced_msg, peer, peer_index, msg_id)
+                        .await;
+
+                    match ae_resp_outcome {
+                        Ok(MsgResent {
+                            new_peer,
+                            new_recv_stream,
+                        }) => {
+                            *recv_stream = new_recv_stream;
+                            trace!(
+                                "{} of correlation {msg_id:?} to {} on {stream_id}",
+                                LogMarker::ReceiveCompleted,
+                                addr,
+                            );
+                            peer = new_peer;
+                            attempt += 1;
+                            continue;
+                        }
+                        Err(err) => return Err(err),
+                    }
+                }
+                (response_id, msg) => {
+                    warn!(
+                        "Unexpected msg type received on {} from {peer:?} in response \
+                    to {msg_id:?}: {msg:?} with {response_id:?}",
+                        recv_stream.id()
+                    );
+                    return Err(Error::UnexpectedMsgType {
+                        correlation_id: msg_id,
+                        peer,
+                        msg,
+                    });
+                }
             }
         }
-        // } else {
-        //     Err(Error::ResponseStreamClosed {
-        //         msg_id: correlation_id,
-        //         peer,
-        //     })
-        // }
     }
 
     // Wait for a msg response incoming on the provided RecvStream
     #[instrument(skip_all, level = "debug")]
     pub(crate) async fn recv_stream_listener(
         &self,
-        correlation_id: MsgId,
-        mut peer: Peer,
+        msg_id: MsgId,
+        peer: Peer,
         peer_index: usize,
         mut recv_stream: RecvStream,
     ) -> MsgResponse {
         // Unless we receive AntiEntropy responses, which require re-sending the
         // message, the first msg received is the response we expect and return
-        let mut attempt = 0;
-        let result = loop {
-            let addr = peer.addr();
-            if attempt > MAX_AE_RETRIES_TO_ATTEMPT {
-                break MsgResponse::Failure(
-                    addr,
-                    Error::AntiEntropyMaxRetries {
-                        msg_id: correlation_id,
-                        retries: attempt - 1,
-                    },
-                );
-            }
-
-            let stream_id = recv_stream.id();
-            debug!("Waiting for response msg on {stream_id} from {peer:?} @ index: {peer_index} for {correlation_id:?}, attempt #{attempt}");
-            let (msg_id, resp_msg) =
-                match Self::read_resp_from_recvstream(&mut recv_stream, peer, correlation_id).await
-                {
-                    Ok(resp_info) => resp_info,
-                    Err(err) => break MsgResponse::Failure(addr, err),
-                };
+        let addr = peer.addr();
+        let result = {
+            let (msg_id, resp_msg) = match self
+                .receive_with_ae(&mut recv_stream, peer, peer_index, msg_id)
+                .await
+            {
+                Ok(resp_info) => resp_info,
+                Err(err) => return MsgResponse::Failure(addr, err),
+            };
 
             match resp_msg {
-                ClientDataResponse::NetworkIssue(err) => {
-                    break MsgResponse::Failure(
-                        peer.addr(),
-                        Error::CmdError {
-                            source: err,
-                            msg_id: correlation_id,
-                        },
-                    )
-                }
                 ClientDataResponse::QueryResponse {
                     response,
                     correlation_id,
@@ -114,7 +142,7 @@ impl Session {
                         "QueryResponse with id {msg_id:?} regarding correlation_id \
                         {correlation_id:?} from {peer:?} with response: {response:?}"
                     );
-                    break MsgResponse::QueryResponse(addr, Box::new(response));
+                    MsgResponse::QueryResponse(addr, Box::new(response))
                 }
                 ClientDataResponse::CmdResponse {
                     response,
@@ -124,54 +152,25 @@ impl Session {
                         "CmdResponse with id {msg_id:?} regarding correlation_id \
                         {correlation_id:?} from {peer:?} with response {response:?}"
                     );
-                    break MsgResponse::CmdResponse(addr, Box::new(response));
+                    MsgResponse::CmdResponse(addr, Box::new(response))
                 }
-                ClientDataResponse::AntiEntropy {
-                    section_tree_update,
-                    bounced_msg,
-                } => {
-                    debug!(
-                        "AntiEntropy msg with id {msg_id:?} received for {correlation_id:?} \
-                        from {peer:?}@{peer_index}"
-                    );
-
-                    let ae_resp_outcome = self
-                        .handle_ae_msg(
-                            section_tree_update,
-                            bounced_msg,
-                            peer,
-                            peer_index,
-                            correlation_id,
-                        )
-                        .await;
-
-                    match ae_resp_outcome {
-                        Err(err) => break MsgResponse::Failure(addr, err),
-                        Ok(MsgResent {
-                            new_peer,
-                            new_recv_stream,
-                        }) => {
-                            recv_stream = new_recv_stream;
-                            trace!(
-                                "{} of correlation {correlation_id:?} to {} on {stream_id}",
-                                LogMarker::ReceiveCompleted,
-                                addr,
-                            );
-                            peer = new_peer;
-                            attempt += 1;
-                            continue;
-                        }
-                    }
-                }
+                ClientDataResponse::NetworkIssue(error) => MsgResponse::Failure(
+                    addr,
+                    Error::CmdError {
+                        source: error,
+                        msg_id,
+                    },
+                ),
             }
         };
 
         trace!(
-            "{} of correlation {correlation_id:?} to {}, on {}, with {result:?}",
+            "{} of correlation {msg_id:?} to {}, on {}, with {result:?}",
             LogMarker::ReceiveCompleted,
-            peer.addr(),
+            addr,
             recv_stream.id()
         );
+
         result
     }
 
@@ -298,16 +297,13 @@ impl Session {
         Error,
     > {
         let wire_msg = WireMsg::from(bounced_msg)?;
+        let msg_id = wire_msg.msg_id();
         let msg_kind = wire_msg.kind();
+        let bounced_msg_dst = wire_msg.dst;
         let msg_type = wire_msg.into_msg()?;
         let query_index = *msg_kind.query_index();
-        let (msg_id, client_msg, bounced_msg_dst, auth) = match msg_type {
-            MsgType::Client {
-                msg_id,
-                msg,
-                dst,
-                auth,
-            } => (msg_id, msg, dst, auth),
+        let (client_msg, auth) = match msg_type {
+            MsgType::Client { msg, auth } => (msg, auth),
             msg => {
                 warn!("Unexpected bounced msg received in AE response: {msg:?}");
                 return Err(Error::UnexpectedMsgType {

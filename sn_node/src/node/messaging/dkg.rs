@@ -866,7 +866,7 @@ mod tests {
         messaging::{
             signature_aggregator::SignatureAggregator,
             system::{DkgSessionId, NodeMsg},
-            SectionSigShare,
+            MsgType, SectionSigShare,
         },
         network_knowledge::{supermajority, NodeState, SectionKeyShare},
         types::Peer,
@@ -1206,12 +1206,12 @@ mod tests {
     fn verify_dkg_outcome_cmds(cmds: Vec<Cmd>) {
         assert_eq!(cmds.len(), 2);
         for cmd in cmds {
-            let msg = assert_matches!(cmd, Cmd::SendMsg { msg, .. } => msg);
-
-            match msg {
-                NodeMsg::RequestHandover { .. } => (),
-                NodeMsg::AntiEntropy { .. } => (),
-                msg => panic!("Unexpected msg {msg}"),
+            match cmd {
+                Cmd::SendMsg {
+                    msg: MsgType::AntiEntropy(_) | MsgType::Node(NodeMsg::RequestHandover { .. }),
+                    ..
+                } => (),
+                msg => panic!("Unexpected cmd/msg {msg}"),
             }
         }
     }

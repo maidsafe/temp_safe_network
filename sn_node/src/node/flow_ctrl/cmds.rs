@@ -15,9 +15,11 @@ use sn_interface::{
     messaging::{
         data::{ClientDataResponse, ClientMsg},
         system::{NodeMsg, SectionSig, SectionSigned},
-        AuthorityProof, ClientAuth, MsgId, WireMsg,
+        AntiEntropyKind, AuthorityProof, ClientAuth, MsgId, MsgType, WireMsg,
     },
-    network_knowledge::{NodeState, SectionAuthorityProvider, SectionKeyShare, SectionsDAG},
+    network_knowledge::{
+        NodeState, SectionAuthorityProvider, SectionKeyShare, SectionTreeUpdate, SectionsDAG,
+    },
     types::{DataAddress, Peer},
 };
 
@@ -116,9 +118,41 @@ pub(crate) enum Cmd {
         /// Batches of DataAddress to be sent together
         data_batch: Vec<DataAddress>,
     },
+    UpdateCaller {
+        /// The outdated caller
+        caller: Peer,
+        /// The id of the causing msg.
+        correlation_id: MsgId,
+        /// The kind of anti-entropy response.
+        kind: AntiEntropyKind,
+        /// The update containing the current `SectionAuthorityProvider`
+        /// and the section chain truncated from the triggering msg's dst section_key or genesis_key
+        /// if the the dst section_key is not a direct ancestor to our section_key
+        section_tree_update: SectionTreeUpdate,
+        #[debug(skip)]
+        context: NodeContext,
+    },
+    UpdateCallerOnStream {
+        /// The outdated caller
+        caller: Peer,
+        /// The id of the msg.
+        msg_id: MsgId,
+        /// The kind of anti-entropy response.
+        kind: AntiEntropyKind,
+        /// The update containing the current `SectionAuthorityProvider`
+        /// and the section chain truncated from the triggering msg's dst section_key or genesis_key
+        /// if the the dst section_key is not a direct ancestor to our section_key
+        section_tree_update: SectionTreeUpdate,
+        /// The id of the causing msg.
+        correlation_id: MsgId,
+        /// The msg stream to the caller.
+        stream: SendStream,
+        #[debug(skip)]
+        context: NodeContext,
+    },
     /// Performs serialisation and signing and sends the msg.
     SendMsg {
-        msg: NodeMsg,
+        msg: MsgType,
         msg_id: MsgId,
         recipients: Peers,
         #[debug(skip)]
@@ -171,6 +205,12 @@ impl Cmd {
     pub(crate) fn send_msg(msg: NodeMsg, recipients: Peers, context: NodeContext) -> Self {
         let msg_id = MsgId::new();
         debug!("Sending msg {msg_id:?} to {recipients:?}: {msg:?}");
+        Cmd::send_network_msg(MsgType::Node(msg), recipients, context)
+    }
+
+    pub(crate) fn send_network_msg(msg: MsgType, recipients: Peers, context: NodeContext) -> Self {
+        let msg_id = MsgId::new();
+        debug!("Sending msg {msg_id:?} to {recipients:?}: {msg:?}");
         Cmd::SendMsg {
             msg,
             msg_id,
@@ -218,12 +258,14 @@ impl Cmd {
     pub(crate) fn statemap_state(&self) -> sn_interface::statemap::State {
         use sn_interface::statemap::State;
         match self {
+            Cmd::UpdateCaller { .. } => State::Ae,
+            Cmd::UpdateCallerOnStream { .. } => State::Ae,
             Cmd::SendMsg { .. }
             | Cmd::SendMsgEnqueueAnyResponse { .. }
             | Cmd::SendNodeMsgResponse { .. }
             | Cmd::SendClientResponse { .. }
-            | Cmd::SendAndForwardResponseToClient { .. } => State::Comms,
-            Cmd::HandleCommsError { .. } => State::Comms,
+            | Cmd::SendAndForwardResponseToClient { .. }
+            | Cmd::HandleCommsError { .. } => State::Comms,
             Cmd::HandleMsg { .. } => State::HandleMsg,
             Cmd::UpdateNetworkAndHandleValidClientMsg { .. } => State::ClientMsg,
             Cmd::TrackNodeIssue { .. } => State::FaultDetection,
@@ -263,10 +305,10 @@ impl fmt::Display for Cmd {
             Cmd::SendMsg { .. } => write!(f, "SendMsg"),
             Cmd::SendMsgEnqueueAnyResponse { .. } => write!(f, "SendMsgEnqueueAnyResponse"),
             Cmd::SendNodeMsgResponse { .. } => write!(f, "SendNodeMsgResponse"),
+            Cmd::SendClientResponse { .. } => write!(f, "SendClientResponse"),
             Cmd::SendAndForwardResponseToClient { .. } => {
                 write!(f, "SendAndForwardResponseToClient")
             }
-            Cmd::SendClientResponse { .. } => write!(f, "SendClientResponse"),
             Cmd::EnqueueDataForReplication { .. } => write!(f, "EnqueueDataForReplication"),
             Cmd::TrackNodeIssue { name, issue } => {
                 write!(f, "TrackNodeIssue {name:?}, {issue:?}")
@@ -275,6 +317,12 @@ impl fmt::Display for Cmd {
             Cmd::SetJoinsAllowed { .. } => write!(f, "SetJoinsAllowed"),
             Cmd::SetJoinsAllowedUntilSplit { .. } => write!(f, "SetJoinsAllowedUntilSplit"),
             Cmd::TryJoinNetwork => write!(f, "TryJoinNetwork"),
+            Cmd::UpdateCaller { caller, kind, .. } => {
+                write!(f, "UpdateCaller {caller:?}: {kind:?}")
+            }
+            Cmd::UpdateCallerOnStream { caller, kind, .. } => {
+                write!(f, "UpdateCallerOnStream {caller:?}: {kind:?}")
+            }
         }
     }
 }

@@ -6,35 +6,45 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{MyNode, Result};
+use crate::node::{Error, MyNode, Result};
 
-use sn_interface::messaging::{data::ClientDataResponse, system::NodeMsg, MsgKind, WireMsg};
+use sn_interface::messaging::{system::NodeMsg, MsgKind, MsgType, WireMsg};
 
 use bytes::Bytes;
 use xor_name::XorName;
 
 impl MyNode {
-    /// Serialize a message for a Client
-    pub(crate) fn serialize_client_msg_response(
-        our_node_name: XorName,
-        msg: &ClientDataResponse,
-    ) -> Result<(MsgKind, Bytes)> {
+    /// Serialize a message for a Node
+    pub(crate) fn serialize_node_msg(our_name: XorName, msg: &NodeMsg) -> Result<(MsgKind, Bytes)> {
         let payload = WireMsg::serialize_msg_payload(msg)?;
-        let kind = MsgKind::ClientDataResponse(our_node_name);
+        let kind = MsgKind::Node {
+            name: our_name,
+            is_join: msg.is_join(),
+        };
         Ok((kind, payload))
     }
 
-    /// Serialize a message for a Node
-    pub(crate) fn serialize_node_msg(
-        our_node_name: XorName,
-        msg: &NodeMsg,
-    ) -> Result<(MsgKind, Bytes)> {
-        let payload = WireMsg::serialize_msg_payload(msg)?;
-        let kind = MsgKind::Node {
-            name: our_node_name,
-            is_join: msg.is_join(),
-            is_ae: msg.is_ae(),
+    /// Serialize a network message
+    pub(crate) fn serialize_msg(our_name: XorName, msg: &MsgType) -> Result<(MsgKind, Bytes)> {
+        let (payload, kind) = match msg {
+            MsgType::AntiEntropy(msg) => (
+                WireMsg::serialize_msg_payload(msg)?,
+                MsgKind::AntiEntropy(our_name),
+            ),
+            MsgType::Node(msg) => (
+                WireMsg::serialize_msg_payload(msg)?,
+                MsgKind::Node {
+                    name: our_name,
+                    is_join: msg.is_join(),
+                },
+            ),
+            MsgType::ClientDataResponse(msg) => (
+                WireMsg::serialize_msg_payload(msg)?,
+                MsgKind::ClientDataResponse(our_name),
+            ),
+            MsgType::Client { .. } => return Err(Error::InvalidMessage),
         };
+
         Ok((kind, payload))
     }
 }

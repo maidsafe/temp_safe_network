@@ -13,7 +13,7 @@ use sn_interface::{
         data::ClientMsg,
         serialisation::WireMsg,
         system::{JoinResponse, NodeMsg},
-        AuthorityProof, ClientAuth, Dst, MsgId, MsgKind,
+        AuthorityProof, ClientAuth, Dst, MsgId, MsgKind, MsgType,
     },
     network_knowledge::{test_utils::*, NodeState},
     types::{Keypair, Peer},
@@ -54,7 +54,9 @@ pub(crate) async fn handle_online_cmd(
     while let Some(cmd) = all_cmds.next().await? {
         let (msg, recipients) = match cmd {
             Cmd::SendMsg {
-                recipients, msg, ..
+                recipients,
+                msg: MsgType::Node(msg),
+                ..
             } => (msg, recipients),
             _ => continue,
         };
@@ -166,9 +168,8 @@ impl<'a> ProcessAndInspectCmds<'a> {
             if !matches!(
                 cmd,
                 Cmd::SendMsg { .. }
-                    | Cmd::SendAndForwardResponseToClient { .. }
                     | Cmd::SendClientResponse { .. }
-                    | Cmd::SendNodeMsgResponse { .. }
+                    | Cmd::SendAndForwardResponseToClient { .. }
             ) {
                 let new_cmds = self.dispatcher.process_cmd(cmd).await?;
                 self.pending_cmds.extend(new_cmds);

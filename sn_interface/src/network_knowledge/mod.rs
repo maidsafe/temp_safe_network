@@ -35,8 +35,8 @@ pub use self::{
 
 use crate::{
     messaging::{
-        system::{NodeMsg, SectionPeers as SectionPeersMsg, SectionSig, SectionSigned},
-        Dst,
+        system::{SectionPeers as SectionPeersMsg, SectionSig, SectionSigned},
+        AntiEntropyMsg, Dst, MsgType,
     },
     types::Peer,
 };
@@ -553,8 +553,8 @@ impl NetworkKnowledge {
             .map(|info| *info.peer())
     }
 
-    pub fn anti_entropy_probe(&self) -> NodeMsg {
-        NodeMsg::AntiEntropyProbe(self.section_key())
+    pub fn anti_entropy_probe(&self) -> MsgType {
+        MsgType::AntiEntropy(AntiEntropyMsg::Probe(self.section_key()))
     }
 }
 

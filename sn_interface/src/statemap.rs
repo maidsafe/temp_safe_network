@@ -44,6 +44,7 @@ pub fn log_state(entity: String, state: State) {
 
 /// States used for generating statemaps
 pub enum State {
+    Ae,
     Idle,
     HandleMsg,
     Comms,
