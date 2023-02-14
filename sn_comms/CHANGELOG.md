@@ -5,18 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.3.2 (2023-02-07)
-
-### Chore
-
- - <csr-id-6cb1f9548ce44aaf04c9d6c64364ca1c8b344470/> remove unused async
+## v0.3.4 (2023-02-14)
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
- - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits contributed to the release over the course of 3 calendar days.
+ - 4 days passed between releases.
+ - 0 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -26,6 +23,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #2093 ([`2bb2b21`](https://github.com/maidsafe/safe_network/commit/2bb2b2154fc4f26202f216bd42f3faf88a13b876))
+    - refactor(comms): simplify peer_session - Removes some unnecessary spawning and channel faff, since we're already on a new thread. ([`a4103fe`](https://github.com/maidsafe/safe_network/commit/a4103fe2f7124188fd17ba3d5f54ac8f6132529b))
+</details>
+
+## v0.3.3 (2023-02-09)
+
+### Chore
+
+ - <csr-id-17ca03749dc6eed8922cde5a7c3ef8a8e5505483/> sn_interface-0.17.9/sn_comms-0.3.3/sn_node-0.74.11
+ - <csr-id-23903c3e7ee462676bd25e3618a4b313c7b5cf3b/> minor cleanup, docs and log fixes
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 6 commits contributed to the release.
+ - 2 days passed between releases.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.17.9/sn_comms-0.3.3/sn_node-0.74.11 ([`17ca037`](https://github.com/maidsafe/safe_network/commit/17ca03749dc6eed8922cde5a7c3ef8a8e5505483))
+    - Merge #2043 ([`bef44e5`](https://github.com/maidsafe/safe_network/commit/bef44e53b55ddbe957b77755ad97f561b35f69e7))
+    - refactor(comms): send single response to client - All results from storage nodes are awaited, and a single response returned to client. ([`39d5574`](https://github.com/maidsafe/safe_network/commit/39d55747512fc233a92c1e8ab310f984aebc1d4f))
+    - minor cleanup, docs and log fixes ([`23903c3`](https://github.com/maidsafe/safe_network/commit/23903c3e7ee462676bd25e3618a4b313c7b5cf3b))
+    - refactor(comms): send to nodes in parallel - Previous commit had the msgs go out sequentially to the nodes. - Also, we didn't send any response to client until all nodes had responded. ([`e4318d1`](https://github.com/maidsafe/safe_network/commit/e4318d14381f71ea7b46957f99dde4ba736774c9))
+    - refactor(comms): don't use dashmap for sessions - This allows a lockfree access to sessions in comms. ([`15670eb`](https://github.com/maidsafe/safe_network/commit/15670eba1ab9afeaebd5abd91551834e59b4c14d))
+</details>
+
+## v0.3.2 (2023-02-07)
+
+<csr-id-6cb1f9548ce44aaf04c9d6c64364ca1c8b344470/>
+
+### Chore
+
+ - <csr-id-6cb1f9548ce44aaf04c9d6c64364ca1c8b344470/> remove unused async
+
+### Chore
+
+ - <csr-id-b7a6024af9e777473615cddfd5940f84fda4bb6b/> sn_comms-0.3.2/sn_node-0.74.4
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_comms-0.3.2/sn_node-0.74.4 ([`b7a6024`](https://github.com/maidsafe/safe_network/commit/b7a6024af9e777473615cddfd5940f84fda4bb6b))
     - Merge #2073 ([`732621c`](https://github.com/maidsafe/safe_network/commit/732621c1261dd24eb58f38b49ba25c78af272c69))
     - remove unused async ([`6cb1f95`](https://github.com/maidsafe/safe_network/commit/6cb1f9548ce44aaf04c9d6c64364ca1c8b344470))
 </details>
@@ -33,6 +93,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## v0.3.1 (2023-02-07)
 
 <csr-id-677ef5cc8b1935b94641c61c53429faf2c58c261/>
+<csr-id-3c34a731eca9d5b37d2574e3e16c7f089c7cc8b2/>
 
 ### Chore
 
