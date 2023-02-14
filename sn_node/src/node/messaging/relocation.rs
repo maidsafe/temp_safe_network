@@ -178,22 +178,26 @@ impl MyNode {
 
 #[cfg(test)]
 mod tests {
-    use crate::node::flow_ctrl::{
-        cmds::Cmd,
-        dispatcher::Dispatcher,
-        tests::{
-            cmd_utils::{get_next_msg, TestDispatcher, TestMsgTracker},
-            network_builder::TestNetworkBuilder,
+    use crate::node::{
+        flow_ctrl::{
+            cmds::Cmd,
+            dispatcher::Dispatcher,
+            tests::{
+                cmd_utils::{get_next_msg, ProcessAndInspectCmds, TestDispatcher, TestMsgTracker},
+                network_builder::TestNetworkBuilder,
+            },
         },
+        relocation_check, ChurnId,
     };
     use sn_comms::CommEvent;
+    use sn_consensus::Decision;
     use sn_interface::{
-        init_logger,
+        elder_count, init_logger,
         messaging::system::{
             AntiEntropyKind, JoinResponse, NodeDataCmd, NodeMsg, SectionStateVote,
         },
-        network_knowledge::RelocationDst,
-        test_utils::prefix,
+        network_knowledge::{recommended_section_size, NodeState, RelocationDst, MIN_ADULT_AGE},
+        test_utils::{gen_peer, gen_peer_in_prefix, prefix, section_decision, TestKeys},
     };
 
     use assert_matches::assert_matches;
@@ -207,6 +211,69 @@ mod tests {
         task::JoinHandle,
     };
     use xor_name::{Prefix, XorName};
+
+    /// Create a `SectionStateVote::Online` whose agreement handling triggers relocation of a node with the
+    /// given age.
+    ///
+    /// NOTE: recommended to call this with low `age` (4 or 5), otherwise it might take very long time
+    /// to complete because it needs to generate a signature with the number of trailing zeroes equal
+    /// to (or greater that) `age`.
+    fn create_relocation_trigger(sk_set: &bls::SecretKeySet, age: u8) -> Decision<NodeState> {
+        loop {
+            let node_state = NodeState::joined(gen_peer(MIN_ADULT_AGE), None);
+            let decision = section_decision(sk_set, node_state.clone());
+
+            let sig: bls::Signature = decision.proposals[&node_state].clone();
+            let churn_id = ChurnId(sig.to_bytes());
+
+            if relocation_check(age, &churn_id) && !relocation_check(age + 1, &churn_id) {
+                return decision;
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn relocation_trigger_is_sent() -> Result<()> {
+        init_logger();
+
+        let prefix: Prefix = prefix("0");
+        let adults = recommended_section_size() - elder_count();
+        let env = TestNetworkBuilder::new(rand::thread_rng())
+            .sap(prefix, elder_count(), adults, None, None)
+            .build();
+        let dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0);
+        let mut section = env.get_network_knowledge(prefix, None);
+        let sk_set = env.get_secret_key_set(prefix, None);
+
+        let relocated_peer = gen_peer_in_prefix(MIN_ADULT_AGE - 1, prefix);
+        let node_state = NodeState::joined(relocated_peer, None);
+        let node_state = TestKeys::get_section_signed(&sk_set.secret_key(), node_state);
+        assert!(section.update_member(node_state));
+        // update our node with the new network_knowledge
+        dispatcher.node().write().await.network_knowledge = section.clone();
+
+        let membership_decision = create_relocation_trigger(&sk_set, relocated_peer.age());
+        let mut cmds = ProcessAndInspectCmds::new(
+            Cmd::HandleMembershipDecision(membership_decision),
+            &dispatcher,
+        );
+
+        let mut trigger_is_sent = false;
+        while let Some(cmd) = cmds.next().await? {
+            let msg = match cmd {
+                Cmd::SendMsg { msg, .. } => msg,
+                _ => continue,
+            };
+
+            // Verify that the `RelocationTrigger` is sent to the relocating node
+            if let NodeMsg::BeginRelocating(_trigger) = msg {
+                trigger_is_sent = true;
+            }
+        }
+
+        assert!(trigger_is_sent);
+        Ok(())
+    }
 
     #[tokio::test]
     async fn relocate_adults_to_the_same_section() -> Result<()> {
