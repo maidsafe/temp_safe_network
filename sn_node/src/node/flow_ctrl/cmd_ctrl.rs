@@ -23,7 +23,6 @@ use xor_name::XorName;
 /// all the while logging the correlation between incoming and resulting cmds.
 pub(crate) struct CmdCtrl {
     pub(crate) dispatcher: Arc<Dispatcher>,
-    #[allow(dead_code)]
     id_counter: Arc<AtomicUsize>,
 }
 

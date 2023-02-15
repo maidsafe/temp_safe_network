@@ -25,7 +25,6 @@ where
     capacity: usize,
 }
 
-#[allow(clippy::len_without_is_empty)]
 impl<T, V> Cache<T, V>
 where
     T: Ord + Hash + Copy,

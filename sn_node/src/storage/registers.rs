@@ -52,7 +52,6 @@ impl RegisterStorage {
         Ok(Self { file_store })
     }
 
-    #[allow(dead_code)]
     pub(super) async fn remove_register(&self, address: &RegisterAddress) -> Result<()> {
         debug!("Removing register, {:?}", address);
         self.file_store.delete_data(address).await

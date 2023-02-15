@@ -60,7 +60,6 @@ pub struct ReplicatedRegisterLog {
 }
 
 ///
-#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum ReplicatedData {
     /// A chunk of data.

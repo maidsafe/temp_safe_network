@@ -12,7 +12,6 @@ use crate::types::{DataAddress, PublicKey, ReplicatedData};
 use serde::{Deserialize, Serialize};
 
 /// cmd message sent among nodes
-#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum NodeDataCmd {
     /// Tells a Node to store some data.
@@ -24,7 +23,6 @@ pub enum NodeDataCmd {
 }
 
 /// Event message sent among nodes
-#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum NodeEvent {
     /// Sent by a full Node, and tells the Elders to store a chunk at some other Node in the section
