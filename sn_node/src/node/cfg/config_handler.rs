@@ -79,12 +79,12 @@ pub struct Config {
     /// Delete all data from a previous node running on the same PC
     #[clap(long)]
     pub clear_data: bool,
-    /// Whether the node is the first on the network.
+    /// Make this the node the first on the network. This requires an address where it's
+    /// reachable for by other nodes. This address will be put in the network contacts file.
     ///
-    /// When set, you must specify either `--local-addr` or `--public-addr` to ensure the correct
-    /// connection info is stored.
+    /// If the port is `0`, then the will be equal to whatever port we will locally bind to.
     #[clap(long)]
-    pub first: bool,
+    pub first: Option<SocketAddr>,
     /// File with initial network contacts to bootstrap to if this node is not the first on
     /// the network. This argument and the `--first` flag are mutually exclusive.
     ///
@@ -124,7 +124,7 @@ impl Config {
     ///
     /// `StructOpt` doesn't support validation that crosses multiple field values.
     fn validate(&self) -> Result<(), Error> {
-        if !(self.first ^ self.network_contacts_file.is_some()) {
+        if !(self.first.is_some() ^ self.network_contacts_file.is_some()) {
             return Err(Error::Configuration(
                 "Either the --first or --network-contacts-file argument is required, and they \
                 are mutually exclusive. Please run the command again and use one or the other, \
@@ -169,7 +169,9 @@ impl Config {
         self.update = config.update || self.update;
         self.update_only = config.update_only || self.update_only;
         self.clear_data = config.clear_data || self.clear_data;
-        self.first = config.first || self.first;
+        if config.first.is_some() {
+            self.first = config.first;
+        }
 
         if config.network_contacts_file.is_some() {
             self.network_contacts_file = config.network_contacts_file;
@@ -186,7 +188,7 @@ impl Config {
     }
 
     /// Is this the first node in a section?
-    pub fn is_first(&self) -> bool {
+    pub fn first(&self) -> Option<SocketAddr> {
         self.first
     }
 

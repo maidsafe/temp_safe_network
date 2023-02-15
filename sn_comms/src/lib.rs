@@ -108,6 +108,7 @@ pub struct MsgFromPeer {
 #[derive(Clone, Debug)]
 pub struct Comm {
     our_endpoint: Endpoint,
+    public_addr: Option<SocketAddr>,
     cmd_sender: Sender<CommCmd>,
 }
 
@@ -115,11 +116,21 @@ impl Comm {
     /// Creates a new instance of Comm with an endpoint
     /// and starts listening to the incoming messages from other nodes.
     #[tracing::instrument(skip_all)]
-    pub fn new(local_addr: SocketAddr) -> Result<(Self, Receiver<CommEvent>)> {
+    pub fn new(
+        local_addr: SocketAddr,
+        mut public_addr: Option<SocketAddr>,
+    ) -> Result<(Self, Receiver<CommEvent>)> {
         let (our_endpoint, incoming_conns) = Endpoint::builder()
             .addr(local_addr)
             .idle_timeout(70_000)
             .server()?;
+
+        // If public port is `0`, we assume it is equal to our local endpoint port.
+        if let Some(ref mut addr) = public_addr {
+            if addr.port() == 0 {
+                addr.set_port(our_endpoint.local_addr().port());
+            }
+        }
 
         trace!("Creating comms..");
         // comm_events_receiver will be used by upper layer to receive all msgs coming in from the network
@@ -134,6 +145,7 @@ impl Comm {
         Ok((
             Self {
                 our_endpoint,
+                public_addr,
                 cmd_sender,
             },
             comm_events_receiver,
@@ -142,7 +154,10 @@ impl Comm {
 
     /// The socket address of our endpoint.
     pub fn socket_addr(&self) -> SocketAddr {
-        self.our_endpoint.local_addr()
+        match self.public_addr {
+            Some(addr) => addr,
+            None => self.our_endpoint.local_addr(),
+        }
     }
 
     /// Closes the endpoint.
@@ -526,7 +541,7 @@ mod tests {
 
     #[tokio::test]
     async fn successful_send() -> Result<()> {
-        let (comm, _rx) = Comm::new(local_addr())?;
+        let (comm, _rx) = Comm::new(local_addr(), None)?;
 
         let (peer0, mut rx0) = new_peer().await?;
         let (peer1, mut rx1) = new_peer().await?;
@@ -553,7 +568,7 @@ mod tests {
 
     #[tokio::test]
     async fn failed_send() -> Result<()> {
-        let (comm, mut rx) = Comm::new(local_addr())?;
+        let (comm, mut rx) = Comm::new(local_addr(), None)?;
 
         let invalid_peer = get_invalid_peer().await?;
         let invalid_addr = invalid_peer.addr();
@@ -581,7 +596,7 @@ mod tests {
 
     #[tokio::test]
     async fn send_after_reconnect() -> Result<()> {
-        let (send_comm, _rx) = Comm::new(local_addr())?;
+        let (send_comm, _rx) = Comm::new(local_addr(), None)?;
 
         let (recv_endpoint, mut incoming_connections) = Endpoint::builder()
             .addr(local_addr())
@@ -630,10 +645,10 @@ mod tests {
 
     #[tokio::test]
     async fn incoming_connection_lost() -> Result<()> {
-        let (comm0, mut rx0) = Comm::new(local_addr())?;
+        let (comm0, mut rx0) = Comm::new(local_addr(), None)?;
         let addr0 = comm0.socket_addr();
 
-        let (comm1, _rx1) = Comm::new(local_addr())?;
+        let (comm1, _rx1) = Comm::new(local_addr(), None)?;
 
         let peer = Peer::new(xor_name::rand::random(), addr0);
         let msg = new_test_msg(dst(peer))?;

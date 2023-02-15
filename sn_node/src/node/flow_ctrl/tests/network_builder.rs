@@ -143,7 +143,7 @@ impl<R: RngCore> TestNetworkBuilder<R> {
             };
 
             let socket_addr: SocketAddr = (Ipv4Addr::LOCALHOST, 0).into();
-            let (comm, rx) = Comm::new(socket_addr).expect("failed to create Comm");
+            let (comm, rx) = Comm::new(socket_addr, None).expect("failed to create Comm");
             let mut node = node.clone();
             node.addr = comm.socket_addr();
 
@@ -795,7 +795,7 @@ impl TestNetwork {
         let handle = Handle::current();
         let _ = handle.enter();
         let socket_addr: SocketAddr = (Ipv4Addr::LOCALHOST, 0).into();
-        let (comm, rx) = Comm::new(socket_addr).expect("failed  to create comm");
+        let (comm, rx) = Comm::new(socket_addr, None).expect("failed  to create comm");
         let info = MyNodeInfo::new(
             gen_keypair(&prefix.unwrap_or_default().range_inclusive(), age),
             comm.socket_addr(),
