@@ -87,8 +87,8 @@ async fn main() -> Result<()> {
         assert_eq!(file_config.local_addr, config.local_addr);
     }
 
-    if command_line_args.first {
-        assert!(config.first);
+    if command_line_args.first.is_some() {
+        assert!(config.first.is_some());
     }
 
     clear_disk_config().await?;

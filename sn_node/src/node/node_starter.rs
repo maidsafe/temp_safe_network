@@ -145,9 +145,9 @@ async fn bootstrap_node(
     let (fault_cmds_sender, fault_cmds_receiver) =
         mpsc::channel::<FaultsCmd>(STANDARD_CHANNEL_SIZE);
 
-    let (comm, incoming_msg_receiver) = Comm::new(config.local_addr())?;
+    let (comm, incoming_msg_receiver) = Comm::new(config.local_addr(), config.first())?;
 
-    let node = if config.is_first() {
+    let node = if config.first().is_some() {
         start_genesis_node(
             comm,
             used_space,
