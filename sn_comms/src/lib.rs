@@ -73,7 +73,7 @@ use tokio::{
 };
 
 /// Standard channel size, to allow for large swings in throughput
-static STANDARD_CHANNEL_SIZE: usize = 100_000;
+static STANDARD_CHANNEL_SIZE: usize = 10_000;
 
 /// Events from the comm module.
 #[derive(Debug)]
@@ -122,7 +122,7 @@ impl Comm {
     ) -> Result<(Self, Receiver<CommEvent>)> {
         let (our_endpoint, incoming_conns) = Endpoint::builder()
             .addr(local_addr)
-            .idle_timeout(70_000)
+            .max_concurrent_bidi_streams(5)
             .server()?;
 
         // If public port is `0`, we assume it is equal to our local endpoint port.
@@ -134,7 +134,7 @@ impl Comm {
 
         trace!("Creating comms..");
         // comm_events_receiver will be used by upper layer to receive all msgs coming in from the network
-        let (comm_events_sender, comm_events_receiver) = mpsc::channel(STANDARD_CHANNEL_SIZE);
+        let (comm_events_sender, comm_events_receiver) = mpsc::channel(5);
         let (cmd_sender, cmd_receiver) = mpsc::channel(STANDARD_CHANNEL_SIZE);
 
         // listen for msgs/connections to our endpoint
@@ -382,7 +382,7 @@ fn send_and_return_response(
         };
         match WireMsg::from(node_response_bytes) {
             Ok(wire_msg) => {
-                listener::msg_received(wire_msg, peer, None, comm_events.clone());
+                listener::msg_received(wire_msg, peer, None, comm_events.clone()).await;
             }
             Err(error) => {
                 error!("Failed sending {msg_id:?} to {peer:?}: {error:?}");
@@ -598,10 +598,8 @@ mod tests {
     async fn send_after_reconnect() -> Result<()> {
         let (send_comm, _rx) = Comm::new(local_addr(), None)?;
 
-        let (recv_endpoint, mut incoming_connections) = Endpoint::builder()
-            .addr(local_addr())
-            .idle_timeout(70_000)
-            .server()?;
+        let (recv_endpoint, mut incoming_connections) =
+            Endpoint::builder().addr(local_addr()).server()?;
         let recv_addr = recv_endpoint.local_addr();
         let name = xor_name::rand::random();
         let peer = Peer::new(name, recv_addr);
@@ -701,10 +699,8 @@ mod tests {
     }
 
     async fn new_peer() -> Result<(Peer, Receiver<UsrMsgBytes>)> {
-        let (endpoint, mut incoming_connections) = Endpoint::builder()
-            .addr(local_addr())
-            .idle_timeout(70_000)
-            .server()?;
+        let (endpoint, mut incoming_connections) =
+            Endpoint::builder().addr(local_addr()).server()?;
         let addr = endpoint.local_addr();
 
         let (tx, rx) = mpsc::channel(1);

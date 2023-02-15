@@ -37,7 +37,7 @@ impl Session {
     #[instrument(skip_all, level = "debug")]
     async fn receive_with_ae(
         &self,
-        recv_stream: &mut RecvStream,
+        mut recv_stream: RecvStream,
         mut peer: Peer,
         peer_index: usize,
         msg_id: MsgId,
@@ -83,7 +83,7 @@ impl Session {
                             new_peer,
                             new_recv_stream,
                         }) => {
-                            *recv_stream = new_recv_stream;
+                            recv_stream = new_recv_stream;
                             trace!(
                                 "{} of correlation {msg_id:?} to {} on {stream_id}",
                                 LogMarker::ReceiveCompleted,
@@ -100,7 +100,7 @@ impl Session {
                     warn!(
                         "Unexpected msg type received on {} from {peer:?} in response \
                     to {msg_id:?}: {msg:?} with {response_id:?}",
-                        recv_stream.id()
+                        stream_id
                     );
                     return Err(Error::UnexpectedNetworkMsg {
                         correlation_id: msg_id,
@@ -119,14 +119,16 @@ impl Session {
         msg_id: MsgId,
         peer: Peer,
         peer_index: usize,
-        mut recv_stream: RecvStream,
+        recv_stream: RecvStream,
     ) -> MsgResponse {
+        let stream_id = recv_stream.id();
+
         // Unless we receive AntiEntropy responses, which require re-sending the
         // message, the first msg received is the response we expect and return
         let addr = peer.addr();
         let result = {
             let (msg_id, resp_msg) = match self
-                .receive_with_ae(&mut recv_stream, peer, peer_index, msg_id)
+                .receive_with_ae(recv_stream, peer, peer_index, msg_id)
                 .await
             {
                 Ok(resp_info) => resp_info,
@@ -167,8 +169,8 @@ impl Session {
         trace!(
             "{} of correlation {msg_id:?} to {}, on {}, with {result:?}",
             LogMarker::ReceiveCompleted,
-            addr,
-            recv_stream.id()
+            peer.addr(),
+            stream_id
         );
 
         result

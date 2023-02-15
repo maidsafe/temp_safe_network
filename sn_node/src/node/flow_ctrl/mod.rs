@@ -42,6 +42,7 @@ use tokio::sync::{
 };
 use xor_name::XorName;
 
+const CMD_CHANNEL_SIZE: usize = 1;
 /// Sent via the rejoin_network_tx to restart the join process.
 /// This would only occur when joins are not allowed, or non-recoverable states.
 #[derive(Debug)]
@@ -85,8 +86,7 @@ impl FlowCtrl {
     ) -> (Sender<(Cmd, Vec<usize>)>, Receiver<RejoinReason>) {
         trace!("[NODE READ]: flowctrl node context lock got");
         let node_context = cmd_ctrl.node().read().await.context();
-        let (cmd_sender_channel, mut incoming_cmds_from_apis) =
-            mpsc::channel(STANDARD_CHANNEL_SIZE);
+        let (cmd_sender_channel, mut incoming_cmds_from_apis) = mpsc::channel(CMD_CHANNEL_SIZE);
         let (rejoin_network_tx, rejoin_network_rx) = mpsc::channel(STANDARD_CHANNEL_SIZE);
 
         let node_identifier = node_context.info.name();
