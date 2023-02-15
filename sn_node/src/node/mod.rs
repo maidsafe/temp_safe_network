@@ -25,7 +25,7 @@ mod node_test_api;
 mod relocation;
 
 /// Standard channel size, to allow for large swings in throughput
-pub static STANDARD_CHANNEL_SIZE: usize = 100_000;
+pub static STANDARD_CHANNEL_SIZE: usize = 1000;
 
 pub use self::{
     cfg::config_handler::Config,

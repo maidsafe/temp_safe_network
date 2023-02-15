@@ -3108,8 +3108,7 @@ dependencies = [
 [[package]]
 name = "qp2p"
 version = "0.35.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "25510a11509057d70cc23ac70f78bcea7bc5ec47dfa284c554d199273d9e2ac3"
+source = "git+https://github.com/joshuef/qp2p.git?branch=ReduceAsyncDuringReadWrite#4bb555e091946666009695499d5483a4019ad4f2"
 dependencies = [
  "bincode",
  "bytes",
