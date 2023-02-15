@@ -3108,7 +3108,7 @@ dependencies = [
 [[package]]
 name = "qp2p"
 version = "0.35.1"
-source = "git+https://github.com/joshuef/qp2p.git?branch=ReduceAsyncDuringReadWrite#4bb555e091946666009695499d5483a4019ad4f2"
+source = "git+https://github.com/joshuef/qp2p.git?branch=ReduceAsyncDuringReadWrite#4e6da07a2cb456e34ccabf6a984f1c6c11531a42"
 dependencies = [
  "bincode",
  "bytes",

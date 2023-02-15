@@ -6,6 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use std::time::Duration;
+
 use super::{CommEvent, MsgFromPeer};
 
 use sn_interface::{
@@ -48,50 +50,76 @@ pub(crate) async fn listen_for_msgs(
     let conn_id = conn.id();
     let remote_address = conn.remote_address();
 
-    while let Some(result) = incoming_msgs.next_with_stream().await.transpose() {
-        match result {
-            Ok((msg_bytes, send_stream)) => {
-                let stream_info = if let Some(stream) = &send_stream {
-                    format!(" on {}", stream.id())
-                } else {
-                    "".to_string()
-                };
-                debug!(
-                    "New msg arrived over conn_id={conn_id} from {remote_address:?}{stream_info}"
-                );
+    loop {
+        let msg = incoming_msgs.next_with_stream().await.transpose();
 
-                let wire_msg = match WireMsg::from(msg_bytes.0) {
-                    Ok(wire_msg) => wire_msg,
-                    Err(error) => {
-                        // TODO: should perhaps rather drop this connection.. as it is a spam vector
-                        debug!("Failed to deserialize message received from {remote_address:?}{stream_info}: {error:?}");
-                        continue;
-                    }
-                };
-
-                let src_name = match wire_msg.kind() {
-                    MsgKind::Client { auth, .. } => auth.public_key.into(),
-                    MsgKind::Node { name, .. } | MsgKind::ClientDataResponse(name) => *name,
-                };
-
-                let peer = Peer::new(src_name, remote_address);
-                let msg_id = wire_msg.msg_id();
-                debug!(
-                    "Msg {msg_id:?} received, over conn_id={conn_id}, from: {peer:?}{stream_info} was: {wire_msg:?}"
-                );
-
-                msg_received(wire_msg, peer, send_stream, comm_events.clone()).await;
-            }
+        // this is after the work, but the send should slow us down enough...
+        // but this way we dont hold if over the `next` call, which may not occur until we gegt a msg in
+        let capacity = comm_events.capacity();
+        trace!("capacity in comms: {capacity:?}");
+        let reserved_sender = match comm_events.reserve().await {
+            Ok(p) => p,
             Err(error) => {
-                warn!("Error on connection {conn_id} with {remote_address}: {error:?}");
+                error!("Could not reserve sender for CommEvent: {error:?}");
+                break;
             }
+        };
+        if let Some(result) = msg {
+            match result {
+                Ok((msg_bytes, send_stream)) => {
+                    let stream_info = if let Some(stream) = &send_stream {
+                        format!(" on {}", stream.id())
+                    } else {
+                        "".to_string()
+                    };
+                    debug!(
+                    "New msg arrived over conn_id={conn_id} from {remote_address:?}{stream_info}"
+                    );
+
+                    let wire_msg = match WireMsg::from(msg_bytes.0) {
+                        Ok(wire_msg) => wire_msg,
+                        Err(error) => {
+                            // TODO: should perhaps rather drop this connection.. as it is a spam vector
+                            debug!("Failed to deserialize message received from {remote_address:?}{stream_info}: {error:?}");
+                            continue;
+                        }
+                    };
+
+                    let src_name = match wire_msg.kind() {
+                        MsgKind::Client { auth, .. } => auth.public_key.into(),
+                        MsgKind::Node { name, .. } | MsgKind::ClientDataResponse(name) => *name,
+                    };
+
+                    let peer = Peer::new(src_name, remote_address);
+                    let msg_id = wire_msg.msg_id();
+                    debug!(
+                    "Msg {msg_id:?} received, over conn_id={conn_id}, from: {peer:?}{stream_info} was: {wire_msg:?}"
+                    );
+
+                    let msg_event = CommEvent::Msg(MsgFromPeer {
+                        sender: peer,
+                        wire_msg,
+                        send_stream,
+                        is_response: false,
+                    });
+
+                    // handle the message first
+                    reserved_sender.send(msg_event);
+                }
+                Err(error) => {
+                    warn!("Error on connection {conn_id} with {remote_address}: {error:?}");
+                }
+            }
+        } else {
+            // we loop rest here
+            tokio::time::sleep(Duration::from_millis(50)).await;
         }
     }
 
     trace!(%conn_id, %remote_address, "{}", LogMarker::ConnectionClosed);
 }
 
-pub(crate) async fn msg_received(
+pub(crate) async fn response_msg_received(
     wire_msg: WireMsg,
     peer: Peer,
     send_stream: Option<qp2p::SendStream>,
@@ -102,6 +130,7 @@ pub(crate) async fn msg_received(
         sender: peer,
         wire_msg,
         send_stream,
+        is_response: true,
     });
 
     // handle the message first

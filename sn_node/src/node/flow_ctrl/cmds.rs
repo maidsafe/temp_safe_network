@@ -55,6 +55,8 @@ pub(crate) enum Cmd {
         origin: Peer,
         wire_msg: WireMsg,
         send_stream: Option<SendStream>,
+        /// was this msg received as a response on a bidi-stream
+        is_response: bool,
     },
     /// Allows joining of new nodes.
     SetJoinsAllowed(bool),
@@ -237,6 +239,18 @@ impl Cmd {
             Cmd::SetJoinsAllowed { .. } => State::Data,
             Cmd::SetJoinsAllowedUntilSplit { .. } => State::Data,
             Cmd::TryJoinNetwork => State::Join,
+        }
+    }
+
+    /// Check if this is a handle msg cmd
+    pub(crate) fn is_handle_msg(&self) -> bool {
+        matches!(self, Cmd::HandleMsg { .. })
+    }
+    /// Check if this is a handle msg cmd
+    pub(crate) fn is_response_msg(&self) -> bool {
+        match self {
+            Cmd::HandleMsg { is_response, .. } => *is_response,
+            _ => false,
         }
     }
 }
