@@ -139,7 +139,14 @@ impl<'a> ProcessAndInspectCmds<'a> {
         };
         let wire_msg = WireMsg::new_msg(msg_id, serialised_payload, msg_kind, dst);
         let user_msg = wire_msg.serialize()?;
-        send_stream.send_user_msg(user_msg).await?;
+
+        // move send msg off thread so send / receive can both complete
+        let _handle = tokio::spawn(async move {
+            let _ = send_stream
+                .send_user_msg(user_msg)
+                .await
+                .context("Could not send user msg");
+        });
 
         match comm_rx.recv().await {
             Some(CommEvent::Msg(MsgFromPeer {

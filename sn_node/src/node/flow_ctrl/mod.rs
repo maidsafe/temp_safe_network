@@ -42,7 +42,9 @@ use tokio::sync::{
 };
 use xor_name::XorName;
 
+/// Keep this as 1 so we properly feedback if we're not popping things out of the channel fast enough
 const CMD_CHANNEL_SIZE: usize = 1;
+
 /// Sent via the rejoin_network_tx to restart the join process.
 /// This would only occur when joins are not allowed, or non-recoverable states.
 #[derive(Debug)]
@@ -131,15 +133,14 @@ impl FlowCtrl {
             // Get a stable identifier for statemap naming. This is NOT the node's current name.
             // It's the initial name... but will not change for the entire statemap
             while let Some((cmd, cmd_id)) = incoming_cmds_from_apis.recv().await {
-                cmd_ctrl
-                    .process_cmd_job(
-                        cmd,
-                        cmd_id,
-                        node_identifier,
-                        cmd_channel.clone(),
-                        rejoin_network_tx.clone(),
-                    )
-                    .await
+                trace!("Taking cmd off stack: {cmd:?}");
+                cmd_ctrl.process_cmd_job(
+                    cmd,
+                    cmd_id,
+                    node_identifier,
+                    cmd_channel.clone(),
+                    rejoin_network_tx.clone(),
+                )
             }
         });
 
@@ -223,6 +224,7 @@ impl FlowCtrl {
     ) {
         let _handle = tokio::task::spawn(async move {
             while let Some(event) = incoming_msg_events.recv().await {
+                debug!("CmdEvent received: {event:?}");
                 let cmd = match event {
                     CommEvent::Error { peer, error } => Cmd::HandleCommsError { peer, error },
                     CommEvent::Msg(MsgFromPeer {
@@ -255,6 +257,9 @@ impl FlowCtrl {
                     }
                 };
 
+                // this await prevents us pulling more msgs than the cmd handler can cope with...
+                // feeding back up the channels to qp2p and quinn where congestion control should
+                // help prevent more messages incoming for the time being
                 if let Err(error) = cmd_channel_for_msgs.send((cmd, vec![])).await {
                     error!("Error sending msg onto cmd channel {error:?}");
                 }

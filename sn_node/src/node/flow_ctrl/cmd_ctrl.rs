@@ -42,7 +42,7 @@ impl CmdCtrl {
     }
 
     /// Processes the passed in cmd on a new task
-    pub(crate) async fn process_cmd_job(
+    pub(crate) fn process_cmd_job(
         &self,
         cmd: Cmd,
         mut id: Vec<usize>,
@@ -55,27 +55,30 @@ impl CmdCtrl {
         }
 
         let dispatcher = self.dispatcher.clone();
+
         let _handle = tokio::task::spawn(async move {
-            trace!("Spawned process for cmd {cmd:?}, id: {id:?}");
+            trace!("Processing for {cmd:?}, id: {id:?}");
 
             #[cfg(feature = "statemap")]
             sn_interface::statemap::log_state(node_identifier.to_string(), cmd.statemap_state());
 
             match dispatcher.process_cmd(cmd).await {
                 Ok(cmds) => {
-                    for (child_nr, cmd) in cmds.into_iter().enumerate() {
-                        // zero based, first child of first cmd => [0, 0], second child => [0, 1], first child of second child => [0, 1, 0]
-                        let child_id = [id.clone(), [child_nr].to_vec()].concat();
-                        match cmd_process_api.send((cmd, child_id)).await {
-                            Ok(_) => (), // no issues
-                            Err(error) => {
-                                let child_id = [id.clone(), [child_nr].to_vec()].concat();
-                                error!(
+                    let _handle = tokio::task::spawn(async move {
+                        for (child_nr, cmd) in cmds.into_iter().enumerate() {
+                            // zero based, first child of first cmd => [0, 0], second child => [0, 1], first child of second child => [0, 1, 0]
+                            let child_id = [id.clone(), [child_nr].to_vec()].concat();
+                            match cmd_process_api.send((cmd, child_id)).await {
+                                Ok(_) => (), // no issues
+                                Err(error) => {
+                                    let child_id = [id.clone(), [child_nr].to_vec()].concat();
+                                    error!(
                                     "Could not enqueue child cmd with id: {child_id:?}: {error:?}",
                                 );
+                                }
                             }
                         }
-                    }
+                    });
                 }
                 Err(error) => {
                     warn!("Error when processing cmd: {:?}", error);

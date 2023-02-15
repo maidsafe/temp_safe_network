@@ -73,7 +73,7 @@ use tokio::{
 };
 
 /// Standard channel size, to allow for large swings in throughput
-static STANDARD_CHANNEL_SIZE: usize = 10_000;
+static STANDARD_CHANNEL_SIZE: usize = 100_000;
 
 /// Events from the comm module.
 #[derive(Debug)]
@@ -122,7 +122,7 @@ impl Comm {
     ) -> Result<(Self, Receiver<CommEvent>)> {
         let (our_endpoint, incoming_conns) = Endpoint::builder()
             .addr(local_addr)
-            .max_concurrent_bidi_streams(5)
+            .idle_timeout(70_000)
             .server()?;
 
         // If public port is `0`, we assume it is equal to our local endpoint port.
@@ -134,7 +134,10 @@ impl Comm {
 
         trace!("Creating comms..");
         // comm_events_receiver will be used by upper layer to receive all msgs coming in from the network
-        let (comm_events_sender, comm_events_receiver) = mpsc::channel(5);
+        // capacity of one as we limit w/ how many cmds we process in the upper layers.
+        // any higher and we're not feeding back directly to incoming msgs...
+        // (we may want some buffer here?)
+        let (comm_events_sender, comm_events_receiver) = mpsc::channel(1);
         let (cmd_sender, cmd_receiver) = mpsc::channel(STANDARD_CHANNEL_SIZE);
 
         // listen for msgs/connections to our endpoint

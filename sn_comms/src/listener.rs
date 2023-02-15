@@ -5,7 +5,6 @@
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
-
 use super::{CommEvent, MsgFromPeer};
 
 use sn_interface::{
@@ -59,7 +58,6 @@ pub(crate) async fn listen_for_msgs(
                 debug!(
                     "New msg arrived over conn_id={conn_id} from {remote_address:?}{stream_info}"
                 );
-
                 let wire_msg = match WireMsg::from(msg_bytes.0) {
                     Ok(wire_msg) => wire_msg,
                     Err(error) => {
@@ -79,8 +77,8 @@ pub(crate) async fn listen_for_msgs(
                 let peer = Peer::new(src_name, remote_address);
                 let msg_id = wire_msg.msg_id();
                 debug!(
-                    "Msg {msg_id:?} received, over conn_id={conn_id}, from: {peer:?}{stream_info} was: {wire_msg:?}"
-                );
+                        "Msg {msg_id:?} received, over conn_id={conn_id}, from: {peer:?}{stream_info} was: {wire_msg:?}"
+                    );
 
                 msg_received(wire_msg, peer, send_stream, comm_events.clone()).await;
             }

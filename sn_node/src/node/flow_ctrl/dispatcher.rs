@@ -14,7 +14,7 @@ use sn_interface::{
     types::{DataAddress, Peer},
 };
 
-use std::sync::Arc;
+use std::{sync::Arc, time::Instant};
 use tokio::sync::{
     mpsc::{channel, Receiver, Sender},
     RwLock,
@@ -44,7 +44,9 @@ impl Dispatcher {
 
     /// Handles a single cmd.
     pub(crate) async fn process_cmd(&self, cmd: Cmd) -> Result<Vec<Cmd>> {
-        match cmd {
+        let start = Instant::now();
+        let cmd_string = format!("{}", cmd);
+        let result = match cmd {
             Cmd::TryJoinNetwork => {
                 info!("[NODE READ]: getting lock for try_join_section");
                 let context = self.node().read().await.context();
@@ -274,6 +276,11 @@ impl Dispatcher {
                 node.joins_allowed_until_split = joins_allowed_until_split;
                 Ok(vec![])
             }
-        }
+        };
+
+        let elapsed = start.elapsed();
+        trace!("Cmd {cmd_string:?} took {:?}", elapsed);
+
+        result
     }
 }
