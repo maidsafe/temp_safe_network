@@ -8,7 +8,7 @@ license = "GPL-3.0"
 name = "sn_node"
 readme = "README.md"
 repository = "https://github.com/maidsafe/safe_network"
-version = "0.74.13"
+version = "0.74.14"
 
 [[bench]]
 name = "data_storage"
