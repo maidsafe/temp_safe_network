@@ -18,7 +18,6 @@ use std::collections::BTreeSet;
 use xor_name::XorName;
 
 /// Spentbook read operations.
-#[allow(clippy::large_enum_variant)]
 #[derive(Hash, Eq, PartialEq, PartialOrd, Clone, Serialize, Deserialize, Debug)]
 pub enum SpentbookQuery {
     /// Query the set of spent proofs if the provided key image has already been spent with a Tx
@@ -26,7 +25,6 @@ pub enum SpentbookQuery {
 }
 
 /// A Spentbook cmd.
-#[allow(clippy::large_enum_variant)]
 #[derive(Eq, PartialEq, Clone, Serialize, Deserialize, custom_debug::Debug)]
 pub enum SpentbookCmd {
     /// Request to Elders to log a key image and its associated transaction as spent.

@@ -13,7 +13,6 @@ use std::{fmt, net::SocketAddr};
 
 /// Response to a request to join a section
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-#[allow(clippy::large_enum_variant)]
 pub struct JoinRequest {
     /// The public key of the section to join.
     pub section_key: bls::PublicKey,

@@ -9,9 +9,7 @@
 mod register;
 mod spentbook;
 
-#[allow(unreachable_pub)]
 pub use register::RegisterAddress;
-#[allow(unreachable_pub)]
 pub use spentbook::SpentbookAddress;
 
 use serde::{Deserialize, Serialize};

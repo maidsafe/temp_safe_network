@@ -20,7 +20,6 @@ use xor_name::XorName;
 /// Network, and their semantics.
 ///
 /// [`types`]: crate::types
-#[allow(clippy::large_enum_variant)]
 #[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
 pub enum DataCmd {
     /// [`Chunk`] write operation.

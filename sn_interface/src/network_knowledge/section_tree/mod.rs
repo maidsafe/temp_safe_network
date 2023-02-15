@@ -124,7 +124,6 @@ impl SectionTree {
     }
 
     /// Get `SectionAuthorityProvider` of a known section with the given prefix.
-    #[allow(unused)]
     pub fn get(&self, prefix: &Prefix) -> Option<SectionAuthorityProvider> {
         self.get_signed(prefix).map(|sap| sap.value.clone())
     }
@@ -866,7 +865,6 @@ mod tests {
             cases: 100, .. ProptestConfig::default()
         })]
         #[test]
-        #[allow(clippy::unwrap_used)]
         fn proptest_section_tree_fields_should_stay_in_sync((genesis_sap, main_dag, list_of_proof_chains) in arb_sections_dag_and_proof_chains(100, true)) {
             let mut section_tree = SectionTree::new(genesis_sap).expect("SAP belongs to the genesis prefix");
             for (proof_chain, sap) in &list_of_proof_chains {

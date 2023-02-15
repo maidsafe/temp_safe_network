@@ -210,7 +210,6 @@ mod core {
             }
         }
 
-        #[allow(clippy::too_many_arguments)]
         pub(crate) fn new(
             comm: Comm,
             keypair: Arc<Keypair>, //todo: Keypair, only test design blocks this

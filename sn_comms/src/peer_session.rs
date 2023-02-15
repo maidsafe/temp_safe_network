@@ -323,7 +323,6 @@ async fn create_connection(
 
 /// Errors that can be returned from `Comm::send_to_one`.
 #[derive(Debug, Error)]
-#[allow(missing_docs)]
 pub(super) enum PeerSessionError {
     #[error("Failed to connect: {0:?}")]
     Connection(qp2p::ConnectionError),

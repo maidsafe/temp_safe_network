@@ -73,7 +73,6 @@ impl Display for ClientMsg {
 }
 
 /// Messages sent from the nodes to the clients in response to queries or commands
-#[allow(clippy::large_enum_variant)]
 #[derive(Eq, PartialEq, Clone, Serialize, Deserialize, custom_debug::Debug)]
 pub enum ClientDataResponse {
     /// Network Issue
@@ -130,7 +129,6 @@ impl Display for ClientDataResponse {
 }
 
 /// The response to a query, containing the query result.
-#[allow(clippy::large_enum_variant, clippy::type_complexity)]
 #[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
 pub enum QueryResponse {
     //
@@ -201,7 +199,6 @@ impl QueryResponse {
 }
 
 /// The response to a Cmd, containing the query result.
-#[allow(clippy::large_enum_variant, clippy::type_complexity)]
 #[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
 pub enum CmdResponse {
     //
