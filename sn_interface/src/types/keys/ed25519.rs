@@ -12,7 +12,9 @@ pub use ed25519_dalek::{Keypair, PublicKey, Signature, Verifier};
 
 use ed25519_dalek::ExpandedSecretKey;
 use std::ops::RangeInclusive;
-use xor_name::{XorName, XOR_NAME_LEN};
+use xor_name::XorName;
+
+use crate::types::calc_age;
 
 /// SHA3-256 hash digest.
 pub type Digest256 = [u8; 32];
@@ -34,7 +36,7 @@ pub fn name(public_key: &PublicKey) -> XorName {
 pub fn gen_name_with_age(age: u8) -> XorName {
     loop {
         let name: XorName = xor_name::rand::random();
-        if age == name[XOR_NAME_LEN - 1] {
+        if age == calc_age(&name) {
             return name;
         }
     }
@@ -52,7 +54,7 @@ pub fn gen_keypair(range: &RangeInclusive<XorName>, age: u8) -> Keypair {
         .map(|_| loop {
             let keypair = Keypair::generate(&mut rand_07::thread_rng());
             let new_name = XorName::from(crate::types::PublicKey::Ed25519(keypair.public));
-            if range.contains(&new_name) && age == new_name[XOR_NAME_LEN - 1] {
+            if range.contains(&new_name) && age == calc_age(&new_name) {
                 return Some(keypair);
             }
         })
@@ -69,7 +71,7 @@ fn gen_keypair_single_thread(range: &RangeInclusive<XorName>, age: u8) -> Keypai
     loop {
         let keypair = Keypair::generate(&mut rng);
         let new_name = XorName::from(crate::types::PublicKey::Ed25519(keypair.public));
-        if range.contains(&new_name) && age == new_name[XOR_NAME_LEN - 1] {
+        if range.contains(&new_name) && age == calc_age(&new_name) {
             return keypair;
         }
     }

@@ -42,7 +42,7 @@ pub use keys::{
 pub use peer::Peer;
 
 use serde::{Deserialize, Serialize};
-use xor_name::XorName;
+use xor_name::{XorName, XOR_NAME_LEN};
 
 // TODO: temporary type tag for spentbook since its underlying data type is
 // still not implemented, it uses a Public Register for now.
@@ -125,4 +125,9 @@ impl ReplicatedData {
             Self::RegisterLog(_) => Err(Error::NoCmdResponseForTheVariant), // should be unreachable, since `RegisterLog` is not resulting from a cmd.,
         }
     }
+}
+
+#[inline]
+pub fn calc_age(xor_name: &XorName) -> u8 {
+    xor_name[XOR_NAME_LEN - 1]
 }

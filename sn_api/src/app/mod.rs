@@ -21,7 +21,7 @@ pub use crate::safeurl::*;
 pub use consts::DEFAULT_XORURL_BASE;
 pub use sn_client::DEFAULT_NETWORK_CONTACTS_FILE_NAME;
 pub use sn_interface::network_knowledge::SectionTree;
-pub use xor_name::{XorName, XOR_NAME_LEN};
+pub use xor_name::XorName;
 
 // --------------------------------------------------------------------
 
