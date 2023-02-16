@@ -51,12 +51,12 @@ pub struct DataStorage {
 
 impl DataStorage {
     /// Set up a new `DataStorage` instance
-    pub fn new(path: &Path, used_space: UsedSpace) -> Result<Self> {
-        Ok(Self {
-            chunks: ChunkStorage::new(path, used_space.clone())?,
-            registers: RegisterStorage::new(path, used_space.clone())?,
+    pub fn new(path: &Path, used_space: UsedSpace) -> Self {
+        Self {
+            chunks: ChunkStorage::new(path, used_space.clone()),
+            registers: RegisterStorage::new(path, used_space.clone()),
             used_space,
-        })
+        }
     }
 
     /// Returns whether the storage min capacity has been reached or not.
@@ -299,7 +299,7 @@ mod tests {
         let used_space = UsedSpace::default();
 
         // Create instance
-        let mut storage = DataStorage::new(path, used_space)?;
+        let mut storage = DataStorage::new(path, used_space);
 
         // 5mb random data chunk
         let bytes = random_bytes(5 * 1024 * 1024);
@@ -351,7 +351,7 @@ mod tests {
         let used_space = UsedSpace::default();
 
         // Create instance
-        let storage = DataStorage::new(path, used_space)?;
+        let storage = DataStorage::new(path, used_space);
 
         // 5mb random data chunk
         let bytes = random_bytes(5 * 1024 * 1024);
@@ -390,7 +390,7 @@ mod tests {
         let used_space = UsedSpace::default();
 
         // Create instance
-        let storage = DataStorage::new(path, used_space)?;
+        let storage = DataStorage::new(path, used_space);
 
         // create reg cmd
 
@@ -484,7 +484,7 @@ mod tests {
         let path = temp_dir.path();
         let used_space = UsedSpace::default();
         let runtime = Runtime::new()?;
-        let mut storage = DataStorage::new(path, used_space)?;
+        let mut storage = DataStorage::new(path, used_space);
         let owner_pk = PublicKey::Bls(bls::SecretKey::random().public_key());
         let owner_keypair = Keypair::new_ed25519();
         for op in ops {

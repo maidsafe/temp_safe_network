@@ -245,7 +245,7 @@ mod core {
 
             let section_keys_provider = SectionKeysProvider::new(section_key_share.clone());
 
-            let data_storage = DataStorage::new(&root_storage_dir, used_space)?;
+            let data_storage = DataStorage::new(&root_storage_dir, used_space);
 
             // create handover
             let handover = if let Some(key) = section_key_share {

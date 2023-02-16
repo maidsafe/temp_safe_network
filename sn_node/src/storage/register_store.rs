@@ -55,11 +55,11 @@ impl RegisterStore {
     /// If the location specified already contains a `RegisterStore`, it is simply used
     ///
     /// Used space of the dir is tracked
-    pub(super) fn new(file_store_path: PathBuf, used_space: UsedSpace) -> Result<Self> {
-        Ok(Self {
+    pub(super) fn new(file_store_path: PathBuf, used_space: UsedSpace) -> Self {
+        Self {
             file_store_path,
             used_space,
-        })
+        }
     }
 
     pub(super) fn address_to_filepath(&self, addr: &RegisterAddress) -> Result<PathBuf> {

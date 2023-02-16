@@ -42,11 +42,11 @@ impl ChunkStorage {
     /// If the location specified already contains a `ChunkStorage`, it is simply used
     ///
     /// Used space of the dir is tracked
-    pub(super) fn new(path: &Path, used_space: UsedSpace) -> Result<Self> {
-        Ok(Self {
+    pub(super) fn new(path: &Path, used_space: UsedSpace) -> Self {
+        Self {
             file_store_path: path.join(CHUNKS_STORE_DIR_NAME),
             used_space,
-        })
+        }
     }
 
     pub(super) fn addrs(&self) -> Vec<ChunkAddress> {
@@ -176,7 +176,6 @@ mod tests {
     fn init_file_store() -> ChunkStorage {
         let root = tempdir().expect("Failed to create temporary directory for chunk disk store");
         ChunkStorage::new(root.path(), UsedSpace::default())
-            .expect("Failed to create chunk disk store")
     }
 
     #[tokio::test]
