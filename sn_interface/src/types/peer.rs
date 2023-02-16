@@ -14,7 +14,7 @@ use std::{
 };
 use xor_name::XorName;
 
-use super::calc_age;
+use super::utils::calc_age;
 
 /// A Peer with name, derived from its `PublicKey`, and an address.
 #[derive(Copy, Clone, Debug, serde::Serialize, serde::Deserialize)]

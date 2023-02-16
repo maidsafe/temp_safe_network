@@ -14,7 +14,7 @@ use ed25519_dalek::ExpandedSecretKey;
 use std::ops::RangeInclusive;
 use xor_name::XorName;
 
-use crate::types::calc_age;
+use crate::types::utils::calc_age;
 
 /// SHA3-256 hash digest.
 pub type Digest256 = [u8; 32];
