@@ -8,7 +8,7 @@
 
 use eyre::{eyre, Result};
 use sn_dbc::{
-    Dbc, KeyImage, Owner, OwnerOnce, RingCtTransaction, SpentProof, SpentProofShare, Token,
+    Dbc, DbcTransaction, Owner, OwnerOnce, PublicKey, SpentProof, SpentProofShare, Token,
     TransactionBuilder,
 };
 use sn_interface::{dbcs::gen_genesis_dbc, messaging::data::RegisterCmd, types::ReplicatedData};
@@ -45,25 +45,22 @@ pub(crate) fn get_spent_proof_share_from_replicated_data(
 pub(crate) fn get_genesis_dbc_spend_info(
     sk_set: &bls::SecretKeySet,
 ) -> Result<(
-    KeyImage,
-    RingCtTransaction,
+    PublicKey,
+    DbcTransaction,
     BTreeSet<SpentProof>,
-    BTreeSet<RingCtTransaction>,
+    BTreeSet<DbcTransaction>,
 )> {
     let genesis_dbc = gen_genesis_dbc(sk_set, &sk_set.secret_key())?;
     let dbc_owner = genesis_dbc.owner_base().clone();
     let output_owner = OwnerOnce::from_owner_base(dbc_owner, &mut rand::thread_rng());
-    let tx_builder = TransactionBuilder::default()
-        .set_decoys_per_input(0)
-        .set_require_all_decoys(false)
-        .add_input_dbc_bearer(&genesis_dbc)?;
+    let tx_builder = TransactionBuilder::default().add_input_dbc_bearer(&genesis_dbc)?;
     let inputs_amount_sum = tx_builder.inputs_amount_sum();
     let dbc_builder = tx_builder
         .add_output_by_amount(inputs_amount_sum, output_owner)
         .build(rand::thread_rng())?;
-    let (key_image, tx) = &dbc_builder.inputs()[0];
+    let (public_key, tx) = &dbc_builder.inputs()[0];
     Ok((
-        *key_image,
+        *public_key,
         tx.clone(),
         genesis_dbc.spent_proofs.clone(),
         genesis_dbc.spent_transactions,
@@ -84,8 +81,6 @@ pub(crate) fn reissue_invalid_dbc_with_no_inputs(
     let mut rng = rand::thread_rng();
     let output_owner = Owner::from(output_owner_sk.clone());
     let dbc_builder = TransactionBuilder::default()
-        .set_decoys_per_input(0)
-        .set_require_all_decoys(false)
         .add_output_by_amount(
             output_amount,
             OwnerOnce::from_owner_base(output_owner, &mut rng),

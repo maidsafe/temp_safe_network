@@ -18,7 +18,7 @@ use sn_interface::{
 };
 
 use bls::PublicKey;
-use sn_dbc::KeyImage;
+use sn_dbc::PublicKey as DbcPublicKey;
 use std::{io, time::Duration};
 use thiserror::Error;
 use xor_name::XorName;
@@ -284,12 +284,14 @@ pub enum Error {
     #[error("A signed section authority provider was not found for section key {0:?}")]
     SignedSapNotFound(PublicKey),
     /// Occurs if a DBC spend command eventually fails after a number of retry attempts.
-    #[error("The DBC spend request failed after {attempts} attempts for key_image: {key_image:?}")]
+    #[error(
+        "The DBC spend request failed after {attempts} attempts for public_key: {public_key:?}"
+    )]
     DbcSpendRetryAttemptsExceeded {
         /// Number of attemtps made
         attempts: u8,
-        /// The key_image that was attempted to spend
-        key_image: KeyImage,
+        /// The public_key that was attempted to spend
+        public_key: DbcPublicKey,
     },
     /// Occurs if a section key is not found when searching the sections DAG.
     #[error("Section key {0:?} was not found in the sections DAG")]

@@ -7,9 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use sn_dbc::{
-    bls_ringct::{bls_bulletproofs::PedersenGens, group::Curve},
-    rng, Dbc, Hash, IndexedSignatureShare, MlsagMaterial, Owner, OwnerOnce, RevealedCommitment,
-    SpentProofContent, SpentProofShare, Token, TransactionBuilder, TrueInput,
+    rng, Dbc, Hash, IndexedSignatureShare, Owner, OwnerOnce, PedersenGens, RevealedCommitment,
+    RevealedInput, SpentProofContent, SpentProofShare, Token, TransactionBuilder,
 };
 
 use std::{fmt::Debug, result};
@@ -51,33 +50,22 @@ pub fn gen_genesis_dbc(
     let output_owner =
         OwnerOnce::from_owner_base(Owner::from(genesis_dbc_sk.clone()), &mut rng::thread_rng());
 
-    let revealed_commitment =
-        RevealedCommitment::from_value(GENESIS_DBC_AMOUNT, &mut rng::thread_rng());
+    let revealed_commitment = RevealedCommitment::from_value(GENESIS_DBC_AMOUNT, rng::thread_rng());
 
     // Use the same key as the input and output of Genesis Tx.
-    let true_input = TrueInput::new(genesis_dbc_sk.clone(), revealed_commitment);
-
-    // build our MlsagMaterial manually without randomness.
-    // note: no decoy inputs because no other DBCs exist prior to genesis DBC.
-    let mlsag_material = MlsagMaterial {
-        true_input,
-        decoy_inputs: vec![],
-        pi_base: 0,
-        alpha: (1234.into(), 5678.into()),
-        r: vec![(9123.into(), 4567.into())],
-    };
+    let genesis_input = RevealedInput::new(genesis_dbc_sk.clone(), revealed_commitment);
 
     let mut dbc_builder = TransactionBuilder::default()
-        .add_input(mlsag_material)
+        .add_input(genesis_input)
         .add_output_by_amount(Token::from_nano(GENESIS_DBC_AMOUNT), output_owner)
         .build(rng::thread_rng())
         .map_err(|err| {
             Error::GenesisDbcError(format!(
-                "Failed to build the ringct transaction for genesis DBC: {err}",
+                "Failed to build the DBC transaction for genesis DBC: {err}",
             ))
         })?;
 
-    let (key_image, tx) = dbc_builder.inputs().into_iter().next().ok_or_else(|| {
+    let (public_key, tx) = dbc_builder.inputs().into_iter().next().ok_or_else(|| {
         Error::GenesisDbcError(
             "DBC builder (unexpectedly) contains an empty set of inputs.".to_string(),
         )
@@ -85,11 +73,9 @@ pub fn gen_genesis_dbc(
 
     // let's build the spent proof and add it to the DBC builder
     let content = SpentProofContent {
-        key_image,
+        public_key,
         transaction_hash: Hash::from(tx.hash()),
-        public_commitments: vec![revealed_commitment
-            .commit(&PedersenGens::default())
-            .to_affine()],
+        public_commitment: revealed_commitment.commit(&PedersenGens::default()),
     };
 
     let sk_share_index = 0;

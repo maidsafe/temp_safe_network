@@ -11,7 +11,7 @@ use crate::node::{core::NodeContext, flow_ctrl::cmds::Cmd, Error, MyNode, Result
 use bytes::BufMut;
 use qp2p::SendStream;
 use sn_dbc::{
-    get_public_commitments_from_transaction, Commitment, KeyImage, RingCtTransaction, SpentProof,
+    get_public_commitments_from_transaction, Commitment, DbcTransaction, PublicKey, SpentProof,
     SpentProofShare,
 };
 use sn_interface::{
@@ -129,7 +129,7 @@ impl MyNode {
             DataCmd::Spentbook(cmd) => {
                 let SpentbookCmd::Spend {
                     network_knowledge,
-                    key_image,
+                    public_key,
                     tx,
                     spent_proofs,
                     spent_transactions,
@@ -150,7 +150,7 @@ impl MyNode {
                         // To avoid a loop, recompose the message without the updated proof_chain.
                         let updated_client_msg =
                             ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
-                                key_image,
+                                public_key,
                                 tx,
                                 spent_proofs,
                                 spent_transactions,
@@ -213,33 +213,33 @@ impl MyNode {
         cmd: SpentbookCmd,
     ) -> Result<ReplicatedData> {
         let SpentbookCmd::Spend {
-            key_image,
+            public_key,
             tx,
             spent_proofs,
             spent_transactions,
             ..
         } = cmd;
 
-        info!("Processing spend request for key image: {:?}", key_image);
+        info!("Processing spend request for public key: {:?}", public_key);
 
         let spent_proof_share = MyNode::gen_spent_proof_share(
             context,
-            &key_image,
+            &public_key,
             &tx,
             &spent_proofs,
             &spent_transactions,
         )?;
-        let reg_cmd = MyNode::gen_register_cmd(context, &key_image, &spent_proof_share)?;
+        let reg_cmd = MyNode::gen_register_cmd(context, &public_key, &spent_proof_share)?;
         Ok(ReplicatedData::SpentbookWrite(reg_cmd))
     }
 
     /// Generate a spent proof share from the information provided by the client.
     fn gen_spent_proof_share(
         context: &NodeContext,
-        key_image: &KeyImage,
-        tx: &RingCtTransaction,
+        public_key: &PublicKey,
+        tx: &DbcTransaction,
         spent_proofs: &BTreeSet<SpentProof>,
-        spent_transactions: &BTreeSet<RingCtTransaction>,
+        spent_transactions: &BTreeSet<DbcTransaction>,
     ) -> Result<SpentProofShare> {
         // Verify spent proof signatures are valid.
         let mut spent_proofs_keys = BTreeSet::new();
@@ -274,7 +274,7 @@ impl MyNode {
             get_public_commitments_from_transaction(tx, spent_proofs, spent_transactions)?;
 
         // Do not sign invalid TX.
-        let tx_public_commitments: Vec<Vec<Commitment>> = public_commitments_info
+        let tx_public_commitments: Vec<Commitment> = public_commitments_info
             .clone()
             .into_iter()
             .map(|(_, v)| v)
@@ -286,24 +286,26 @@ impl MyNode {
         }
 
         // TODO:
-        // Check the key_image wasn't already spent with a different TX (i.e. double spent)
+        // Check the public_key wasn't already spent with a different TX (i.e. double spent)
 
-        // Grab the commitments specific to the spent key image.
-        let public_commitments: Vec<Commitment> = public_commitments_info
+        // Grab the commitment specific to the spent public key.
+        let public_commitment: Commitment = public_commitments_info
             .into_iter()
-            .flat_map(|(k, v)| if &k == key_image { v } else { vec![] })
-            .collect();
-        if public_commitments.is_empty() {
-            let msg = format!("There are no commitments for the given key image {key_image:?}",);
-            warn!("Dropping spend request: {msg}");
-            return Err(Error::SpentbookError(msg));
-        }
+            .find(|(k, _c)| k == public_key)
+            .map(|(_k, c)| c)
+            .ok_or_else(|| {
+                let msg =
+                    format!("There are no commitments for the given public key {public_key:?}",);
+                warn!("Dropping spend request: {msg}");
+                Error::SpentbookError(msg)
+            })?;
+
         let spent_proof_share = build_spent_proof_share(
-            key_image,
+            public_key,
             tx,
             &context.network_knowledge.section_auth(),
             &context.section_keys_provider,
-            public_commitments,
+            public_commitment,
         )?;
         Ok(spent_proof_share)
     }
@@ -312,7 +314,7 @@ impl MyNode {
     /// (Register).
     fn gen_register_cmd(
         context: &NodeContext,
-        key_image: &KeyImage,
+        public_key: &PublicKey,
         spent_proof_share: &SpentProofShare,
     ) -> Result<RegisterCmd> {
         let mut permissions = BTreeMap::new();
@@ -325,7 +327,7 @@ impl MyNode {
 
         let mut register = Register::new(
             owner,
-            XorName::from_content(&key_image.to_bytes()),
+            XorName::from_content(&public_key.to_bytes()),
             SPENTBOOK_TYPE_TAG,
             policy,
         );

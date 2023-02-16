@@ -8,7 +8,7 @@ use eyre::{eyre, Result};
 use itertools::Itertools;
 use sn_consensus::{Ballot, Consensus, Decision, Proposition, Vote, VoteResponse};
 use sn_dbc::{
-    get_public_commitments_from_transaction, Commitment, Dbc, Owner, OwnerOnce, RingCtTransaction,
+    get_public_commitments_from_transaction, Commitment, Dbc, DbcTransaction, Owner, OwnerOnce,
     Token, TransactionBuilder,
 };
 use std::{
@@ -178,8 +178,6 @@ pub fn reissue_dbc(
     let mut rng = rand::thread_rng();
     let output_owner = Owner::from(output_owner_sk.clone());
     let mut dbc_builder = TransactionBuilder::default()
-        .set_decoys_per_input(0)
-        .set_require_all_decoys(false)
         .add_input_dbc_bearer(input)?
         .add_output_by_amount(
             output_amount,
@@ -190,22 +188,24 @@ pub fn reissue_dbc(
             OwnerOnce::from_owner_base(input.owner_base().clone(), &mut rng),
         )
         .build(rng)?;
-    for (key_image, tx) in dbc_builder.inputs() {
+    for (public_key, tx) in dbc_builder.inputs() {
         let public_commitments = get_public_commitments_from_transaction(
             &tx,
             &input.spent_proofs,
             &input.spent_transactions,
         )?;
-        let public_commitments: Vec<Commitment> = public_commitments
+        let public_commitment: Commitment = public_commitments
             .into_iter()
-            .flat_map(|(k, v)| if k == key_image { v } else { vec![] })
-            .collect();
+            .find(|(k, _c)| k == &public_key)
+            .map(|(_k, c)| c)
+            .expect("Found no commitment for Tx input with pubkey: {public_key:?}");
+
         let spent_proof_share = build_spent_proof_share(
-            &key_image,
+            &public_key,
             &tx,
             sap,
             section_keys_provider,
-            public_commitments,
+            public_commitment,
         )?;
         dbc_builder = dbc_builder
             .add_spent_proof_share(spent_proof_share)
@@ -220,12 +220,12 @@ pub fn reissue_dbc(
     Ok(output_dbc)
 }
 
-/// Gets a key image and a transaction that are ready to be used in a spend request.
+/// Gets a public key and a transaction that are ready to be used in a spend request.
 pub fn get_input_dbc_spend_info(
     input: &Dbc,
     amount: u64,
     output_owner_sk: &bls::SecretKey,
-) -> Result<(bls::PublicKey, RingCtTransaction)> {
+) -> Result<(bls::PublicKey, DbcTransaction)> {
     let output_amount = Token::from_nano(amount);
     let input_amount = input.amount_secrets_bearer()?.amount();
     let change_amount = input_amount
@@ -235,8 +235,6 @@ pub fn get_input_dbc_spend_info(
     let mut rng = rand::thread_rng();
     let output_owner = Owner::from(output_owner_sk.clone());
     let dbc_builder = TransactionBuilder::default()
-        .set_decoys_per_input(0)
-        .set_require_all_decoys(false)
         .add_input_dbc_bearer(input)?
         .add_output_by_amount(
             output_amount,

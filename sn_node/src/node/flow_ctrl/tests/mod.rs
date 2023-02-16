@@ -850,13 +850,13 @@ async fn spentbook_spend_client_message_should_replicate_to_adults_and_send_ack(
     let dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0);
     let sk_set = env.get_secret_key_set(prefix, None);
 
-    let (key_image, tx, spent_proofs, spent_transactions) =
+    let (public_key, tx, spent_proofs, spent_transactions) =
         dbc_utils::get_genesis_dbc_spend_info(&sk_set)?;
 
     let comm_rx = env.take_comm_rx(dispatcher.node().read().await.info().public_key());
     let mut cmds = ProcessAndInspectCmds::new_from_client_msg(
         ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
-            key_image,
+            public_key,
             tx: tx.clone(),
             spent_proofs,
             spent_transactions,
@@ -883,7 +883,7 @@ async fn spentbook_spend_client_message_should_replicate_to_adults_and_send_ack(
                         assert_eq!(targets.len(), replication_count);
                         let spent_proof_share =
                             dbc_utils::get_spent_proof_share_from_replicated_data(data)?;
-                        assert_eq!(key_image.to_hex(), spent_proof_share.key_image().to_hex());
+                        assert_eq!(public_key.to_hex(), spent_proof_share.public_key().to_hex());
                         assert_eq!(Hash::from(tx.hash()), spent_proof_share.transaction_hash());
                         assert_eq!(
                             sk_set.public_keys().public_key().to_hex(),
@@ -936,7 +936,7 @@ async fn spentbook_spend_transaction_with_no_inputs_should_return_spentbook_erro
     let comm_rx = env.take_comm_rx(dispatcher.node().read().await.info().public_key());
     let mut cmds = ProcessAndInspectCmds::new_from_client_msg(
         ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
-            key_image: new_dbc2_sk.public_key(),
+            public_key: new_dbc2_sk.public_key(),
             tx: new_dbc2.transaction,
             spent_proofs: new_dbc.spent_proofs.clone(),
             spent_transactions: new_dbc.spent_transactions,
@@ -1042,12 +1042,12 @@ async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node()
     // is used. Again, the owner of the output DBCs don't really matter, so a random key is
     // used.
     let proof_chain = other_section.section_chain();
-    let (key_image, tx) = get_input_dbc_spend_info(&new_dbc2, 2, &bls::SecretKey::random())?;
+    let (public_key, tx) = get_input_dbc_spend_info(&new_dbc2, 2, &bls::SecretKey::random())?;
 
     let comm_rx = env.take_comm_rx(info.public_key());
     let mut cmds = ProcessAndInspectCmds::new_from_client_msg(
         ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
-            key_image,
+            public_key,
             tx,
             spent_proofs: new_dbc2.spent_proofs,
             spent_transactions: new_dbc2.spent_transactions,
