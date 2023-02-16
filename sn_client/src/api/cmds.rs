@@ -43,17 +43,23 @@ impl Client {
         };
 
         let msg_id = MsgId::new();
-        tokio::time::timeout(self.cmd_timeout, async {
+        if let Some(cmd_timeout) = self.cmd_timeout {
+            tokio::time::timeout(cmd_timeout, async {
+                self.session
+                    .send_cmd(dst_address, auth, serialised_cmd, is_spend_cmd, msg_id)
+                    .await
+            })
+            .await
+            .map_err(|_| Error::CmdAckValidationTimeout {
+                msg_id,
+                elapsed: cmd_timeout,
+                dst_address,
+            })?
+        } else {
             self.session
                 .send_cmd(dst_address, auth, serialised_cmd, is_spend_cmd, msg_id)
                 .await
-        })
-        .await
-        .map_err(|_| Error::CmdAckValidationTimeout {
-            msg_id,
-            elapsed: self.cmd_timeout,
-            dst_address,
-        })?
+        }
     }
 
     /// Public API to send a `DataCmd` to the network.

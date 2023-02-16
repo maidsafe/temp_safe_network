@@ -57,9 +57,9 @@ pub struct Client {
     keypair: Keypair,
     dbc_owner: Owner,
     session: Session,
-    pub(crate) query_timeout: Duration,
+    pub(crate) query_timeout: Option<Duration>,
     pub(crate) max_backoff_interval: Duration,
-    pub(crate) cmd_timeout: Duration,
+    pub(crate) cmd_timeout: Option<Duration>,
     chunks_cache: Arc<RwLock<ChunksCache>>,
 }
 

@@ -36,8 +36,6 @@ pub const ENV_CMD_TIMEOUT: &str = "SN_CMD_TIMEOUT";
 
 /// Bind by default to all network interfaces on a OS assigned port
 pub const DEFAULT_LOCAL_ADDR: (Ipv4Addr, u16) = (Ipv4Addr::UNSPECIFIED, 0);
-/// Default timeout to use before timing out queries and commands
-pub const DEFAULT_QUERY_CMD_TIMEOUT: Duration = Duration::from_secs(90);
 /// Max amount of time for an operation backoff (time between attempts). In Seconds.
 pub const DEFAULT_MAX_QUERY_CMD_BACKOFF_INTERVAL: Duration = Duration::from_secs(3);
 
@@ -126,15 +124,14 @@ impl ClientBuilder {
     ///
     /// In case parameters have not been passed to this builder, defaults will be used:
     /// - `[Self::keypair]` and `[Self::dbc_owner]` are randomly generated
-    /// - `[Self::query_timeout`] and `[Self::cmd_timeout]` default to [`DEFAULT_QUERY_CMD_TIMEOUT`]
     /// - `[Self::max_backoff_interval`] defaults to [`DEFAULT_MAX_QUERY_CMD_BACKOFF_INTERVAL`]
     /// - Network contacts file will be read from a standard location
     pub async fn build(self) -> Result<Client, Error> {
         let max_backoff_interval = self
             .max_backoff_interval
             .unwrap_or(DEFAULT_MAX_QUERY_CMD_BACKOFF_INTERVAL);
-        let query_timeout = self.query_timeout.unwrap_or(DEFAULT_QUERY_CMD_TIMEOUT);
-        let cmd_timeout = self.cmd_timeout.unwrap_or(DEFAULT_QUERY_CMD_TIMEOUT);
+        let query_timeout = self.query_timeout;
+        let cmd_timeout = self.cmd_timeout;
 
         let network_contacts = match self.network_contacts {
             Some(pm) => pm,
