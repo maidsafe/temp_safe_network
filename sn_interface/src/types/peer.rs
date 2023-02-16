@@ -12,7 +12,9 @@ use std::{
     hash::{Hash, Hasher},
     net::SocketAddr,
 };
-use xor_name::{XorName, XOR_NAME_LEN};
+use xor_name::XorName;
+
+use super::utils::calc_age;
 
 /// A Peer with name, derived from its `PublicKey`, and an address.
 #[derive(Copy, Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -36,7 +38,7 @@ impl Peer {
 
     /// Returns the age.
     pub fn age(&self) -> u8 {
-        self.name[XOR_NAME_LEN - 1]
+        calc_age(&self.name)
     }
 
     pub fn id(&self) -> (XorName, SocketAddr) {

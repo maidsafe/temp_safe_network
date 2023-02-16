@@ -6,14 +6,14 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::types::{Peer, PublicKey};
+use crate::types::{utils::calc_age, Peer, PublicKey};
 use ed25519_dalek::Keypair;
 use std::{
     fmt::{self, Display, Formatter},
     net::SocketAddr,
     sync::Arc,
 };
-use xor_name::{XorName, XOR_NAME_LEN};
+use xor_name::XorName;
 
 /// Information and state of our node
 #[derive(Clone, custom_debug::Debug)]
@@ -47,7 +47,7 @@ impl MyNodeInfo {
 
     // Last byte of the name represents the age.
     pub fn age(&self) -> u8 {
-        self.name()[XOR_NAME_LEN - 1]
+        calc_age(&self.name())
     }
 }
 

@@ -13,6 +13,7 @@ use multibase::{self, Base};
 use rand::{rngs::OsRng, Rng};
 use rayon::current_num_threads;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use xor_name::{XorName, XOR_NAME_LEN};
 
 /// Wrapper for raw `bincode::serialise`.
 pub fn serialise<T: Serialize>(data: &T) -> Result<Vec<u8>> {
@@ -75,4 +76,9 @@ pub fn random_bytes(length: usize) -> Bytes {
     bytes.extend(vec![0u8; remainder]);
 
     Bytes::from(bytes)
+}
+
+#[inline]
+pub fn calc_age(xor_name: &XorName) -> u8 {
+    xor_name[XOR_NAME_LEN - 1]
 }
