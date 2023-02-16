@@ -13,7 +13,7 @@ use sn_interface::{
         data::ClientMsg,
         serialisation::WireMsg,
         system::{JoinResponse, NodeMsg},
-        AuthorityProof, ClientAuth, Dst, MsgId, MsgKind, MsgType,
+        AuthorityProof, ClientAuth, Dst, MsgId, MsgKind,
     },
     network_knowledge::{test_utils::*, NodeState},
     types::{Keypair, Peer},
@@ -21,13 +21,17 @@ use sn_interface::{
 
 use assert_matches::assert_matches;
 use bytes::Bytes;
-use eyre::Result;
+use eyre::{Context, Result};
 use qp2p::Endpoint;
 use std::{
     collections::{btree_map::Entry, BTreeMap, BTreeSet, VecDeque},
     net::{Ipv4Addr, SocketAddr},
+    sync::Arc,
 };
-use tokio::sync::mpsc::{error::TryRecvError, Receiver};
+use tokio::sync::{
+    mpsc::{error::TryRecvError, Receiver},
+    RwLock,
+};
 use xor_name::XorName;
 
 pub(crate) struct JoinApprovalSent(pub(crate) bool);
@@ -205,31 +209,97 @@ pub(crate) fn get_client_msg_parts_for_handling(
     Ok((MsgId::new(), payload, kind, auth_proof))
 }
 
-// A test utility to keep track of the Msgs that has been sent and received
-#[derive(Debug, Default)]
-pub(crate) struct TestMsgCounter {
-    pub(crate) counter: BTreeMap<MsgId, BTreeSet<XorName>>,
+/// Bundles the `Dispatcher` along with the `TestMsgTracker` to easily track the
+/// NodeMsgs during tests
+pub(crate) struct TestDispatcher {
+    pub(crate) dispatcher: Arc<Dispatcher>,
+    pub(crate) msg_tracker: Arc<RwLock<TestMsgTracker>>,
 }
 
-impl TestMsgCounter {
-    /// Tracks the msgs during SendMsg Cmd
+impl TestDispatcher {
+    pub(crate) fn new(dispatcher: Dispatcher, msg_tracker: Arc<RwLock<TestMsgTracker>>) -> Self {
+        Self {
+            dispatcher: Arc::new(dispatcher),
+            msg_tracker,
+        }
+    }
+
+    pub(crate) fn node(&self) -> Arc<RwLock<MyNode>> {
+        self.dispatcher.node()
+    }
+
+    /// Tracks the cmds before executing them
+    pub(crate) async fn process_cmd(&self, cmd: Cmd) -> Result<Vec<Cmd>> {
+        self.msg_tracker.write().await.track(&cmd);
+        self.dispatcher
+            .process_cmd(cmd)
+            .await
+            .wrap_err("Failed to process {cmd}")
+    }
+
+    /// Handle and keep track of Msg from Peers
+    /// Contains optional relocation_old_name to deal with name change during relocation
+    pub(crate) async fn test_handle_msg_from_peer(
+        &self,
+        msg: MsgFromPeer,
+        relocation_old_name: Option<XorName>,
+    ) -> Vec<Cmd> {
+        let msg_id = msg.wire_msg.msg_id();
+
+        // check if we have successfully untracked the msg
+        let mut untracked = false;
+        if let Some(old_name) = relocation_old_name {
+            untracked = untracked || self.msg_tracker.write().await.untrack(msg_id, &old_name);
+        }
+        let our_name = self.dispatcher.node().read().await.name();
+        untracked = untracked || self.msg_tracker.write().await.untrack(msg_id, &our_name);
+        assert!(untracked);
+
+        let handle_node_msg_cmd = Cmd::HandleMsg {
+            origin: msg.sender,
+            wire_msg: msg.wire_msg,
+            send_stream: msg.send_stream,
+        };
+        self.dispatcher
+            .process_cmd(handle_node_msg_cmd)
+            .await
+            .expect("Error while handling node msg")
+    }
+}
+
+/// Test utility to keep track of the msgs that has been sent.
+/// When the msg has been received, it is removed from the tracker.
+/// Used to terminate tests.
+#[derive(Debug, Default)]
+pub(crate) struct TestMsgTracker {
+    pub(crate) tracker: BTreeMap<MsgId, BTreeSet<XorName>>,
+}
+
+impl TestMsgTracker {
+    /// Tracks the msgs during SendMsg* Cmd
     pub(crate) fn track(&mut self, cmd: &Cmd) {
         if let Cmd::SendMsg {
             msg_id, recipients, ..
         } = cmd
         {
             let recp = recipients.get().into_iter().map(|p| p.name()).collect();
-            info!("Tracking {msg_id:?} for {recp:?}");
-            let _ = self.counter.insert(*msg_id, recp);
+            info!("Tracking {msg_id:?} for {recp:?}, cmd {cmd}");
+            let _ = self.tracker.insert(*msg_id, recp);
         } else if let Cmd::SendMsgEnqueueAnyResponse {
             msg_id, recipients, ..
         } = cmd
         {
             let recp = recipients.iter().map(|p| p.name()).collect();
-            info!("Tracking {msg_id:?} for {recp:?}");
-            let _ = self.counter.insert(*msg_id, recp);
-        } else {
-            panic!("A Cmd::SendMsg variant was expected")
+            info!("Tracking {msg_id:?} for {recp:?}, cmd {cmd}");
+            let _ = self.tracker.insert(*msg_id, recp);
+        } else if let Cmd::SendNodeMsgResponse {
+            msg_id, recipient, ..
+        } = cmd
+        {
+            info!("Tracking {msg_id:?} for {recipient:?}, cmd {cmd}");
+            let _ = self
+                .tracker
+                .insert(*msg_id, BTreeSet::from([recipient.name()]));
         }
     }
 
@@ -237,7 +307,7 @@ impl TestMsgCounter {
     pub(crate) fn untrack(&mut self, msg_id: MsgId, our_name: &XorName) -> bool {
         info!("Untracking {msg_id:?} for {our_name:?}");
         let removed;
-        if let Entry::Occupied(mut entry) = self.counter.entry(msg_id) {
+        if let Entry::Occupied(mut entry) = self.tracker.entry(msg_id) {
             let peers = entry.get_mut();
             removed = peers.remove(our_name);
             if peers.is_empty() {
@@ -251,7 +321,7 @@ impl TestMsgCounter {
 
     /// When the counter is empty we are sure that all the msgs are processed
     pub(crate) fn is_empty(&self) -> bool {
-        self.counter.is_empty()
+        self.tracker.is_empty()
     }
 }
 
@@ -287,51 +357,6 @@ impl Cmd {
         } else {
             panic!("A Cmd::SendMsg variant was expected")
         };
-    }
-}
-
-/// Extend the `Dispatcher` with some utilities for testing.
-///
-/// Since this is in a module marked as #[test], this functionality will only be present in the
-/// testing context.
-impl Dispatcher {
-    // Handle and keep track of Msg from Peers
-    // Contains optional relocation_old_name to deal with name change during relocation
-    pub(crate) async fn test_handle_msg_from_peer(
-        &self,
-        msg: MsgFromPeer,
-        msg_counter: &mut TestMsgCounter,
-        relocation_old_name: Option<XorName>,
-    ) -> Vec<Cmd> {
-        let msg_id = {
-            let msg_type = msg
-                .wire_msg
-                .into_msg()
-                .expect("Failed to convert wire_msg to MsgType");
-            match msg_type {
-                MsgType::Client { msg_id, .. } => msg_id,
-                MsgType::ClientDataResponse { msg_id, .. } => msg_id,
-                MsgType::Node { msg_id, .. } => msg_id,
-            }
-        };
-
-        // check if we have successfully untracked the msg
-        let mut untracked = false;
-        if let Some(old_name) = relocation_old_name {
-            untracked = untracked || msg_counter.untrack(msg_id, &old_name);
-        }
-        let our_name = self.node().read().await.name();
-        untracked = untracked || msg_counter.untrack(msg_id, &our_name);
-        assert!(untracked);
-
-        let handle_node_msg_cmd = Cmd::HandleMsg {
-            origin: msg.sender,
-            wire_msg: msg.wire_msg,
-            send_stream: msg.send_stream,
-        };
-        self.process_cmd(handle_node_msg_cmd)
-            .await
-            .expect("Error while handling node msg")
     }
 }
 

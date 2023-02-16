@@ -332,16 +332,16 @@ impl MyNode {
                     trace!("Sending AE response over send_stream for {msg_id:?}");
                     Ok(vec![
                         track_node_cmd,
-                        Cmd::SendNodeMsgResponse {
-                            msg: NodeMsg::AntiEntropy {
+                        Cmd::send_node_response(
+                            NodeMsg::AntiEntropy {
                                 section_tree_update,
                                 kind,
                             },
                             msg_id,
-                            send_stream: stream,
-                            recipient: origin,
-                            context: context.clone(),
-                        },
+                            origin,
+                            stream,
+                            context.clone(),
+                        ),
                     ])
                 } else {
                     trace!("Attempting to send AE response over fresh conn for {msg_id:?}");
@@ -454,16 +454,16 @@ impl MyNode {
             LogMarker::AeSendRetryAsOutdated
         );
 
-        Cmd::SendClientResponse {
-            msg: ClientDataResponse::AntiEntropy {
+        Cmd::send_client_response(
+            ClientDataResponse::AntiEntropy {
                 section_tree_update,
                 bounced_msg,
             },
             correlation_id,
-            send_stream: response_stream,
-            context,
             source_client,
-        }
+            response_stream,
+            context,
+        )
     }
 }
 

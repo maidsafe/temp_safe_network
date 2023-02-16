@@ -137,6 +137,7 @@ pub(crate) enum Cmd {
     SendNodeMsgResponse {
         msg: NodeMsg,
         msg_id: MsgId,
+        correlation_id: MsgId,
         recipient: Peer,
         send_stream: SendStream,
         #[debug(skip)]
@@ -145,6 +146,7 @@ pub(crate) enum Cmd {
     /// Performs serialisation and sends the msg to the client over the given stream.
     SendClientResponse {
         msg: ClientDataResponse,
+        msg_id: MsgId,
         correlation_id: MsgId,
         send_stream: SendStream,
         #[debug(skip)]
@@ -173,6 +175,42 @@ impl Cmd {
             msg,
             msg_id,
             recipients,
+            context,
+        }
+    }
+
+    pub(crate) fn send_node_response(
+        msg: NodeMsg,
+        correlation_id: MsgId,
+        recipient: Peer,
+        send_stream: SendStream,
+        context: NodeContext,
+    ) -> Self {
+        let msg_id = MsgId::new();
+        Cmd::SendNodeMsgResponse {
+            msg,
+            msg_id,
+            correlation_id,
+            recipient,
+            send_stream,
+            context,
+        }
+    }
+
+    pub(crate) fn send_client_response(
+        msg: ClientDataResponse,
+        correlation_id: MsgId,
+        source_client: Peer,
+        send_stream: SendStream,
+        context: NodeContext,
+    ) -> Self {
+        let msg_id = MsgId::new();
+        Cmd::SendClientResponse {
+            msg,
+            msg_id,
+            correlation_id,
+            source_client,
+            send_stream,
             context,
         }
     }
