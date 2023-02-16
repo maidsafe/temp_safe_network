@@ -51,12 +51,12 @@ pub struct DataStorage {
 
 impl DataStorage {
     /// Set up a new `DataStorage` instance
-    pub fn new(path: &Path, used_space: UsedSpace) -> Result<Self> {
-        Ok(Self {
-            chunks: ChunkStorage::new(path, used_space.clone())?,
-            registers: RegisterStorage::new(path, used_space.clone())?,
+    pub fn new(path: &Path, used_space: UsedSpace) -> Self {
+        Self {
+            chunks: ChunkStorage::new(path, used_space.clone()),
+            registers: RegisterStorage::new(path, used_space.clone()),
             used_space,
-        })
+        }
     }
 
     /// Returns whether the storage min capacity has been reached or not.
@@ -77,16 +77,31 @@ impl DataStorage {
     /// of `has_reached_min_capacity() == true` before doing it.
     pub(crate) fn try_retain_data_of(&self, prefix: xor_name::Prefix) {
         if self.has_reached_min_capacity() {
-            let chunk_storage = self.chunks.clone();
-            // run this on another thread, since it can be a bit heavy
+            // run these on other threads, since they can be a bit heavy
+
+            let chunks = self.chunks.clone();
             let _handle = tokio::task::spawn(async move {
-                let chunk_addr_to_remove = chunk_storage
+                let chunk_addr_to_remove = chunks
                     .addrs()
                     .into_iter()
                     .filter(|addr| !prefix.matches(addr.name()));
                 for addr in chunk_addr_to_remove {
-                    if let Err(err) = chunk_storage.remove_chunk(&addr).await {
+                    if let Err(err) = chunks.remove_chunk(&addr).await {
                         warn!("Could not remove chunk {addr:?} due to {err}.");
+                    }
+                }
+            });
+
+            let registers = self.registers.clone();
+            let _handle = tokio::task::spawn(async move {
+                let reg_addr_to_remove = registers
+                    .addrs()
+                    .await
+                    .into_iter()
+                    .filter(|addr| !prefix.matches(addr.name()));
+                for addr in reg_addr_to_remove {
+                    if let Err(err) = registers.remove_register(&addr).await {
+                        warn!("Could not remove register {addr:?} due to {err}.");
                     }
                 }
             });
@@ -299,7 +314,7 @@ mod tests {
         let used_space = UsedSpace::default();
 
         // Create instance
-        let mut storage = DataStorage::new(path, used_space)?;
+        let mut storage = DataStorage::new(path, used_space);
 
         // 5mb random data chunk
         let bytes = random_bytes(5 * 1024 * 1024);
@@ -351,7 +366,7 @@ mod tests {
         let used_space = UsedSpace::default();
 
         // Create instance
-        let storage = DataStorage::new(path, used_space)?;
+        let storage = DataStorage::new(path, used_space);
 
         // 5mb random data chunk
         let bytes = random_bytes(5 * 1024 * 1024);
@@ -390,7 +405,7 @@ mod tests {
         let used_space = UsedSpace::default();
 
         // Create instance
-        let storage = DataStorage::new(path, used_space)?;
+        let storage = DataStorage::new(path, used_space);
 
         // create reg cmd
 
@@ -484,7 +499,7 @@ mod tests {
         let path = temp_dir.path();
         let used_space = UsedSpace::default();
         let runtime = Runtime::new()?;
-        let mut storage = DataStorage::new(path, used_space)?;
+        let mut storage = DataStorage::new(path, used_space);
         let owner_pk = PublicKey::Bls(bls::SecretKey::random().public_key());
         let owner_keypair = Keypair::new_ed25519();
         for op in ops {
