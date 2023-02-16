@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1676563899905,
+  "lastUpdate": 1676568458761,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -70852,6 +70852,150 @@ window.BENCHMARK_DATA = {
             "name": "read-sampling/chunk keys/4000",
             "value": 332594510,
             "range": "± 3706897",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "6f51e6064184d8d6934a2277743a4621ab22e8c4",
+          "message": "Merge #2108 #2111 #2112\n\n2108: refactor: call nodes after check still in section r=joshuef a=oetyng\n\n- It is an unnecessary work started if node was removed from section.\n\n2111: chore: removing unnecessary results r=joshuef a=oetyng\n\nThis is probably a remainder from old code where the paths had potential errors.\r\n\n\n2112: fix: extend cleanup to registers r=joshuef a=oetyng\n\nAs nodes fill up they check if there's any data they are no longer responsible for, and clean it up.\r\n\r\nIt was missing the removal of registers.\r\n\r\nNB: This can be made more granular, by looking at close nodes instead of prefix.\n\nCo-authored-by: oetyng <oetyng@gmail.com>",
+          "timestamp": "2023-02-16T15:23:03Z",
+          "tree_id": "ae55def9dab5d9a330225e21084103eb66eb8678",
+          "url": "https://github.com/maidsafe/safe_network/commit/6f51e6064184d8d6934a2277743a4621ab22e8c4"
+        },
+        "date": 1676568455698,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "serialize/serialize for sending",
+            "value": 2696788,
+            "range": "± 88171",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 106332930,
+            "range": "± 1983494",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 124180237,
+            "range": "± 3206342",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 507568559,
+            "range": "± 5494445",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 87062754,
+            "range": "± 951566",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 103474276,
+            "range": "± 815534",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 410546213,
+            "range": "± 4529598",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "register-edit-sampling/register_edits/1000",
+            "value": 28729436947,
+            "range": "± 640962227",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/100",
+            "value": 75583826,
+            "range": "± 19245503",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/1000",
+            "value": 3344141623,
+            "range": "± 303833393",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/4000",
+            "value": 11652904356,
+            "range": "± 283850720",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/100",
+            "value": 301725812,
+            "range": "± 34704636",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/1000",
+            "value": 2673262105,
+            "range": "± 112379525",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/4000",
+            "value": 10974620978,
+            "range": "± 408429412",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/100",
+            "value": 58816325,
+            "range": "± 1388804",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/1000",
+            "value": 563009407,
+            "range": "± 9127762",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/4000",
+            "value": 2232506155,
+            "range": "± 22591611",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/100",
+            "value": 13994320,
+            "range": "± 860596",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/1000",
+            "value": 112679323,
+            "range": "± 6952187",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/4000",
+            "value": 386104037,
+            "range": "± 10704096",
             "unit": "ns/iter"
           }
         ]
