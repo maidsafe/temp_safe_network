@@ -71,7 +71,6 @@ pub struct SectionAuthorityProvider {
 
 /// `SectionAuthorityProvider` candidates for handover consensus to vote on
 /// Each is signed by their own section key (the one in the SectionAuthorityProvider)
-#[allow(clippy::large_enum_variant)]
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug, Serialize, Deserialize)]
 pub enum SapCandidate {
     ElderHandover(SectionSigned<SectionAuthorityProvider>),

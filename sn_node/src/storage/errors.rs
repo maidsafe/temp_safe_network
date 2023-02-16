@@ -18,7 +18,6 @@ use xor_name::XorName;
 /// Specialisation of `std::Result` for storage mod.
 pub(crate) type Result<T, E = Error> = std::result::Result<T, E>;
 
-#[allow(clippy::large_enum_variant)]
 #[derive(Error, Debug)]
 #[non_exhaustive]
 /// Node error variants.

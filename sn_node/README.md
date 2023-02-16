@@ -14,7 +14,7 @@ By specifying the `otlp` feature for the `sn_node` binary, logs will be sent to 
 export OTEL_EXPORTER_OTLP_ENDPOINT="http://localhost:4317" # Already the default
 export RUST_LOG=sn_node=info # This filters the output for stdout/files, not OTLP
 export RUST_LOG_OTLP=sn_node=trace # This filters what is sent to OTLP endpoint 
-cargo run --release --bin sn_node --features otlp -- --first --skip-auto-port-forwarding --local-addr=127.0.0.1:0
+cargo run --release --bin sn_node --features otlp -- --first --local-addr=127.0.0.1:0
 ```
 
 Before running the node, an OTLP endpoint should be available. An example of an OTLP-supporting endpoint is Jaeger, which can be launched with Docker like this (see [documentation](https://www.jaegertracing.io/docs/1.42/getting-started/#all-in-one)):

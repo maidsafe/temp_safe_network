@@ -99,7 +99,6 @@ impl RegisterCmd {
 }
 
 ///
-#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct CreateRegister {
     /// The name of the [`Register`].

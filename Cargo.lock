@@ -3946,7 +3946,7 @@ dependencies = [
 
 [[package]]
 name = "sn_cli"
-version = "0.69.2"
+version = "0.69.3"
 dependencies = [
  "ansi_term",
  "assert_cmd",
@@ -3998,7 +3998,7 @@ dependencies = [
 
 [[package]]
 name = "sn_client"
-version = "0.78.6"
+version = "0.78.7"
 dependencies = [
  "assert_matches",
  "backoff",
@@ -4184,9 +4184,9 @@ dependencies = [
 
 [[package]]
 name = "sn_launch_tool"
-version = "0.12.2"
+version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "66f1c2a853d446b444c13618f2cb131e4788ea656813eecadbcaf97f479acc29"
+checksum = "17c4e0297134de4c10e3be4a7305619a5948cc4751fdbfd70e3ee58e4455c8dc"
 dependencies = [
  "clap",
  "color-eyre",
@@ -4198,7 +4198,7 @@ dependencies = [
 
 [[package]]
 name = "sn_node"
-version = "0.74.12"
+version = "0.74.14"
 dependencies = [
  "assert_matches",
  "base64 0.13.1",

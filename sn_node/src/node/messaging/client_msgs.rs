@@ -53,7 +53,6 @@ impl MyNode {
     }
 
     /// Handle data query
-    #[allow(clippy::too_many_arguments)]
     pub(crate) async fn handle_data_query_where_stored(
         msg_id: MsgId,
         query: &DataQuery,

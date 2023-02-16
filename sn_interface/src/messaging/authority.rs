@@ -140,6 +140,5 @@ impl VerifyAuthority for SectionSig {
 impl sealed::Sealed for SectionSig {}
 
 mod sealed {
-    #[allow(missing_docs, unreachable_pub)]
     pub trait Sealed {}
 }

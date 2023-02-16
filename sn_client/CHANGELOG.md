@@ -1113,15 +1113,19 @@ needed, as they keypair itself contains the Arcs we need.
     - Self authentication Example
     - Example to demonstrate Storage API
 
-## v0.78.6 (2023-02-13)
+## v0.78.7 (2023-02-14)
+
+### Chore
+
+ - <csr-id-b50fa2c502915fbca752354f271ee0d370f5b06e/> update sn_launch_tool
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
  - 1 commit contributed to the release.
- - 4 days passed between releases.
- - 0 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 1 day passed between releases.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -1131,10 +1135,39 @@ needed, as they keypair itself contains the Arcs we need.
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - update sn_launch_tool ([`b50fa2c`](https://github.com/maidsafe/safe_network/commit/b50fa2c502915fbca752354f271ee0d370f5b06e))
+</details>
+
+## v0.78.6 (2023-02-13)
+
+### Chore
+
+ - <csr-id-7b209d81ce679308c5e4f4123b07558cdd33a6b8/> sn_client-0.78.6
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 4 days passed between releases.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_client-0.78.6 ([`7b209d8`](https://github.com/maidsafe/safe_network/commit/7b209d81ce679308c5e4f4123b07558cdd33a6b8))
     - Merge #1886 ([`6082509`](https://github.com/maidsafe/safe_network/commit/6082509275b3813bc7e5ffe8da5f93bc3ce5fded))
 </details>
 
 ## v0.78.5 (2023-02-08)
+
+<csr-id-b09329be395afc79c01c8276a83db02fbd8feded/>
+<csr-id-c8bbc738158c35020c0a7c4c5108aceb744a0247/>
 
 ### Other
 

@@ -11,7 +11,6 @@ use strum_macros::{Display as StrumDisplay, EnumIter, EnumString};
 
 /// Internal log marker, to be used in tests asserts.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, EnumIter, StrumDisplay, EnumString)]
-#[allow(missing_docs)]
 pub enum LogMarker {
     // Stats
     TotalNetworkElders,

@@ -27,7 +27,6 @@ pub struct SignatureShare {
 
 /// Wrapper for different signature types.
 #[derive(Clone, Eq, PartialEq, Serialize, Deserialize, custom_debug::Debug)]
-#[allow(clippy::large_enum_variant)]
 pub enum Signature {
     /// Ed25519 signature.
     Ed25519(

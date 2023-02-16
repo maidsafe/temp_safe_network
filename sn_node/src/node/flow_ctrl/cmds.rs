@@ -46,7 +46,6 @@ pub(crate) struct CmdJob {
 /// Modelling a call like this also allows for throttling
 /// and prioritization, which is not something e.g. tokio tasks allow.
 /// In other words, it enables enhanced flow control.
-#[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub(crate) enum Cmd {
     TryJoinNetwork,

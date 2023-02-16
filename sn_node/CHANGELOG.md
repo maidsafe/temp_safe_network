@@ -5,17 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.74.12 (2023-02-10)
+## v0.74.14 (2023-02-15)
 
-### Chore
+### Test
 
- - <csr-id-9bfd18e36a8d8c16dc1878e067f1e7845c78048a/> removing const left unused by recent refactoring
+ - <csr-id-ebef737f7da6aa2ba1f77a54262f8aad77f999e1/> fix failing test after rustup update
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
+ - 1 commit contributed to the release.
  - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
@@ -26,11 +26,77 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - fix failing test after rustup update ([`ebef737`](https://github.com/maidsafe/safe_network/commit/ebef737f7da6aa2ba1f77a54262f8aad77f999e1))
+</details>
+
+## v0.74.13 (2023-02-14)
+
+<csr-id-933164e253fb43ec1177ddc56a576b35c3d85bfa/>
+
+### Refactor
+
+ - <csr-id-933164e253fb43ec1177ddc56a576b35c3d85bfa/> remove skip port forward flag
+
+### Chore
+
+ - <csr-id-a7799933cfeadfb70fdb7c1b20ebef9982ea9a41/> sn_client-0.78.7/sn_node-0.74.13/sn_cli-0.69.3
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 3 days passed between releases.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_client-0.78.7/sn_node-0.74.13/sn_cli-0.69.3 ([`a779993`](https://github.com/maidsafe/safe_network/commit/a7799933cfeadfb70fdb7c1b20ebef9982ea9a41))
+    - remove skip port forward flag ([`933164e`](https://github.com/maidsafe/safe_network/commit/933164e253fb43ec1177ddc56a576b35c3d85bfa))
+</details>
+
+## v0.74.12 (2023-02-10)
+
+<csr-id-9bfd18e36a8d8c16dc1878e067f1e7845c78048a/>
+<csr-id-279788d6e550ee148d43bba60aad7901e3631737/>
+
+### Chore
+
+ - <csr-id-9bfd18e36a8d8c16dc1878e067f1e7845c78048a/> removing const left unused by recent refactoring
+
+### Chore
+
+ - <csr-id-279788d6e550ee148d43bba60aad7901e3631737/> sn_node-0.74.12
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_node-0.74.12 ([`279788d`](https://github.com/maidsafe/safe_network/commit/279788d6e550ee148d43bba60aad7901e3631737))
     - Merge #2091 ([`6b11b12`](https://github.com/maidsafe/safe_network/commit/6b11b12c418f11fca00397e5cccf368eaab1ac35))
     - removing const left unused by recent refactoring ([`9bfd18e`](https://github.com/maidsafe/safe_network/commit/9bfd18e36a8d8c16dc1878e067f1e7845c78048a))
 </details>
 
 ## v0.74.11 (2023-02-09)
+
+<csr-id-17ca03749dc6eed8922cde5a7c3ef8a8e5505483/>
 
 ### Chore
 
