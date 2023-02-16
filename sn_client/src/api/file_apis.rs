@@ -216,6 +216,7 @@ impl Client {
     #[instrument(skip_all, level = "trace")]
     async fn upload_large(&self, large: LargeFile, verify: bool) -> Result<XorName> {
         let (head_address, all_chunks) = Self::encrypt_large(large)?;
+        println!(">>>> {}", all_chunks.len());
         for next_batch in all_chunks.chunks(CHUNKS_BATCH_MAX_SIZE) {
             // Connect to all relevant elders before we fire off all msgs...
             self.session

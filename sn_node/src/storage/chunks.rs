@@ -142,13 +142,17 @@ impl ChunkStorage {
         if let Some(dirs) = filepath.parent() {
             create_dir_all(dirs).await?;
         }
+        trace!("{:?} {addr:?} DIRS CREATED", LogMarker::StoringChunk);
 
         let mut file = File::create(filepath).await?;
+        trace!("{:?} {addr:?} FILE CREATED", LogMarker::StoringChunk);
 
         file.write_all(chunk.value()).await?;
+        trace!("{:?} {addr:?} BYTES WRITTEN", LogMarker::StoringChunk);
         // Let's sync up OS data to disk to reduce the chances of
         // concurrent reading failing by reading an empty/incomplete file
         file.sync_data().await?;
+        trace!("{:?} {addr:?} DATA SYNCED", LogMarker::StoringChunk);
 
         let storage_level = self.used_space.increase(chunk.value().len());
         trace!("{:?} {addr:?}", LogMarker::StoredNewChunk);

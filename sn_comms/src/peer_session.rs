@@ -125,7 +125,10 @@ impl PeerSession {
             let stream_id = send_stream.id();
             trace!("bidi {stream_id} opened for {msg_id:?} to {peer:?}");
             send_stream.set_priority(10);
-            if let Err(err) = send_stream.send_user_msg(bytes.clone()).await {
+            if let Err(err) = send_stream
+                .send_user_msg(bytes.clone(), msg_id.as_ref())
+                .await
+            {
                 error!("Error sending bytes for {msg_id:?} over {stream_id}: {err:?}");
                 // remove that broken conn
                 let _conn = self.connections.remove(&conn_id);
@@ -215,7 +218,8 @@ impl PeerSession {
             debug!("Connection got for sendjob: {msg_id:?}, with conn_id: {conn_id:?}");
 
             let send_resp =
-                Self::send_with_connection(conn, bytes.clone(), self.connections.clone()).await;
+                Self::send_with_connection(conn, bytes.clone(), self.connections.clone(), msg_id)
+                    .await;
 
             match send_resp {
                 Ok(()) => {
@@ -270,12 +274,13 @@ impl PeerSession {
         conn: Arc<Connection>,
         bytes: UsrMsgBytes,
         connections: PeerConnections,
+        msg_id: MsgId,
     ) -> Result<(), PeerSessionError> {
         let conn_id = conn.id();
         let conns_count = connections.len();
         trace!("We have {conns_count} open connections to node {conn_id}.");
 
-        conn.send_with(bytes, 0 /* priority */).await.map_err(|error| {
+        conn.send_with(bytes, 0 /* priority */, msg_id.as_ref()).await.map_err(|error| {
             error!(
                 "Error sending out msg... We have {conns_count} open connections to node {conn_id}: {error:?}",
             );

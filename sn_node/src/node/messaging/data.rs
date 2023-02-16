@@ -184,7 +184,7 @@ impl MyNode {
         query_index: Option<usize>,
     ) -> BTreeSet<Peer> {
         // TODO: reuse our_members_sorted_by_distance_to API when core is merged into upper layer
-        let members = context.network_knowledge.members();
+        let members = context.network_knowledge.adults();
 
         debug!("Total members known about: {:?}", members.len());
 

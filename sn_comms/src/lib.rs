@@ -463,7 +463,7 @@ fn send_error(peer: Peer, error: Error, comm_events: Sender<CommEvent>) {
 
 #[tracing::instrument(skip_all)]
 async fn send_on_stream(msg_id: MsgId, bytes: UsrMsgBytes, mut stream: SendStream) {
-    match stream.send_user_msg(bytes).await {
+    match stream.send_user_msg(bytes, msg_id.as_ref()).await {
         Ok(()) => trace!("Response to {msg_id:?} sent to client."),
         Err(error) => error!("Could not send the response to {msg_id:?} to client due to {error}!"),
     }
