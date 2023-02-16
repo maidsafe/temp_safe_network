@@ -77,16 +77,31 @@ impl DataStorage {
     /// of `has_reached_min_capacity() == true` before doing it.
     pub(crate) fn try_retain_data_of(&self, prefix: xor_name::Prefix) {
         if self.has_reached_min_capacity() {
-            let chunk_storage = self.chunks.clone();
-            // run this on another thread, since it can be a bit heavy
+            // run these on other threads, since they can be a bit heavy
+
+            let chunks = self.chunks.clone();
             let _handle = tokio::task::spawn(async move {
-                let chunk_addr_to_remove = chunk_storage
+                let chunk_addr_to_remove = chunks
                     .addrs()
                     .into_iter()
                     .filter(|addr| !prefix.matches(addr.name()));
                 for addr in chunk_addr_to_remove {
-                    if let Err(err) = chunk_storage.remove_chunk(&addr).await {
+                    if let Err(err) = chunks.remove_chunk(&addr).await {
                         warn!("Could not remove chunk {addr:?} due to {err}.");
+                    }
+                }
+            });
+
+            let registers = self.registers.clone();
+            let _handle = tokio::task::spawn(async move {
+                let reg_addr_to_remove = registers
+                    .addrs()
+                    .await
+                    .into_iter()
+                    .filter(|addr| !prefix.matches(addr.name()));
+                for addr in reg_addr_to_remove {
+                    if let Err(err) = registers.remove_register(&addr).await {
+                        warn!("Could not remove register {addr:?} due to {err}.");
                     }
                 }
             });

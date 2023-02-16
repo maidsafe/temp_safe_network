@@ -91,7 +91,7 @@ impl RegisterStore {
             }
         }
 
-        trace!("Listening all register addrs done");
+        trace!("Listing all register addrs done.");
         addrs.into_values().collect()
     }
 
