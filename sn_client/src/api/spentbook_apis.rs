@@ -337,6 +337,9 @@ mod tests {
 
         let (output_dbc_1, _output_owneronce_1, _amount_secrects_1) = output_dbcs_1[0].clone();
 
+        let pk = output_dbc_1
+            .public_key_bearer()
+            .expect("unexpectedly failed to get DBC public key");
         let spend_amount_2 = 5;
         let recipient_owneronce_2 =
             OwnerOnce::from_owner_base(client.dbc_owner().clone(), &mut rng::thread_rng());
@@ -355,9 +358,6 @@ mod tests {
         let (output_dbc_2, output_owneronce_2, _amount_secrects_2) = output_dbcs_2[0].clone();
 
         // Try spend the dbc.
-        let pk = genesis_dbc
-            .public_key_bearer()
-            .expect("unexpectedly failed to get DBC public key");
         let result = client
             .spend_dbc(
                 output_owneronce_2.as_owner().public_key(),
