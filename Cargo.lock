@@ -310,6 +310,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2ce4f10ea3abcd6617873bae9f91d1c5332b4a778bd9ce34d0cd517474c1de82"
 
 [[package]]
+name = "atomic"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b88d82667eca772c4aa12f0f1348b3ae643424c8876448f3f7bd5787032e234c"
+dependencies = [
+ "autocfg",
+]
+
+[[package]]
 name = "atomic-waker"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3643,6 +3652,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "seahash"
+version = "4.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1c107b6f4780854c8b126e228ea8869f4d7b71260f962fefb57b996b8959ba6b"
+
+[[package]]
 name = "self_encryption"
 version = "0.27.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4247,6 +4262,7 @@ dependencies = [
  "sn_fault_detection",
  "sn_interface",
  "sn_sdkg",
+ "stretto",
  "strum",
  "strum_macros",
  "sysinfo",
@@ -4297,6 +4313,28 @@ name = "spin"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6e63cff320ae2c57904679ba7cb63280a3dc4613885beafb148ee7bf9aa9042d"
+
+[[package]]
+name = "stable_deref_trait"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a8f112729512f8e442d81f95a8a7ddf2b7c6b8a1a6f509a95864142b30cab2d3"
+
+[[package]]
+name = "stretto"
+version = "0.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e84bcc3af74e733dcd0382baa7deec3fadee09cc89089d1f0350068f31df39bb"
+dependencies = [
+ "atomic",
+ "crossbeam-channel",
+ "parking_lot",
+ "rand 0.8.5",
+ "seahash",
+ "thiserror",
+ "wg",
+ "xxhash-rust",
+]
 
 [[package]]
 name = "string_cache"
@@ -4924,6 +4962,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "triomphe"
+version = "0.1.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f1ee9bd9239c339d714d657fac840c6d2a4f9c45f4f9ec7b0975113458be78db"
+dependencies = [
+ "serde",
+ "stable_deref_trait",
+]
+
+[[package]]
 name = "try-lock"
 version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5227,6 +5275,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "wg"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cc4a87eca0e149703202bc625506b908d94f620dfbfbad7aac3402b2868f0043"
+dependencies = [
+ "parking_lot",
+ "triomphe",
+]
+
+[[package]]
 name = "which"
 version = "4.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5389,6 +5447,12 @@ dependencies = [
  "serde_test",
  "tiny-keccak",
 ]
+
+[[package]]
+name = "xxhash-rust"
+version = "0.8.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "735a71d46c4d68d71d4b24d03fdc2b98e38cea81730595801db779c04fe80d70"
 
 [[package]]
 name = "yaml-rust"

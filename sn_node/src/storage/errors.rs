@@ -52,13 +52,16 @@ pub enum Error {
     /// Messaging error.
     #[error("Messaging error:: {0}")]
     Messaging(#[from] Box<sn_interface::messaging::data::Error>),
+    /// Cache error.
+    #[error("Cache error:: {0}")]
+    Cache(#[from] stretto::CacheError),
     /// No filename found
     #[error("Path contains no file name: {0}")]
     NoFilename(PathBuf),
     /// Invalid filename
     #[error("Invalid chunk filename: {0}")]
     InvalidFilename(PathBuf),
-    /// Register command/op destinaation adddress mistmatch
+    /// Register command/op destination adddress mistmatch
     #[error(
         "Register command destination address ({cmd_dst_addr:?}) doesn't match stored Register address: {reg_addr:?}"
     )]

@@ -25,10 +25,17 @@ use std::{
     mem::size_of,
     path::{Path, PathBuf},
 };
+use stretto::Cache;
 use tiny_keccak::{Hasher, Sha3};
-use tokio::fs::{create_dir_all, metadata, read, remove_file, File};
-use tokio::io::AsyncWriteExt;
+use tokio::{
+    fs::{create_dir_all, metadata, read, remove_file, File},
+    io::AsyncWriteExt,
+    time::Duration,
+};
 use xor_name::XorName;
+
+const REGISTERS_CACHE_SIZE: usize = 20 * 1024 * 1024;
+const REGISTERS_CACHE_TTL: Duration = Duration::from_millis(70_000);
 
 // Deterministic Id for a register Cmd, takes into account the underlying cmd, and all sigs
 type RegisterCmdId = String;
@@ -43,10 +50,12 @@ pub(super) struct StoredRegister {
 }
 
 /// A disk store for Registers
-#[derive(Clone, Debug)]
+#[derive(Clone, custom_debug::Debug)]
 pub(super) struct RegisterStore {
     file_store_path: PathBuf,
     used_space: UsedSpace,
+    #[debug(skip)]
+    cache: Cache<RegisterAddress, StoredRegister>,
 }
 
 impl RegisterStore {
@@ -59,6 +68,7 @@ impl RegisterStore {
         Self {
             file_store_path,
             used_space,
+            cache: Cache::new(REGISTERS_CACHE_SIZE, 1i64).expect("FAILED TO CREATE REGISTER CACHE"),
         }
     }
 
@@ -74,7 +84,7 @@ impl RegisterStore {
     }
 
     pub(super) async fn list_all_reg_addrs(&self) -> Vec<RegisterAddress> {
-        trace!("Listening all register addrs");
+        trace!("Listing all register addrs");
         let iter = list_files_in(&self.file_store_path)
             .into_iter()
             .filter_map(|e| e.parent().map(|parent| (parent.to_path_buf(), e.clone())));
@@ -97,8 +107,12 @@ impl RegisterStore {
 
     pub(super) async fn delete_data(&self, addr: &RegisterAddress) -> Result<()> {
         let filepath = self.address_to_filepath(addr)?;
-        let meta = metadata(filepath.clone()).await?;
-        remove_file(filepath).await?;
+        let meta = metadata(&filepath).await?;
+
+        remove_file(&filepath).await?;
+        self.cache.remove(addr);
+        self.cache.wait()?;
+
         self.used_space.decrease(meta.len() as usize);
         Ok(())
     }
@@ -115,6 +129,13 @@ impl RegisterStore {
             op_log: RegisterLog::new(),
             op_log_path: path.clone(),
         };
+
+        // let's try to find it in the in-memory cache first
+        if let Some(entry) = self.cache.get(addr) {
+            let stored_reg = entry.value().clone();
+            entry.release();
+            return Ok(stored_reg);
+        }
 
         if !path.exists() {
             trace!(
@@ -160,8 +181,10 @@ impl RegisterStore {
     pub(super) async fn write_log_to_disk(
         &self,
         log: &RegisterLog,
-        path: &Path,
+        reg: StoredRegister,
+        addr: RegisterAddress,
     ) -> Result<StorageLevel> {
+        let path = &reg.op_log_path;
         trace!(
             "Writing to register log with {} cmd/s at {}",
             log.len(),
@@ -200,6 +223,16 @@ impl RegisterStore {
                 log.len(),
                 path.display()
             );
+
+            // let's write the Register into the cache
+            if !self
+                .cache
+                .insert_with_ttl(addr, reg, 1, REGISTERS_CACHE_TTL)
+            {
+                trace!("Register with {addr:?} was not stored in cache");
+            }
+            self.cache.wait()?;
+
             Ok(storage_level)
         }
     }
@@ -247,7 +280,6 @@ impl RegisterStore {
         }
 
         let mut file = File::create(&path).await?;
-
         let serialized_data = serialise(cmd)?;
         file.write_all(&serialized_data).await?;
         // Let's sync up OS data to disk to reduce the chances of
