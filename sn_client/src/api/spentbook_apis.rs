@@ -355,6 +355,7 @@ mod tests {
         let (output_dbc_2, output_owneronce_2, _amount_secrects_2) = output_dbcs_2[0].clone();
 
         // Try spend the dbc.
+        let pk = genesis_dbc.public_key_bearer().unwrap();
         let result = client
             .spend_dbc(
                 output_owneronce_2.as_owner().public_key(),
@@ -370,11 +371,10 @@ mod tests {
                 source: ErrorMsg::InvalidOperation(error_string),
                 ..
             }) => {
-                let correct_error_str =
-                    "DbcError(CommitmentsInputLenMismatch { current: 0, expected: 1 })";
+                let correct_error_str = format!("{:?}", sn_dbc::Error::MissingCommitmentForPubkey(pk));
                 assert!(
-                    error_string.contains(correct_error_str),
-                    "A different SpentbookError error was expected for this case. What we got: {error_string:?}"
+                    error_string.contains(&correct_error_str),
+                    "A different SpentbookError error was expected for this case. What we got: {error_string:?}, expected: {correct_error_str:?}"
                 );
                 Ok(())
             }
