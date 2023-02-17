@@ -24,7 +24,7 @@ use std::{
     sync::Arc,
 };
 use tiny_keccak::{Hasher, Sha3};
-use xor_name::{XorName, XOR_NAME_LEN};
+use xor_name::XorName;
 
 const SHA3_512_HASH_LEN: usize = 64;
 
@@ -83,7 +83,7 @@ pub fn derive_location_and_keypair(passphrase: &str, password: &str) -> Result<(
 /// Generates User's Identity for the network using supplied credentials in
 /// a deterministic way.  This is similar to the username in various places.
 pub fn generate_network_address(passphrase: &[u8], salt: &[u8]) -> Result<XorName> {
-    let mut id = XorName([0; XOR_NAME_LEN]);
+    let mut id = XorName::default();
 
     const ITERATIONS: u32 = 10_000u32;
 

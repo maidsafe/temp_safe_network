@@ -29,6 +29,7 @@ impl MyNode {
         node: Arc<RwLock<MyNode>>,
         context: &NodeContext,
         peer: Peer,
+        correlation_id: MsgId,
         relocation: Option<RelocationProof>,
         send_stream: Option<SendStream>,
     ) -> Result<Vec<Cmd>> {
@@ -87,13 +88,13 @@ impl MyNode {
 
                 // Send it over response stream if we have one
                 if let Some(stream) = send_stream {
-                    return Ok(vec![Cmd::SendNodeMsgResponse {
+                    return Ok(vec![Cmd::send_node_response(
                         msg,
-                        msg_id: MsgId::new(),
-                        send_stream: stream,
-                        recipient: peer,
-                        context: context.clone(),
-                    }]);
+                        correlation_id,
+                        peer,
+                        stream,
+                        context.clone(),
+                    )]);
                 }
 
                 return Ok(vec![Cmd::send_msg(
@@ -110,13 +111,13 @@ impl MyNode {
 
         // Let the joiner know we are considering.
         if let Some(send_stream) = send_stream {
-            cmds.push(Cmd::SendNodeMsgResponse {
-                msg: NodeMsg::JoinResponse(JoinResponse::UnderConsideration),
-                msg_id: MsgId::new(),
+            cmds.push(Cmd::send_node_response(
+                NodeMsg::JoinResponse(JoinResponse::UnderConsideration),
+                correlation_id,
+                peer,
                 send_stream,
-                recipient: peer,
-                context: context.clone(),
-            });
+                context.clone(),
+            ));
         }
 
         // We propose membership

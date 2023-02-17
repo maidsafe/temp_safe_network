@@ -24,6 +24,7 @@ impl MyNode {
     pub(crate) async fn send_node_msg_response(
         msg: NodeMsg,
         msg_id: MsgId,
+        correlation_id: MsgId,
         recipient: Peer,
         context: NodeContext,
         send_stream: SendStream,
@@ -38,12 +39,14 @@ impl MyNode {
             send_stream,
             recipient,
             msg_id,
+            correlation_id,
         )
         .await
     }
 
     pub(crate) async fn send_client_response(
         msg: ClientDataResponse,
+        msg_id: MsgId,
         correlation_id: MsgId,
         send_stream: SendStream,
         context: NodeContext,
@@ -57,6 +60,7 @@ impl MyNode {
             kind,
             send_stream,
             source_client,
+            msg_id,
             correlation_id,
         )
         .await
@@ -105,7 +109,10 @@ impl MyNode {
         let msg_id = wire_msg.msg_id();
         let targets_len = targets.len();
 
-        debug!("Sending out {msg_id:?} to {targets_len} holder node/s {targets:?}");
+        debug!(
+            "Sending out {msg_id:?}, coming from {}, to {targets_len} holder node/s {targets:?}",
+            source_client.addr()
+        );
 
         let node_bytes: BTreeMap<_, _> = targets
             .into_par_iter()
@@ -147,13 +154,13 @@ async fn send_msg_on_stream(
     kind: MsgKind,
     mut send_stream: SendStream,
     target_peer: Peer,
+    msg_id: MsgId,
     correlation_id: MsgId,
 ) -> Result<Option<Cmd>> {
     let dst = Dst {
         name: target_peer.name(),
         section_key,
     };
-    let msg_id = MsgId::new();
     let wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
     let bytes = wire_msg.serialize().map_err(|_| Error::InvalidMessage)?;
 

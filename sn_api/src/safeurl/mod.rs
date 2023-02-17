@@ -27,11 +27,7 @@ use url_parts::UrlParts;
 use xor_name::{XorName, XOR_NAME_LEN};
 use xorurl_media_types::{MEDIA_TYPE_CODES, MEDIA_TYPE_STR};
 
-/// Type tag to use for the `NrsMapContainer` stored on Register
-pub const NRS_MAP_TYPE_TAG: u64 = 1_500;
-
-/// Default base encoding used for XOR URLs
-pub const DEFAULT_XORURL_BASE: XorUrlBase = XorUrlBase::Base32z;
+use crate::{nrs::NRS_MAP_TYPE_TAG, DEFAULT_XORURL_BASE};
 
 const URL_PROTOCOL: &str = "safe://";
 const URL_SCHEME: &str = "safe";

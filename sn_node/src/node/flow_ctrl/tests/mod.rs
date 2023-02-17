@@ -17,12 +17,11 @@ use crate::node::{
         tests::network_builder::{TestNetwork, TestNetworkBuilder},
     },
     messaging::Peers,
-    relocation_check, ChurnId, Cmd, Error, SectionStateVote,
+    Cmd, Error, SectionStateVote,
 };
 use cmd_utils::{handle_online_cmd, ProcessAndInspectCmds};
 
 use sn_comms::{CommEvent, MsgFromPeer};
-use sn_consensus::Decision;
 use sn_dbc::Hash;
 use sn_interface::{
     dbcs::gen_genesis_dbc,
@@ -36,9 +35,9 @@ use sn_interface::{
         Dst, MsgType, WireMsg,
     },
     network_knowledge::{
-        recommended_section_size, section_keys::SectionKeysProvider, supermajority,
-        Error as NetworkKnowledgeError, MembershipState, MyNodeInfo, NodeState, RelocationDst,
-        RelocationInfo, RelocationProof, SectionTreeUpdate, SectionsDAG, MIN_ADULT_AGE,
+        section_keys::SectionKeysProvider, Error as NetworkKnowledgeError, MyNodeInfo, NodeState,
+        RelocationDst, RelocationInfo, RelocationProof, SectionTreeUpdate, SectionsDAG,
+        MIN_ADULT_AGE,
     },
     test_utils::*,
     types::{keys::ed25519, PublicKey},
@@ -500,83 +499,6 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
             .collect::<Vec<_>>(),
         vec![&signed_sap.value]
     );
-    Ok(())
-}
-
-/// Create a `SectionStateVote::Online` whose agreement handling triggers relocation of a node with the
-/// given age.
-///
-/// NOTE: recommended to call this with low `age` (4 or 5), otherwise it might take very long time
-/// to complete because it needs to generate a signature with the number of trailing zeroes equal
-/// to (or greater that) `age`.
-pub(crate) fn create_relocation_trigger(
-    sk_set: &bls::SecretKeySet,
-    age: u8,
-) -> Decision<NodeState> {
-    loop {
-        let node_state = NodeState::joined(gen_peer(MIN_ADULT_AGE), Some(xor_name::rand::random()));
-        let decision = section_decision(sk_set, node_state.clone());
-
-        let sig: bls::Signature = decision.proposals[&node_state].clone();
-        let churn_id = ChurnId(sig.to_bytes());
-
-        if relocation_check(age, &churn_id) && !relocation_check(age + 1, &churn_id) {
-            return decision;
-        }
-    }
-}
-
-fn threshold() -> usize {
-    supermajority(elder_count()) - 1
-}
-
-#[tokio::test]
-async fn relocation_decision_is_sent() -> Result<()> {
-    init_logger();
-
-    let prefix: Prefix = prefix("0");
-    let adults = recommended_section_size() - elder_count();
-    let env = TestNetworkBuilder::new(thread_rng())
-        .sap(prefix, elder_count(), adults, None, None)
-        .build();
-    let dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0);
-    let mut section = env.get_network_knowledge(prefix, None);
-    let sk_set = env.get_secret_key_set(prefix, None);
-
-    let relocated_peer = gen_peer_in_prefix(MIN_ADULT_AGE - 1, prefix);
-    let node_state = NodeState::joined(relocated_peer, None);
-    let node_state = TestKeys::get_section_signed(&sk_set.secret_key(), node_state);
-    assert!(section.update_member(node_state));
-    // update our node with the new network_knowledge
-    dispatcher.node().write().await.network_knowledge = section.clone();
-
-    let membership_decision = create_relocation_trigger(&sk_set, relocated_peer.age());
-    let mut cmds = ProcessAndInspectCmds::new(
-        Cmd::HandleMembershipDecision(membership_decision),
-        &dispatcher,
-    );
-
-    let mut offline_relocate_sent = false;
-
-    while let Some(cmd) = cmds.next().await? {
-        let msg = match cmd {
-            Cmd::SendMsg { msg, .. } => msg,
-            _ => continue,
-        };
-
-        // Verify that there was a membership vote to relocate this node.
-        if let NodeMsg::MembershipVotes(votes) = msg {
-            let node_state_proposals = votes.iter().flat_map(|v| v.proposals());
-            for node_state in node_state_proposals {
-                assert_eq!(node_state.name(), relocated_peer.name());
-                if let MembershipState::Relocated(_dst) = node_state.state() {
-                    offline_relocate_sent = true;
-                }
-            }
-        }
-    }
-
-    assert!(offline_relocate_sent);
     Ok(())
 }
 

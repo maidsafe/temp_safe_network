@@ -47,9 +47,9 @@ pub(super) struct RegisterStorage {
 
 impl RegisterStorage {
     /// Create new `RegisterStorage`
-    pub(super) fn new(path: &Path, used_space: UsedSpace) -> Result<Self> {
-        let file_store = RegisterStore::new(path.join(REGISTER_STORE_DIR_NAME), used_space)?;
-        Ok(Self { file_store })
+    pub(super) fn new(path: &Path, used_space: UsedSpace) -> Self {
+        let file_store = RegisterStore::new(path.join(REGISTER_STORE_DIR_NAME), used_space);
+        Self { file_store }
     }
 
     pub(super) async fn remove_register(&self, address: &RegisterAddress) -> Result<()> {
@@ -793,7 +793,7 @@ mod test {
         let tmp_dir = tempdir()?;
         let path = tmp_dir.path();
         let used_space = UsedSpace::default();
-        let store = RegisterStorage::new(path, used_space)?;
+        let store = RegisterStorage::new(path, used_space);
         Ok(store)
     }
 

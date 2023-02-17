@@ -89,23 +89,31 @@ impl Dispatcher {
             Cmd::SendNodeMsgResponse {
                 msg,
                 msg_id,
+                correlation_id,
                 recipient,
                 send_stream,
                 context,
-            } => Ok(
-                MyNode::send_node_msg_response(msg, msg_id, recipient, context, send_stream)
-                    .await?
-                    .into_iter()
-                    .collect(),
-            ),
+            } => Ok(MyNode::send_node_msg_response(
+                msg,
+                msg_id,
+                correlation_id,
+                recipient,
+                context,
+                send_stream,
+            )
+            .await?
+            .into_iter()
+            .collect()),
             Cmd::SendClientResponse {
                 msg,
+                msg_id,
                 correlation_id,
                 send_stream,
                 context,
                 source_client,
             } => Ok(MyNode::send_client_response(
                 msg,
+                msg_id,
                 correlation_id,
                 send_stream,
                 context,

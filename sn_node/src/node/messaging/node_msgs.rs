@@ -135,13 +135,13 @@ impl MyNode {
             response,
             correlation_id,
         };
-        cmds.push(Cmd::SendClientResponse {
+        cmds.push(Cmd::send_client_response(
             msg,
             correlation_id,
-            send_stream,
-            context: context.clone(),
             source_client,
-        });
+            send_stream,
+            context.clone(),
+        ));
 
         Ok(cmds)
     }
@@ -161,14 +161,30 @@ impl MyNode {
         match msg {
             NodeMsg::TryJoin(relocation) => {
                 trace!("Handling msg {:?}: TryJoin from {}", msg_id, sender);
-                MyNode::handle_join(node, &context, sender, relocation, send_stream)
+                MyNode::handle_join(node, &context, sender, msg_id, relocation, send_stream)
                     .await
                     .map(|c| c.into_iter().collect())
             }
+            NodeMsg::BeginRelocating(relocation_trigger) => {
+                let mut node = node.write().await;
+                trace!("[NODE WRITE]: BeginRelocating write gottt...");
+                trace!("Handling BeginRelocating msg from {sender}: {msg_id:?}");
+                Ok(node.handle_begin_relocating(relocation_trigger))
+            }
+            NodeMsg::RelocationRequest {
+                relocation_node,
+                relocation_trigger,
+            } => {
+                let mut node = node.write().await;
+                trace!("[NODE WRITE]: RelocationRequest write gottt...");
+                trace!("Handling RelocationRequest msg from {sender}: {msg_id:?}");
+                Ok(node.handle_relocation_request(relocation_node, relocation_trigger)?)
+            }
+
             NodeMsg::Relocate(signed_relocation) => {
                 let mut node = node.write().await;
                 trace!("[NODE WRITE]: Relocated write gottt...");
-                trace!("Handling relocate msg from {}: {:?}", sender, msg_id);
+                trace!("Handling Relocate msg from {sender}: {msg_id:?}");
                 Ok(node.relocate(signed_relocation)?.into_iter().collect())
             }
             NodeMsg::AntiEntropy {

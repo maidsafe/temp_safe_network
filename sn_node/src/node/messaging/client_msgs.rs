@@ -43,13 +43,7 @@ impl MyNode {
         source_client: Peer,
     ) -> Cmd {
         debug!("{correlation_id:?} sending cmd response error back to client");
-        Cmd::SendClientResponse {
-            msg,
-            correlation_id,
-            send_stream,
-            context,
-            source_client,
-        }
+        Cmd::send_client_response(msg, correlation_id, source_client, send_stream, context)
     }
 
     /// Handle data query
@@ -73,13 +67,13 @@ impl MyNode {
             correlation_id: msg_id,
         };
 
-        vec![Cmd::SendClientResponse {
+        vec![Cmd::send_client_response(
             msg,
-            correlation_id: msg_id,
+            msg_id,
+            source_client,
             send_stream,
             context,
-            source_client,
-        }]
+        )]
     }
 
     /// Handle incoming client msgs.

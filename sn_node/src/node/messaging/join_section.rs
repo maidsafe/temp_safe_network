@@ -43,7 +43,10 @@ mod tests {
     use sn_comms::CommEvent;
     use sn_interface::{
         elder_count, init_logger,
-        messaging::system::{JoinRejectReason, JoinResponse},
+        messaging::{
+            system::{JoinRejectReason, JoinResponse},
+            MsgId,
+        },
         network_knowledge::{MembershipState, NetworkKnowledge},
     };
 
@@ -98,9 +101,10 @@ mod tests {
         let elder = Arc::new(RwLock::new(elder));
 
         let joiner_peer = joining_node.info().peer();
-        let some_cmd = MyNode::handle_join(elder, &elder_context, joiner_peer, None, None)
-            .await
-            .expect("An error was not expected.");
+        let some_cmd =
+            MyNode::handle_join(elder, &elder_context, joiner_peer, MsgId::new(), None, None)
+                .await
+                .expect("An error was not expected.");
 
         let some_cmd = some_cmd
             .iter()
@@ -161,7 +165,7 @@ mod tests {
         let adult = Arc::new(RwLock::new(adult));
 
         let joiner_peer = joining_node.info().peer();
-        let cmd = MyNode::handle_join(adult, &adult_context, joiner_peer, None, None)
+        let cmd = MyNode::handle_join(adult, &adult_context, joiner_peer, MsgId::new(), None, None)
             .await
             .expect("An error was not expected.");
 
@@ -198,7 +202,7 @@ mod tests {
         let elder = Arc::new(RwLock::new(elder));
 
         let joiner_peer = joining_node.info().peer();
-        let cmd = MyNode::handle_join(elder, &elder_context, joiner_peer, None, None)
+        let cmd = MyNode::handle_join(elder, &elder_context, joiner_peer, MsgId::new(), None, None)
             .await
             .expect("An error was not expected.");
 
@@ -233,7 +237,7 @@ mod tests {
         let elder = Arc::new(RwLock::new(elder));
 
         let joiner_peer = joining_node.info().peer();
-        let cmd = MyNode::handle_join(elder, &elder_context, joiner_peer, None, None)
+        let cmd = MyNode::handle_join(elder, &elder_context, joiner_peer, MsgId::new(), None, None)
             .await
             .expect("An error was not expected.");
 
@@ -271,9 +275,10 @@ mod tests {
         let elder = Arc::new(RwLock::new(elder));
 
         let joiner_peer = joining_node.info().peer();
-        let some_cmd = MyNode::handle_join(elder, &elder_context, joiner_peer, None, None)
-            .await
-            .expect("An error was not expected.");
+        let some_cmd =
+            MyNode::handle_join(elder, &elder_context, joiner_peer, MsgId::new(), None, None)
+                .await
+                .expect("An error was not expected.");
 
         let some_cmd = some_cmd
             .iter()
