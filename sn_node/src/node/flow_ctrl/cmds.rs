@@ -13,9 +13,9 @@ use sn_consensus::Decision;
 use sn_fault_detection::IssueType;
 use sn_interface::{
     messaging::{
-        data::{ClientDataResponse, ClientMsg},
+        data::{ClientMsg, DataResponse},
         system::{NodeMsg, SectionSig, SectionSigned},
-        AntiEntropyKind, AuthorityProof, ClientAuth, MsgId, MsgType, WireMsg,
+        AntiEntropyKind, AuthorityProof, ClientAuth, MsgId, NetworkMsg, WireMsg,
     },
     network_knowledge::{
         NodeState, SectionAuthorityProvider, SectionKeyShare, SectionTreeUpdate, SectionsDAG,
@@ -152,7 +152,7 @@ pub(crate) enum Cmd {
     },
     /// Performs serialisation and signing and sends the msg.
     SendMsg {
-        msg: MsgType,
+        msg: NetworkMsg,
         msg_id: MsgId,
         recipients: Peers,
         #[debug(skip)]
@@ -178,8 +178,8 @@ pub(crate) enum Cmd {
         context: NodeContext,
     },
     /// Performs serialisation and sends the msg to the client over the given stream.
-    SendClientResponse {
-        msg: ClientDataResponse,
+    SendDataResponse {
+        msg: DataResponse,
         msg_id: MsgId,
         correlation_id: MsgId,
         send_stream: SendStream,
@@ -205,10 +205,14 @@ impl Cmd {
     pub(crate) fn send_msg(msg: NodeMsg, recipients: Peers, context: NodeContext) -> Self {
         let msg_id = MsgId::new();
         debug!("Sending msg {msg_id:?} to {recipients:?}: {msg:?}");
-        Cmd::send_network_msg(MsgType::Node(msg), recipients, context)
+        Cmd::send_network_msg(NetworkMsg::Node(msg), recipients, context)
     }
 
-    pub(crate) fn send_network_msg(msg: MsgType, recipients: Peers, context: NodeContext) -> Self {
+    pub(crate) fn send_network_msg(
+        msg: NetworkMsg,
+        recipients: Peers,
+        context: NodeContext,
+    ) -> Self {
         let msg_id = MsgId::new();
         debug!("Sending msg {msg_id:?} to {recipients:?}: {msg:?}");
         Cmd::SendMsg {
@@ -237,15 +241,15 @@ impl Cmd {
         }
     }
 
-    pub(crate) fn send_client_response(
-        msg: ClientDataResponse,
+    pub(crate) fn send_data_response(
+        msg: DataResponse,
         correlation_id: MsgId,
         source_client: Peer,
         send_stream: SendStream,
         context: NodeContext,
     ) -> Self {
         let msg_id = MsgId::new();
-        Cmd::SendClientResponse {
+        Cmd::SendDataResponse {
             msg,
             msg_id,
             correlation_id,
@@ -263,7 +267,7 @@ impl Cmd {
             Cmd::SendMsg { .. }
             | Cmd::SendMsgEnqueueAnyResponse { .. }
             | Cmd::SendNodeMsgResponse { .. }
-            | Cmd::SendClientResponse { .. }
+            | Cmd::SendDataResponse { .. }
             | Cmd::SendAndForwardResponseToClient { .. }
             | Cmd::HandleCommsError { .. } => State::Comms,
             Cmd::HandleMsg { .. } => State::HandleMsg,
@@ -305,7 +309,7 @@ impl fmt::Display for Cmd {
             Cmd::SendMsg { .. } => write!(f, "SendMsg"),
             Cmd::SendMsgEnqueueAnyResponse { .. } => write!(f, "SendMsgEnqueueAnyResponse"),
             Cmd::SendNodeMsgResponse { .. } => write!(f, "SendNodeMsgResponse"),
-            Cmd::SendClientResponse { .. } => write!(f, "SendClientResponse"),
+            Cmd::SendDataResponse { .. } => write!(f, "SendDataResponse"),
             Cmd::SendAndForwardResponseToClient { .. } => {
                 write!(f, "SendAndForwardResponseToClient")
             }

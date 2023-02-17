@@ -72,14 +72,14 @@ impl Display for ClientMsg {
 
 /// Messages sent from the nodes to the clients in response to queries or commands
 #[derive(Eq, PartialEq, Clone, Serialize, Deserialize, custom_debug::Debug)]
-pub enum ClientDataResponse {
+pub enum DataResponse {
     /// Network Issue
     NetworkIssue(Error),
     /// The response to a query, containing the query result.
     QueryResponse {
         /// The result of the query.
         response: QueryResponse,
-        /// ID of the [`Query`] message.
+        /// ID of the causing[`Query`] message.
         ///
         /// [`Query`]: self::ClientMsg::Query
         correlation_id: MsgId,
@@ -96,17 +96,17 @@ pub enum ClientDataResponse {
     },
 }
 
-impl Display for ClientDataResponse {
+impl Display for DataResponse {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Self::QueryResponse { response, .. } => {
-                write!(f, "ClientDataResponse::QueryResponse({response:?})")
+                write!(f, "DataResponse::QueryResponse({response:?})")
             }
             Self::CmdResponse { response, .. } => {
-                write!(f, "ClientDataResponse::CmdResponse({response:?})")
+                write!(f, "DataResponse::CmdResponse({response:?})")
             }
             Self::NetworkIssue(error) => {
-                write!(f, "ClientClientDataResponse::NetworkIssue({error:?})")
+                write!(f, "DataResponse::NetworkIssue({error:?})")
             }
         }
     }

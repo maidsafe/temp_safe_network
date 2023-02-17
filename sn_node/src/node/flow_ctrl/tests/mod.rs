@@ -28,11 +28,11 @@ use sn_interface::{
     elder_count, init_logger,
     messaging::{
         data::{
-            ClientDataResponse, ClientMsg, CmdResponse, DataCmd, Error as MessagingDataError,
+            ClientMsg, CmdResponse, DataCmd, DataResponse, Error as MessagingDataError,
             SpentbookCmd,
         },
         system::{NodeDataCmd, NodeMsg},
-        AntiEntropyKind, AntiEntropyMsg, Dst, MsgType, WireMsg,
+        AntiEntropyKind, AntiEntropyMsg, Dst, NetworkMsg, WireMsg,
     },
     network_knowledge::{
         section_keys::SectionKeysProvider, Error as NetworkKnowledgeError, MyNodeInfo, NodeState,
@@ -199,7 +199,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
         let (msg, recipients) = match cmd {
             Cmd::SendMsg {
                 recipients,
-                msg: MsgType::Node(msg),
+                msg: NetworkMsg::Node(msg),
                 ..
             } => (msg, recipients),
             _ => continue,
@@ -534,7 +534,7 @@ async fn msg_to_self() -> Result<()> {
         assert_matches!(wire_msg.into_msg(), Ok(msg_type) => msg_type)
     });
 
-    assert_matches!(msg_type, MsgType::Node(msg) => {
+    assert_matches!(msg_type, NetworkMsg::Node(msg) => {
         assert_eq!(
             msg,
             node_msg
@@ -610,7 +610,7 @@ async fn handle_elders_update() -> Result<()> {
         };
 
         let section_tree_update = match msg {
-            MsgType::AntiEntropy(AntiEntropyMsg::AntiEntropy {
+            NetworkMsg::AntiEntropy(AntiEntropyMsg::AntiEntropy {
                 kind: AntiEntropyKind::Update { .. },
                 section_tree_update,
             }) => section_tree_update.clone(),
@@ -745,7 +745,7 @@ async fn handle_demote_during_split() -> Result<()> {
             _ => continue,
         };
 
-        if let MsgType::AntiEntropy(AntiEntropyMsg::AntiEntropy {
+        if let NetworkMsg::AntiEntropy(AntiEntropyMsg::AntiEntropy {
             kind: AntiEntropyKind::Update { .. },
             ..
         }) = msg
@@ -796,7 +796,7 @@ async fn spentbook_spend_client_message_should_replicate_to_adults_and_send_ack(
         {
             let msg = wire_msg.into_msg()?;
             match msg {
-                MsgType::Node(msg) => match msg {
+                NetworkMsg::Node(msg) => match msg {
                     NodeMsg::NodeDataCmd(NodeDataCmd::StoreData(data)) => {
                         assert_eq!(targets.len(), replication_count);
                         let spent_proof_share =
@@ -866,9 +866,9 @@ async fn spentbook_spend_transaction_with_no_inputs_should_return_spentbook_erro
     .await?;
 
     while let Some(cmd) = cmds.next().await? {
-        if let Cmd::SendClientResponse {
+        if let Cmd::SendDataResponse {
             msg:
-                ClientDataResponse::CmdResponse {
+                DataResponse::CmdResponse {
                     response: CmdResponse::SpendKey(Err(error)),
                     ..
                 },

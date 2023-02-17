@@ -17,7 +17,7 @@ use sn_dbc::{
 use sn_interface::{
     messaging::{
         data::{
-            ClientDataResponse, ClientMsg, DataCmd, DataQuery, EditRegister, SignedRegisterEdit,
+            ClientMsg, DataCmd, DataQuery, DataResponse, EditRegister, SignedRegisterEdit,
             SpentbookCmd,
         },
         AuthorityProof, ClientAuth, MsgId,
@@ -37,13 +37,13 @@ impl MyNode {
     /// Forms a `CmdError` msg to send back to the client over the response stream
     pub(crate) fn send_cmd_error_response_over_stream(
         context: NodeContext,
-        msg: ClientDataResponse,
+        msg: DataResponse,
         correlation_id: MsgId,
         send_stream: SendStream,
         source_client: Peer,
     ) -> Cmd {
         debug!("{correlation_id:?} sending cmd response error back to client");
-        Cmd::send_client_response(msg, correlation_id, source_client, send_stream, context)
+        Cmd::send_data_response(msg, correlation_id, source_client, send_stream, context)
     }
 
     /// Handle data query
@@ -62,12 +62,12 @@ impl MyNode {
 
         trace!("{msg_id:?} data query response at node is: {response:?}");
 
-        let msg = ClientDataResponse::QueryResponse {
+        let msg = DataResponse::QueryResponse {
             response,
             correlation_id: msg_id,
         };
 
-        vec![Cmd::send_client_response(
+        vec![Cmd::send_data_response(
             msg,
             msg_id,
             source_client,
@@ -184,7 +184,7 @@ impl MyNode {
                 MyNode::store_data_and_respond(context, data, send_stream, origin, msg_id).await
             }
             Err(error) => {
-                let data_response = ClientDataResponse::CmdResponse {
+                let data_response = DataResponse::CmdResponse {
                     response: cmd.to_error_response(error.into()),
                     correlation_id: msg_id,
                 };

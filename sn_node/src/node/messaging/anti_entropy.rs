@@ -15,7 +15,7 @@ use crate::node::{
 
 use sn_fault_detection::IssueType;
 use sn_interface::{
-    messaging::{AntiEntropyKind, AntiEntropyMsg, MsgId, MsgKind, MsgType, WireMsg},
+    messaging::{AntiEntropyKind, AntiEntropyMsg, MsgId, MsgKind, NetworkMsg, WireMsg},
     network_knowledge::{NetworkKnowledge, SectionTreeUpdate},
     types::{log_markers::LogMarker, Peer, PublicKey},
 };
@@ -71,7 +71,7 @@ impl MyNode {
     ) -> Cmd {
         let members = context.network_knowledge.section_signed_members();
 
-        let ae_msg = MsgType::AntiEntropy(AntiEntropyMsg::AntiEntropy {
+        let ae_msg = NetworkMsg::AntiEntropy(AntiEntropyMsg::AntiEntropy {
             section_tree_update: MyNode::generate_ae_section_tree_update(context, Some(section_pk)),
             kind: AntiEntropyKind::Update { members },
         });
@@ -231,7 +231,7 @@ impl MyNode {
         }
 
         // Check if we need to resend any messages and who should we send it to.
-        let (bounced_msg, response_peer) = match kind {
+        let (bounced_msg, target_peer) = match kind {
             AntiEntropyKind::Update { .. } => {
                 // log the msg as received. Elders track this for other elders in fault detection
                 latest_context.untrack_node_issue(sender.name(), IssueType::AeProbeMsg);
@@ -266,9 +266,9 @@ impl MyNode {
         let dst = wire_msg.dst;
         let msg_id = wire_msg.msg_id();
         let msg_to_resend = match wire_msg.into_msg()? {
-            MsgType::Node(msg) => msg,
+            NetworkMsg::Node(msg) => msg,
             _ => {
-                warn!("Non System MsgType received in AE response. We do not handle any other type in AE msgs yet.");
+                warn!("Not a Node NetworkMsg received in AE response. We do not handle any other type in AE msgs yet.");
                 return Ok(cmds);
             }
         };
@@ -280,12 +280,12 @@ impl MyNode {
             return Ok(cmds);
         }
 
-        trace!("Resend Original {msg_id:?} to {response_peer:?} with {msg_to_resend:?}");
+        trace!("Resending original {msg_id:?} to {target_peer:?} with {msg_to_resend:?}");
         trace!("{}", LogMarker::AeResendAfterRedirect);
 
         cmds.push(Cmd::send_msg(
             msg_to_resend,
-            Peers::Single(response_peer),
+            Peers::Single(target_peer),
             latest_context,
         ));
         Ok(cmds)
@@ -302,7 +302,7 @@ impl MyNode {
     ) -> Result<Vec<Cmd>> {
         if matches!(
             wire_msg.kind(),
-            MsgKind::AntiEntropy(_) | MsgKind::ClientDataResponse(_)
+            MsgKind::AntiEntropy(_) | MsgKind::DataResponse(_)
         ) {
             // TODO: error
             error!("Should be unreachable. Dropping message.");

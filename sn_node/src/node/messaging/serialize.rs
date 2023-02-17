@@ -8,7 +8,7 @@
 
 use crate::node::{Error, MyNode, Result};
 
-use sn_interface::messaging::{system::NodeMsg, MsgKind, MsgType, WireMsg};
+use sn_interface::messaging::{system::NodeMsg, MsgKind, NetworkMsg, WireMsg};
 
 use bytes::Bytes;
 use xor_name::XorName;
@@ -25,24 +25,24 @@ impl MyNode {
     }
 
     /// Serialize a network message
-    pub(crate) fn serialize_msg(our_name: XorName, msg: &MsgType) -> Result<(MsgKind, Bytes)> {
+    pub(crate) fn serialize_msg(our_name: XorName, msg: &NetworkMsg) -> Result<(MsgKind, Bytes)> {
         let (payload, kind) = match msg {
-            MsgType::AntiEntropy(msg) => (
+            NetworkMsg::AntiEntropy(msg) => (
                 WireMsg::serialize_msg_payload(msg)?,
                 MsgKind::AntiEntropy(our_name),
             ),
-            MsgType::Node(msg) => (
+            NetworkMsg::Node(msg) => (
                 WireMsg::serialize_msg_payload(msg)?,
                 MsgKind::Node {
                     name: our_name,
                     is_join: msg.is_join(),
                 },
             ),
-            MsgType::ClientDataResponse(msg) => (
+            NetworkMsg::DataResponse(msg) => (
                 WireMsg::serialize_msg_payload(msg)?,
-                MsgKind::ClientDataResponse(our_name),
+                MsgKind::DataResponse(our_name),
             ),
-            MsgType::Client { .. } => return Err(Error::InvalidMessage),
+            NetworkMsg::Client { .. } => return Err(Error::InvalidMessage),
         };
 
         Ok((kind, payload))

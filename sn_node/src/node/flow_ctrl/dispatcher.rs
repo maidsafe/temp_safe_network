@@ -9,7 +9,7 @@
 use crate::node::{messaging::Peers, Cmd, Error, MyNode, Result, STANDARD_CHANNEL_SIZE};
 
 use sn_interface::{
-    messaging::{AntiEntropyMsg, MsgType},
+    messaging::{AntiEntropyMsg, NetworkMsg},
     network_knowledge::SectionTreeUpdate,
     types::{DataAddress, Peer},
 };
@@ -62,7 +62,7 @@ impl Dispatcher {
             } => {
                 info!("Sending ae response msg for {correlation_id:?}");
                 Ok(vec![Cmd::send_network_msg(
-                    MsgType::AntiEntropy(AntiEntropyMsg::AntiEntropy {
+                    NetworkMsg::AntiEntropy(AntiEntropyMsg::AntiEntropy {
                         section_tree_update,
                         kind,
                     }),
@@ -144,14 +144,14 @@ impl Dispatcher {
             .await?
             .into_iter()
             .collect()),
-            Cmd::SendClientResponse {
+            Cmd::SendDataResponse {
                 msg,
                 msg_id,
                 correlation_id,
                 send_stream,
                 context,
                 source_client,
-            } => Ok(MyNode::send_client_response(
+            } => Ok(MyNode::send_data_response(
                 msg,
                 msg_id,
                 correlation_id,

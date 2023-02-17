@@ -14,8 +14,8 @@ use itertools::Itertools;
 use qp2p::{RecvStream, UsrMsgBytes};
 use sn_interface::{
     messaging::{
-        data::ClientDataResponse, AntiEntropyKind, AntiEntropyMsg, AuthorityProof, ClientAuth, Dst,
-        MsgId, MsgKind, MsgType, WireMsg,
+        data::DataResponse, AntiEntropyKind, AntiEntropyMsg, AuthorityProof, ClientAuth, Dst,
+        MsgId, MsgKind, NetworkMsg, WireMsg,
     },
     network_knowledge::SectionTreeUpdate,
     types::{log_markers::LogMarker, Peer},
@@ -41,7 +41,7 @@ impl Session {
         mut peer: Peer,
         peer_index: usize,
         msg_id: MsgId,
-    ) -> Result<(MsgId, ClientDataResponse), Error> {
+    ) -> Result<(MsgId, DataResponse), Error> {
         // Unless we receive AntiEntropy responses, which require re-sending the
         // message, the first msg received is the response we expect and return
         let mut attempt = 0;
@@ -59,10 +59,10 @@ impl Session {
             let bytes = recv_stream.read().await?;
 
             match WireMsg::deserialize(bytes)? {
-                (response_id, MsgType::ClientDataResponse(msg)) => return Ok((response_id, msg)),
+                (response_id, NetworkMsg::DataResponse(msg)) => return Ok((response_id, msg)),
                 (
                     _,
-                    MsgType::AntiEntropy(AntiEntropyMsg::AntiEntropy {
+                    NetworkMsg::AntiEntropy(AntiEntropyMsg::AntiEntropy {
                         section_tree_update,
                         kind:
                             AntiEntropyKind::Retry { bounced_msg }
@@ -102,7 +102,7 @@ impl Session {
                     to {msg_id:?}: {msg:?} with {response_id:?}",
                         recv_stream.id()
                     );
-                    return Err(Error::UnexpectedMsgType {
+                    return Err(Error::UnexpectedNetworkMsg {
                         correlation_id: msg_id,
                         peer,
                         msg,
@@ -134,7 +134,7 @@ impl Session {
             };
 
             match resp_msg {
-                ClientDataResponse::QueryResponse {
+                DataResponse::QueryResponse {
                     response,
                     correlation_id,
                 } => {
@@ -144,7 +144,7 @@ impl Session {
                     );
                     MsgResponse::QueryResponse(addr, Box::new(response))
                 }
-                ClientDataResponse::CmdResponse {
+                DataResponse::CmdResponse {
                     response,
                     correlation_id,
                 } => {
@@ -154,7 +154,7 @@ impl Session {
                     );
                     MsgResponse::CmdResponse(addr, Box::new(response))
                 }
-                ClientDataResponse::NetworkIssue(error) => MsgResponse::Failure(
+                DataResponse::NetworkIssue(error) => MsgResponse::Failure(
                     addr,
                     Error::CmdError {
                         source: error,
@@ -303,10 +303,10 @@ impl Session {
         let msg_type = wire_msg.into_msg()?;
         let query_index = *msg_kind.query_index();
         let (client_msg, auth) = match msg_type {
-            MsgType::Client { msg, auth } => (msg, auth),
+            NetworkMsg::Client { msg, auth } => (msg, auth),
             msg => {
                 warn!("Unexpected bounced msg received in AE response: {msg:?}");
-                return Err(Error::UnexpectedMsgType {
+                return Err(Error::UnexpectedNetworkMsg {
                     correlation_id,
                     peer: src_peer,
                     msg,

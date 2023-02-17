@@ -10,7 +10,7 @@ use crate::node::{core::NodeContext, Cmd, Error, MyNode, Result};
 
 use sn_interface::{
     messaging::{
-        data::ClientDataResponse, system::NodeMsg, AntiEntropyMsg, Dst, MsgId, MsgKind, WireMsg,
+        data::DataResponse, system::NodeMsg, AntiEntropyMsg, Dst, MsgId, MsgKind, WireMsg,
     },
     types::Peer,
 };
@@ -67,8 +67,8 @@ impl MyNode {
         .await
     }
 
-    pub(crate) async fn send_client_response(
-        msg: ClientDataResponse,
+    pub(crate) async fn send_data_response(
+        msg: DataResponse,
         msg_id: MsgId,
         correlation_id: MsgId,
         send_stream: SendStream,
@@ -78,7 +78,7 @@ impl MyNode {
         info!("Sending client response msg for {correlation_id:?}");
         send_msg_on_stream(
             msg_id,
-            MsgKind::ClientDataResponse(context.name),
+            MsgKind::DataResponse(context.name),
             WireMsg::serialize_msg_payload(&msg)?,
             source_client,
             correlation_id,

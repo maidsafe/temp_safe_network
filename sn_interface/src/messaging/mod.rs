@@ -34,7 +34,7 @@ mod errors;
 // Message ID definition
 mod msg_id;
 // Message types
-mod msg_type;
+mod network_msg;
 // Types of messages and corresponding source authorities
 mod msg_kind;
 // Msg dst
@@ -49,7 +49,7 @@ pub use self::{
     errors::{Error, Result},
     msg_id::{MsgId, MESSAGE_ID_LEN},
     msg_kind::MsgKind,
-    msg_type::MsgType,
+    network_msg::NetworkMsg,
     serialisation::WireMsg,
 };
 

@@ -195,7 +195,7 @@ mod tests {
         elder_count, init_logger,
         messaging::{
             system::{JoinResponse, NodeDataCmd, NodeMsg, SectionStateVote},
-            AntiEntropyKind, AntiEntropyMsg, MsgType,
+            AntiEntropyKind, AntiEntropyMsg, NetworkMsg,
         },
         network_knowledge::{recommended_section_size, NodeState, RelocationDst, MIN_ADULT_AGE},
         test_utils::{gen_peer, gen_peer_in_prefix, prefix, section_decision, TestKeys},
@@ -263,7 +263,7 @@ mod tests {
         while let Some(cmd) = cmds.next().await? {
             let msg = match cmd {
                 Cmd::SendMsg {
-                    msg: MsgType::Node(msg),
+                    msg: NetworkMsg::Node(msg),
                     ..
                 } => msg,
                 _ => continue,
@@ -582,7 +582,7 @@ mod tests {
                             let mut send_cmd = dispatcher.process_cmd(cmd).await?;
                             assert_eq!(send_cmd.len(), 1);
                             let send_cmd = send_cmd.remove(0);
-                            assert_matches!(&send_cmd, Cmd::SendMsg { msg: MsgType::Node(msg), .. } => {
+                            assert_matches!(&send_cmd, Cmd::SendMsg { msg: NetworkMsg::Node(msg), .. } => {
                                 assert_matches!(msg, NodeMsg::MembershipVotes(_));
                             });
                             assert!(dispatcher.process_cmd(send_cmd).await?.is_empty());
@@ -598,7 +598,7 @@ mod tests {
                                 // relocate msg to the relocation_node
                                 assert_eq!(send_cmds.len(), 3);
                                 let send_cmd = send_cmds.remove(0);
-                                assert_matches!(&send_cmd, Cmd::SendMsg { msg: MsgType::Node(msg), .. } => {
+                                assert_matches!(&send_cmd, Cmd::SendMsg { msg: NetworkMsg::Node(msg), .. } => {
                                     assert_matches!(msg, NodeMsg::Relocate(_));
                                 });
                                 assert!(dispatcher.process_cmd(send_cmd).await?.is_empty());
@@ -607,7 +607,7 @@ mod tests {
                             } else {
                                 assert_eq!(send_cmds.len(), 3);
                                 let send_cmd = send_cmds.remove(0);
-                                assert_matches!(&send_cmd, Cmd::SendMsg { msg: MsgType::Node(msg), .. } => {
+                                assert_matches!(&send_cmd, Cmd::SendMsg { msg: NetworkMsg::Node(msg), .. } => {
                                     assert_matches!(msg,  NodeMsg::JoinResponse(JoinResponse::Approved { .. }));
                                 });
                                 assert!(dispatcher.process_cmd(send_cmd).await?.is_empty());
@@ -618,7 +618,7 @@ mod tests {
                             assert_matches!(
                                 &send_cmd,
                                 Cmd::SendMsg {
-                                    msg: MsgType::AntiEntropy(AntiEntropyMsg::AntiEntropy {
+                                    msg: NetworkMsg::AntiEntropy(AntiEntropyMsg::AntiEntropy {
                                         kind: AntiEntropyKind::Update { .. },
                                         ..
                                     }),
@@ -629,7 +629,7 @@ mod tests {
 
                             // Skip NodeDataCmd as we don't have any data
                             let send_cmd = send_cmds.remove(0);
-                            assert_matches!(&send_cmd, Cmd::SendMsg { msg: MsgType::Node(msg), .. } => {
+                            assert_matches!(&send_cmd, Cmd::SendMsg { msg: NetworkMsg::Node(msg), .. } => {
                                 assert_matches!(msg,  NodeMsg::NodeDataCmd(NodeDataCmd::SendAnyMissingRelevantData(data)) => {
                                     assert!(data.is_empty());
                                 });
@@ -654,7 +654,7 @@ mod tests {
                             assert_matches!(
                                 &send_cmd,
                                 Cmd::SendMsg {
-                                    msg: MsgType::AntiEntropy(AntiEntropyMsg::AntiEntropy {
+                                    msg: NetworkMsg::AntiEntropy(AntiEntropyMsg::AntiEntropy {
                                         kind: AntiEntropyKind::Redirect { .. },
                                         ..
                                     }),

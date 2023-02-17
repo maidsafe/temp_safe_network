@@ -27,7 +27,7 @@ use crate::node::{flow_ctrl::cmds::Cmd, Error, MyNode, Result};
 
 use qp2p::SendStream;
 use sn_interface::{
-    messaging::{AntiEntropyMsg, MsgKind, MsgType, WireMsg},
+    messaging::{AntiEntropyMsg, MsgKind, NetworkMsg, WireMsg},
     types::{log_markers::LogMarker, Peer},
 };
 
@@ -131,21 +131,19 @@ impl MyNode {
 
         // if we got here, we are the destination
         match msg_type {
-            MsgType::Node(msg) => {
+            NetworkMsg::Node(msg) => {
                 MyNode::handle_node_msg(node, context, msg_id, msg, origin, send_stream).await
             }
-            MsgType::Client { msg, auth, .. } => {
+            NetworkMsg::Client { msg, auth, .. } => {
                 trace!("Client msg {msg_id:?} reached its destination.");
-
                 // TODO: clarify this err w/ peer
                 let Some(stream) = send_stream else {
                     error!("No stream for client tho....");
                     return Err(Error::NoClientResponseStream);
                 };
-
                 MyNode::handle_client_msg_for_us(context, msg_id, msg, auth, origin, stream).await
             }
-            MsgType::AntiEntropy(AntiEntropyMsg::AntiEntropy {
+            NetworkMsg::AntiEntropy(AntiEntropyMsg::AntiEntropy {
                 section_tree_update,
                 kind,
             }) => {
@@ -156,7 +154,7 @@ impl MyNode {
             // Respond to a probe msg
             // We always respond to probe msgs if we're an elder as health checks use this to see if a node is alive
             // and repsonsive, as well as being a method of keeping nodes up to date.
-            MsgType::AntiEntropy(AntiEntropyMsg::Probe(section_key)) => {
+            NetworkMsg::AntiEntropy(AntiEntropyMsg::Probe(section_key)) => {
                 debug!("Aeprobe in");
                 let mut cmds = vec![];
                 if !context.is_elder {
@@ -173,10 +171,10 @@ impl MyNode {
                 ));
                 Ok(cmds)
             }
-            other @ MsgType::ClientDataResponse { .. } => {
+            other @ NetworkMsg::DataResponse { .. } => {
                 error!(
-                    "Client data response {msg_id:?}, from {}, has been dropped since it's not \
-                    meant to be handled by a node: {other:?}",
+                    "Data response {msg_id:?}, from {}, has been dropped since it's not \
+                    meant to be handled this way (it is directly forwarded to client): {other:?}",
                     origin.addr()
                 );
                 Ok(vec![])

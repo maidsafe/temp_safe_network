@@ -866,7 +866,7 @@ mod tests {
         messaging::{
             signature_aggregator::SignatureAggregator,
             system::{DkgSessionId, NodeMsg},
-            MsgType, SectionSigShare,
+            NetworkMsg, SectionSigShare,
         },
         network_knowledge::{supermajority, NodeState, SectionKeyShare},
         types::Peer,
@@ -1208,7 +1208,8 @@ mod tests {
         for cmd in cmds {
             match cmd {
                 Cmd::SendMsg {
-                    msg: MsgType::AntiEntropy(_) | MsgType::Node(NodeMsg::RequestHandover { .. }),
+                    msg:
+                        NetworkMsg::AntiEntropy(_) | NetworkMsg::Node(NodeMsg::RequestHandover { .. }),
                     ..
                 } => (),
                 msg => panic!("Unexpected cmd/msg {msg}"),

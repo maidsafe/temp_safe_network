@@ -14,7 +14,7 @@ use crate::storage::{Error as StorageError, StorageLevel};
 use sn_interface::{
     data_copy_count,
     messaging::{
-        data::ClientDataResponse,
+        data::DataResponse,
         system::{NodeDataCmd, NodeEvent, NodeMsg},
         MsgId, MsgKind, WireMsg,
     },
@@ -69,7 +69,7 @@ impl MyNode {
                 found: targets.len() as u8,
             };
 
-            let data_response = ClientDataResponse::NetworkIssue(error);
+            let data_response = DataResponse::NetworkIssue(error);
 
             return MyNode::send_cmd_error_response_over_stream(
                 context,
@@ -92,7 +92,7 @@ impl MyNode {
                     found: context.network_knowledge.members().len() as u8,
                 };
 
-                let data_response = ClientDataResponse::NetworkIssue(error);
+                let data_response = DataResponse::NetworkIssue(error);
 
                 return MyNode::send_cmd_error_response_over_stream(
                     context,

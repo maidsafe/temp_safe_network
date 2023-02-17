@@ -12,7 +12,7 @@ use sn_interface::{
     messaging::{
         data::{DataQuery, Error as ErrorMsg, QueryResponse},
         system::NodeMsg,
-        Error as MessagingError, MsgId, MsgType,
+        Error as MessagingError, MsgId, NetworkMsg,
     },
     types::{Error as DtError, Peer},
 };
@@ -195,13 +195,13 @@ pub enum Error {
     },
     /// Unexpected msg type received
     #[error("Unexpected type of message received from {peer} in response to {correlation_id:?}. Received: {msg:?}")]
-    UnexpectedMsgType {
+    UnexpectedNetworkMsg {
         /// MsgId of the msg sent
         correlation_id: MsgId,
         /// Peer the unexpected msg was received from
         peer: Peer,
         /// Unexpected msg received
-        msg: MsgType,
+        msg: NetworkMsg,
     },
     /// Other types errors
     #[error(transparent)]

@@ -54,7 +54,7 @@ use self::peer_session::PeerSession;
 
 use sn_interface::{
     messaging::{
-        data::{ClientDataResponse, Error as MsgError},
+        data::{DataResponse, Error as MsgError},
         Dst, MsgId, MsgKind, WireMsg,
     },
     types::Peer,
@@ -470,8 +470,8 @@ async fn send_on_stream(msg_id: MsgId, bytes: UsrMsgBytes, mut stream: SendStrea
 }
 
 fn error_response(dst: Dst) -> Option<UsrMsgBytes> {
-    let kind = MsgKind::ClientDataResponse(dst.name);
-    let response = ClientDataResponse::NetworkIssue(MsgError::InconsistentStorageNodeResponses);
+    let kind = MsgKind::DataResponse(dst.name);
+    let response = DataResponse::NetworkIssue(MsgError::InconsistentStorageNodeResponses);
     let payload = WireMsg::serialize_msg_payload(&response).ok()?;
     let wire_msg = WireMsg::new_msg(MsgId::new(), payload, kind, dst);
     wire_msg.serialize().ok()
