@@ -76,11 +76,13 @@ impl MyNode {
                 found: targets.len() as u8,
             };
 
-            let data_response = DataResponse::NetworkIssue(error);
+            let data_response = DataResponse::NetworkIssue {
+                error,
+                correlation_id: msg_id,
+            };
 
             return MyNode::send_cmd_error_response_over_stream(
                 data_response,
-                msg_id,
                 client_stream,
                 client_id,
             );
@@ -98,11 +100,13 @@ impl MyNode {
                     found: context.network_knowledge.members().len() as u8,
                 };
 
-                let data_response = DataResponse::NetworkIssue(error);
+                let data_response = DataResponse::NetworkIssue {
+                    error,
+                    correlation_id: msg_id,
+                };
 
                 return MyNode::send_cmd_error_response_over_stream(
                     data_response,
-                    msg_id,
                     client_stream,
                     client_id,
                 );

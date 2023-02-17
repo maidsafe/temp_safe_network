@@ -115,20 +115,14 @@ impl MyNode {
             Cmd::SendDataResponse {
                 msg,
                 msg_id,
-                correlation_id,
                 send_stream,
                 client_id,
-            } => Ok(MyNode::send_data_response(
-                msg,
-                msg_id,
-                correlation_id,
-                send_stream,
-                context,
-                client_id,
-            )
-            .await?
-            .into_iter()
-            .collect()),
+            } => Ok(
+                MyNode::send_data_response(msg, msg_id, send_stream, context, client_id)
+                    .await?
+                    .into_iter()
+                    .collect(),
+            ),
             Cmd::TrackNodeIssue { name, issue } => {
                 context.track_node_issue(name, issue);
                 Ok(vec![])

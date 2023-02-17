@@ -190,7 +190,6 @@ pub enum Cmd {
     SendDataResponse {
         msg: DataResponse,
         msg_id: MsgId,
-        correlation_id: MsgId,
         send_stream: SendStream,
         client_id: ClientId,
     },
@@ -240,15 +239,12 @@ impl Cmd {
 
     pub(crate) fn send_data_response(
         msg: DataResponse,
-        correlation_id: MsgId,
         client_id: ClientId,
         send_stream: SendStream,
     ) -> Self {
-        let msg_id = MsgId::new();
         Cmd::SendDataResponse {
             msg,
-            msg_id,
-            correlation_id,
+            msg_id: MsgId::new(),
             client_id,
             send_stream,
         }

@@ -161,11 +161,14 @@ impl Session {
                     );
                     MsgResponse::CmdResponse(addr, Box::new(response))
                 }
-                DataResponse::NetworkIssue(error) => MsgResponse::Failure(
+                DataResponse::NetworkIssue {
+                    error,
+                    correlation_id,
+                } => MsgResponse::Failure(
                     addr,
                     Error::CmdError {
                         source: error,
-                        msg_id,
+                        msg_id: correlation_id,
                     },
                 ),
             }

@@ -137,12 +137,7 @@ impl MyNode {
             response,
             correlation_id,
         };
-        cmds.push(Cmd::send_data_response(
-            msg,
-            correlation_id,
-            client_id,
-            send_stream,
-        ));
+        cmds.push(Cmd::send_data_response(msg, client_id, send_stream));
 
         Ok(cmds)
     }

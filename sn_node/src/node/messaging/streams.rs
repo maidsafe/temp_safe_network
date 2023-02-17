@@ -70,11 +70,11 @@ impl MyNode {
     pub(crate) async fn send_data_response(
         msg: DataResponse,
         msg_id: MsgId,
-        correlation_id: MsgId,
         send_stream: SendStream,
         context: NodeContext,
         client_id: ClientId,
     ) -> Result<Option<Cmd>> {
+        let correlation_id = *msg.correlation_id();
         info!("Sending client response msg for {correlation_id:?}");
         send_msg_on_stream(
             msg_id,

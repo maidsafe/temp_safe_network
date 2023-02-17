@@ -32,12 +32,14 @@ impl MyNode {
     /// Forms a `CmdError` msg to send back to the client over the response stream
     pub(crate) fn send_cmd_error_response_over_stream(
         msg: DataResponse,
-        correlation_id: MsgId,
         send_stream: SendStream,
         client_id: ClientId,
     ) -> Cmd {
-        debug!("{correlation_id:?} sending cmd response error back to client");
-        Cmd::send_data_response(msg, correlation_id, client_id, send_stream)
+        debug!(
+            "{:?} sending cmd response error back to client",
+            msg.correlation_id()
+        );
+        Cmd::send_data_response(msg, client_id, send_stream)
     }
 
     /// Handle data query
@@ -48,7 +50,7 @@ impl MyNode {
         client_id: ClientId,
         send_stream: SendStream,
         context: NodeContext,
-    ) -> Vec<Cmd> {
+    ) -> Cmd {
         let response = if let DataQuery::Spentbook(SpendQuery::GetFees(_)) = query {
             // We receive this directly from client, as an Elder, since `is_spend` is set to true (that is a very messy/confusing pattern, to be fixed).
             NodeQueryResponse::GetFees(Ok((context.reward_key, context.store_cost)))
@@ -66,7 +68,7 @@ impl MyNode {
             correlation_id: msg_id,
         };
 
-        vec![Cmd::send_data_response(msg, msg_id, client_id, send_stream)]
+        Cmd::send_data_response(msg, client_id, send_stream)
     }
 
     /// Handle incoming client msgs.
@@ -87,15 +89,17 @@ impl MyNode {
             ClientMsg::Cmd(cmd) => {
                 MyNode::handle_data_cmd(cmd, msg_id, client_id, auth, send_stream, context).await
             }
-            ClientMsg::Query(query) => Ok(MyNode::handle_data_query_where_stored(
-                msg_id,
-                &query,
-                auth.into_inner(),
-                client_id,
-                send_stream,
-                context,
-            )
-            .await),
+            ClientMsg::Query(query) => Ok(vec![
+                MyNode::handle_data_query_where_stored(
+                    msg_id,
+                    &query,
+                    auth.into_inner(),
+                    client_id,
+                    send_stream,
+                    context,
+                )
+                .await,
+            ]),
         }
     }
 
@@ -196,12 +200,8 @@ impl MyNode {
             response: cmd.to_error_response(error.into()),
             correlation_id: msg_id,
         };
-        let cmd = MyNode::send_cmd_error_response_over_stream(
-            data_response,
-            msg_id,
-            send_stream,
-            client_id,
-        );
+        let cmd =
+            MyNode::send_cmd_error_response_over_stream(data_response, send_stream, client_id);
         Ok(vec![cmd])
     }
 

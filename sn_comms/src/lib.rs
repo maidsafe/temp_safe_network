@@ -449,7 +449,7 @@ fn send_and_respond_on_stream(
         let all_ok_equal = || succeeded.windows(2).all(|w| are_equal(&w[0].1, &w[1].1));
 
         let response_bytes = if some_failed || !all_ok_equal() {
-            match error_response(dst) {
+            match error_response(dst, msg_id) {
                 None => {
                     error!("Could not send the error response to client!");
                     return;
@@ -489,9 +489,12 @@ async fn send_on_stream(msg_id: MsgId, bytes: UsrMsgBytes, mut stream: SendStrea
     }
 }
 
-fn error_response(dst: Dst) -> Option<UsrMsgBytes> {
+fn error_response(dst: Dst, correlation_id: MsgId) -> Option<UsrMsgBytes> {
     let kind = MsgKind::DataResponse(dst.name);
-    let response = DataResponse::NetworkIssue(MsgError::InconsistentStorageNodeResponses);
+    let response = DataResponse::NetworkIssue {
+        correlation_id,
+        error: MsgError::InconsistentStorageNodeResponses,
+    };
     let payload = WireMsg::serialize_msg_payload(&response).ok()?;
     let wire_msg = WireMsg::new_msg(MsgId::new(), payload, kind, dst);
     wire_msg.serialize().ok()
