@@ -91,7 +91,6 @@ impl Session {
                 );
             }
 
-            let stream_id = recv_stream.id();
             debug!("Waiting for response msg on {stream_id} from {peer:?} @ index: {peer_index} for {correlation_id:?}, attempt #{attempt}");
             let (msg_id, resp_msg) =
                 match Self::read_resp_from_recvstream(recv_stream, peer, correlation_id).await {
