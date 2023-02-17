@@ -25,6 +25,8 @@ pub mod signature_aggregator;
 /// Operational Messages that can be exchanged on the network.
 pub mod system;
 
+// Network membership state sync.
+mod anti_entropy;
 // Message authority - keys and signatures.
 mod authority;
 // Error types definitions
@@ -39,6 +41,7 @@ mod msg_kind;
 mod dst;
 
 pub use self::{
+    anti_entropy::{AntiEntropyKind, AntiEntropyMsg},
     authority::{
         AuthorityProof, ClientAuth, NodeSig, SectionSig, SectionSigShare, VerifyAuthority,
     },

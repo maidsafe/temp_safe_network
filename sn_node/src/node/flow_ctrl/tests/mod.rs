@@ -31,8 +31,8 @@ use sn_interface::{
             ClientDataResponse, ClientMsg, CmdResponse, DataCmd, Error as MessagingDataError,
             SpentbookCmd,
         },
-        system::{AntiEntropyKind, NodeDataCmd, NodeMsg},
-        Dst, MsgType, WireMsg,
+        system::{NodeDataCmd, NodeMsg},
+        AntiEntropyKind, AntiEntropyMsg, Dst, MsgType, WireMsg,
     },
     network_knowledge::{
         section_keys::SectionKeysProvider, Error as NetworkKnowledgeError, MyNodeInfo, NodeState,
@@ -88,7 +88,7 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
 
     let proof = RelocationProof::new(info, signature_over_new_name, old_keypair.public);
 
-    let wire_msg = WireMsg::single_src_node(
+    let wire_msg = single_src_node(
         new_info.name(),
         Dst {
             name: XorName::from(PublicKey::Bls(section_key)),
@@ -198,7 +198,9 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
     while let Some(cmd) = cmds.next().await? {
         let (msg, recipients) = match cmd {
             Cmd::SendMsg {
-                recipients, msg, ..
+                recipients,
+                msg: MsgType::Node(msg),
+                ..
             } => (msg, recipients),
             _ => continue,
         };
@@ -379,13 +381,13 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
 
     // Create the `Sync` message containing the new `Section`.
     let sender = gen_info(MIN_ADULT_AGE, None);
-    let wire_msg = WireMsg::single_src_node(
+    let wire_msg = ae_msg(
         sender.name(),
         Dst {
             name: XorName::from(PublicKey::Bls(pk_0)),
             section_key: pk_0,
         },
-        NodeMsg::AntiEntropy {
+        AntiEntropyMsg::AntiEntropy {
             section_tree_update,
             kind: AntiEntropyKind::Update {
                 members: BTreeSet::default(),
@@ -445,22 +447,21 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
     let bogus_section_tree_update =
         SectionTreeUpdate::new(bogus_sap, SectionsDAG::new(bogus_section_pk));
 
-    let node_msg = NodeMsg::AntiEntropy {
-        section_tree_update: bogus_section_tree_update,
-        kind: AntiEntropyKind::Update {
-            members: BTreeSet::default(),
-        },
-    };
-
     let sender = gen_info(MIN_ADULT_AGE, None);
-    let wire_msg = WireMsg::single_src_node(
+
+    let wire_msg = ae_msg(
         sender.name(),
         Dst {
             name: XorName::from(PublicKey::Bls(bogus_section_pk)),
             section_key: bogus_section_pk,
         },
-        node_msg.clone(),
         // we use the nonsense here
+        AntiEntropyMsg::AntiEntropy {
+            section_tree_update: bogus_section_tree_update,
+            kind: AntiEntropyKind::Update {
+                members: BTreeSet::default(),
+            },
+        },
     )?;
 
     assert!(matches!(
@@ -533,7 +534,7 @@ async fn msg_to_self() -> Result<()> {
         assert_matches!(wire_msg.into_msg(), Ok(msg_type) => msg_type)
     });
 
-    assert_matches!(msg_type, MsgType::Node { msg, .. } => {
+    assert_matches!(msg_type, MsgType::Node(msg) => {
         assert_eq!(
             msg,
             node_msg
@@ -609,11 +610,10 @@ async fn handle_elders_update() -> Result<()> {
         };
 
         let section_tree_update = match msg {
-            NodeMsg::AntiEntropy {
-                section_tree_update,
+            MsgType::AntiEntropy(AntiEntropyMsg::AntiEntropy {
                 kind: AntiEntropyKind::Update { .. },
-                ..
-            } => section_tree_update.clone(),
+                section_tree_update,
+            }) => section_tree_update.clone(),
             _ => continue,
         };
 
@@ -745,10 +745,10 @@ async fn handle_demote_during_split() -> Result<()> {
             _ => continue,
         };
 
-        if let NodeMsg::AntiEntropy {
+        if let MsgType::AntiEntropy(AntiEntropyMsg::AntiEntropy {
             kind: AntiEntropyKind::Update { .. },
             ..
-        } = msg
+        }) = msg
         {
             update_recipients.extend(recipients.into_iter().map(|r| r.name()))
         }
@@ -796,11 +796,7 @@ async fn spentbook_spend_client_message_should_replicate_to_adults_and_send_ack(
         {
             let msg = wire_msg.into_msg()?;
             match msg {
-                MsgType::Node {
-                    msg_id: _,
-                    dst: _,
-                    msg,
-                } => match msg {
+                MsgType::Node(msg) => match msg {
                     NodeMsg::NodeDataCmd(NodeDataCmd::StoreData(data)) => {
                         assert_eq!(targets.len(), replication_count);
                         let spent_proof_share =
@@ -1021,4 +1017,31 @@ async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node()
 
 fn get_single_sig(proposal: &SectionStateVote) -> Vec<u8> {
     bincode::serialize(proposal).expect("Failed to serialize")
+}
+
+fn ae_msg(name: XorName, dst: Dst, msg: AntiEntropyMsg) -> Result<WireMsg> {
+    use sn_interface::messaging::{MsgId, MsgKind};
+    Ok(WireMsg::new_msg(
+        MsgId::new(),
+        WireMsg::serialize_msg_payload(&msg)?,
+        MsgKind::AntiEntropy(name),
+        dst,
+    ))
+}
+
+fn single_src_node(name: XorName, dst: Dst, msg: NodeMsg) -> Result<WireMsg> {
+    use sn_interface::messaging::{MsgId, MsgKind};
+    let msg_payload = WireMsg::serialize_msg_payload(&msg)?;
+
+    let wire_msg = WireMsg::new_msg(
+        MsgId::new(),
+        msg_payload,
+        MsgKind::Node {
+            name,
+            is_join: msg.is_join(),
+        },
+        dst,
+    );
+
+    Ok(wire_msg)
 }

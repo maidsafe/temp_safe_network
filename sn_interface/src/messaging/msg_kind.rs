@@ -17,6 +17,8 @@ use xor_name::XorName;
 #[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum MsgKind {
+    /// An update to our NetworkKnowledge.
+    AntiEntropy(XorName),
     /// A data message, with the requesting peer's authority.
     /// Authority is needed to access private data, such as reading or writing a private file.
     /// is spend tells us if we're dealing with a spend cmd
@@ -27,23 +29,16 @@ pub enum MsgKind {
         is_spend: bool,
         query_index: Option<usize>,
     },
-    /// A data response sent from a Node (along with its name) to the client
+    /// A data cmd/query response sent from a Node (along with its name).
     ClientDataResponse(XorName),
     /// A message from a Node along with its name
-    Node {
-        name: XorName,
-        is_join: bool,
-        is_ae: bool,
-    },
+    Node { name: XorName, is_join: bool },
 }
 
 impl MsgKind {
     /// is this an ae msg
     pub fn is_ae_msg(&self) -> bool {
-        match self {
-            Self::Node { is_ae, .. } => *is_ae,
-            _ => false,
-        }
+        matches!(self, MsgKind::AntiEntropy(_))
     }
     /// is a client spend cmd
     pub fn is_client_spend(&self) -> bool {

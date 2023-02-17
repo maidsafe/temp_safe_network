@@ -27,7 +27,7 @@ use crate::node::{flow_ctrl::cmds::Cmd, Error, MyNode, Result};
 
 use qp2p::SendStream;
 use sn_interface::{
-    messaging::{MsgKind, MsgType, WireMsg},
+    messaging::{AntiEntropyMsg, MsgKind, MsgType, WireMsg},
     types::{log_markers::LogMarker, Peer},
 };
 
@@ -131,12 +131,10 @@ impl MyNode {
 
         // if we got here, we are the destination
         match msg_type {
-            MsgType::Node { msg, .. } => {
+            MsgType::Node(msg) => {
                 MyNode::handle_node_msg(node, context, msg_id, msg, origin, send_stream).await
             }
-            MsgType::Client {
-                msg_id, msg, auth, ..
-            } => {
+            MsgType::Client { msg, auth, .. } => {
                 trace!("Client msg {msg_id:?} reached its destination.");
 
                 // TODO: clarify this err w/ peer
@@ -146,6 +144,34 @@ impl MyNode {
                 };
 
                 MyNode::handle_client_msg_for_us(context, msg_id, msg, auth, origin, stream).await
+            }
+            MsgType::AntiEntropy(AntiEntropyMsg::AntiEntropy {
+                section_tree_update,
+                kind,
+            }) => {
+                trace!("Handling msg: AE from {origin}: {msg_id:?}");
+                MyNode::handle_anti_entropy_msg(node, context, section_tree_update, kind, origin)
+                    .await
+            }
+            // Respond to a probe msg
+            // We always respond to probe msgs if we're an elder as health checks use this to see if a node is alive
+            // and repsonsive, as well as being a method of keeping nodes up to date.
+            MsgType::AntiEntropy(AntiEntropyMsg::Probe(section_key)) => {
+                debug!("Aeprobe in");
+                let mut cmds = vec![];
+                if !context.is_elder {
+                    info!("Dropping AEProbe since we are not an elder");
+                    // early return here as we do not get health checks as adults,
+                    // normal AE rules should have applied
+                    return Ok(cmds);
+                }
+                trace!("Received Probe message from {}: {:?}", origin, msg_id);
+                cmds.push(MyNode::send_ae_update_to_nodes(
+                    &context,
+                    Peers::Single(origin),
+                    section_key,
+                ));
+                Ok(cmds)
             }
             other @ MsgType::ClientDataResponse { .. } => {
                 error!(

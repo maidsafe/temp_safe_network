@@ -44,8 +44,11 @@ mod tests {
     use sn_interface::{
         elder_count, init_logger,
         messaging::{
-            system::{JoinRejectReason, JoinResponse},
             MsgId,
+            {
+                system::{JoinRejectReason, JoinResponse},
+                MsgType,
+            },
         },
         network_knowledge::{MembershipState, NetworkKnowledge},
     };
@@ -110,7 +113,7 @@ mod tests {
             .iter()
             .find(|cmd| matches!(cmd, Cmd::SendMsg { .. }));
         assert_matches!(some_cmd, Some(Cmd::SendMsg {
-            msg,
+            msg: MsgType::Node(msg),
             recipients,
             ..
         }) => {
@@ -285,7 +288,7 @@ mod tests {
             .find(|cmd| matches!(cmd, Cmd::SendMsg { .. }));
 
         assert_matches!(some_cmd, Some(Cmd::SendMsg {
-            msg,
+            msg: MsgType::Node(msg),
             recipients,
             ..
         }) => {

@@ -9,7 +9,9 @@
 use crate::node::{core::NodeContext, Cmd, Error, MyNode, Result};
 
 use sn_interface::{
-    messaging::{data::ClientDataResponse, system::NodeMsg, Dst, MsgId, MsgKind, WireMsg},
+    messaging::{
+        data::ClientDataResponse, system::NodeMsg, AntiEntropyMsg, Dst, MsgId, MsgKind, WireMsg,
+    },
     types::Peer,
 };
 
@@ -33,13 +35,34 @@ impl MyNode {
         info!("Sending response msg {msg_id:?} over {stream_id}");
         let (kind, payload) = MyNode::serialize_node_msg(context.name, &msg)?;
         send_msg_on_stream(
-            context.network_knowledge.section_key(),
-            payload,
-            kind,
-            send_stream,
-            recipient,
             msg_id,
+            kind,
+            payload,
+            recipient,
             correlation_id,
+            context.network_knowledge.section_key(),
+            send_stream,
+        )
+        .await
+    }
+
+    pub(crate) async fn send_ae_response(
+        msg: AntiEntropyMsg,
+        msg_id: MsgId,
+        source_client: Peer,
+        correlation_id: MsgId,
+        send_stream: SendStream,
+        context: NodeContext,
+    ) -> Result<Option<Cmd>> {
+        info!("Sending ae response msg for {correlation_id:?}");
+        send_msg_on_stream(
+            msg_id,
+            MsgKind::AntiEntropy(context.name),
+            WireMsg::serialize_msg_payload(&msg)?,
+            source_client,
+            correlation_id,
+            context.network_knowledge.section_key(),
+            send_stream,
         )
         .await
     }
@@ -53,15 +76,14 @@ impl MyNode {
         source_client: Peer,
     ) -> Result<Option<Cmd>> {
         info!("Sending client response msg for {correlation_id:?}");
-        let (kind, payload) = MyNode::serialize_client_msg_response(context.name, &msg)?;
         send_msg_on_stream(
-            context.network_knowledge.section_key(),
-            payload,
-            kind,
-            send_stream,
-            source_client,
             msg_id,
+            MsgKind::ClientDataResponse(context.name),
+            WireMsg::serialize_msg_payload(&msg)?,
+            source_client,
             correlation_id,
+            context.network_knowledge.section_key(),
+            send_stream,
         )
         .await
     }
@@ -149,13 +171,13 @@ impl MyNode {
 
 // Send a msg on a given stream
 async fn send_msg_on_stream(
-    section_key: bls::PublicKey,
-    payload: Bytes,
-    kind: MsgKind,
-    mut send_stream: SendStream,
-    target_peer: Peer,
     msg_id: MsgId,
+    kind: MsgKind,
+    payload: Bytes,
+    target_peer: Peer,
     correlation_id: MsgId,
+    section_key: bls::PublicKey,
+    mut send_stream: SendStream,
 ) -> Result<Option<Cmd>> {
     let dst = Dst {
         name: target_peer.name(),

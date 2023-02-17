@@ -18,7 +18,7 @@ use sn_interface::{
     messaging::{
         data::{ClientDataResponse, CmdResponse},
         system::{JoinResponse, NodeDataCmd, NodeEvent, NodeMsg},
-        Dst, MsgId, WireMsg,
+        Dst, MsgId, MsgType, WireMsg,
     },
     network_knowledge::{MembershipState, NetworkKnowledge},
     types::{log_markers::LogMarker, Keypair, Peer, PublicKey, ReplicatedData},
@@ -30,9 +30,9 @@ use tokio::sync::RwLock;
 use xor_name::XorName;
 
 impl MyNode {
-    /// Send a (`NodeMsg`) message to peers
+    /// Send a (`MsgType`) to peers
     pub(crate) fn send_msg(
-        msg: NodeMsg,
+        msg: MsgType,
         msg_id: MsgId,
         recipients: Peers,
         context: NodeContext,
@@ -186,38 +186,6 @@ impl MyNode {
                 trace!("[NODE WRITE]: Relocated write gottt...");
                 trace!("Handling Relocate msg from {sender}: {msg_id:?}");
                 Ok(node.relocate(signed_relocation)?.into_iter().collect())
-            }
-            NodeMsg::AntiEntropy {
-                section_tree_update,
-                kind,
-            } => {
-                trace!("Handling msg: AE from {sender}: {msg_id:?}");
-                // as we've data storage reqs inside here for reorganisation, we have async calls to
-                // the fs
-                MyNode::handle_anti_entropy_msg(node, context, section_tree_update, kind, sender)
-                    .await
-            }
-            // Respond to a probe msg
-            // We always respond to probe msgs if we're an elder as health checks use this to see if a node is alive
-            // and repsonsive, as well as being a method of keeping nodes up to date.
-            NodeMsg::AntiEntropyProbe(section_key) => {
-                trace!("Aeprobe in");
-
-                let mut cmds = vec![];
-                if !context.is_elder {
-                    info!("Dropping AEProbe since we are not an elder");
-                    // early return here as we do not get health checks as adults,
-                    // normal AE rules should have applied
-                    return Ok(cmds);
-                }
-
-                trace!("Received Probe message from {}: {:?}", sender, msg_id);
-                cmds.push(MyNode::send_ae_update_to_nodes(
-                    &context,
-                    Peers::Single(sender),
-                    section_key,
-                ));
-                Ok(cmds)
             }
             // The approval or rejection of a join (approval both for new network joiner as well as
             // existing node relocated to the section) will be received here.
@@ -489,11 +457,11 @@ impl MyNode {
 pub(crate) fn into_msg_bytes(
     network_knowledge: &NetworkKnowledge,
     our_node_name: XorName,
-    msg: NodeMsg,
+    msg: MsgType,
     msg_id: MsgId,
     recipients: Peers,
 ) -> Result<Vec<(Peer, UsrMsgBytes)>> {
-    let (kind, payload) = MyNode::serialize_node_msg(our_node_name, &msg)?;
+    let (kind, payload) = MyNode::serialize_msg(our_node_name, &msg)?;
     let recipients = match recipients {
         Peers::Single(peer) => vec![peer],
         Peers::Multiple(peers) => peers.into_iter().collect(),

@@ -6,12 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::Dst;
-
 use super::{
     data::{ClientDataResponse, ClientMsg},
     system::NodeMsg,
-    AuthorityProof, ClientAuth, MsgId,
+    AntiEntropyMsg, AuthorityProof, ClientAuth,
 };
 use std::fmt::{Display, Formatter};
 
@@ -21,42 +19,29 @@ use std::fmt::{Display, Formatter};
 #[derive(PartialEq, Debug, Clone)]
 #[allow(clippy::large_enum_variant)]
 pub enum MsgType {
-    /// Message from client to nodes.
+    /// Msgs for synchronizing network membership state.
+    AntiEntropy(AntiEntropyMsg),
+    /// Msg from client to nodes.
     Client {
-        /// Message ID
-        msg_id: MsgId,
-        /// Requester's authority over this message
+        /// Requester's authority over this msg.
         auth: AuthorityProof<ClientAuth>,
-        /// Message dst
-        dst: Dst,
-        /// the message
+        /// The msg from requester.
         msg: ClientMsg,
     },
-    /// Message response for clients sent by nodes.
-    ClientDataResponse {
-        /// Message ID
-        msg_id: MsgId,
-        /// the message
-        msg: ClientDataResponse,
-    },
-    /// System message for node<->node comms.
-    Node {
-        /// Message ID
-        msg_id: MsgId,
-        /// Message dst
-        dst: Dst,
-        /// the message
-        msg: NodeMsg,
-    },
+    /// Data response msg.
+    ClientDataResponse(ClientDataResponse),
+    /// Msg for node<->node comms.
+    Node(NodeMsg),
 }
 
 impl Display for MsgType {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Node { msg, .. } => write!(f, "MsgType::Node({msg})"),
+            Self::AntiEntropy(msg) => write!(f, "MsgType::AntiEntropy({msg:?})"),
             Self::Client { msg, .. } => write!(f, "MsgType::Client({msg})"),
-            Self::ClientDataResponse { msg, .. } => {
-                write!(f, "MsgType::ClientDataResponse({msg})")
+            Self::Node(msg) => write!(f, "MsgType::Node({msg})"),
+            Self::ClientDataResponse(msg) => {
+                write!(f, "MsgType::ClientDataResponse({msg:?})")
             }
         }
     }
