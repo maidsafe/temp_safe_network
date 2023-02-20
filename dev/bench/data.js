@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1676882663438,
+  "lastUpdate": 1676889924195,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -71284,6 +71284,150 @@ window.BENCHMARK_DATA = {
             "name": "read-sampling/chunk keys/4000",
             "value": 336372068,
             "range": "± 2012097",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "be64f75991cbe72899dd7bde6aab8c1ed66aaae9",
+          "message": "Merge #2087 #2107\n\n2087: Rename MsgType to NetworkMsg r=joshuef a=oetyng\n\nThis better reflects the domain.\n\n2107: sn_dbc without ringcts integration r=grumbach a=grumbach\n\n<!--\r\nThanks for contributing to the project! We recommend you check out our \"Guide to contributing\" page if you haven't already: https://github.com/maidsafe/QA/blob/master/CONTRIBUTING.md\r\n\r\nWrite your comment below this line: -->\r\n\r\n- Integrates with the latest RingCT removal in `sn_dbc`\n\nCo-authored-by: oetyng <oetyng@gmail.com>\nCo-authored-by: grumbach <anselmega@gmail.com>\nCo-authored-by: Anselme <anselmega@gmail.com>",
+          "timestamp": "2023-02-20T08:12:48Z",
+          "tree_id": "778bed4986dbd0abee203f687645cd9dcde2d41b",
+          "url": "https://github.com/maidsafe/safe_network/commit/be64f75991cbe72899dd7bde6aab8c1ed66aaae9"
+        },
+        "date": 1676889921586,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "serialize/serialize for sending",
+            "value": 2206106,
+            "range": "± 3872",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 74700373,
+            "range": "± 1754054",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 89232697,
+            "range": "± 2206984",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 393549172,
+            "range": "± 1945361",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 63161138,
+            "range": "± 350423",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 75089362,
+            "range": "± 616862",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 316257126,
+            "range": "± 1326200",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "register-edit-sampling/register_edits/1000",
+            "value": 21393742102,
+            "range": "± 38053367",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/100",
+            "value": 42400049,
+            "range": "± 16051495",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/1000",
+            "value": 2590727798,
+            "range": "± 394480199",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/4000",
+            "value": 5507240221,
+            "range": "± 1706973251",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/100",
+            "value": 149690484,
+            "range": "± 6892323",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/1000",
+            "value": 1486777199,
+            "range": "± 42658613",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/4000",
+            "value": 5565786407,
+            "range": "± 136454294",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/100",
+            "value": 39648464,
+            "range": "± 897161",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/1000",
+            "value": 388037857,
+            "range": "± 2796513",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/4000",
+            "value": 1494441774,
+            "range": "± 5715154",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/100",
+            "value": 10862617,
+            "range": "± 157500",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/1000",
+            "value": 95760561,
+            "range": "± 3613440",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/4000",
+            "value": 331987908,
+            "range": "± 3147290",
             "unit": "ns/iter"
           }
         ]
