@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1676889924195,
+  "lastUpdate": 1676920998719,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -71428,6 +71428,150 @@ window.BENCHMARK_DATA = {
             "name": "read-sampling/chunk keys/4000",
             "value": 331987908,
             "range": "± 3147290",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "7886bc842d75e65c6799cfecb8a5a4ae662a72d7",
+          "message": "Merge #2089\n\n2089: feat(sn_node): refactor SectionPeers to use Decision r=davidrusu a=maqi\n\n<!--\r\nThanks for contributing to the project! We recommend you check out our \"Guide to contributing\" page if you haven't already: https://github.com/maidsafe/QA/blob/master/CONTRIBUTING.md\r\n\r\nWrite your comment below this line: -->\r\n\r\nBeing the first step as described within the issue https://github.com/maidsafe/safe_network/issues/2081 , the work of this PR relies on couple of TODO points that shall get addressed in the following PRs :\r\n1, the util function of `section_signed_to_decision` shall get removed once complete the full transition\r\n2, Decision requires the PublicKeySet to validate, however NetworkKnowledge only retains the PublicKey info currently. Need to re-enable the validation in the following PR\r\n3, The current `update`, `merge_members` procedure is based on `node_state` as atomic. However `Decision` may contain multipe of `node_state` within one. Need to double check this won't incur any trouble.\r\n4, The current `members` function return list of `Decision`, which may contain `Join` and `Left` in one Decision, or multiple Joins. This need to be double checked in the following PRs.\r\n5,  \r\n\n\nCo-authored-by: qima <qi.ma@maidsafe.net>",
+          "timestamp": "2023-02-20T17:35:05Z",
+          "tree_id": "7731a1768ef0833eef27a2907ec67bef4f0c0623",
+          "url": "https://github.com/maidsafe/safe_network/commit/7886bc842d75e65c6799cfecb8a5a4ae662a72d7"
+        },
+        "date": 1676920996169,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "serialize/serialize for sending",
+            "value": 2219162,
+            "range": "± 2690",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 77838828,
+            "range": "± 1924291",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 93610203,
+            "range": "± 2384579",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 399143269,
+            "range": "± 2956090",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 65230778,
+            "range": "± 256239",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 78275970,
+            "range": "± 838931",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 326874802,
+            "range": "± 2555430",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "register-edit-sampling/register_edits/1000",
+            "value": 22444156313,
+            "range": "± 112243580",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/100",
+            "value": 44275261,
+            "range": "± 17949419",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/1000",
+            "value": 2856885631,
+            "range": "± 247890957",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/4000",
+            "value": 5598800198,
+            "range": "± 271361672",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/100",
+            "value": 152793234,
+            "range": "± 6681060",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/1000",
+            "value": 1478168447,
+            "range": "± 47087924",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/4000",
+            "value": 5594490728,
+            "range": "± 247242283",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/100",
+            "value": 40748629,
+            "range": "± 357651",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/1000",
+            "value": 386896976,
+            "range": "± 4397018",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/4000",
+            "value": 1508191111,
+            "range": "± 8699761",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/100",
+            "value": 11813683,
+            "range": "± 135087",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/1000",
+            "value": 96691824,
+            "range": "± 4083939",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/4000",
+            "value": 331799827,
+            "range": "± 3299613",
             "unit": "ns/iter"
           }
         ]
