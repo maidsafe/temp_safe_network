@@ -71,7 +71,9 @@ pub(crate) async fn listen_for_msgs(
 
                 let src_name = match wire_msg.kind() {
                     MsgKind::Client { auth, .. } => auth.public_key.into(),
-                    MsgKind::Node { name, .. } | MsgKind::ClientDataResponse(name) => *name,
+                    MsgKind::Node { name, .. }
+                    | MsgKind::AntiEntropy(name)
+                    | MsgKind::ClientDataResponse(name) => *name,
                 };
 
                 let peer = Peer::new(src_name, remote_address);

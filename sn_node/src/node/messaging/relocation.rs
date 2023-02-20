@@ -193,8 +193,9 @@ mod tests {
     use sn_consensus::Decision;
     use sn_interface::{
         elder_count, init_logger,
-        messaging::system::{
-            AntiEntropyKind, JoinResponse, NodeDataCmd, NodeMsg, SectionStateVote,
+        messaging::{
+            system::{JoinResponse, NodeDataCmd, NodeMsg, SectionStateVote},
+            AntiEntropyKind, AntiEntropyMsg, MsgType,
         },
         network_knowledge::{recommended_section_size, NodeState, RelocationDst, MIN_ADULT_AGE},
         test_utils::{gen_peer, gen_peer_in_prefix, prefix, section_decision, TestKeys},
@@ -261,7 +262,10 @@ mod tests {
         let mut trigger_is_sent = false;
         while let Some(cmd) = cmds.next().await? {
             let msg = match cmd {
-                Cmd::SendMsg { msg, .. } => msg,
+                Cmd::SendMsg {
+                    msg: MsgType::Node(msg),
+                    ..
+                } => msg,
                 _ => continue,
             };
 
@@ -578,7 +582,7 @@ mod tests {
                             let mut send_cmd = dispatcher.process_cmd(cmd).await?;
                             assert_eq!(send_cmd.len(), 1);
                             let send_cmd = send_cmd.remove(0);
-                            assert_matches!(&send_cmd, Cmd::SendMsg { msg, .. } => {
+                            assert_matches!(&send_cmd, Cmd::SendMsg { msg: MsgType::Node(msg), .. } => {
                                 assert_matches!(msg, NodeMsg::MembershipVotes(_));
                             });
                             assert!(dispatcher.process_cmd(send_cmd).await?.is_empty());
@@ -594,7 +598,7 @@ mod tests {
                                 // relocate msg to the relocation_node
                                 assert_eq!(send_cmds.len(), 3);
                                 let send_cmd = send_cmds.remove(0);
-                                assert_matches!(&send_cmd, Cmd::SendMsg { msg, .. } => {
+                                assert_matches!(&send_cmd, Cmd::SendMsg { msg: MsgType::Node(msg), .. } => {
                                     assert_matches!(msg, NodeMsg::Relocate(_));
                                 });
                                 assert!(dispatcher.process_cmd(send_cmd).await?.is_empty());
@@ -603,7 +607,7 @@ mod tests {
                             } else {
                                 assert_eq!(send_cmds.len(), 3);
                                 let send_cmd = send_cmds.remove(0);
-                                assert_matches!(&send_cmd, Cmd::SendMsg { msg, .. } => {
+                                assert_matches!(&send_cmd, Cmd::SendMsg { msg: MsgType::Node(msg), .. } => {
                                     assert_matches!(msg,  NodeMsg::JoinResponse(JoinResponse::Approved { .. }));
                                 });
                                 assert!(dispatcher.process_cmd(send_cmd).await?.is_empty());
@@ -611,16 +615,21 @@ mod tests {
 
                             // Common for both the cases
                             let send_cmd = send_cmds.remove(0);
-                            assert_matches!(&send_cmd, Cmd::SendMsg { msg, .. } => {
-                                assert_matches!(msg, NodeMsg::AntiEntropy { section_tree_update: _, kind  } => {
-                                    assert_matches!(kind, AntiEntropyKind::Update { .. });
-                                });
-                            });
+                            assert_matches!(
+                                &send_cmd,
+                                Cmd::SendMsg {
+                                    msg: MsgType::AntiEntropy(AntiEntropyMsg::AntiEntropy {
+                                        kind: AntiEntropyKind::Update { .. },
+                                        ..
+                                    }),
+                                    ..
+                                }
+                            );
                             assert!(dispatcher.process_cmd(send_cmd).await?.is_empty());
 
                             // Skip NodeDataCmd as we don't have any data
                             let send_cmd = send_cmds.remove(0);
-                            assert_matches!(&send_cmd, Cmd::SendMsg { msg, .. } => {
+                            assert_matches!(&send_cmd, Cmd::SendMsg { msg: MsgType::Node(msg), .. } => {
                                 assert_matches!(msg,  NodeMsg::NodeDataCmd(NodeDataCmd::SendAnyMissingRelevantData(data)) => {
                                     assert!(data.is_empty());
                                 });
@@ -632,7 +641,27 @@ mod tests {
                             ..
                         } = &cmd
                         {
-                            assert!(dispatcher.process_cmd(cmd).await?.is_empty());
+                            // Send out the `UnderConsideration` as stream response.
+                            let _ = dispatcher.process_cmd(cmd).await?;
+                        } else if let Cmd::UpdateCaller {
+                            kind: AntiEntropyKind::Redirect { .. },
+                            ..
+                        } = &cmd
+                        {
+                            let mut send_cmds = dispatcher.process_cmd(cmd).await?;
+
+                            let send_cmd = send_cmds.remove(0);
+                            assert_matches!(
+                                &send_cmd,
+                                Cmd::SendMsg {
+                                    msg: MsgType::AntiEntropy(AntiEntropyMsg::AntiEntropy {
+                                        kind: AntiEntropyKind::Redirect { .. },
+                                        ..
+                                    }),
+                                    ..
+                                }
+                            );
+                            assert!(dispatcher.process_cmd(send_cmd).await?.is_empty());
                         } else {
                             panic!("got a different cmd {cmd:?}");
                         }

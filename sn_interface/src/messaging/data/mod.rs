@@ -25,14 +25,12 @@ pub use self::{
     spentbook::{SpentbookCmd, SpentbookQuery},
 };
 
-use crate::network_knowledge::SectionTreeUpdate;
 use crate::types::{
     register::{Entry, EntryHash, Permissions, Policy, Register, User},
     Chunk,
 };
 use crate::{messaging::MsgId, types::ReplicatedData};
 
-use qp2p::UsrMsgBytes;
 use serde::{Deserialize, Serialize};
 use sn_dbc::SpentProofShare;
 use std::{
@@ -96,17 +94,6 @@ pub enum ClientDataResponse {
         /// [`Cmd`]: self::ClientMsg::Cmd
         correlation_id: MsgId,
     },
-    AntiEntropy {
-        /// The update to our NetworkKnowledge containing the current `SectionAuthorityProvider`
-        /// and the section chain truncated from the triggering msg's dst section_key or genesis_key
-        /// if the the dst section_key is not a direct ancestor to our section_key
-        section_tree_update: SectionTreeUpdate,
-        /// This AE message is sent to a client when a message with outdated section
-        /// information was received, attaching the bounced message so
-        /// the client can resend it with up to date destination information.
-        #[debug(skip)]
-        bounced_msg: UsrMsgBytes,
-    },
 }
 
 impl Display for ClientDataResponse {
@@ -118,11 +105,8 @@ impl Display for ClientDataResponse {
             Self::CmdResponse { response, .. } => {
                 write!(f, "ClientDataResponse::CmdResponse({response:?})")
             }
-            Self::AntiEntropy { .. } => {
-                write!(f, "ClientDataResponse::AntiEntropy")
-            }
             Self::NetworkIssue(error) => {
-                write!(f, "ClientDataResponse::NetworkIssue({error:?})")
+                write!(f, "ClientClientDataResponse::NetworkIssue({error:?})")
             }
         }
     }

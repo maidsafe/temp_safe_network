@@ -11,7 +11,7 @@ use super::wire_msg_header::WireMsgHeader;
 use crate::messaging::{
     data::{ClientDataResponse, ClientMsg},
     system::NodeMsg,
-    AuthorityProof, Dst, Error, MsgId, MsgKind, MsgType, Result,
+    AntiEntropyMsg, AuthorityProof, Dst, Error, MsgId, MsgKind, MsgType, Result,
 };
 
 use bytes::{BufMut, Bytes, BytesMut};
@@ -89,7 +89,6 @@ impl WireMsg {
             msg_payload,
             MsgKind::Node {
                 name,
-                is_ae: msg.is_ae(),
                 is_join: msg.is_join(),
             },
             dst,
@@ -193,6 +192,12 @@ impl WireMsg {
     /// Deserialize the payload from this `WireMsg` returning a `MsgType` instance.
     pub fn into_msg(&self) -> Result<MsgType> {
         match self.header.msg_envelope.kind.clone() {
+            MsgKind::AntiEntropy(_) => {
+                let msg: AntiEntropyMsg = rmp_serde::from_slice(&self.payload).map_err(|err| {
+                    Error::FailedToParse(format!("Ae message payload as Msgpack: {err}"))
+                })?;
+                Ok(MsgType::AntiEntropy(msg))
+            }
             MsgKind::Client { auth, .. } => {
                 let msg: ClientMsg = rmp_serde::from_slice(&self.payload).map_err(|err| {
                     Error::FailedToParse(format!("Data message payload as Msgpack: {err}"))
@@ -200,34 +205,20 @@ impl WireMsg {
 
                 let auth = AuthorityProof::verify(auth, &self.payload)?;
 
-                Ok(MsgType::Client {
-                    msg_id: self.header.msg_envelope.msg_id,
-                    auth,
-                    dst: self.dst,
-                    msg,
-                })
+                Ok(MsgType::Client { auth, msg })
             }
             MsgKind::ClientDataResponse(_) => {
                 let msg: ClientDataResponse =
                     rmp_serde::from_slice(&self.payload).map_err(|err| {
                         Error::FailedToParse(format!("Data message payload as Msgpack: {err}"))
                     })?;
-
-                Ok(MsgType::ClientDataResponse {
-                    msg_id: self.header.msg_envelope.msg_id,
-                    msg,
-                })
+                Ok(MsgType::ClientDataResponse(msg))
             }
             MsgKind::Node { .. } => {
                 let msg: NodeMsg = rmp_serde::from_slice(&self.payload).map_err(|err| {
                     Error::FailedToParse(format!("Node signed message payload as Msgpack: {err}"))
                 })?;
-
-                Ok(MsgType::Node {
-                    msg_id: self.header.msg_envelope.msg_id,
-                    dst: self.dst,
-                    msg,
-                })
+                Ok(MsgType::Node(msg))
             }
         }
     }
@@ -254,8 +245,9 @@ impl WireMsg {
 
     /// Convenience function which creates a temporary `WireMsg` from the provided
     /// bytes, returning the deserialized message.
-    pub fn deserialize(bytes: UsrMsgBytes) -> Result<MsgType> {
-        Self::from(bytes)?.into_msg()
+    pub fn deserialize(bytes: UsrMsgBytes) -> Result<(MsgId, MsgType)> {
+        let msg = Self::from(bytes)?;
+        Ok((msg.msg_id(), msg.into_msg()?))
     }
 }
 
@@ -288,7 +280,6 @@ mod tests {
         let kind = MsgKind::Node {
             name: Default::default(),
             is_join: true,
-            is_ae: false,
         };
         let wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
         let serialized = wire_msg.serialize()?;
@@ -301,14 +292,7 @@ mod tests {
         assert_eq!(deserialized.dst_section_key(), dst.section_key);
 
         // test deserialisation of payload
-        assert_eq!(
-            deserialized.into_msg()?,
-            MsgType::Node {
-                msg_id: wire_msg.msg_id(),
-                dst,
-                msg,
-            }
-        );
+        assert_eq!(deserialized.into_msg()?, MsgType::Node(msg),);
 
         Ok(())
     }
@@ -353,9 +337,7 @@ mod tests {
         assert_eq!(
             deserialized.into_msg()?,
             MsgType::Client {
-                msg_id: wire_msg.msg_id(),
                 auth: auth_proof,
-                dst,
                 msg: client_msg,
             }
         );
