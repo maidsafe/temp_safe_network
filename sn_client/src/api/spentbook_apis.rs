@@ -10,7 +10,7 @@ use super::Client;
 
 use crate::{Error, Result};
 
-use sn_dbc::{KeyImage, RingCtTransaction, SpentProof, SpentProofShare};
+use sn_dbc::{DbcTransaction, PublicKey, SpentProof, SpentProofShare};
 use sn_interface::{
     messaging::data::{
         DataCmd, DataQuery, Error as NetworkDataError, QueryResponse, SpentbookCmd, SpentbookQuery,
@@ -29,7 +29,7 @@ impl Client {
     // Write Operations
     //---------------------
 
-    /// Spend a DBC's key image.
+    /// Spend a DBC's public key.
     ///
     /// It's possible that the section processing the spend request will not be aware of the
     /// section keys used to sign the spent proofs. If this is the case, the network will return a
@@ -39,13 +39,13 @@ impl Client {
     ///
     /// When the request is resubmitted, it gets sent along with a proof chain and a signed SAP
     /// that the section can use to update itself.
-    #[instrument(skip(self, tx, spent_proofs, spent_transactions), level = "debug")]
+    #[instrument(skip(self, tx, spent_proofs), level = "debug")]
     pub async fn spend_dbc(
         &self,
-        key_image: KeyImage,
-        tx: RingCtTransaction,
+        public_key: PublicKey,
+        tx: DbcTransaction,
         spent_proofs: BTreeSet<SpentProof>,
-        spent_transactions: BTreeSet<RingCtTransaction>,
+        spent_transactions: BTreeSet<DbcTransaction>,
     ) -> Result<()> {
         let mut network_knowledge = None;
         let mut attempts = 1;
@@ -56,7 +56,7 @@ impl Client {
         );
         loop {
             let cmd = SpentbookCmd::Spend {
-                key_image,
+                public_key,
                 tx: tx.clone(),
                 spent_proofs: spent_proofs.clone(),
                 spent_transactions: spent_transactions.clone(),
@@ -79,7 +79,7 @@ impl Client {
                     error!("DBC spend request failed after {attempts} attempts");
                     return Err(Error::DbcSpendRetryAttemptsExceeded {
                         attempts,
-                        key_image,
+                        public_key,
                     });
                 }
                 let network = self.session.network.read().await;
@@ -103,10 +103,10 @@ impl Client {
     // Read Spentbook
     //---------------------
 
-    /// Return the set of spent proof shares if the provided DBC's key image is spent
+    /// Return the set of spent proof shares if the provided DBC's public key is spent
     #[instrument(skip(self), level = "debug")]
-    pub async fn spent_proof_shares(&self, key_image: KeyImage) -> Result<Vec<SpentProofShare>> {
-        let address = SpentbookAddress::new(XorName::from_content(&key_image.to_bytes()));
+    pub async fn spent_proof_shares(&self, public_key: PublicKey) -> Result<Vec<SpentProofShare>> {
+        let address = SpentbookAddress::new(XorName::from_content(&public_key.to_bytes()));
         let query = DataQuery::Spentbook(SpentbookQuery::SpentProofShares(address));
         let response = self.send_query(query.clone()).await?;
         match response {
@@ -128,7 +128,7 @@ mod tests {
     };
     use crate::Client;
 
-    use sn_dbc::{rng, Hash, OwnerOnce, RingCtTransaction, TransactionBuilder};
+    use sn_dbc::{rng, DbcTransaction, Hash, OwnerOnce, TransactionBuilder};
     use sn_interface::messaging::data::Error as ErrorMsg;
 
     use eyre::{bail, Result};
@@ -145,8 +145,8 @@ mod tests {
     const NUM_OF_DBC_REISSUE_ATTEMPTS: u8 = 5;
 
     async fn verify_spent_proof_share(
-        key_image: bls::PublicKey,
-        tx: RingCtTransaction,
+        public_key: bls::PublicKey,
+        tx: DbcTransaction,
         client: &Client,
     ) -> Result<()> {
         // The query could be too close to the spend which make adult only accumulated
@@ -155,8 +155,8 @@ mod tests {
         loop {
             attempts += 1;
 
-            // Get spent proof shares for the key_image.
-            let spent_proof_shares = client.spent_proof_shares(key_image).await?;
+            // Get spent proof shares for the public_key.
+            let spent_proof_shares = client.spent_proof_shares(public_key).await?;
 
             // Note this test could have been run more than once thus the genesis DBC
             // could have been spent a few times already, so we filter
@@ -189,23 +189,23 @@ mod tests {
         let (
             client,
             SpendDetails {
-                key_image,
+                public_key,
                 genesis_dbc,
                 tx,
             },
         ) = setup(false).await?;
 
-        // Spend the key_image.
+        // Spend the public_key.
         client
             .spend_dbc(
-                key_image,
+                public_key,
                 tx.clone(),
                 genesis_dbc.spent_proofs,
                 genesis_dbc.spent_transactions,
             )
             .await?;
 
-        verify_spent_proof_share(key_image, tx, &client).await
+        verify_spent_proof_share(public_key, tx, &client).await
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -220,7 +220,7 @@ mod tests {
         let (
             client,
             SpendDetails {
-                key_image,
+                public_key,
                 genesis_dbc,
                 tx,
             },
@@ -237,10 +237,10 @@ mod tests {
             })
             .collect();
 
-        // Try spend the key_image.
+        // Try spend the public_key.
         let result = client
             .spend_dbc(
-                key_image,
+                public_key,
                 tx.clone(),
                 invalid_spent_proofs,
                 genesis_dbc.spent_transactions,
@@ -274,7 +274,7 @@ mod tests {
         let (
             client,
             SpendDetails {
-                key_image,
+                public_key,
                 genesis_dbc,
                 tx,
             },
@@ -282,10 +282,10 @@ mod tests {
 
         let genesis_dbc_owner_pk = genesis_dbc.owner_base().public_key();
 
-        // Try spend the key_image.
+        // Try spend the public_key.
         let result = client
             .spend_dbc(
-                key_image,
+                public_key,
                 tx.clone(),
                 genesis_dbc.spent_proofs,
                 genesis_dbc.spent_transactions,
@@ -314,7 +314,7 @@ mod tests {
         let (client, SpendDetails { genesis_dbc, .. }) = setup(false).await?;
 
         // The idea for this test case is to pass the wrong spent proofs and transactions for
-        // the key image we're trying to spend. To do so, we reissue `output_dbc_1` from
+        // the public key we're trying to spend. To do so, we reissue `output_dbc_1` from
         // `genesis_dbc`, then reissue `output_dbc_2` from `output_dbc_1`, then when we try to spend
         // `output_dbc_2`, we use the spent proofs/transactions from `genesis_dbc`. This should
         // not be permitted. The correct way would be to pass the spent proofs/transactions
@@ -337,6 +337,9 @@ mod tests {
 
         let (output_dbc_1, _output_owneronce_1, _amount_secrects_1) = output_dbcs_1[0].clone();
 
+        let pk = output_dbc_1
+            .public_key_bearer()
+            .expect("unexpectedly failed to get DBC public key");
         let spend_amount_2 = 5;
         let recipient_owneronce_2 =
             OwnerOnce::from_owner_base(client.dbc_owner().clone(), &mut rng::thread_rng());
@@ -371,10 +374,10 @@ mod tests {
                 ..
             }) => {
                 let correct_error_str =
-                    "DbcError(CommitmentsInputLenMismatch { current: 0, expected: 1 })";
+                    format!("{:?}", sn_dbc::Error::MissingCommitmentForPubkey(pk));
                 assert!(
-                    error_string.contains(correct_error_str),
-                    "A different SpentbookError error was expected for this case. What we got: {error_string:?}"
+                    error_string.contains(&correct_error_str),
+                    "A different SpentbookError error was expected for this case. What we got: {error_string:?}, expected: {correct_error_str:?}"
                 );
                 Ok(())
             }
@@ -383,10 +386,10 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn spentbook_spend_with_random_key_image_should_return_spentbook_error() -> Result<()> {
+    async fn spentbook_spend_with_random_public_key_should_return_spentbook_error() -> Result<()> {
         init_logger();
         let _outer_span = tracing::info_span!(
-            "test__spentbook_spend_with_random_key_image_should_return_spentbook_error"
+            "test__spentbook_spend_with_random_public_key_should_return_spentbook_error"
         )
         .entered();
 
@@ -397,13 +400,13 @@ mod tests {
             },
         ) = setup(false).await?;
 
-        // generate the random key image
-        let random_key_image = bls::SecretKey::random().public_key();
+        // generate the random public key
+        let random_public_key = bls::SecretKey::random().public_key();
 
-        // Try spend the random_key_image.
+        // Try spend the random_public_key.
         let result = client
             .spend_dbc(
-                random_key_image,
+                random_public_key,
                 tx.clone(),
                 genesis_dbc.spent_proofs.clone(),
                 genesis_dbc.spent_transactions,
@@ -417,7 +420,7 @@ mod tests {
                 ..
             }) => {
                 let correct_error_str =
-                    format!("SpentbookError(\"There are no commitments for the given key image {random_key_image:?}\"");
+                    format!("SpentbookError(\"There are no commitments for the given public key {random_public_key:?}\"");
                 assert!(
                     error_string.contains(&correct_error_str),
                     "A different SpentbookError error was expected for this case. What we got: {error_string:?}"
@@ -430,8 +433,8 @@ mod tests {
 
     struct SpendDetails {
         genesis_dbc: sn_dbc::Dbc,
-        tx: RingCtTransaction,
-        key_image: sn_dbc::PublicKey,
+        tx: DbcTransaction,
+        public_key: sn_dbc::PublicKey,
     }
 
     // returns a client which is the owner to the genesis dbc,
@@ -449,13 +452,10 @@ mod tests {
         let dbc_owner = genesis_dbc.owner_base().clone();
         let client = create_test_client_with(None, Some(dbc_owner.clone()), None).await?;
 
-        let genesis_key_image = genesis_dbc.key_image_bearer()?;
+        let genesis_public_key = genesis_dbc.public_key_bearer()?;
 
         let output_owner = OwnerOnce::from_owner_base(dbc_owner, &mut rng::thread_rng());
-        let dbc_builder = TransactionBuilder::default()
-            .set_decoys_per_input(0)
-            .set_require_all_decoys(false)
-            .add_input_dbc_bearer(&genesis_dbc)?;
+        let dbc_builder = TransactionBuilder::default().add_input_dbc_bearer(&genesis_dbc)?;
 
         let inputs_amount_sum = dbc_builder.inputs_amount_sum();
         let dbc_builder = dbc_builder
@@ -463,15 +463,15 @@ mod tests {
             .build(rng::thread_rng())?;
 
         assert_eq!(dbc_builder.inputs().len(), 1);
-        let (key_image, tx) = dbc_builder.inputs()[0].clone();
-        assert_eq!(genesis_key_image, key_image);
+        let (public_key, tx) = dbc_builder.inputs()[0].clone();
+        assert_eq!(genesis_public_key, public_key);
 
         Ok((
             client,
             SpendDetails {
                 genesis_dbc,
                 tx,
-                key_image,
+                public_key,
             },
         ))
     }
@@ -489,8 +489,6 @@ mod tests {
     )> {
         // TODO: enable the use of decoys
         let mut tx_builder = TransactionBuilder::default()
-            .set_decoys_per_input(0)
-            .set_require_all_decoys(false)
             .add_inputs_dbc_bearer(input_dbcs.iter())?
             .add_outputs_by_amount(outputs.into_iter().map(|(token, owner)| (token, owner)));
 
@@ -505,7 +503,7 @@ mod tests {
             .flat_map(|dbc| dbc.spent_proofs.clone())
             .collect();
 
-        let spent_transactions: BTreeSet<RingCtTransaction> = input_dbcs
+        let spent_transactions: BTreeSet<DbcTransaction> = input_dbcs
             .iter()
             .flat_map(|dbc| dbc.spent_transactions.clone())
             .collect();
@@ -516,7 +514,7 @@ mod tests {
         let mut dbc_builder = tx_builder.build(rng::thread_rng())?;
 
         // Spend all the input DBCs, collecting the spent proof shares for each of them
-        for (key_image, tx) in dbc_builder.inputs() {
+        for (public_key, tx) in dbc_builder.inputs() {
             let tx_hash = Hash::from(tx.hash());
             // TODO: spend DBCs concurrently spawning tasks
             let mut attempts = 0;
@@ -524,14 +522,14 @@ mod tests {
                 attempts += 1;
                 client
                     .spend_dbc(
-                        key_image,
+                        public_key,
                         tx.clone(),
                         spent_proofs.clone(),
                         spent_transactions.clone(),
                     )
                     .await?;
 
-                let spent_proof_shares = client.spent_proof_shares(key_image).await?;
+                let spent_proof_shares = client.spent_proof_shares(public_key).await?;
 
                 // TODO: we temporarilly filter the spent proof shares which correspond to the TX we
                 // are spending now. This is because current implementation of Spentbook allows
@@ -542,7 +540,7 @@ mod tests {
                     .collect();
 
                 match verify_spent_proof_shares_for_tx(
-                    key_image,
+                    public_key,
                     tx_hash,
                     shares_for_current_tx.iter(),
                     &proof_key_verifier,
@@ -562,7 +560,7 @@ mod tests {
                         ))
                         // return Err(crate::Error::DbcSpendRetryAttemptsExceeded {
                         //     attempts,
-                        //     key_image,
+                        //     public_key,
                         // });
                     }
                     Err(_) => {}
@@ -587,14 +585,14 @@ mod tests {
         Ok((output_dbcs, change_dbc))
     }
 
-    // Private helper to verify if a set of spent proof shares are valid for a given key_image and TX
+    // Private helper to verify if a set of spent proof shares are valid for a given public_key and TX
     fn verify_spent_proof_shares_for_tx<'a>(
-        key_image: sn_dbc::KeyImage,
+        public_key: sn_dbc::PublicKey,
         tx_hash: Hash,
         proof_shares: impl Iterator<Item = &'a sn_dbc::SpentProofShare>,
         proof_key_verifier: &SpentProofKeyVerifier,
     ) -> Result<()> {
-        sn_dbc::SpentProof::try_from_proof_shares(key_image, tx_hash, proof_shares)
+        sn_dbc::SpentProof::try_from_proof_shares(public_key, tx_hash, proof_shares)
             .and_then(|spent_proof| spent_proof.verify(tx_hash, proof_key_verifier))?;
 
         Ok(())

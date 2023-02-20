@@ -74,10 +74,10 @@ lazy_static! {
 
 impl WireMsgHeader {
     // Instantiate a WireMsgHeader as per current supported version.
-    pub fn new(msg_id: MsgId, auth: MsgKind) -> Self {
+    pub fn new(msg_id: MsgId, kind: MsgKind) -> Self {
         Self {
             version: MESSAGING_PROTO_VERSION,
-            msg_envelope: MsgEnvelope { msg_id, kind: auth },
+            msg_envelope: MsgEnvelope { msg_id, kind },
         }
     }
 

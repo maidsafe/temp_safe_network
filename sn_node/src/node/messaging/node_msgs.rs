@@ -16,9 +16,9 @@ use crate::{
 use sn_fault_detection::IssueType;
 use sn_interface::{
     messaging::{
-        data::{ClientDataResponse, CmdResponse},
+        data::{CmdResponse, DataResponse},
         system::{JoinResponse, NodeDataCmd, NodeEvent, NodeMsg},
-        Dst, MsgId, MsgType, WireMsg,
+        Dst, MsgId, NetworkMsg, WireMsg,
     },
     network_knowledge::{MembershipState, NetworkKnowledge},
     types::{log_markers::LogMarker, Keypair, Peer, PublicKey, ReplicatedData},
@@ -30,9 +30,9 @@ use tokio::sync::RwLock;
 use xor_name::XorName;
 
 impl MyNode {
-    /// Send a (`MsgType`) to peers
+    /// Send a (`NetworkMsg`) to peers
     pub(crate) fn send_msg(
-        msg: MsgType,
+        msg: NetworkMsg,
         msg_id: MsgId,
         recipients: Peers,
         context: NodeContext,
@@ -131,11 +131,11 @@ impl MyNode {
             }
         };
 
-        let msg = ClientDataResponse::CmdResponse {
+        let msg = DataResponse::CmdResponse {
             response,
             correlation_id,
         };
-        cmds.push(Cmd::send_client_response(
+        cmds.push(Cmd::send_data_response(
             msg,
             correlation_id,
             source_client,
@@ -457,7 +457,7 @@ impl MyNode {
 pub(crate) fn into_msg_bytes(
     network_knowledge: &NetworkKnowledge,
     our_node_name: XorName,
-    msg: MsgType,
+    msg: NetworkMsg,
     msg_id: MsgId,
     recipients: Peers,
 ) -> Result<Vec<(Peer, UsrMsgBytes)>> {

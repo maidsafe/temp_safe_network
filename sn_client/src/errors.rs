@@ -12,13 +12,13 @@ use sn_interface::{
     messaging::{
         data::{DataQuery, Error as ErrorMsg, QueryResponse},
         system::NodeMsg,
-        Error as MessagingError, MsgId, MsgType,
+        Error as MessagingError, MsgId, NetworkMsg,
     },
     types::{Error as DtError, Peer},
 };
 
 use bls::PublicKey;
-use sn_dbc::KeyImage;
+use sn_dbc::PublicKey as DbcPublicKey;
 use std::{io, time::Duration};
 use thiserror::Error;
 use xor_name::XorName;
@@ -195,13 +195,13 @@ pub enum Error {
     },
     /// Unexpected msg type received
     #[error("Unexpected type of message received from {peer} in response to {correlation_id:?}. Received: {msg:?}")]
-    UnexpectedMsgType {
+    UnexpectedNetworkMsg {
         /// MsgId of the msg sent
         correlation_id: MsgId,
         /// Peer the unexpected msg was received from
         peer: Peer,
         /// Unexpected msg received
-        msg: MsgType,
+        msg: NetworkMsg,
     },
     /// Other types errors
     #[error(transparent)]
@@ -286,12 +286,14 @@ pub enum Error {
     #[error("A signed section authority provider was not found for section key {0:?}")]
     SignedSapNotFound(PublicKey),
     /// Occurs if a DBC spend command eventually fails after a number of retry attempts.
-    #[error("The DBC spend request failed after {attempts} attempts for key_image: {key_image:?}")]
+    #[error(
+        "The DBC spend request failed after {attempts} attempts for public_key: {public_key:?}"
+    )]
     DbcSpendRetryAttemptsExceeded {
         /// Number of attemtps made
         attempts: u8,
-        /// The key_image that was attempted to spend
-        key_image: KeyImage,
+        /// The public_key that was attempted to spend
+        public_key: DbcPublicKey,
     },
     /// Occurs if a section key is not found when searching the sections DAG.
     #[error("Section key {0:?} was not found in the sections DAG")]

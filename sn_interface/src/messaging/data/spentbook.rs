@@ -13,21 +13,21 @@ use crate::network_knowledge::{SectionAuthorityProvider, SectionsDAG};
 use crate::types::SpentbookAddress;
 
 use serde::{Deserialize, Serialize};
-use sn_dbc::{KeyImage, RingCtTransaction, SpentProof};
+use sn_dbc::{DbcTransaction, PublicKey, SpentProof};
 use std::collections::BTreeSet;
 use xor_name::XorName;
 
 /// Spentbook read operations.
 #[derive(Hash, Eq, PartialEq, PartialOrd, Clone, Serialize, Deserialize, Debug)]
 pub enum SpentbookQuery {
-    /// Query the set of spent proofs if the provided key image has already been spent with a Tx
+    /// Query the set of spent proofs if the provided public key has already been spent with a Tx
     SpentProofShares(SpentbookAddress),
 }
 
 /// A Spentbook cmd.
 #[derive(Eq, PartialEq, Clone, Serialize, Deserialize, custom_debug::Debug)]
 pub enum SpentbookCmd {
-    /// Request to Elders to log a key image and its associated transaction as spent.
+    /// Request to Elders to log a public key and its associated transaction as spent.
     ///
     /// If successful, a spent proof signature share will be returned to the sender.
     ///
@@ -35,13 +35,13 @@ pub enum SpentbookCmd {
     /// latest SAP for that proof chain. This can be used in the case where one of the spent proofs
     /// was signed with a section key that the spend request section was not aware of.
     Spend {
-        key_image: KeyImage,
+        public_key: PublicKey,
         #[debug(skip)]
-        tx: RingCtTransaction,
+        tx: DbcTransaction,
         #[debug(skip)]
         spent_proofs: BTreeSet<SpentProof>,
         #[debug(skip)]
-        spent_transactions: BTreeSet<RingCtTransaction>,
+        spent_transactions: BTreeSet<DbcTransaction>,
         #[debug(skip)]
         network_knowledge: Option<(SectionsDAG, SectionSigned<SectionAuthorityProvider>)>,
     },
@@ -89,8 +89,8 @@ impl SpentbookCmd {
     /// Returns the dst address of the spentbook.
     pub fn dst_address(&self) -> SpentbookAddress {
         match self {
-            Self::Spend { key_image, .. } => {
-                SpentbookAddress::new(XorName::from_content(&key_image.to_bytes()))
+            Self::Spend { public_key, .. } => {
+                SpentbookAddress::new(XorName::from_content(&public_key.to_bytes()))
             }
         }
     }

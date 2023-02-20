@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{
-    data::{ClientDataResponse, ClientMsg},
+    data::{ClientMsg, DataResponse},
     system::NodeMsg,
     AntiEntropyMsg, AuthorityProof, ClientAuth,
 };
@@ -18,7 +18,7 @@ use std::fmt::{Display, Formatter};
 /// never serialised or even part of the message that is sent over the wire.
 #[derive(PartialEq, Debug, Clone)]
 #[allow(clippy::large_enum_variant)]
-pub enum MsgType {
+pub enum NetworkMsg {
     /// Msgs for synchronizing network membership state.
     AntiEntropy(AntiEntropyMsg),
     /// Msg from client to nodes.
@@ -28,20 +28,20 @@ pub enum MsgType {
         /// The msg from requester.
         msg: ClientMsg,
     },
-    /// Data response msg.
-    ClientDataResponse(ClientDataResponse),
     /// Msg for node<->node comms.
     Node(NodeMsg),
+    /// Data response msg.
+    DataResponse(DataResponse),
 }
 
-impl Display for MsgType {
+impl Display for NetworkMsg {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::AntiEntropy(msg) => write!(f, "MsgType::AntiEntropy({msg:?})"),
-            Self::Client { msg, .. } => write!(f, "MsgType::Client({msg})"),
-            Self::Node(msg) => write!(f, "MsgType::Node({msg})"),
-            Self::ClientDataResponse(msg) => {
-                write!(f, "MsgType::ClientDataResponse({msg:?})")
+            Self::AntiEntropy(msg) => write!(f, "NetworkMsg::AntiEntropy({msg:?})"),
+            Self::Client { msg, .. } => write!(f, "NetworkMsg::Client({msg})"),
+            Self::Node(msg) => write!(f, "NetworkMsg::Node({msg})"),
+            Self::DataResponse(msg) => {
+                write!(f, "NetworkMsg::DataResponse({msg:?})")
             }
         }
     }

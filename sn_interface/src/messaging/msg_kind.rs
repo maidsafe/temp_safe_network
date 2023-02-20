@@ -29,10 +29,10 @@ pub enum MsgKind {
         is_spend: bool,
         query_index: Option<usize>,
     },
-    /// A data cmd/query response sent from a Node (along with its name).
-    ClientDataResponse(XorName),
     /// A message from a Node along with its name
     Node { name: XorName, is_join: bool },
+    /// A data cmd/query response sent from a Node (along with its name).
+    DataResponse(XorName),
 }
 
 impl MsgKind {

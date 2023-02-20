@@ -20,13 +20,16 @@ pub use join::{JoinRejectReason, JoinRequest, JoinResponse};
 pub use node_msgs::{NodeDataCmd, NodeEvent, NodeQueryResponse};
 pub use section_sig::{SectionSig, SectionSigShare, SectionSigned};
 
+use sn_consensus::{Generation, SignedVote};
+use sn_sdkg::DkgSignedVote;
+
 use bls::PublicKey as BlsPublicKey;
 use ed25519::Signature;
 use serde::{Deserialize, Serialize};
-use sn_consensus::{Generation, SignedVote};
-use sn_sdkg::DkgSignedVote;
-use std::collections::{BTreeMap, BTreeSet};
-use std::fmt::{Display, Formatter};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fmt::{Display, Formatter},
+};
 use xor_name::XorName;
 
 /// List of peers of a section

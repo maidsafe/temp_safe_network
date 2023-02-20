@@ -10,7 +10,7 @@ use crate::network_knowledge::{Error, Result, SectionAuthorityProvider};
 use crate::types::log_markers::LogMarker;
 
 use sn_dbc::{
-    Commitment, Hash, IndexedSignatureShare, RingCtTransaction, SpentProofContent, SpentProofShare,
+    Commitment, DbcTransaction, Hash, IndexedSignatureShare, SpentProofContent, SpentProofShare,
 };
 use uluru::LRUCache;
 
@@ -105,16 +105,16 @@ impl SectionKeysProvider {
 /// location for it, but since it makes use of the section key provider I thought it could sit
 /// alongside it.
 pub fn build_spent_proof_share(
-    key_image: &bls::PublicKey,
-    tx: &RingCtTransaction,
+    public_key: &bls::PublicKey,
+    tx: &DbcTransaction,
     sap: &SectionAuthorityProvider,
     skp: &SectionKeysProvider,
-    public_commitments: Vec<Commitment>,
+    public_commitment: Commitment,
 ) -> Result<SpentProofShare> {
     let content = SpentProofContent {
-        key_image: *key_image,
+        public_key: *public_key,
         transaction_hash: Hash::from(tx.hash()),
-        public_commitments,
+        public_commitment,
     };
     let (index, sig_share) = skp.sign_with(content.hash().as_ref(), &sap.section_key())?;
     Ok(SpentProofShare {

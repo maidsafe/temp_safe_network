@@ -28,11 +28,11 @@ use sn_interface::{
     elder_count, init_logger,
     messaging::{
         data::{
-            ClientDataResponse, ClientMsg, CmdResponse, DataCmd, Error as MessagingDataError,
+            ClientMsg, CmdResponse, DataCmd, DataResponse, Error as MessagingDataError,
             SpentbookCmd,
         },
         system::{NodeDataCmd, NodeMsg},
-        AntiEntropyKind, AntiEntropyMsg, Dst, MsgType, WireMsg,
+        AntiEntropyKind, AntiEntropyMsg, Dst, NetworkMsg, WireMsg,
     },
     network_knowledge::{
         section_keys::SectionKeysProvider, Error as NetworkKnowledgeError, MyNodeInfo, NodeState,
@@ -199,7 +199,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
         let (msg, recipients) = match cmd {
             Cmd::SendMsg {
                 recipients,
-                msg: MsgType::Node(msg),
+                msg: NetworkMsg::Node(msg),
                 ..
             } => (msg, recipients),
             _ => continue,
@@ -534,7 +534,7 @@ async fn msg_to_self() -> Result<()> {
         assert_matches!(wire_msg.into_msg(), Ok(msg_type) => msg_type)
     });
 
-    assert_matches!(msg_type, MsgType::Node(msg) => {
+    assert_matches!(msg_type, NetworkMsg::Node(msg) => {
         assert_eq!(
             msg,
             node_msg
@@ -610,7 +610,7 @@ async fn handle_elders_update() -> Result<()> {
         };
 
         let section_tree_update = match msg {
-            MsgType::AntiEntropy(AntiEntropyMsg::AntiEntropy {
+            NetworkMsg::AntiEntropy(AntiEntropyMsg::AntiEntropy {
                 kind: AntiEntropyKind::Update { .. },
                 section_tree_update,
             }) => section_tree_update.clone(),
@@ -745,7 +745,7 @@ async fn handle_demote_during_split() -> Result<()> {
             _ => continue,
         };
 
-        if let MsgType::AntiEntropy(AntiEntropyMsg::AntiEntropy {
+        if let NetworkMsg::AntiEntropy(AntiEntropyMsg::AntiEntropy {
             kind: AntiEntropyKind::Update { .. },
             ..
         }) = msg
@@ -772,13 +772,13 @@ async fn spentbook_spend_client_message_should_replicate_to_adults_and_send_ack(
     let dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0);
     let sk_set = env.get_secret_key_set(prefix, None);
 
-    let (key_image, tx, spent_proofs, spent_transactions) =
+    let (public_key, tx, spent_proofs, spent_transactions) =
         dbc_utils::get_genesis_dbc_spend_info(&sk_set)?;
 
     let comm_rx = env.take_comm_rx(dispatcher.node().read().await.info().public_key());
     let mut cmds = ProcessAndInspectCmds::new_from_client_msg(
         ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
-            key_image,
+            public_key,
             tx: tx.clone(),
             spent_proofs,
             spent_transactions,
@@ -796,12 +796,12 @@ async fn spentbook_spend_client_message_should_replicate_to_adults_and_send_ack(
         {
             let msg = wire_msg.into_msg()?;
             match msg {
-                MsgType::Node(msg) => match msg {
+                NetworkMsg::Node(msg) => match msg {
                     NodeMsg::NodeDataCmd(NodeDataCmd::StoreData(data)) => {
                         assert_eq!(targets.len(), replication_count);
                         let spent_proof_share =
                             dbc_utils::get_spent_proof_share_from_replicated_data(data)?;
-                        assert_eq!(key_image.to_hex(), spent_proof_share.key_image().to_hex());
+                        assert_eq!(public_key.to_hex(), spent_proof_share.public_key().to_hex());
                         assert_eq!(Hash::from(tx.hash()), spent_proof_share.transaction_hash());
                         assert_eq!(
                             sk_set.public_keys().public_key().to_hex(),
@@ -854,7 +854,7 @@ async fn spentbook_spend_transaction_with_no_inputs_should_return_spentbook_erro
     let comm_rx = env.take_comm_rx(dispatcher.node().read().await.info().public_key());
     let mut cmds = ProcessAndInspectCmds::new_from_client_msg(
         ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
-            key_image: new_dbc2_sk.public_key(),
+            public_key: new_dbc2_sk.public_key(),
             tx: new_dbc2.transaction,
             spent_proofs: new_dbc.spent_proofs.clone(),
             spent_transactions: new_dbc.spent_transactions,
@@ -866,9 +866,9 @@ async fn spentbook_spend_transaction_with_no_inputs_should_return_spentbook_erro
     .await?;
 
     while let Some(cmd) = cmds.next().await? {
-        if let Cmd::SendClientResponse {
+        if let Cmd::SendDataResponse {
             msg:
-                ClientDataResponse::CmdResponse {
+                DataResponse::CmdResponse {
                     response: CmdResponse::SpendKey(Err(error)),
                     ..
                 },
@@ -960,12 +960,12 @@ async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node()
     // is used. Again, the owner of the output DBCs don't really matter, so a random key is
     // used.
     let proof_chain = other_section.section_chain();
-    let (key_image, tx) = get_input_dbc_spend_info(&new_dbc2, 2, &bls::SecretKey::random())?;
+    let (public_key, tx) = get_input_dbc_spend_info(&new_dbc2, 2, &bls::SecretKey::random())?;
 
     let comm_rx = env.take_comm_rx(info.public_key());
     let mut cmds = ProcessAndInspectCmds::new_from_client_msg(
         ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
-            key_image,
+            public_key,
             tx,
             spent_proofs: new_dbc2.spent_proofs,
             spent_transactions: new_dbc2.spent_transactions,

@@ -9,9 +9,9 @@
 use super::wire_msg_header::WireMsgHeader;
 
 use crate::messaging::{
-    data::{ClientDataResponse, ClientMsg},
+    data::{ClientMsg, DataResponse},
     system::NodeMsg,
-    AntiEntropyMsg, AuthorityProof, Dst, Error, MsgId, MsgKind, MsgType, Result,
+    AntiEntropyMsg, AuthorityProof, Dst, Error, MsgId, MsgKind, NetworkMsg, Result,
 };
 
 use bytes::{BufMut, Bytes, BytesMut};
@@ -98,9 +98,9 @@ impl WireMsg {
     }
 
     /// Creates a new `WireMsg` with the provided serialized payload and `MsgKind`.
-    pub fn new_msg(msg_id: MsgId, payload: Bytes, auth: MsgKind, dst: Dst) -> Self {
+    pub fn new_msg(msg_id: MsgId, payload: Bytes, kind: MsgKind, dst: Dst) -> Self {
         Self {
-            header: WireMsgHeader::new(msg_id, auth),
+            header: WireMsgHeader::new(msg_id, kind),
             dst,
             payload,
             serialized_dst: None,
@@ -189,14 +189,14 @@ impl WireMsg {
         Ok((header, dst, self.payload.clone()))
     }
 
-    /// Deserialize the payload from this `WireMsg` returning a `MsgType` instance.
-    pub fn into_msg(&self) -> Result<MsgType> {
+    /// Deserialize the payload from this `WireMsg` returning a `NetworkMsg` instance.
+    pub fn into_msg(&self) -> Result<NetworkMsg> {
         match self.header.msg_envelope.kind.clone() {
             MsgKind::AntiEntropy(_) => {
                 let msg: AntiEntropyMsg = rmp_serde::from_slice(&self.payload).map_err(|err| {
                     Error::FailedToParse(format!("Ae message payload as Msgpack: {err}"))
                 })?;
-                Ok(MsgType::AntiEntropy(msg))
+                Ok(NetworkMsg::AntiEntropy(msg))
             }
             MsgKind::Client { auth, .. } => {
                 let msg: ClientMsg = rmp_serde::from_slice(&self.payload).map_err(|err| {
@@ -205,20 +205,19 @@ impl WireMsg {
 
                 let auth = AuthorityProof::verify(auth, &self.payload)?;
 
-                Ok(MsgType::Client { auth, msg })
+                Ok(NetworkMsg::Client { auth, msg })
             }
-            MsgKind::ClientDataResponse(_) => {
-                let msg: ClientDataResponse =
-                    rmp_serde::from_slice(&self.payload).map_err(|err| {
-                        Error::FailedToParse(format!("Data message payload as Msgpack: {err}"))
-                    })?;
-                Ok(MsgType::ClientDataResponse(msg))
+            MsgKind::DataResponse(_) => {
+                let msg: DataResponse = rmp_serde::from_slice(&self.payload).map_err(|err| {
+                    Error::FailedToParse(format!("Data message payload as Msgpack: {err}"))
+                })?;
+                Ok(NetworkMsg::DataResponse(msg))
             }
             MsgKind::Node { .. } => {
                 let msg: NodeMsg = rmp_serde::from_slice(&self.payload).map_err(|err| {
                     Error::FailedToParse(format!("Node signed message payload as Msgpack: {err}"))
                 })?;
-                Ok(MsgType::Node(msg))
+                Ok(NetworkMsg::Node(msg))
             }
         }
     }
@@ -245,7 +244,7 @@ impl WireMsg {
 
     /// Convenience function which creates a temporary `WireMsg` from the provided
     /// bytes, returning the deserialized message.
-    pub fn deserialize(bytes: UsrMsgBytes) -> Result<(MsgId, MsgType)> {
+    pub fn deserialize(bytes: UsrMsgBytes) -> Result<(MsgId, NetworkMsg)> {
         let msg = Self::from(bytes)?;
         Ok((msg.msg_id(), msg.into_msg()?))
     }
@@ -292,7 +291,7 @@ mod tests {
         assert_eq!(deserialized.dst_section_key(), dst.section_key);
 
         // test deserialisation of payload
-        assert_eq!(deserialized.into_msg()?, MsgType::Node(msg),);
+        assert_eq!(deserialized.into_msg()?, NetworkMsg::Node(msg),);
 
         Ok(())
     }
@@ -336,7 +335,7 @@ mod tests {
         // test deserialisation of payload
         assert_eq!(
             deserialized.into_msg()?,
-            MsgType::Client {
+            NetworkMsg::Client {
                 auth: auth_proof,
                 msg: client_msg,
             }

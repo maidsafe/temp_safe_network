@@ -13,7 +13,7 @@ use sn_interface::{
         data::ClientMsg,
         serialisation::WireMsg,
         system::{JoinResponse, NodeMsg},
-        AuthorityProof, ClientAuth, Dst, MsgId, MsgKind, MsgType,
+        AuthorityProof, ClientAuth, Dst, MsgId, MsgKind, NetworkMsg,
     },
     network_knowledge::{test_utils::*, NodeState},
     types::{Keypair, Peer},
@@ -55,7 +55,7 @@ pub(crate) async fn handle_online_cmd(
         let (msg, recipients) = match cmd {
             Cmd::SendMsg {
                 recipients,
-                msg: MsgType::Node(msg),
+                msg: NetworkMsg::Node(msg),
                 ..
             } => (msg, recipients),
             _ => continue,
@@ -105,7 +105,7 @@ impl<'a> ProcessAndInspectCmds<'a> {
     // provided ClientMsg, and it uses the outcome (commands) as the
     // starting set of cmds to process by the ProcessAndInspectCmds instance herein created.
     // TODO: the client recv-stream created could be returned for the caller to use if necessary,
-    // at this point it's useless since `Cmd::SendClientResponse` is not processed but only inspected.
+    // at this point it's useless since `Cmd::SendDataResponse` is not processed but only inspected.
     pub(crate) async fn new_from_client_msg(
         msg: ClientMsg,
         dispatcher: &'a Dispatcher,
@@ -168,7 +168,7 @@ impl<'a> ProcessAndInspectCmds<'a> {
             if !matches!(
                 cmd,
                 Cmd::SendMsg { .. }
-                    | Cmd::SendClientResponse { .. }
+                    | Cmd::SendDataResponse { .. }
                     | Cmd::SendAndForwardResponseToClient { .. }
             ) {
                 let new_cmds = self.dispatcher.process_cmd(cmd).await?;

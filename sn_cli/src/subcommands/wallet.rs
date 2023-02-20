@@ -140,15 +140,15 @@ pub async fn wallet_commander(
                 Dbc::from_hex(dbc_hex.trim())?
             };
 
-            let (sk, key_image) = if dbc.is_bearer() {
-                (None, dbc.key_image_bearer()?)
+            let (sk, public_key) = if dbc.is_bearer() {
+                (None, dbc.public_key_bearer()?)
             } else if let Some(sk_hex) = secret_key_hex {
                 // This is an owned DBC and its secret key has been supplied
                 let sk = SecretKey::from_hex(&sk_hex)?;
-                let key_image = dbc
-                    .key_image(&sk)
+                let public_key = dbc
+                    .public_key(&sk)
                     .map_err(|e| map_invalid_sk_error(e.into()))?;
-                (Some(sk), key_image)
+                (Some(sk), public_key)
             } else {
                 // This is an owned DBC but its secret key was not provided,
                 // thus attempt to use the key configured for use with the CLI.
@@ -162,10 +162,10 @@ pub async fn wallet_commander(
                          argument to specify the key."
                         .to_string(),
                 )?;
-                let key_image = dbc
-                    .key_image(&sk)
+                let public_key = dbc
+                    .public_key(&sk)
                     .map_err(|e| map_invalid_sk_error(e.into()))?;
-                (Some(sk), key_image)
+                (Some(sk), public_key)
             };
 
             if force {
@@ -173,7 +173,7 @@ pub async fn wallet_commander(
                     "\nWARNING: --force flag set, hence skipping verification to check if \
                 supplied DBC has been already spent.\n"
                 );
-            } else if safe.is_dbc_spent(key_image).await? {
+            } else if safe.is_dbc_spent(public_key).await? {
                 return Err(
                     eyre!("The supplied DBC has been already spent on the network.").suggestion(
                         "Please run the command again with the --force flag if you still \

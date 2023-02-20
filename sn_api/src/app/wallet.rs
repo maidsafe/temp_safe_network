@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use dbc::DbcTransaction;
 pub use sn_dbc::{self as dbc, Dbc, Token};
 
 use super::{helpers::parse_tokens_amount, register::EntryHash};
@@ -17,8 +18,8 @@ use bytes::Bytes;
 use log::{debug, warn};
 use sn_client::Client;
 use sn_dbc::{
-    rng, AmountSecrets, Error as DbcError, Hash, KeyImage, Owner, OwnerOnce, PublicKey,
-    RingCtTransaction, SpentProof, SpentProofShare, TransactionBuilder,
+    rng, AmountSecrets, Error as DbcError, Hash, Owner, OwnerOnce, PublicKey, SpentProof,
+    SpentProofShare, TransactionBuilder,
 };
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
@@ -140,10 +141,10 @@ impl Safe {
         Ok((spendable_name, amount))
     }
 
-    /// Verify if the provided DBC's key_image has been already spent on the network.
-    pub async fn is_dbc_spent(&self, key_image: KeyImage) -> Result<bool> {
+    /// Verify if the provided DBC's public_key has been already spent on the network.
+    pub async fn is_dbc_spent(&self, public_key: PublicKey) -> Result<bool> {
         let client = self.get_safe_client()?;
-        let spent_proof_shares = client.spent_proof_shares(key_image).await?;
+        let spent_proof_shares = client.spent_proof_shares(public_key).await?;
 
         // We obtain a set of unique spent transactions hash the shares belong to
         let spent_transactions: BTreeSet<Hash> = spent_proof_shares
@@ -155,7 +156,7 @@ impl Safe {
 
         // Among all different proof shares that could have been signed for different
         // transactions, let's try to find one set of shares which can actually
-        // be aggregated onto a valid proof signature for the provided DBC's key_image,
+        // be aggregated onto a valid proof signature for the provided DBC's public_key,
         // and which is signed by a known section key.
         let is_spent = spent_transactions.into_iter().any(|tx_hash| {
             let shares_for_current_tx = spent_proof_shares
@@ -163,7 +164,7 @@ impl Safe {
                 .filter(|share| share.content.transaction_hash == tx_hash);
 
             verify_spent_proof_shares_for_tx(
-                key_image,
+                public_key,
                 tx_hash,
                 shares_for_current_tx,
                 &proof_key_verifier,
@@ -453,8 +454,6 @@ impl Safe {
     ) -> Result<(Vec<(Dbc, OwnerOnce, AmountSecrets)>, Option<Dbc>)> {
         // TODO: enable the use of decoys
         let mut tx_builder = TransactionBuilder::default()
-            .set_decoys_per_input(0)
-            .set_require_all_decoys(false)
             .add_inputs_dbc_bearer(input_dbcs.iter())?
             .add_outputs_by_amount(outputs.into_iter().map(|(token, owner)| (token, owner)));
 
@@ -470,7 +469,7 @@ impl Safe {
             .flat_map(|dbc| dbc.spent_proofs.clone())
             .collect();
 
-        let spent_transactions: BTreeSet<RingCtTransaction> = input_dbcs
+        let spent_transactions: BTreeSet<DbcTransaction> = input_dbcs
             .iter()
             .flat_map(|dbc| dbc.spent_transactions.clone())
             .collect();
@@ -481,7 +480,7 @@ impl Safe {
         let mut dbc_builder = tx_builder.build(rng::thread_rng())?;
 
         // Spend all the input DBCs, collecting the spent proof shares for each of them
-        for (key_image, tx) in dbc_builder.inputs() {
+        for (public_key, tx) in dbc_builder.inputs() {
             let tx_hash = Hash::from(tx.hash());
             // TODO: spend DBCs concurrently spawning tasks
             let mut attempts = 0;
@@ -489,14 +488,14 @@ impl Safe {
                 attempts += 1;
                 client
                     .spend_dbc(
-                        key_image,
+                        public_key,
                         tx.clone(),
                         spent_proofs.clone(),
                         spent_transactions.clone(),
                     )
                     .await?;
 
-                let spent_proof_shares = client.spent_proof_shares(key_image).await?;
+                let spent_proof_shares = client.spent_proof_shares(public_key).await?;
 
                 // TODO: we temporarilly filter the spent proof shares which correspond to the TX we
                 // are spending now. This is because current implementation of Spentbook allows
@@ -507,7 +506,7 @@ impl Safe {
                     .collect();
 
                 match verify_spent_proof_shares_for_tx(
-                    key_image,
+                    public_key,
                     tx_hash,
                     shares_for_current_tx.iter(),
                     &proof_key_verifier,
@@ -549,14 +548,14 @@ impl Safe {
     }
 }
 
-// Private helper to verify if a set of spent proof shares are valid for a given key_image and TX
+// Private helper to verify if a set of spent proof shares are valid for a given public_key and TX
 fn verify_spent_proof_shares_for_tx<'a>(
-    key_image: KeyImage,
+    public_key: PublicKey,
     tx_hash: Hash,
     proof_shares: impl Iterator<Item = &'a SpentProofShare>,
     proof_key_verifier: &SpentProofKeyVerifier,
 ) -> Result<()> {
-    SpentProof::try_from_proof_shares(key_image, tx_hash, proof_shares)
+    SpentProof::try_from_proof_shares(public_key, tx_hash, proof_shares)
         .and_then(|spent_proof| spent_proof.verify(tx_hash, proof_key_verifier))?;
 
     Ok(())
@@ -1168,7 +1167,7 @@ mod tests {
             .wallet_deposit(&wallet_xorurl, Some("deposited-dbc"), &dbc, None)
             .await
         {
-            Err(Error::DbcError(DbcError::InvalidSpentProofSignature(_key_image))) => Ok(()),
+            Err(Error::DbcError(DbcError::InvalidSpentProofSignature(_public_key))) => Ok(()),
             Err(err) => Err(anyhow!("Error returned is not the expected: {:?}", err)),
             Ok(_) => Err(anyhow!("Wallet deposit succeeded unexpectedly".to_string())),
         }
@@ -1223,8 +1222,8 @@ mod tests {
     async fn test_wallet_is_dbc_spent() -> Result<()> {
         let safe = new_safe_instance().await?;
 
-        // the api shall confirm the genesis DBC's key_image has been spent
-        let is_genesis_spent = safe.is_dbc_spent(GENESIS_DBC.key_image_bearer()?).await?;
+        // the api shall confirm the genesis DBC's public_key has been spent
+        let is_genesis_spent = safe.is_dbc_spent(GENESIS_DBC.public_key_bearer()?).await?;
         assert!(is_genesis_spent);
 
         Ok(())
@@ -1234,8 +1233,8 @@ mod tests {
     async fn test_wallet_dbc_is_unspent() -> Result<()> {
         let (safe, unspent_dbc, _) = new_safe_instance_with_dbc().await?;
 
-        // confirm the DBC's key_image has not been spent yet
-        let is_unspent_dbc_spent = safe.is_dbc_spent(unspent_dbc.key_image_bearer()?).await?;
+        // confirm the DBC's public_key has not been spent yet
+        let is_unspent_dbc_spent = safe.is_dbc_spent(unspent_dbc.public_key_bearer()?).await?;
         assert!(!is_unspent_dbc_spent);
 
         Ok(())

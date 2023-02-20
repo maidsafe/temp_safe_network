@@ -47,7 +47,7 @@ mod tests {
             MsgId,
             {
                 system::{JoinRejectReason, JoinResponse},
-                MsgType,
+                NetworkMsg,
             },
         },
         network_knowledge::{MembershipState, NetworkKnowledge},
@@ -113,7 +113,7 @@ mod tests {
             .iter()
             .find(|cmd| matches!(cmd, Cmd::SendMsg { .. }));
         assert_matches!(some_cmd, Some(Cmd::SendMsg {
-            msg: MsgType::Node(msg),
+            msg: NetworkMsg::Node(msg),
             recipients,
             ..
         }) => {
@@ -288,7 +288,7 @@ mod tests {
             .find(|cmd| matches!(cmd, Cmd::SendMsg { .. }));
 
         assert_matches!(some_cmd, Some(Cmd::SendMsg {
-            msg: MsgType::Node(msg),
+            msg: NetworkMsg::Node(msg),
             recipients,
             ..
         }) => {
