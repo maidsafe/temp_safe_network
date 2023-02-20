@@ -6,10 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{
-    messaging::system::SectionSigned,
-    network_knowledge::{errors::Result, MembershipState, NodeState, SectionsDAG},
-};
+use crate::network_knowledge::{errors::Result, MembershipState, NodeState, SectionsDAG};
+use sn_consensus::Decision;
 use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
 use xor_name::{Prefix, XorName};
 
@@ -21,47 +19,77 @@ const ELDER_CHURN_EVENTS_TO_PRUNE_ARCHIVE: usize = 5;
 const ELDER_CHURN_EVENTS_TO_PRUNE_ARCHIVE: usize = 3;
 
 /// Container for storing information about (current and archived) members of our section.
-#[derive(Clone, Default, Debug)]
+#[derive(Clone, Default, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub(super) struct SectionPeers {
-    members: BTreeMap<XorName, SectionSigned<NodeState>>,
-    archive: BTreeMap<XorName, SectionSigned<NodeState>>,
+    members: BTreeMap<XorName, Decision<NodeState>>,
+    archive: BTreeMap<XorName, Decision<NodeState>>,
 }
 
 impl SectionPeers {
     /// Returns set of current members, i.e. those with state == `Joined`.
-    pub(super) fn members(&self) -> BTreeSet<SectionSigned<NodeState>> {
+    pub(super) fn members(&self) -> BTreeSet<NodeState> {
+        let mut node_state_list = BTreeSet::new();
+        for (name, decision) in self.members.iter() {
+            if let Some(node_state) = decision
+                .proposals
+                .keys()
+                .find(|state| state.name() == *name)
+            {
+                let _ = node_state_list.insert(node_state.clone());
+            }
+        }
+        node_state_list
+    }
+
+    /// Returns set of current members, i.e. those with state == `Joined`.
+    /// with the correspondent Decision info
+    pub(super) fn section_members_with_decision(&self) -> BTreeSet<Decision<NodeState>> {
+        // TODO: ensure Decision has no Joined and Left combined within one
         self.members.values().cloned().collect()
     }
 
     /// Returns set of archived members, i.e those that've left our section
-    pub(super) fn archived_members(&self) -> BTreeSet<SectionSigned<NodeState>> {
-        self.archive.values().cloned().collect()
+    pub(super) fn archived_members(&self) -> BTreeSet<NodeState> {
+        let mut node_state_list = BTreeSet::new();
+        for (name, decision) in self.archive.iter() {
+            if let Some(node_state) = decision
+                .proposals
+                .keys()
+                .find(|state| state.name() == *name)
+            {
+                let _ = node_state_list.insert(node_state.clone());
+            }
+        }
+        node_state_list
     }
 
     /// Returns the number of current members.
     pub(super) fn num_of_members(&self) -> usize {
-        self.members.len()
+        self.members().len()
     }
 
     /// Get the `NodeState` for the member with the given name.
     pub(super) fn get(&self, name: &XorName) -> Option<NodeState> {
-        self.members.get(name).map(|state| state.value.clone())
+        self.members()
+            .iter()
+            .find(|node_state| node_state.name() == *name)
+            .cloned()
     }
 
     /// Returns whether the given peer is currently a member of our section.
     pub(super) fn is_member(&self, name: &XorName) -> bool {
-        self.members.get(name).is_some()
+        self.get(name).is_some()
     }
 
     /// Get section signed `NodeState` for the member with the given name.
-    pub(super) fn is_either_member_or_archived(
-        &self,
-        name: &XorName,
-    ) -> Option<SectionSigned<NodeState>> {
-        if let Some(member) = self.members.get(name).cloned() {
+    pub(super) fn is_either_member_or_archived(&self, name: &XorName) -> Option<NodeState> {
+        if let Some(member) = self.get(name) {
             Some(member)
         } else {
-            self.archive.get(name).cloned()
+            self.archived_members()
+                .iter()
+                .find(|node_state| node_state.name() == *name)
+                .cloned()
         }
     }
 
@@ -71,32 +99,36 @@ impl SectionPeers {
     /// - Joined -> Left
     /// - Joined -> Relocated
     /// - Relocated <--> Left (should not happen, but needed for consistency)
-    pub(super) fn update(&mut self, new_state: SectionSigned<NodeState>) -> bool {
-        let node_name = new_state.name();
+    pub(super) fn update(&mut self, new_decision: Decision<NodeState>) -> bool {
+        let mut updated = false;
+        for new_state in new_decision.proposals.keys() {
+            let node_name = new_state.name();
 
-        match (self.members.entry(node_name), new_state.state()) {
-            (Entry::Vacant(entry), MembershipState::Joined) => {
-                // unless it was already archived, insert it as current member
-                if self.archive.contains_key(&node_name) {
-                    false
-                } else {
-                    entry.insert(new_state);
+            updated |= match (self.members.entry(node_name), new_state.state()) {
+                (Entry::Vacant(entry), MembershipState::Joined) => {
+                    // unless it was already archived, insert it as current member
+                    if self.archive.contains_key(&node_name) {
+                        false
+                    } else {
+                        entry.insert(new_decision.clone());
+                        true
+                    }
+                }
+                (Entry::Vacant(_), MembershipState::Left | MembershipState::Relocated(_)) => {
+                    // insert it in our archive regardless it was there with another state
+                    let _prev = self.archive.insert(node_name, new_decision.clone());
                     true
                 }
-            }
-            (Entry::Vacant(_), MembershipState::Left | MembershipState::Relocated(_)) => {
-                // insert it in our archive regardless it was there with another state
-                let _prev = self.archive.insert(node_name, new_state.clone());
-                true
-            }
-            (Entry::Occupied(_), MembershipState::Joined) => false,
-            (Entry::Occupied(entry), MembershipState::Left | MembershipState::Relocated(_)) => {
-                //  remove it from our current members, and insert it into our archive
-                let _ = entry.remove();
-                let _ = self.archive.insert(node_name, new_state);
-                true
-            }
+                (Entry::Occupied(_), MembershipState::Joined) => false,
+                (Entry::Occupied(entry), MembershipState::Left | MembershipState::Relocated(_)) => {
+                    //  remove it from our current members, and insert it into our archive
+                    let _ = entry.remove();
+                    let _ = self.archive.insert(node_name, new_decision.clone());
+                    true
+                }
+            };
         }
+        updated
     }
 
     /// Remove all members whose name does not match `prefix`.
@@ -114,8 +146,19 @@ impl SectionPeers {
         let mut latest_section_keys = proof_chain.get_ancestors(last_key)?;
         latest_section_keys.truncate(ELDER_CHURN_EVENTS_TO_PRUNE_ARCHIVE - 1);
         latest_section_keys.push(*last_key);
-        self.archive
-            .retain(|_, node_state| latest_section_keys.contains(&node_state.sig.public_key));
+        self.archive.retain(|_, decision| {
+            latest_section_keys.iter().any(|section_key| {
+                for (node_state, sig) in decision.proposals.iter() {
+                    if bincode::serialize(node_state)
+                        .map(|bytes| section_key.verify(sig, bytes))
+                        .unwrap_or(false)
+                    {
+                        return true;
+                    }
+                }
+                false
+            })
+        });
         Ok(())
     }
 }
@@ -124,13 +167,14 @@ impl SectionPeers {
 mod tests {
     use super::{SectionPeers, SectionsDAG};
     use crate::{
-        messaging::system::SectionSigned,
-        network_knowledge::{MembershipState, NodeState, RelocationDst},
+        network_knowledge::{MembershipState, NodeState, RelocationDst, SectionSigned},
         test_utils::{assert_lists, gen_addr, TestKeys},
         types::Peer,
     };
     use eyre::Result;
     use rand::thread_rng;
+    use sn_consensus::Decision;
+    use std::collections::{BTreeMap, BTreeSet};
     use xor_name::XorName;
 
     #[test]
@@ -230,10 +274,25 @@ mod tests {
         assert!(section_peers.update(node_left.clone()));
         assert!(section_peers.update(node_relocated.clone()));
 
+        let (node_left_state, _) = node_left
+            .proposals
+            .first_key_value()
+            .unwrap_or_else(|| panic!("Proposal of Decision is empty"));
+        let (node_relocated_state, _) = node_relocated
+            .proposals
+            .first_key_value()
+            .unwrap_or_else(|| panic!("Proposal of Decision is empty"));
+
         let node_left_joins =
-            TestKeys::get_section_signed(&sk, NodeState::joined(*node_left.peer(), None));
-        let node_relocated_joins =
-            TestKeys::get_section_signed(&sk, NodeState::joined(*node_relocated.peer(), None));
+            TestKeys::get_section_signed(&sk, NodeState::joined(*node_left_state.peer(), None));
+        let node_left_joins = section_signed_to_decision(node_left_joins);
+
+        let node_relocated_joins = TestKeys::get_section_signed(
+            &sk,
+            NodeState::joined(*node_relocated_state.peer(), None),
+        );
+        let node_relocated_joins = section_signed_to_decision(node_relocated_joins);
+
         assert!(!section_peers.update(node_left_joins));
         assert!(!section_peers.update(node_relocated_joins));
 
@@ -254,10 +313,21 @@ mod tests {
         assert!(section_peers.update(node_1.clone()));
         assert!(section_peers.update(node_2.clone()));
 
-        let node_1 = NodeState::left(*node_1.peer(), Some(node_1.name()));
+        let (node_state_1, _) = node_1
+            .proposals
+            .first_key_value()
+            .unwrap_or_else(|| panic!("Proposal of Decision is empty"));
+        let (node_state_2, _) = node_2
+            .proposals
+            .first_key_value()
+            .unwrap_or_else(|| panic!("Proposal of Decision is empty"));
+
+        let node_1 = NodeState::left(*node_state_1.peer(), Some(node_state_1.name()));
         let node_1 = TestKeys::get_section_signed(&sk, node_1);
-        let node_2 = NodeState::left(*node_2.peer(), Some(node_2.name()));
+        let node_1 = section_signed_to_decision(node_1);
+        let node_2 = NodeState::left(*node_state_2.peer(), Some(node_state_2.name()));
         let node_2 = TestKeys::get_section_signed(&sk, node_2);
+        let node_2 = section_signed_to_decision(node_2);
         assert!(section_peers.update(node_1.clone()));
         assert!(section_peers.update(node_2.clone()));
 
@@ -271,9 +341,9 @@ mod tests {
         num_nodes: usize,
         membership_state: MembershipState,
         secret_key: &bls::SecretKey,
-    ) -> Vec<SectionSigned<NodeState>> {
+    ) -> Vec<Decision<NodeState>> {
         let mut rng = thread_rng();
-        let mut signed_node_states = Vec::new();
+        let mut decisions = Vec::new();
         for _ in 0..num_nodes {
             let addr = gen_addr();
             let name = XorName::random(&mut rng);
@@ -285,9 +355,20 @@ mod tests {
                     NodeState::relocated(peer, None, (*dst).clone())
                 }
             };
-            let sig = TestKeys::get_section_signed(secret_key, node_state);
-            signed_node_states.push(sig);
+            let sectioin_signed_node_state = TestKeys::get_section_signed(secret_key, node_state);
+            decisions.push(section_signed_to_decision(sectioin_signed_node_state));
         }
-        signed_node_states
+        decisions
+    }
+
+    // Convert SectionSigned to Decision
+    fn section_signed_to_decision(section_signed: SectionSigned<NodeState>) -> Decision<NodeState> {
+        let mut proposals = BTreeMap::new();
+        let _ = proposals.insert(section_signed.value, section_signed.sig.signature);
+        Decision::<NodeState> {
+            votes: BTreeSet::new(),
+            proposals,
+            faults: BTreeSet::new(),
+        }
     }
 }

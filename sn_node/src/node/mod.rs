@@ -226,12 +226,7 @@ mod core {
                 let n_elders = network_knowledge.signed_sap().elder_count();
 
                 // TODO: the bootstrap members should come from handover
-                let bootstrap_members = BTreeSet::from_iter(
-                    network_knowledge
-                        .section_signed_members()
-                        .into_iter()
-                        .map(|section_auth| section_auth.value),
-                );
+                let bootstrap_members = network_knowledge.section_members();
 
                 Some(Membership::from(
                     (key.index as u8, key.secret_key_share),
@@ -810,11 +805,12 @@ mod core {
         pub(crate) fn update_comm_target_list(context: &NodeContext) {
             let relocated_members = context
                 .network_knowledge
-                .section_signed_archived_members()
+                .archived_members()
                 .into_iter()
                 .filter_map(|state| {
+                    // TODO: figure out hot to retain the section sign key info within Decsion
                     if state.is_relocated()
-                        && state.sig.public_key == context.network_knowledge.section_key()
+                    // && state.sig.public_key == context.network_knowledge.section_key()
                     {
                         Some(*state.peer())
                     } else {

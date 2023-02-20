@@ -69,7 +69,7 @@ impl MyNode {
         recipients: Peers,
         section_pk: BlsPublicKey,
     ) -> Cmd {
-        let members = context.network_knowledge.section_signed_members();
+        let members = context.network_knowledge.section_members_with_decision();
 
         let ae_msg = NetworkMsg::AntiEntropy(AntiEntropyMsg::AntiEntropy {
             section_tree_update: MyNode::generate_ae_section_tree_update(context, Some(section_pk)),
