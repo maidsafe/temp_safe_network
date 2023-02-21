@@ -67,9 +67,9 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
     let sk_set = env.get_secret_key_set(prefix, None);
     let section_key = sk_set.public_keys().public_key();
 
-    let adult_dispatcher = env.get_dispatchers(prefix, 0, 1, None).remove(0);
-    let adult_node = adult_dispatcher.node();
-    let old_info = adult_node.read().await.info();
+    let (_adult_dispatcher, adult_node) =
+        env.get_dispatchers_and_nodes(prefix, 0, 1, None).remove(0);
+    let old_info = adult_node.info();
     let old_name = old_info.name();
     let old_keypair = old_info.keypair.clone();
 
@@ -97,8 +97,10 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
         NodeMsg::TryJoin(Some(proof)),
     )?;
 
-    let elder_dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0);
-    let elder_node = elder_dispatcher.node();
+    let (elder_dispatcher, elder_node) =
+        env.get_dispatchers_and_nodes(prefix, 1, 0, None).remove(0);
+
+    let elder_node = Arc::new(RwLock::new(elder_node));
 
     ProcessAndInspectCmds::new(
         Cmd::HandleMsg {
@@ -107,6 +109,7 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
             send_stream: None,
         },
         &elder_dispatcher,
+        elder_node.clone(),
     )
     .process_all()
     .await?;
@@ -128,14 +131,15 @@ async fn handle_agreement_on_online() -> Result<()> {
     let env = TestNetworkBuilder::new(thread_rng())
         .sap(prefix, elder_count(), 0, None, None)
         .build();
-    let dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0);
+    let (dispatcher, node) = env.get_dispatchers_and_nodes(prefix, 1, 0, None).remove(0);
     let sk_set = env.get_secret_key_set(prefix, None);
     let new_peer = gen_peer(MIN_ADULT_AGE);
-    let join_approval_sent = handle_online_cmd(&new_peer, &sk_set, &dispatcher).await?;
+    let node = Arc::new(RwLock::new(node));
+    let join_approval_sent =
+        handle_online_cmd(&new_peer, &sk_set, &dispatcher, node.clone()).await?;
     assert!(join_approval_sent.0);
 
-    assert!(dispatcher
-        .node()
+    assert!(node
         .read()
         .await
         .network_knowledge()
@@ -158,8 +162,8 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
             None,
         )
         .build();
-    let dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0);
-    let node_name = dispatcher.node().read().await.name();
+    let (dispatcher, mut node) = env.get_dispatchers_and_nodes(prefix, 1, 0, None).remove(0);
+    let node_name = node.name();
     let section = env.get_network_knowledge(prefix, None);
     let sk_set = env.get_secret_key_set(prefix, None);
 
@@ -177,11 +181,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
     let membership_decision = section_decision(&sk_set, node_state.clone());
 
     // Force this node to join
-    dispatcher
-        .node()
-        .write()
-        .await
-        .membership
+    node.membership
         .as_mut()
         .ok_or_else(|| eyre!("Membership for the node must be set"))?
         .force_bootstrap(node_state);
@@ -189,6 +189,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
     let mut cmds = ProcessAndInspectCmds::new(
         Cmd::HandleMembershipDecision(membership_decision),
         &dispatcher,
+        Arc::new(RwLock::new(node)),
     );
 
     // Verify we sent a `DkgStart` message with the expected participants.
@@ -239,33 +240,22 @@ async fn handle_join_request_of_rejoined_node() -> Result<()> {
     let env = TestNetworkBuilder::new(thread_rng())
         .sap(prefix, elder_count(), 0, None, None)
         .build();
-    let dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0);
+    let (_dispatcher, mut node) = env.get_dispatchers_and_nodes(prefix, 1, 0, None).remove(0);
 
     // Make a left peer.
     let peer = gen_peer_in_prefix(MIN_ADULT_AGE, prefix);
-    dispatcher
-        .node()
-        .write()
-        .await
-        .membership
+    node.membership
         .as_mut()
         .ok_or_else(|| eyre!("Membership for the node must be set"))?
         .force_bootstrap(NodeState::left(peer, None));
 
     // Simulate the same peer rejoining
     let node_state = NodeState::joined(peer, None);
-    let join_cmd = dispatcher
-        .node()
-        .write()
-        .await
-        .propose_membership_change(node_state.clone());
+    let join_cmd = node.propose_membership_change(node_state);
 
     // A rejoining node will always be rejected
     assert!(join_cmd.is_none()); // no cmd signals this membership proposal was dropped.
-    assert!(!dispatcher
-        .node()
-        .read()
-        .await
+    assert!(!node
         .membership
         .as_ref()
         .ok_or_else(|| eyre!("Membership for the node must be set"))?
@@ -281,7 +271,7 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
     let env = TestNetworkBuilder::new(thread_rng())
         .sap(prefix, elder_count(), 1, None, None)
         .build();
-    let dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0);
+    let (dispatcher, node) = env.get_dispatchers_and_nodes(prefix, 1, 0, None).remove(0);
     let sk_set = env.get_secret_key_set(prefix, None);
 
     // get the node state of the non_elder node
@@ -291,15 +281,16 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
     let proposal = SectionStateVote::NodeIsOffline(node_state.clone());
     let sig = TestKeys::get_section_sig_bytes(&sk_set.secret_key(), &get_single_sig(&proposal));
 
+    let node = Arc::new(RwLock::new(node));
     ProcessAndInspectCmds::new(
         Cmd::HandleSectionDecisionAgreement { proposal, sig },
         &dispatcher,
+        node.clone(),
     )
     .process_all()
     .await?;
 
-    assert!(!dispatcher
-        .node()
+    assert!(!node
         .read()
         .await
         .network_knowledge()
@@ -314,27 +305,29 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
     let env = TestNetworkBuilder::new(thread_rng())
         .sap(prefix, elder_count(), 0, None, None)
         .build();
-    let mut elders = env.get_dispatchers(prefix, 2, 0, None);
-    let dispatcher = elders.remove(0);
+    let mut elders = env.get_dispatchers_and_nodes(prefix, 2, 0, None);
+    let (dispatcher, node) = elders.remove(0);
     let sk_set = env.get_secret_key_set(prefix, None);
 
-    let remove_elder = elders.remove(0).node().read().await.info().peer();
-    let remove_elder = NodeState::left(remove_elder, None);
+    let (_remove_dispatcher, remove_elder) = elders.remove(0);
+    let remove_elder_peer = remove_elder.info().peer();
+    let remove_elder = NodeState::left(remove_elder_peer, None);
 
     // Handle agreement on the Offline proposal
     let proposal = SectionStateVote::NodeIsOffline(remove_elder.clone());
     let sig = TestKeys::get_section_sig_bytes(&sk_set.secret_key(), &get_single_sig(&proposal));
+    let node = Arc::new(RwLock::new(node));
 
     ProcessAndInspectCmds::new(
         Cmd::HandleSectionDecisionAgreement { proposal, sig },
         &dispatcher,
+        node.clone(),
     )
     .process_all()
     .await?;
 
     // Verify we initiated a membership churn
-    assert!(dispatcher
-        .node()
+    assert!(node
         .read()
         .await
         .membership
@@ -400,7 +393,8 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
     node.section_keys_provider
         .insert(TestKeys::get_section_key_share(&sk_set1, 0));
 
-    let (dispatcher, _) = Dispatcher::new(Arc::new(RwLock::new(node)));
+    let (dispatcher, _) = Dispatcher::new();
+    let node = Arc::new(RwLock::new(node));
 
     ProcessAndInspectCmds::new(
         Cmd::HandleMsg {
@@ -409,13 +403,14 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
             send_stream: None,
         },
         &dispatcher,
+        node.clone(),
     )
     .process_all()
     .await?;
 
     // Verify our `Section` got updated.
     assert_lists(
-        dispatcher.node().read().await.network_knowledge().elders(),
+        node.read().await.network_knowledge().elders(),
         new_section_elders,
     );
     Ok(())
@@ -432,7 +427,7 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
     let env = TestNetworkBuilder::new(thread_rng())
         .sap(prefix, elder_count(), 0, None, None)
         .build();
-    let dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0);
+    let (dispatcher, node) = env.get_dispatchers_and_nodes(prefix, 1, 0, None).remove(0);
     let section = env.get_network_knowledge(prefix, None);
     let signed_sap = section.signed_sap();
     let sk_set = env.get_secret_key_set(prefix, None);
@@ -464,6 +459,8 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
         },
     )?;
 
+    let node = Arc::new(RwLock::new(node));
+
     assert!(matches!(
         ProcessAndInspectCmds::new(
             Cmd::HandleMsg {
@@ -472,6 +469,7 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
                 send_stream: None,
             },
             &dispatcher,
+            node.clone()
         )
         .process_all()
         .await,
@@ -480,19 +478,9 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
         ))
     ));
 
+    assert_eq!(node.read().await.network_knowledge().genesis_key(), &pk);
     assert_eq!(
-        dispatcher
-            .node()
-            .read()
-            .await
-            .network_knowledge()
-            .genesis_key(),
-        &pk
-    );
-    assert_eq!(
-        dispatcher
-            .node()
-            .read()
+        node.read()
             .await
             .network_knowledge()
             .section_tree()
@@ -514,17 +502,16 @@ async fn msg_to_self() -> Result<()> {
     let mut comm_rx = env.take_comm_rx(node.info().public_key());
     let context = node.context();
     let info = node.info();
-    let (dispatcher, _) = Dispatcher::new(Arc::new(RwLock::new(node)));
+    let (dispatcher, _) = Dispatcher::new();
 
     let node_msg = NodeMsg::NodeDataCmd(NodeDataCmd::ReplicateDataBatch(vec![]));
 
     // don't use the cmd collection fn, as it skips Cmd::SendMsg
     let cmds = dispatcher
-        .process_cmd(Cmd::send_msg(
-            node_msg.clone(),
-            Peers::Single(info.peer()),
-            context,
-        ))
+        .process_cmd(
+            Cmd::send_msg(node_msg.clone(), Peers::Single(info.peer()), context),
+            Arc::new(RwLock::new(node)),
+        )
         .await?;
 
     assert!(cmds.is_empty());
@@ -582,7 +569,7 @@ async fn handle_elders_update() -> Result<()> {
     // the new section key share to our cache
     node.section_keys_provider
         .insert(TestKeys::get_section_key_share(&sk_set1, 0));
-    let (dispatcher, _) = Dispatcher::new(Arc::new(RwLock::new(node)));
+    let (dispatcher, _) = Dispatcher::new();
 
     // Create `HandleNewEldersAgreement` cmd. This will demote one of the
     // current elders and promote the oldest peer.
@@ -590,12 +577,15 @@ async fn handle_elders_update() -> Result<()> {
     let bytes = bincode::serialize(&sap1.sig.public_key).expect("Failed to serialize");
     let sig = TestKeys::get_section_sig_bytes(&sk_set0.secret_key(), &bytes);
 
+    let node = Arc::new(RwLock::new(node));
+
     let mut cmds = ProcessAndInspectCmds::new(
         Cmd::HandleNewEldersAgreement {
             new_elders: sap1,
             sig,
         },
         &dispatcher,
+        node.clone(),
     );
 
     let mut update_actual_recipients = HashSet::new();
@@ -640,10 +630,7 @@ async fn handle_elders_update() -> Result<()> {
 
     assert_eq!(update_actual_recipients, update_expected_recipients);
 
-    assert_lists(
-        dispatcher.node().read().await.network_knowledge().elders(),
-        elders_1,
-    );
+    assert_lists(node.read().await.network_knowledge().elders(), elders_1);
 
     Ok(())
 }
@@ -717,7 +704,7 @@ async fn handle_demote_during_split() -> Result<()> {
             .insert(TestKeys::get_section_key_share(&sk_set1, 0));
     }
 
-    let (dispatcher, _) = Dispatcher::new(Arc::new(RwLock::new(node)));
+    let (dispatcher, _) = Dispatcher::new();
 
     let cmd = {
         // Sign the saps.
@@ -734,7 +721,10 @@ async fn handle_demote_during_split() -> Result<()> {
             sig2: TestKeys::get_section_sig_bytes(&sk_set_gen.secret_key(), &bytes1),
         }
     };
-    let mut cmds = ProcessAndInspectCmds::new(cmd, &dispatcher);
+
+    let node = Arc::new(RwLock::new(node));
+
+    let mut cmds = ProcessAndInspectCmds::new(cmd, &dispatcher, node);
 
     let mut update_recipients = BTreeSet::new();
     while let Some(cmd) = cmds.next().await? {
@@ -769,13 +759,13 @@ async fn spentbook_spend_client_message_should_replicate_to_adults_and_send_ack(
     let mut env = TestNetworkBuilder::new(thread_rng())
         .sap(prefix, elder_count(), 6, None, Some(0))
         .build();
-    let dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0);
+    let (dispatcher, node) = env.get_dispatchers_and_nodes(prefix, 1, 0, None).remove(0);
     let sk_set = env.get_secret_key_set(prefix, None);
 
     let (public_key, tx, spent_proofs, spent_transactions) =
         dbc_utils::get_genesis_dbc_spend_info(&sk_set)?;
 
-    let comm_rx = env.take_comm_rx(dispatcher.node().read().await.info().public_key());
+    let comm_rx = env.take_comm_rx(node.info().public_key());
     let mut cmds = ProcessAndInspectCmds::new_from_client_msg(
         ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
             public_key,
@@ -785,6 +775,7 @@ async fn spentbook_spend_client_message_should_replicate_to_adults_and_send_ack(
             network_knowledge: None,
         })),
         &dispatcher,
+        Arc::new(RwLock::new(node)),
         comm_rx,
     )
     .await?;
@@ -833,13 +824,13 @@ async fn spentbook_spend_transaction_with_no_inputs_should_return_spentbook_erro
     let mut env = TestNetworkBuilder::new(thread_rng())
         .sap(prefix, elder_count(), 6, None, Some(0))
         .build();
-    let dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0);
+    let (dispatcher, node) = env.get_dispatchers_and_nodes(prefix, 1, 0, None).remove(0);
     let section = env.get_network_knowledge(prefix, None);
     let sk_set = env.get_secret_key_set(prefix, None);
 
     // These conditions will produce a failure on `tx.verify` in the message handler.
     let sap = section.section_auth();
-    let keys_provider = dispatcher.node().read().await.section_keys_provider.clone();
+    let keys_provider = node.section_keys_provider.clone();
     let genesis_dbc = gen_genesis_dbc(&sk_set, &sk_set.secret_key())?;
     let new_dbc = reissue_dbc(
         &genesis_dbc,
@@ -851,7 +842,7 @@ async fn spentbook_spend_transaction_with_no_inputs_should_return_spentbook_erro
     let new_dbc2_sk = bls::SecretKey::random();
     let new_dbc2 = dbc_utils::reissue_invalid_dbc_with_no_inputs(&new_dbc, 5, &new_dbc2_sk)?;
 
-    let comm_rx = env.take_comm_rx(dispatcher.node().read().await.info().public_key());
+    let comm_rx = env.take_comm_rx(node.info().public_key());
     let mut cmds = ProcessAndInspectCmds::new_from_client_msg(
         ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
             public_key: new_dbc2_sk.public_key(),
@@ -861,6 +852,7 @@ async fn spentbook_spend_transaction_with_no_inputs_should_return_spentbook_erro
             network_knowledge: None,
         })),
         &dispatcher,
+        Arc::new(RwLock::new(node)),
         comm_rx,
     )
     .await?;
@@ -905,35 +897,28 @@ async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node()
         .sap(prefix1, elder_count(), 0, None, Some(0))
         .build();
 
-    let dispatcher = env.get_dispatchers(Prefix::default(), 1, 0, None).remove(0);
-    let info = dispatcher.node().read().await.info();
+    let (dispatcher, mut node) = env
+        .get_dispatchers_and_nodes(Prefix::default(), 1, 0, None)
+        .remove(0);
+    let info = node.info();
     let genesis_sk_set = env.get_secret_key_set(Prefix::default(), None);
 
-    let other_dispatcher = env.get_dispatchers(prefix1, 1, 0, None).remove(0);
-    let other_node_info = other_dispatcher.node().read().await.info();
+    let (_other_dispatcher, other_node) =
+        env.get_dispatchers_and_nodes(prefix1, 1, 0, None).remove(0);
+    let other_node_info = other_node.info();
     let other_section_key_share =
         env.get_section_key_share(prefix1, other_node_info.public_key(), None);
     let other_section = env.get_network_knowledge(prefix1, None);
     let other_section_key = env.get_secret_key_set(prefix1, None);
 
     // At this point, only the genesis key should be in the proof chain on this node.
-    let tree = dispatcher
-        .node()
-        .read()
-        .await
-        .network_knowledge()
-        .section_tree()
-        .clone();
+    let tree = node.network_knowledge().section_tree().clone();
     let proof_chain = tree.get_sections_dag().clone();
     assert_eq!(proof_chain.keys().into_iter().count(), 1);
 
     // The key share also needs to be added to the section keys provider, which is stored
     // on the node.
-    dispatcher
-        .node()
-        .write()
-        .await
-        .section_keys_provider
+    node.section_keys_provider
         .insert(other_section_key_share.clone());
 
     // Reissue a couple of DBC from genesis. They will be reissued using the section keys
@@ -963,6 +948,8 @@ async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node()
     let (public_key, tx) = get_input_dbc_spend_info(&new_dbc2, 2, &bls::SecretKey::random())?;
 
     let comm_rx = env.take_comm_rx(info.public_key());
+    let node = Arc::new(RwLock::new(node));
+
     let mut cmds = ProcessAndInspectCmds::new_from_client_msg(
         ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
             public_key,
@@ -972,6 +959,7 @@ async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node()
             network_knowledge: Some((proof_chain, sap)),
         })),
         &dispatcher,
+        node.clone(),
         comm_rx,
     )
     .await?;
@@ -988,13 +976,7 @@ async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node()
     assert!(found, "UpdateNetworkAndHandleValidClientMsg was not generated to update the node's network knowledge");
 
     // Now the proof chain should have the other section key.
-    let tree = dispatcher
-        .node()
-        .read()
-        .await
-        .network_knowledge()
-        .section_tree()
-        .clone();
+    let tree = node.read().await.network_knowledge().section_tree().clone();
     let proof_chain = tree.get_sections_dag().clone();
     assert_eq!(proof_chain.keys().into_iter().count(), 2);
     let mut proof_chain_iter = proof_chain.keys();

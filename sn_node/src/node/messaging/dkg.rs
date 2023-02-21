@@ -1114,8 +1114,8 @@ mod tests {
             .into_iter()
             .map(|node| {
                 let name = node.name();
-                let (dispatcher, _) = Dispatcher::new(Arc::new(RwLock::new(node)));
-                let dispatcher = TestDispatcher::new(dispatcher, msg_tracker.clone());
+                let (dispatcher, _) = Dispatcher::new();
+                let dispatcher = TestDispatcher::new(node, dispatcher, msg_tracker.clone());
                 (name, dispatcher)
             })
             .collect::<BTreeMap<XorName, TestDispatcher>>();
