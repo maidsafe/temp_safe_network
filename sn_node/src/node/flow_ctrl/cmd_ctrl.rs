@@ -8,7 +8,7 @@
 
 use crate::node::{
     flow_ctrl::{cmds::Cmd, dispatcher::Dispatcher, RejoinReason},
-    Error,
+    Error, MyNode,
 };
 
 use std::sync::{
@@ -35,10 +35,6 @@ impl CmdCtrl {
             dispatcher: Arc::new(dispatcher),
             id_counter: Arc::new(AtomicUsize::new(0)),
         }
-    }
-
-    pub(crate) fn node(&self) -> Arc<RwLock<crate::node::MyNode>> {
-        self.dispatcher.node()
     }
 
     /// Processes the passed in cmd on a new task

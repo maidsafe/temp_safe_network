@@ -81,7 +81,7 @@ impl FlowCtrl {
     /// Constructs a FlowCtrl instance, spawnning a task which starts processing messages,
     /// returning the channel where it can receive commands on
     pub(crate) async fn start(
-        node: Arc<RwLock<MyNode>>
+        node: Arc<RwLock<MyNode>>,
         cmd_ctrl: CmdCtrl,
         incoming_msg_events: Receiver<CommEvent>,
         data_replication_receiver: Receiver<(Vec<DataAddress>, Peer)>,
@@ -135,12 +135,12 @@ impl FlowCtrl {
         let _handle = tokio::task::spawn(async move {
             // Get a stable identifier for statemap naming. This is NOT the node's current name.
             // It's the initial name... but will not change for the entire statemap
-            let node_arc_for_processing = node_arc_for_processing.clone();
+            let the_node = node_arc_for_processing.clone();
             while let Some((cmd, cmd_id)) = incoming_cmds_from_apis.recv().await {
                 trace!("Taking cmd off stack: {cmd:?}");
                 cmd_ctrl
                     .process_cmd_job(
-                        node_arc_for_processing,
+                        the_node.clone(),
                         cmd,
                         cmd_id,
                         node_identifier,
@@ -152,7 +152,6 @@ impl FlowCtrl {
         });
 
         Self::send_out_data_for_replication(
-            node_arc_for_replication,
             node_arc_for_replication,
             node_context.data_storage,
             data_replication_receiver,

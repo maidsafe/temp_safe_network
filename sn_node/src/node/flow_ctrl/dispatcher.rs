@@ -22,7 +22,6 @@ use tokio::sync::{
 
 // Cmd Dispatcher.
 pub(crate) struct Dispatcher {
-    node: Arc<RwLock<MyNode>>,
     data_replication_sender: Sender<(Vec<DataAddress>, Peer)>,
 }
 
@@ -38,7 +37,11 @@ impl Dispatcher {
     }
 
     /// Handles a single cmd.
-    pub(crate) async fn process_cmd(&self, cmd: Cmd, node: Arc<RwLock<MyNode>>) -> Result<Vec<Cmd>> {
+    pub(crate) async fn process_cmd(
+        &self,
+        cmd: Cmd,
+        node: Arc<RwLock<MyNode>>,
+    ) -> Result<Vec<Cmd>> {
         let start = Instant::now();
         let cmd_string = format!("{}", cmd);
         let result = match cmd {
