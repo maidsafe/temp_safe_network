@@ -29,14 +29,13 @@ use std::collections::BTreeSet;
 impl MyNode {
     /// Forms a `CmdError` msg to send back to the client over the response stream
     pub(crate) fn send_cmd_error_response_over_stream(
-        context: NodeContext,
         msg: DataResponse,
         correlation_id: MsgId,
         send_stream: SendStream,
         source_client: Peer,
     ) -> Cmd {
         debug!("{correlation_id:?} sending cmd response error back to client");
-        Cmd::send_data_response(msg, correlation_id, source_client, send_stream, context)
+        Cmd::send_data_response(msg, correlation_id, source_client, send_stream)
     }
 
     /// Handle data query
@@ -65,7 +64,6 @@ impl MyNode {
             msg_id,
             source_client,
             send_stream,
-            context,
         )]
     }
 
@@ -150,7 +148,6 @@ impl MyNode {
                             origin,
                             send_stream,
                             auth,
-                            context: context.clone(),
                         };
                         return Ok(vec![update_command]);
                     }
@@ -159,16 +156,7 @@ impl MyNode {
                 // first we validate it here at the Elder
                 let spent_share = match MyNode::validate_spentbook_cmd(cmd, &context) {
                     Ok(share) => share,
-                    Err(e) => {
-                        return MyNode::send_error(
-                            msg_id,
-                            data_cmd,
-                            e,
-                            context,
-                            send_stream,
-                            origin,
-                        )
-                    }
+                    Err(e) => return MyNode::send_error(msg_id, data_cmd, e, send_stream, origin),
                 };
 
                 // then we forward it to data holders
@@ -187,7 +175,7 @@ impl MyNode {
             Ok(data) => {
                 MyNode::store_data_and_respond(&context, data, send_stream, origin, msg_id).await
             }
-            Err(error) => MyNode::send_error(msg_id, data_cmd, error, context, send_stream, origin),
+            Err(error) => MyNode::send_error(msg_id, data_cmd, error, send_stream, origin),
         }
     }
 
@@ -195,7 +183,6 @@ impl MyNode {
         msg_id: MsgId,
         cmd: DataCmd,
         error: Error,
-        context: NodeContext,
         send_stream: SendStream,
         origin: Peer,
     ) -> Result<Vec<Cmd>> {
@@ -203,13 +190,8 @@ impl MyNode {
             response: cmd.to_error_response(error.into()),
             correlation_id: msg_id,
         };
-        let cmd = MyNode::send_cmd_error_response_over_stream(
-            context,
-            data_response,
-            msg_id,
-            send_stream,
-            origin,
-        );
+        let cmd =
+            MyNode::send_cmd_error_response_over_stream(data_response, msg_id, send_stream, origin);
         Ok(vec![cmd])
     }
 

@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{core::NodeContext, messaging::Peers, XorName};
+use crate::node::{messaging::Peers, XorName};
 
 use qp2p::SendStream;
 use sn_consensus::Decision;
@@ -98,8 +98,6 @@ pub(crate) enum Cmd {
         send_stream: SendStream,
         /// Requester's authority over this message
         auth: AuthorityProof<ClientAuth>,
-        #[debug(skip)]
-        context: NodeContext,
     },
     /// Handle comms error.
     HandleCommsError {
@@ -151,8 +149,6 @@ pub(crate) enum Cmd {
         /// and the section chain truncated from the triggering msg's dst section_key or genesis_key
         /// if the the dst section_key is not a direct ancestor to our section_key
         section_tree_update: SectionTreeUpdate,
-        #[debug(skip)]
-        context: NodeContext,
     },
     UpdateCallerOnStream {
         /// The outdated caller
@@ -169,16 +165,12 @@ pub(crate) enum Cmd {
         correlation_id: MsgId,
         /// The msg stream to the caller.
         stream: SendStream,
-        #[debug(skip)]
-        context: NodeContext,
     },
     /// Performs serialisation and signing and sends the msg.
     SendMsg {
         msg: NetworkMsg,
         msg_id: MsgId,
         recipients: Peers,
-        #[debug(skip)]
-        context: NodeContext,
     },
     /// Performs serialisation and signing and sends the msg over a bidi connection
     /// and then enqueues any response returned.
@@ -186,8 +178,6 @@ pub(crate) enum Cmd {
         msg: NodeMsg,
         msg_id: MsgId,
         recipients: BTreeSet<Peer>,
-        #[debug(skip)]
-        context: NodeContext,
     },
     /// Performs serialisation and sends the response NodeMsg to the peer over the given stream.
     SendNodeMsgResponse {
@@ -196,8 +186,6 @@ pub(crate) enum Cmd {
         correlation_id: MsgId,
         recipient: Peer,
         send_stream: SendStream,
-        #[debug(skip)]
-        context: NodeContext,
     },
     /// Performs serialisation and sends the msg to the client over the given stream.
     SendDataResponse {
@@ -205,16 +193,12 @@ pub(crate) enum Cmd {
         msg_id: MsgId,
         correlation_id: MsgId,
         send_stream: SendStream,
-        #[debug(skip)]
-        context: NodeContext,
         source_client: Peer,
     },
     /// Performs serialisation and sends the msg to the peer node over a new bi-stream,
     /// awaiting for a response which is forwarded to the client.
     SendAndForwardResponseToClient {
         wire_msg: WireMsg,
-        #[debug(skip)]
-        context: NodeContext,
         targets: BTreeSet<Peer>,
         client_stream: SendStream,
         source_client: Peer,
@@ -224,22 +208,17 @@ pub(crate) enum Cmd {
 }
 
 impl Cmd {
-    pub(crate) fn send_msg(msg: NodeMsg, recipients: Peers, context: NodeContext) -> Self {
-        Cmd::send_network_msg(NetworkMsg::Node(msg), recipients, context)
+    pub(crate) fn send_msg(msg: NodeMsg, recipients: Peers) -> Self {
+        Cmd::send_network_msg(NetworkMsg::Node(msg), recipients)
     }
 
-    pub(crate) fn send_network_msg(
-        msg: NetworkMsg,
-        recipients: Peers,
-        context: NodeContext,
-    ) -> Self {
+    pub(crate) fn send_network_msg(msg: NetworkMsg, recipients: Peers) -> Self {
         let msg_id = MsgId::new();
         debug!("Sending msg {msg_id:?} to {recipients:?}: {msg:?}");
         Cmd::SendMsg {
             msg,
             msg_id,
             recipients,
-            context,
         }
     }
 
@@ -248,7 +227,6 @@ impl Cmd {
         correlation_id: MsgId,
         recipient: Peer,
         send_stream: SendStream,
-        context: NodeContext,
     ) -> Self {
         let msg_id = MsgId::new();
         Cmd::SendNodeMsgResponse {
@@ -257,7 +235,6 @@ impl Cmd {
             correlation_id,
             recipient,
             send_stream,
-            context,
         }
     }
 
@@ -266,7 +243,6 @@ impl Cmd {
         correlation_id: MsgId,
         source_client: Peer,
         send_stream: SendStream,
-        context: NodeContext,
     ) -> Self {
         let msg_id = MsgId::new();
         Cmd::SendDataResponse {
@@ -275,7 +251,6 @@ impl Cmd {
             correlation_id,
             source_client,
             send_stream,
-            context,
         }
     }
 
