@@ -12,8 +12,6 @@ pub mod cat;
 pub mod config;
 pub mod dog;
 pub mod files;
-mod files_get;
-mod helpers;
 pub mod keys;
 pub mod networks;
 pub mod node;
@@ -23,6 +21,9 @@ pub mod setup;
 pub mod update;
 pub mod wallet;
 pub mod xorurl;
+
+mod files_get;
+mod helpers;
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub enum OutputFmt {
@@ -76,18 +77,21 @@ pub enum SubCommands {
     )]
     /// Read data on the SAFE Network
     Cat(cat::CatCommands),
+    #[cfg(feature = "data-network")]
     #[clap(
         name = "dog",
         global_settings(&[AppSettings::DisableVersion]),
     )]
     /// Inspect data on the SAFE Network providing only metadata information about the content
     Dog(dog::DogCommands),
+    #[cfg(feature = "data-network")]
     #[clap(name = "files", subcommand, global_settings(&[AppSettings::DisableVersion]))]
     /// Manage files on the SAFE Network
     Files(files::FilesSubCommands),
     #[clap(name = "setup", subcommand, global_settings(&[AppSettings::DisableVersion]))]
     /// Perform setup tasks
     Setup(setup::SetupSubCommands),
+    #[cfg(feature = "data-network")]
     #[clap(name = "nrs", subcommand, global_settings(&[AppSettings::DisableVersion]))]
     /// Manage public names on the SAFE Network
     Nrs(nrs::NrsSubCommands),

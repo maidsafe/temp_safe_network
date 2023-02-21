@@ -7,22 +7,28 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::OutputFmt;
-use ansi_term::Style;
-use color_eyre::{eyre::bail, eyre::eyre, eyre::WrapErr, Result};
-use comfy_table::{Cell, CellAlignment, Table};
-use num_traits::Float;
-use serde::ser::Serialize;
+
+#[cfg(feature = "data-network")]
+use sn_api::nrs::NrsMap;
 use sn_api::{
     files::{FilesMapChange, ProcessedFiles},
     multimap::Multimap,
-    nrs::NrsMap,
     wallet::Dbc,
     Safe, SafeUrl,
 };
+
+#[cfg(feature = "data-network")]
+use ansi_term::Style;
+use color_eyre::{eyre::bail, eyre::eyre, eyre::WrapErr, Result};
+use comfy_table::{Cell, CellAlignment, Table};
+#[cfg(feature = "data-network")]
+use num_traits::Float;
+use serde::ser::Serialize;
 use std::io::{stdin, stdout, Read, Write};
 use tracing::{debug, warn};
 use xor_name::XorName;
 
+#[cfg(feature = "data-network")]
 // Warn the user about a dry-run being performed
 pub fn notice_dry_run() {
     println!("NOTE the operation is being performed in dry-run mode, therefore no changes are committed to the network.");
@@ -199,6 +205,7 @@ pub async fn gen_wallet_table(safe: &Safe, multimap: &Multimap) -> Result<Table>
     Ok(table)
 }
 
+#[cfg(feature = "data-network")]
 // converts "-" to "", both of which mean to read from stdin.
 pub fn parse_stdin_arg(src: &str) -> String {
     if src.is_empty() || src == "-" {
@@ -227,6 +234,7 @@ where
     }
 }
 
+#[cfg(feature = "data-network")]
 pub fn print_nrs_map(nrs_map: &NrsMap) {
     println!("Listing NRS map contents:");
     let summary = nrs_map.get_map_summary();
@@ -235,6 +243,7 @@ pub fn print_nrs_map(nrs_map: &NrsMap) {
     }
 }
 
+#[cfg(feature = "data-network")]
 // returns singular or plural version of string, based on count.
 pub fn pluralize<'a>(singular: &'a str, plural: &'a str, count: u64) -> &'a str {
     if count == 1 {
@@ -244,6 +253,7 @@ pub fn pluralize<'a>(singular: &'a str, plural: &'a str, count: u64) -> &'a str 
     }
 }
 
+#[cfg(feature = "data-network")]
 // if stdout is a TTY, then it returns a string with ansi codes according to
 // style.  Otherwise, it returns the original string.
 pub fn if_tty(s: &str, style: Style) -> String {
@@ -254,6 +264,7 @@ pub fn if_tty(s: &str, style: Style) -> String {
     }
 }
 
+#[cfg(feature = "data-network")]
 pub fn div_or<X: Float>(num: X, den: X, default: X) -> X {
     if (!num.is_normal() && !num.is_zero()) || !den.is_normal() {
         default

@@ -6,18 +6,17 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+#[cfg(feature = "data-network")]
+use crate::subcommands::{dog::dog_commander, files::files_commander, nrs::nrs_commander};
 use crate::{
     operations::auth_and_connect::connect,
     operations::config::{Config, SnLaunchToolNetworkLauncher},
     subcommands::{
         cat::cat_commander,
         config::config_commander,
-        dog::dog_commander,
-        files::files_commander,
         keys::key_commander,
         networks::networks_commander,
         node::node_commander,
-        nrs::nrs_commander,
         setup::setup_commander,
         update::update_commander,
         wallet::wallet_commander,
@@ -167,14 +166,22 @@ async fn process_commands(mut safe: &mut Safe, args: CmdArgs, config: &mut Confi
                 connect(safe, config).await?;
             }
 
-            match other {
+            #[cfg(not(feature = "data-network"))]
+            return match other {
+                SubCommands::Cat(cmd) => cat_commander(cmd, output_fmt, safe).await,
+                SubCommands::Wallet(cmd) => wallet_commander(cmd, output_fmt, safe, config).await,
+                _ => Err(eyre!("Unknown safe subcommand")),
+            };
+
+            #[cfg(feature = "data-network")]
+            return match other {
                 SubCommands::Cat(cmd) => cat_commander(cmd, output_fmt, safe).await,
                 SubCommands::Dog(cmd) => dog_commander(cmd, output_fmt, safe).await,
                 SubCommands::Files(cmd) => files_commander(cmd, output_fmt, safe).await,
                 SubCommands::Nrs(cmd) => nrs_commander(cmd, output_fmt, safe).await,
                 SubCommands::Wallet(cmd) => wallet_commander(cmd, output_fmt, safe, config).await,
                 _ => Err(eyre!("Unknown safe subcommand")),
-            }
+            };
         }
     }
 }
