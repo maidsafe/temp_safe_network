@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1676920998719,
+  "lastUpdate": 1676971617291,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -71572,6 +71572,150 @@ window.BENCHMARK_DATA = {
             "name": "read-sampling/chunk keys/4000",
             "value": 331799827,
             "range": "± 3299613",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "bzeeman@live.nl",
+            "name": "Benno Zeeman",
+            "username": "b-zee"
+          },
+          "committer": {
+            "email": "joshuef@gmail.com",
+            "name": "joshuef",
+            "username": "joshuef"
+          },
+          "distinct": true,
+          "id": "d682cef91723d778501323aef1f03818d0425ee7",
+          "message": "refactor(node): pass public addr in --first\n\nThe genesis node will output a network contact file which contains its\nown address. This public address was specified by a separate flag but\nwas removed, making the genesis incapable of producing a proper contacts\nfile. This changes the `--first` flag to be used to pass in that public\naddress, which should be done for all genesis nodes, so the proper\nexternal address can be advertised.",
+          "timestamp": "2023-02-21T09:31:54+01:00",
+          "tree_id": "940a9c7c9d523410b7de93025cb3f7f715da11da",
+          "url": "https://github.com/maidsafe/safe_network/commit/d682cef91723d778501323aef1f03818d0425ee7"
+        },
+        "date": 1676971615125,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "serialize/serialize for sending",
+            "value": 2201958,
+            "range": "± 14326",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 76787989,
+            "range": "± 880038",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 91488082,
+            "range": "± 2860522",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 404495700,
+            "range": "± 2587069",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 64333286,
+            "range": "± 516771",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 76720391,
+            "range": "± 941499",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 323222123,
+            "range": "± 2312845",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "register-edit-sampling/register_edits/1000",
+            "value": 21783043150,
+            "range": "± 325887612",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/100",
+            "value": 39878922,
+            "range": "± 28952662",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/1000",
+            "value": 2468499918,
+            "range": "± 653630650",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/4000",
+            "value": 10596745997,
+            "range": "± 2502785258",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/100",
+            "value": 141162362,
+            "range": "± 23575519",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/1000",
+            "value": 1404406283,
+            "range": "± 55310883",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/4000",
+            "value": 5393118047,
+            "range": "± 168054661",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/100",
+            "value": 40064025,
+            "range": "± 836839",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/1000",
+            "value": 390255257,
+            "range": "± 1930391",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/4000",
+            "value": 1507328855,
+            "range": "± 8663356",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/100",
+            "value": 10845051,
+            "range": "± 184332",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/1000",
+            "value": 97005048,
+            "range": "± 5753894",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/4000",
+            "value": 339608735,
+            "range": "± 2487991",
             "unit": "ns/iter"
           }
         ]
