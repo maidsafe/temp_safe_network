@@ -330,11 +330,7 @@ mod core {
             let probe = context.network_knowledge.anti_entropy_probe();
             info!("ProbeMsg targets {:?}: {probe:?}", recipients);
 
-            Ok(Cmd::send_network_msg(
-                probe,
-                Peers::Multiple(recipients),
-                context.clone(),
-            ))
+            Ok(Cmd::send_network_msg(probe, Peers::Multiple(recipients)))
         }
 
         /// Generates a AE probe for our section elders
@@ -342,7 +338,7 @@ mod core {
             let elders = context.network_knowledge.elders();
             let probe = context.network_knowledge.anti_entropy_probe();
 
-            Cmd::send_network_msg(probe, Peers::Multiple(elders), context.clone())
+            Cmd::send_network_msg(probe, Peers::Multiple(elders))
         }
 
         /// Generates section infos for the best elder candidate among the members at the given generation
