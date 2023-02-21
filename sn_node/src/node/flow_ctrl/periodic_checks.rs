@@ -354,31 +354,27 @@ impl FlowCtrl {
     fn check_for_missed_dkg_messages(node: &MyNode, sender_channel: CmdChannel) {
         info!("Checking for DKG missed messages");
 
-        // DKG checks can be long running, move off thread to unblock the main loop
-        let _handle = tokio::task::spawn(async move {
-            let dkg_voter = &node.dkg_voter;
+        let dkg_voter = &node.dkg_voter;
+        let last_received_dkg_message = dkg_voter.last_received_dkg_message();
 
-            let last_received_dkg_message = dkg_voter.last_received_dkg_message();
-
-            if let Some(time) = last_received_dkg_message {
-                if time.elapsed() >= MISSING_DKG_MSG_INTERVAL {
-                    let cmds = node.dkg_gossip_msgs();
-                    if !cmds.is_empty() {
-                        debug!("Dkg msg resending cmd, as Dkg voting appears stalled...");
-                    }
-
-                    // move cmd spawn off thread to not block
-                    // let sender_channel = sender_channel.clone();
-                    let _handle = tokio::spawn(async move {
-                        for cmd in cmds {
-                            if let Err(error) = sender_channel.send((cmd, vec![])).await {
-                                error!("Error sending DKG gossip msgs {error:?}");
-                            }
-                        }
-                    });
+        if let Some(time) = last_received_dkg_message {
+            if time.elapsed() >= MISSING_DKG_MSG_INTERVAL {
+                let cmds = node.dkg_gossip_msgs();
+                if !cmds.is_empty() {
+                    debug!("Dkg msg resending cmd, as Dkg voting appears stalled...");
                 }
+
+                // move cmd spawn off thread to not block
+                // let sender_channel = sender_channel.clone();
+                let _handle = tokio::spawn(async move {
+                    for cmd in cmds {
+                        if let Err(error) = sender_channel.send((cmd, vec![])).await {
+                            error!("Error sending DKG gossip msgs {error:?}");
+                        }
+                    }
+                });
             }
-        });
+        }
     }
 
     async fn vote_out_faulty_nodes(&mut self) -> Vec<Cmd> {

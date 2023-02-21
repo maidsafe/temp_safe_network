@@ -39,12 +39,8 @@ impl Dispatcher {
     }
 
     /// Handles a single cmd.
-    pub(crate) async fn process_cmd(
-        &self,
-        cmd: Cmd,
-        node: &mut MyNode,
-        context: NodeContext,
-    ) -> Result<Vec<Cmd>> {
+    pub(crate) async fn process_cmd(&self, cmd: Cmd, node: &mut MyNode) -> Result<Vec<Cmd>> {
+        let context = node.context();
         let start = Instant::now();
         let cmd_string = format!("{}", cmd);
         let result = match cmd {

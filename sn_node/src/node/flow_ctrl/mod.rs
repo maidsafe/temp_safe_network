@@ -234,10 +234,8 @@ impl FlowCtrl {
             // cheeck if we are a member
             if !is_member {
                 // await for join retry time
-                let our_name = latest_context.name;
-                is_member = latest_context
-                    .network_knowledge
-                    .is_section_member(&our_name);
+                let our_name = node.info().name();
+                is_member = node.network_knowledge.is_section_member(&our_name);
 
                 // skip periodics
                 if is_member {

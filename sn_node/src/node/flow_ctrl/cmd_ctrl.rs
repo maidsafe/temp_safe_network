@@ -42,13 +42,12 @@ impl CmdCtrl {
     pub(crate) async fn process_cmd_job(
         &self,
         node: &mut MyNode,
-        // context: NodeContext,
         cmd: Cmd,
         mut id: Vec<usize>,
         cmd_process_api: mpsc::Sender<(Cmd, Vec<usize>)>,
         rejoin_network_sender: mpsc::Sender<RejoinReason>,
     ) {
-        let node_identifier = context.info.name();
+        let node_identifier = node.info().name();
 
         if id.is_empty() {
             id.push(self.id_counter.fetch_add(1, Ordering::SeqCst));
@@ -61,7 +60,7 @@ impl CmdCtrl {
         #[cfg(feature = "statemap")]
         sn_interface::statemap::log_state(node_identifier.to_string(), cmd.statemap_state());
 
-        match dispatcher.process_cmd(cmd, node, context).await {
+        match dispatcher.process_cmd(cmd, node).await {
             Ok(cmds) => {
                 let _handle = tokio::task::spawn(async move {
                     for (child_nr, cmd) in cmds.into_iter().enumerate() {
