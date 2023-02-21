@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1676971617291,
+  "lastUpdate": 1676977767159,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -71716,6 +71716,150 @@ window.BENCHMARK_DATA = {
             "name": "read-sampling/chunk keys/4000",
             "value": 339608735,
             "range": "± 2487991",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "f8a8633b7e7d2e3923e5dfa83028826d34005f57",
+          "message": "Merge #2104\n\n2104: refactor(node): pass public addr in --first r=joshuef a=b-zee\n\nThe genesis node will output a network contact file which contains its own address. This public address was specified by a separate flag but was removed, making the genesis incapable of producing a proper contacts file. This changes the `--first` flag to be used to pass in that public address, which should be done for all genesis nodes, so the proper external address can be advertised.\r\n\r\n\r\nSee https://github.com/maidsafe/sn_launch_tool/pull/136 for relevant changes in the sn_launch_tool after which this PR can be turned into review mode.\r\n<!--\r\nThanks for contributing to the project! We recommend you check out our \"Guide to contributing\" page if you haven't already: https://github.com/maidsafe/QA/blob/master/CONTRIBUTING.md\r\n\r\nWrite your comment below this line: -->\r\n\n\nCo-authored-by: Benno Zeeman <bzeeman@live.nl>",
+          "timestamp": "2023-02-21T09:14:07Z",
+          "tree_id": "940a9c7c9d523410b7de93025cb3f7f715da11da",
+          "url": "https://github.com/maidsafe/safe_network/commit/f8a8633b7e7d2e3923e5dfa83028826d34005f57"
+        },
+        "date": 1676977764310,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "serialize/serialize for sending",
+            "value": 2199399,
+            "range": "± 4868",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 83482173,
+            "range": "± 1733361",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 98808669,
+            "range": "± 3688609",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 405675004,
+            "range": "± 3239683",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 67622402,
+            "range": "± 769997",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 81054015,
+            "range": "± 764851",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 330727630,
+            "range": "± 1128789",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "register-edit-sampling/register_edits/1000",
+            "value": 21876400865,
+            "range": "± 137198499",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/100",
+            "value": 44622828,
+            "range": "± 15991685",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/1000",
+            "value": 2488361587,
+            "range": "± 486648376",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/4000",
+            "value": 10071870071,
+            "range": "± 1709960108",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/100",
+            "value": 185836215,
+            "range": "± 20567980",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/1000",
+            "value": 1738472962,
+            "range": "± 53497525",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/4000",
+            "value": 6992122504,
+            "range": "± 387243683",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/100",
+            "value": 40840121,
+            "range": "± 898917",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/1000",
+            "value": 390224296,
+            "range": "± 2696443",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/4000",
+            "value": 1520037095,
+            "range": "± 7892044",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/100",
+            "value": 10878045,
+            "range": "± 217497",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/1000",
+            "value": 96969485,
+            "range": "± 4137801",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/4000",
+            "value": 337391499,
+            "range": "± 4059378",
             "unit": "ns/iter"
           }
         ]
