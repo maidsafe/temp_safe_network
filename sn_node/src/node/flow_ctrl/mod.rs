@@ -190,6 +190,7 @@ impl FlowCtrl {
             // first do any pending processing
             while let Ok((cmd, cmd_id)) = incoming_cmds_from_apis.try_recv() {
                 trace!("Taking cmd off stack: {cmd:?}");
+                latest_context = node.read().await.context();
                 let may_modify = cmd.may_modify();
                 cmd_ctrl
                     .process_cmd_job(
@@ -204,7 +205,6 @@ impl FlowCtrl {
 
                 // Temp change to update context for each processed cmd
                 // if may_modify {
-                    latest_context = node.read().await.context();
                 // }
             }
 
@@ -264,15 +264,6 @@ impl FlowCtrl {
         error!("Processing loop dead");
     }
 
-    async fn await_join(node: Arc<RwLock<MyNode>>) {
-        let mut is_member = false;
-        while !is_member {
-            let read_only = node.read().await;
-            let our_name = read_only.name();
-            is_member = read_only.network_knowledge.is_section_member(&our_name);
-            tokio::time::sleep(Duration::from_millis(100)).await;
-        }
-    }
 
     /// Listens on data_replication_receiver on a new thread, sorts and batches data, generating SendMsg Cmds
     async fn send_out_data_for_replication(
@@ -327,7 +318,7 @@ impl FlowCtrl {
     ) {
         let _handle = tokio::task::spawn(async move {
             while let Some(event) = incoming_msg_events.recv().await {
-                debug!("CmdEvent received: {event:?}");
+                debug!("CommEvent received: {event:?}");
                 let cmd = match event {
                     CommEvent::Error { peer, error } => Cmd::HandleCommsError { peer, error },
                     CommEvent::Msg(MsgFromPeer {
