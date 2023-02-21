@@ -23,7 +23,10 @@ use sn_interface::{
 use bls::PublicKey as BlsPublicKey;
 use itertools::Itertools;
 use qp2p::SendStream;
-use std::{collections::BTreeSet, sync::{Arc, Mutex}};
+use std::{
+    collections::BTreeSet,
+    sync::{Arc, Mutex},
+};
 use tokio::sync::RwLock;
 use xor_name::XorName;
 
@@ -172,20 +175,14 @@ impl MyNode {
             if should_update {
                 // let mut write_locked_node = node;
                 trace!("[NODE WRITE]: handling AE write gottt...");
-                let updated = node
-                    .network_knowledge
-                    .update_knowledge_if_valid(
-                        section_tree_update,
-                        members,
-                        &starting_context.name,
-                    )?;
+                let updated = node.network_knowledge.update_knowledge_if_valid(
+                    section_tree_update,
+                    members,
+                    &starting_context.name,
+                )?;
                 debug!("net knowledge updated");
                 // always run this, only changes will trigger events
-                cmds.extend(
-                    node
-                        .update_on_section_change(&starting_context)
-                        .await?,
-                );
+                cmds.extend(node.update_on_section_change(&starting_context).await?);
                 trace!("updated for section change");
                 updated
             } else {

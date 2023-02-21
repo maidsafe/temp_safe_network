@@ -163,10 +163,7 @@ impl Dispatcher {
                 msg,
                 origin,
                 send_stream,
-            } => {
-                MyNode::handle_node_msg(node, context, msg_id, msg, origin, send_stream)
-                    .await
-            }
+            } => MyNode::handle_node_msg(node, context, msg_id, msg, origin, send_stream).await,
             Cmd::ProcessClientMsg {
                 msg_id,
                 msg,
@@ -190,14 +187,8 @@ impl Dispatcher {
                 origin,
             } => {
                 trace!("Handling msg: AE from {origin}: {msg_id:?}");
-                MyNode::handle_anti_entropy_msg(
-                    node,
-                    context,
-                    section_tree_update,
-                    kind,
-                    origin,
-                )
-                .await
+                MyNode::handle_anti_entropy_msg(node, context, section_tree_update, kind, origin)
+                    .await
             }
             Cmd::HandleMsg {
                 origin,
@@ -227,11 +218,7 @@ impl Dispatcher {
                 };
                 info!("Network knowledge was updated: {updated}");
 
-                let context = if updated {
-                    node.context()
-                } else {
-                    context
-                };
+                let context = if updated { node.context() } else { context };
 
                 MyNode::handle_client_msg_for_us(context, msg_id, msg, auth, origin, send_stream)
                     .await

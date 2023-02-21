@@ -35,7 +35,12 @@ use sn_interface::{
     types::{log_markers::LogMarker, DataAddress, Peer},
 };
 
-use std::{collections::BTreeSet, net::SocketAddr, sync::Arc, time::{Duration, Instant}};
+use std::{
+    collections::BTreeSet,
+    net::SocketAddr,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 use tokio::sync::{
     mpsc::{self, Receiver, Sender},
     RwLock,
@@ -184,7 +189,7 @@ impl FlowCtrl {
         let mut latest_context = node.context();
         let mut is_member = false;
         let cmd_channel = self.cmd_sender_channel.clone();
-        let mut last_join_attempt = Instant::now() - (join_retry_timeout * 2) ;
+        let mut last_join_attempt = Instant::now() - (join_retry_timeout * 2);
         loop {
             let mut processed = false;
             // debug!("boop");
@@ -213,13 +218,12 @@ impl FlowCtrl {
             // second, check if we've joined... if not fire off cmds for that
             // this must come _after_ clearing the cmd channel
             if !is_member && last_join_attempt.elapsed() > join_retry_timeout {
-
                 last_join_attempt = Instant::now();
 
                 debug!("we're not joined so firing off cmd");
 
                 let cmd_channel_clone = cmd_channel.clone();
-                let _handle =tokio::spawn(async move {
+                let _handle = tokio::spawn(async move {
                     // send the join message...
                     if let Err(error) = cmd_channel_clone
                         .send((Cmd::TryJoinNetwork, vec![]))
@@ -233,20 +237,19 @@ impl FlowCtrl {
                     }
                 });
                 debug!("we'rennot joined cmd is away");
-
             }
 
             // cheeck if we are a member
             if !is_member {
-
                 // await for join retry time
                 // let result =
                 //     tokio::time::timeout(join_retry_timeout, Self::await_join(node.clone())).await;
                 // let read_only = node.read().await;
                 let our_name = latest_context.name;
-                is_member = latest_context.network_knowledge.is_section_member(&our_name);
+                is_member = latest_context
+                    .network_knowledge
+                    .is_section_member(&our_name);
                 // tokio::time::sleep(Duration::from_millis(100)).await;
-
 
                 // skip periodics
                 if is_member {
@@ -255,7 +258,6 @@ impl FlowCtrl {
                     debug!("we joined!!!");
                     // is_member = true;
                 }
-
             }
 
             // lastly perform periodics
@@ -268,7 +270,6 @@ impl FlowCtrl {
 
         error!("Processing loop dead");
     }
-
 
     /// Listens on data_replication_receiver on a new thread, sorts and batches data, generating SendMsg Cmds
     async fn send_out_data_for_replication(

@@ -34,7 +34,7 @@ use sn_interface::{
 use std::collections::BTreeSet;
 
 #[derive(Debug, Clone)]
-pub(crate) enum Peers {
+pub enum Peers {
     Single(Peer),
     Multiple(BTreeSet<Peer>),
 }

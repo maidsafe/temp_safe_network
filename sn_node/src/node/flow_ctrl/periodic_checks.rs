@@ -79,7 +79,10 @@ impl FlowCtrl {
         let context = node.context();
         let mut cmds = vec![];
 
-        cmds.extend(self.enqueue_cmds_for_node_periodic_checks(&context, node).await);
+        cmds.extend(
+            self.enqueue_cmds_for_node_periodic_checks(&context, node)
+                .await,
+        );
         if !context.is_elder {
             // self.enqueue_cmds_for_adult_periodic_checks(&context).await;
         } else {
@@ -93,7 +96,6 @@ impl FlowCtrl {
         let sender_channel = self.cmd_sender_channel.clone();
         let _handle = tokio::spawn(async move {
             for cmd in cmds {
-
                 if let Err(error) = sender_channel.send((cmd, vec![])).await {
                     error!("Error queuing periodic check: {error:?}");
                 }
@@ -102,7 +104,11 @@ impl FlowCtrl {
     }
 
     /// Periodic tasks run for both elders and adults
-    async fn enqueue_cmds_for_node_periodic_checks(&mut self, context: &NodeContext, node: &mut MyNode) -> Vec<Cmd> {
+    async fn enqueue_cmds_for_node_periodic_checks(
+        &mut self,
+        context: &NodeContext,
+        node: &mut MyNode,
+    ) -> Vec<Cmd> {
         let mut cmds = vec![];
 
         // check if we can request for relocation
@@ -352,33 +358,32 @@ impl FlowCtrl {
 
         // DKG checks can be long running, move off thread to unblock the main loop
         // let _handle = tokio::task::spawn(async move {
-            // trace!("[NODE READ]: dkg msg lock attempt");
-            // let node = node.read().await;
-            // trace!("[NODE READ]: dkg msg lock got");
+        // trace!("[NODE READ]: dkg msg lock attempt");
+        // let node = node.read().await;
+        // trace!("[NODE READ]: dkg msg lock got");
 
-            let dkg_voter = &node.dkg_voter;
+        let dkg_voter = &node.dkg_voter;
 
-            let last_received_dkg_message = dkg_voter.last_received_dkg_message();
+        let last_received_dkg_message = dkg_voter.last_received_dkg_message();
 
-            if let Some(time) = last_received_dkg_message {
-                if time.elapsed() >= MISSING_DKG_MSG_INTERVAL {
-                    let cmds = node.dkg_gossip_msgs();
-                    if !cmds.is_empty() {
-                        debug!("Dkg msg resending cmd, as Dkg voting appears stalled...");
-                    }
-
-                    // move cmd spawn off thread to not block
-                    let _handle = tokio::spawn(async {
-                        for cmd in cmds {
-
-                            if let Err(error) = sender_channel.send((cmd, vec![])).await {
-                                error!("Error sending DKG gossip msgs {error:?}");
-                            }
-                        }
-                    });
-
+        if let Some(time) = last_received_dkg_message {
+            if time.elapsed() >= MISSING_DKG_MSG_INTERVAL {
+                let cmds = node.dkg_gossip_msgs();
+                if !cmds.is_empty() {
+                    debug!("Dkg msg resending cmd, as Dkg voting appears stalled...");
                 }
+
+                // move cmd spawn off thread to not block
+                // let sender_channel = sender_channel.clone();
+                let _handle = tokio::spawn(async move {
+                    for cmd in cmds {
+                        if let Err(error) = sender_channel.send((cmd, vec![])).await {
+                            error!("Error sending DKG gossip msgs {error:?}");
+                        }
+                    }
+                });
             }
+        }
         // });
     }
 

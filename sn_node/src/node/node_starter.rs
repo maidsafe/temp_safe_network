@@ -97,7 +97,7 @@ async fn new_node(
 
     let used_space = UsedSpace::new(config.min_capacity(), config.max_capacity());
 
-    let ( cmd_channel, rejoin_network_rx) =
+    let (cmd_channel, rejoin_network_rx) =
         bootstrap_node(config, used_space, root_dir, join_retry_timeout).await?;
 
     {
@@ -137,10 +137,7 @@ async fn bootstrap_node(
     used_space: UsedSpace,
     root_storage_dir: &Path,
     join_retry_timeout: Duration,
-) -> Result<(
-    CmdChannel,
-    mpsc::Receiver<RejoinReason>,
-)> {
+) -> Result<(CmdChannel, mpsc::Receiver<RejoinReason>)> {
     let (fault_cmds_sender, fault_cmds_receiver) =
         mpsc::channel::<FaultsCmd>(STANDARD_CHANNEL_SIZE);
 

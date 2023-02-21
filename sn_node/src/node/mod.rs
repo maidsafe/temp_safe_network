@@ -31,7 +31,7 @@ pub use self::{
     cfg::config_handler::Config,
     error::{Error, Result},
     flow_ctrl::RejoinReason,
-    node_starter::{start_new_node},
+    node_starter::start_new_node,
     // node_starter::{new_test_api, start_new_node},
     node_test_api::NodeTestApi,
 };
