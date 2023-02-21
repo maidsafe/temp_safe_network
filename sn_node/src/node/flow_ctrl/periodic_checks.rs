@@ -365,7 +365,6 @@ impl FlowCtrl {
                 }
 
                 // move cmd spawn off thread to not block
-                // let sender_channel = sender_channel.clone();
                 let _handle = tokio::spawn(async move {
                     for cmd in cmds {
                         if let Err(error) = sender_channel.send((cmd, vec![])).await {
