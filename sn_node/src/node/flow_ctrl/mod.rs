@@ -35,7 +35,7 @@ use sn_interface::{
     types::{log_markers::LogMarker, DataAddress, Peer},
 };
 
-use std::{collections::BTreeSet, net::SocketAddr, sync::Arc, time::Duration};
+use std::{collections::BTreeSet, net::SocketAddr, sync::Arc, time::{Duration, Instant}};
 use tokio::sync::{
     mpsc::{self, Receiver, Sender},
     RwLock,
@@ -184,7 +184,7 @@ impl FlowCtrl {
         let mut latest_context = node.read().await.context();
         let mut is_member = false;
         let cmd_channel = self.cmd_sender_channel.clone();
-
+        let mut last_join_attempt = Instant::now();
         loop {
             // first do any pending processing
             while let Ok((cmd, cmd_id)) = incoming_cmds_from_apis.try_recv() {
@@ -209,7 +209,10 @@ impl FlowCtrl {
 
             // second, check if we've joined... if not fire off cmds for that
             // this must come _after_ clearing the cmd channel
-            if !is_member {
+            if !is_member && last_join_attempt.elapsed() > join_retry_timeout {
+
+                last_join_attempt = Instant::now();
+
                 debug!("we're not joined so firing off cmd");
 
                 let cmd_channel_clone = cmd_channel.clone();
@@ -228,13 +231,18 @@ impl FlowCtrl {
                 });
                 debug!("we'rennot joined cmd is away");
 
+            }
+
+            // cheeck if we are a member
+            if !is_member {
+
                 // await for join retry time
                 // let result =
                 //     tokio::time::timeout(join_retry_timeout, Self::await_join(node.clone())).await;
                 // let read_only = node.read().await;
                 let our_name = latest_context.name;
                 is_member = latest_context.network_knowledge.is_section_member(&our_name);
-                tokio::time::sleep(join_retry_timeout).await;
+                tokio::time::sleep(Duration::from_millis(100)).await;
 
 
                 // skip periodics
