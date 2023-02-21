@@ -184,8 +184,9 @@ impl FlowCtrl {
         let mut latest_context = node.read().await.context();
         let mut is_member = false;
         let cmd_channel = self.cmd_sender_channel.clone();
-        let mut last_join_attempt = Instant::now();
+        let mut last_join_attempt = Instant::now() - (join_retry_timeout * 2) ;
         loop {
+            // debug!("boop");
             // first do any pending processing
             while let Ok((cmd, cmd_id)) = incoming_cmds_from_apis.try_recv() {
                 trace!("Taking cmd off stack: {cmd:?}");
@@ -202,9 +203,9 @@ impl FlowCtrl {
                     .await;
 
                 // Temp change to update context for each processed cmd
-                if may_modify {
+                // if may_modify {
                     latest_context = node.read().await.context();
-                }
+                // }
             }
 
             // second, check if we've joined... if not fire off cmds for that
@@ -242,17 +243,17 @@ impl FlowCtrl {
                 // let read_only = node.read().await;
                 let our_name = latest_context.name;
                 is_member = latest_context.network_knowledge.is_section_member(&our_name);
-                tokio::time::sleep(Duration::from_millis(100)).await;
+                // tokio::time::sleep(Duration::from_millis(100)).await;
 
 
                 // skip periodics
-                if !is_member {
-                    error!("Join not accepted in. Will try and join again.");
-                    continue;
+                if is_member {
+                    // error!("Join not accepted in. Will try and join again.");
+                    // continue;
+                    debug!("we joined!!!");
+                    // is_member = true;
                 }
 
-                debug!("we joined!!!");
-                is_member = true;
             }
 
             // lastly perform periodics
