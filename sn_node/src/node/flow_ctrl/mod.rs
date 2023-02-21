@@ -190,6 +190,7 @@ impl FlowCtrl {
             // first do any pending processing
             while let Some((cmd, cmd_id)) = incoming_cmds_from_apis.recv().await {
                 trace!("Taking cmd off stack: {cmd:?}");
+                let may_modify = cmd.may_modify();
                 cmd_ctrl
                     .process_cmd_job(
                         node.clone(),
@@ -199,7 +200,12 @@ impl FlowCtrl {
                         cmd_channel.clone(),
                         rejoin_network_tx.clone(),
                     )
-                    .await
+                    .await;
+
+                // Temp change to update context for each processed cmd
+                if may_modify {
+                    latest_context = node.read().await.context();
+                }
             }
 
             self.perform_periodic_checks(node.clone()).await;
