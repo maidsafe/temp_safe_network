@@ -79,10 +79,7 @@ impl FlowCtrl {
         let context = node.read().await.context();
         let mut cmds = vec![];
 
-        cmds.extend(
-            self.enqueue_cmds_for_node_periodic_checks(&context, node.clone())
-                .await,
-        );
+        cmds.extend(self.enqueue_cmds_for_node_periodic_checks(&context).await);
         if !context.is_elder {
             // self.enqueue_cmds_for_adult_periodic_checks(&context).await;
         } else {
@@ -100,11 +97,7 @@ impl FlowCtrl {
     }
 
     /// Periodic tasks run for both elders and adults
-    async fn enqueue_cmds_for_node_periodic_checks(
-        &mut self,
-        context: &NodeContext,
-        node: Arc<RwLock<MyNode>>,
-    ) -> Vec<Cmd> {
+    async fn enqueue_cmds_for_node_periodic_checks(&mut self, context: &NodeContext) -> Vec<Cmd> {
         let mut cmds = vec![];
 
         // check if we can request for relocation

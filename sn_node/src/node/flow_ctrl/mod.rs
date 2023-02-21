@@ -23,9 +23,9 @@ use crate::node::{
     flow_ctrl::{
         cmds::Cmd,
         fault_detection::{FaultChannels, FaultsCmd},
-    },Error,
+    },
     messaging::Peers,
-    MyNode, STANDARD_CHANNEL_SIZE,
+    Error, MyNode, STANDARD_CHANNEL_SIZE,
 };
 
 use sn_comms::{CommEvent, MsgFromPeer};
@@ -170,6 +170,16 @@ impl FlowCtrl {
         (cmd_sender_channel, rejoin_network_rx)
     }
 
+    fn get_cmds(incoming_cmds_from_apis: Receiver<(Cmd, Vec<usize>)>) -> Option<(Cmd, Vec<usize>)> {
+        match incoming_cmds_from_apis.try_recv() {
+            Ok(cmd) => Some(cmd),
+            Err(e) => {
+                // nothing atm
+                None
+            }
+        }
+    }
+
     /// This is a never ending loop as long as the node is live.
     /// This loop drives the periodic events internal to the node.
     async fn process_cmds_and_periodic_checks(
@@ -187,7 +197,7 @@ impl FlowCtrl {
 
         loop {
             // first do any pending processing
-            while let Some((cmd, cmd_id)) = incoming_cmds_from_apis.recv().await {
+            while let Some((cmd, cmd_id)) = Self::get_cmds(incoming_cmds_from_apis) {
                 trace!("Taking cmd off stack: {cmd:?}");
                 let may_modify = cmd.may_modify();
                 cmd_ctrl
@@ -207,27 +217,30 @@ impl FlowCtrl {
                 }
             }
 
-
             // second, check if we've joined... if not fire off cmds for that
             // this must come _after_ clearing the cmd channel
             if !we_joined {
+                debug!("we'rennot joined so firing off cmd");
                 // send the join message...
-                   if let Err(error) = cmd_channel
-                   .send((Cmd::TryJoinNetwork, vec![]))
-                   .await
-                   .map_err(|e| {
-                       error!("Failed join: {:?}", e);
-                       Error::JoinTimeout
-                   }) {
+                if let Err(error) = cmd_channel
+                    .send((Cmd::TryJoinNetwork, vec![]))
+                    .await
+                    .map_err(|e| {
+                        error!("Failed join: {:?}", e);
+                        Error::JoinTimeout
+                    })
+                {
                     error!("Could not joing the network: {error:?}");
 
                     break;
-                   }
+                }
+                debug!("we'rennot joined cmd is away");
 
-               // await for join retry time
-               let result = tokio::time::timeout(join_retry_timeout, Self::await_join(node.clone())).await;
+                // await for join retry time
+                let result =
+                    tokio::time::timeout(join_retry_timeout, Self::await_join(node.clone())).await;
 
-               if result.is_err() {
+                if result.is_err() {
                     error!("Join not accepted in {join_retry_timeout:?}. Will try and join again. Error was: {:?}", result);
                     continue;
                 }
@@ -236,11 +249,12 @@ impl FlowCtrl {
                 we_joined = true;
             }
 
-
             // lastly perform periodics
             self.perform_periodic_checks(node.clone()).await;
             tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
         }
+
+        error!("Processing loop dead");
     }
 
     async fn await_join(node: Arc<RwLock<MyNode>>) {
@@ -252,7 +266,6 @@ impl FlowCtrl {
             tokio::time::sleep(Duration::from_millis(100)).await;
         }
     }
-
 
     /// Listens on data_replication_receiver on a new thread, sorts and batches data, generating SendMsg Cmds
     async fn send_out_data_for_replication(
