@@ -178,6 +178,26 @@ impl Dispatcher {
                 MyNode::handle_node_msg(node.clone(), context, msg_id, msg, origin, send_stream)
                     .await
             }
+            Cmd::ProcessClientMsg {
+                msg_id,
+                msg,
+                auth,
+                origin,
+                send_stream,
+            } => {
+                // MyNode::handle_node_msg(node.clone(), context, msg_id, msg, origin, send_stream)
+                //     .await
+                // NetworkMsg::Client { msg, auth, .. } => {
+                    trace!("Client msg {msg_id:?} reached its destination.");
+
+                    // TODO: clarify this err w/ peer
+                    let Some(stream) = send_stream else {
+                        error!("No stream for client tho....");
+                        return Err(Error::NoClientResponseStream);
+                    };
+                    MyNode::handle_client_msg_for_us(context, msg_id, msg, auth, origin, stream).await
+                // }
+            }
             Cmd::ProcessAeMsg {
                 msg_id,
                 kind,

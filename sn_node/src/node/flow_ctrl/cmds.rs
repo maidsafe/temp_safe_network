@@ -65,6 +65,14 @@ pub(crate) enum Cmd {
         origin: Peer,
         send_stream: Option<SendStream>,
     },
+    /// Process a deserialised client msg (after AE checks etc)
+    ProcessClientMsg {
+        msg_id: MsgId,
+        msg: ClientMsg,
+        auth: AuthorityProof<ClientAuth>,
+        origin: Peer,
+        send_stream: Option<SendStream>,
+    },
     /// Process a deserialised AntiEntropy msg
     ProcessAeMsg {
         msg_id: MsgId,
@@ -286,6 +294,7 @@ impl Cmd {
             | Cmd::HandleCommsError { .. } => State::Comms,
             Cmd::HandleMsg { .. } => State::HandleMsg,
             Cmd::ProcessNodeMsg { .. } => State::HandleMsg,
+            Cmd::ProcessClientMsg { .. } => State::HandleMsg,
             Cmd::ProcessAeMsg { .. } => State::HandleMsg,
             Cmd::UpdateNetworkAndHandleValidClientMsg { .. } => State::ClientMsg,
             Cmd::TrackNodeIssue { .. } => State::FaultDetection,
@@ -346,6 +355,9 @@ impl fmt::Display for Cmd {
             }
             Cmd::ProcessNodeMsg { msg_id, .. } => {
                 write!(f, "ProcessNodeMsg {:?}", msg_id)
+            }
+            Cmd::ProcessClientMsg { msg_id, .. } => {
+                write!(f, "ProcessClientMsg {:?}", msg_id)
             }
             Cmd::ProcessAeMsg { msg_id, .. } => {
                 write!(f, "ProcessAeMsg {:?}", msg_id)
