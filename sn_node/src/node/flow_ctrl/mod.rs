@@ -23,7 +23,7 @@ use crate::node::{
     flow_ctrl::{
         cmds::Cmd,
         fault_detection::{FaultChannels, FaultsCmd},
-    },
+    },Error,
     messaging::Peers,
     MyNode, STANDARD_CHANNEL_SIZE,
 };
@@ -35,7 +35,7 @@ use sn_interface::{
     types::{log_markers::LogMarker, DataAddress, Peer},
 };
 
-use std::{collections::BTreeSet, net::SocketAddr, sync::Arc};
+use std::{collections::BTreeSet, net::SocketAddr, sync::Arc, time::Duration};
 use tokio::sync::{
     mpsc::{self, Receiver, Sender},
     RwLock,
@@ -83,6 +83,7 @@ impl FlowCtrl {
     pub(crate) async fn start(
         node: Arc<RwLock<MyNode>>,
         cmd_ctrl: CmdCtrl,
+        join_retry_timeout: Duration,
         incoming_msg_events: Receiver<CommEvent>,
         data_replication_receiver: Receiver<(Vec<DataAddress>, Peer)>,
         fault_cmds_channels: (Sender<FaultsCmd>, Receiver<FaultsCmd>),
@@ -127,6 +128,7 @@ impl FlowCtrl {
         let _handle = tokio::task::spawn(flow_ctrl.process_cmds_and_periodic_checks(
             node_arc_for_periodics,
             cmd_ctrl,
+            join_retry_timeout,
             incoming_cmds_from_apis,
             rejoin_network_tx,
         ));
@@ -174,19 +176,16 @@ impl FlowCtrl {
         mut self,
         node: Arc<RwLock<MyNode>>,
         cmd_ctrl: CmdCtrl,
+        join_retry_timeout: Duration,
         mut incoming_cmds_from_apis: Receiver<(Cmd, Vec<usize>)>,
         rejoin_network_tx: Sender<RejoinReason>,
     ) {
         // starting context
         let mut latest_context = node.read().await.context();
-        // let cmd_ctrl = self.
-        // the internal process loop
-
+        let mut we_joined = false;
         let cmd_channel = self.cmd_sender_channel.clone();
 
         loop {
-            // let the_node = node_arc_for_processing.clone();
-
             // first do any pending processing
             while let Some((cmd, cmd_id)) = incoming_cmds_from_apis.recv().await {
                 trace!("Taking cmd off stack: {cmd:?}");
@@ -208,10 +207,52 @@ impl FlowCtrl {
                 }
             }
 
+
+            // second, check if we've joined... if not fire off cmds for that
+            // this must come _after_ clearing the cmd channel
+            if !we_joined {
+                // send the join message...
+                   if let Err(error) = cmd_channel
+                   .send((Cmd::TryJoinNetwork, vec![]))
+                   .await
+                   .map_err(|e| {
+                       error!("Failed join: {:?}", e);
+                       Error::JoinTimeout
+                   }) {
+                    error!("Could not joing the network: {error:?}");
+
+                    break;
+                   }
+
+               // await for join retry time
+               let result = tokio::time::timeout(join_retry_timeout, Self::await_join(node.clone())).await;
+
+               if result.is_err() {
+                    error!("Join not accepted in {join_retry_timeout:?}. Will try and join again. Error was: {:?}", result);
+                    continue;
+                }
+
+                debug!("we joined!!!");
+                we_joined = true;
+            }
+
+
+            // lastly perform periodics
             self.perform_periodic_checks(node.clone()).await;
             tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
         }
     }
+
+    async fn await_join(node: Arc<RwLock<MyNode>>) {
+        let mut is_member = false;
+        while !is_member {
+            let read_only = node.read().await;
+            let our_name = read_only.name();
+            is_member = read_only.network_knowledge.is_section_member(&our_name);
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+    }
+
 
     /// Listens on data_replication_receiver on a new thread, sorts and batches data, generating SendMsg Cmds
     async fn send_out_data_for_replication(

@@ -173,48 +173,49 @@ async fn bootstrap_node(
     let (cmd_channel, rejoin_network_rx) = FlowCtrl::start(
         node.clone(),
         cmd_ctrl,
+        join_retry_timeout,
         incoming_msg_receiver,
         data_replication_receiver,
         (fault_cmds_sender, fault_cmds_receiver),
     )
     .await;
 
-    // keep trying to join as this node
-    loop {
-        // send the join message...
-        cmd_channel
-            .send((Cmd::TryJoinNetwork, vec![]))
-            .await
-            .map_err(|e| {
-                error!("Failed join: {:?}", e);
-                Error::JoinTimeout
-            })?;
+    // // keep trying to join as this node
+    // loop {
+    //     // send the join message...
+    //     cmd_channel
+    //         .send((Cmd::TryJoinNetwork, vec![]))
+    //         .await
+    //         .map_err(|e| {
+    //             error!("Failed join: {:?}", e);
+    //             Error::JoinTimeout
+    //         })?;
 
-        // await for join retry time
-        let result = tokio::time::timeout(join_retry_timeout, await_join(node.clone())).await;
+    //     // await for join retry time
+    //     let result = tokio::time::timeout(join_retry_timeout, await_join(node.clone())).await;
 
-        if result.is_err() {
-            error!("Join not accepted in {join_retry_timeout:?}. Will try and join again. Error was: {:?}", result);
-            continue;
-        } else {
-            break;
-        }
-    }
+    //     if result.is_err() {
+    //         error!("Join not accepted in {join_retry_timeout:?}. Will try and join again. Error was: {:?}", result);
+    //         continue;
+    //     } else {
+    //         break;
+    //     }
+    // }
 
     info!("Node {:?} join has been accepted.", node_name);
 
     Ok((node, cmd_channel, rejoin_network_rx))
 }
 
-async fn await_join(node: Arc<RwLock<MyNode>>) {
-    let mut is_member = false;
-    while !is_member {
-        let read_only = node.read().await;
-        let our_name = read_only.name();
-        is_member = read_only.network_knowledge.is_section_member(&our_name);
-        tokio::time::sleep(Duration::from_millis(100)).await;
-    }
-}
+// async fn await_join(node: Arc<RwLock<MyNode>>) {
+//     let mut is_member = false;
+//     while !is_member {
+//         let read_only = node.read().await;
+//         let our_name = read_only.name();
+//         is_member = read_only.network_knowledge.is_section_member(&our_name);
+//         tokio::time::sleep(Duration::from_millis(100)).await;
+//     }
+// }
 
 async fn start_genesis_node(
     comm: Comm,
