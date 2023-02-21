@@ -242,7 +242,7 @@ mod tests {
         let env = TestNetworkBuilder::new(rand::thread_rng())
             .sap(prefix, elder_count(), adults, None, None)
             .build();
-        let dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0);
+        let (dispatcher, mut node) = env.get_dispatchers_and_nodes(prefix, 1, 0, None).remove(0);
         let mut section = env.get_network_knowledge(prefix, None);
         let sk_set = env.get_secret_key_set(prefix, None);
 
@@ -251,12 +251,16 @@ mod tests {
         let node_state = TestKeys::get_section_signed(&sk_set.secret_key(), node_state);
         assert!(section.update_member(node_state));
         // update our node with the new network_knowledge
-        dispatcher.node().write().await.network_knowledge = section.clone();
+        node.network_knowledge = section.clone();
 
         let membership_decision = create_relocation_trigger(&sk_set, relocated_peer.age());
+
+        let node = Arc::new(RwLock::new(node));
+
         let mut cmds = ProcessAndInspectCmds::new(
             Cmd::HandleMembershipDecision(membership_decision),
             &dispatcher,
+            node,
         );
 
         let mut trigger_is_sent = false;
@@ -296,8 +300,9 @@ mod tests {
             .map(|node| {
                 let prefix = node.network_knowledge().prefix();
                 let name = node.name();
-                let (dispatcher, _) = Dispatcher::new(Arc::new(RwLock::new(node)));
-                let dispatcher = Arc::new(TestDispatcher::new(dispatcher, msg_tracker.clone()));
+                let (dispatcher, _) = Dispatcher::new();
+                let dispatcher =
+                    Arc::new(TestDispatcher::new(node, dispatcher, msg_tracker.clone()));
                 ((prefix, name), dispatcher)
             })
             .collect::<BTreeMap<(Prefix, XorName), Arc<TestDispatcher>>>();
@@ -413,14 +418,15 @@ mod tests {
                         .update_the_section_tree(st_update_0.clone())
                         .expect("Section tree update failed");
                 }
-                let (dispatcher, _) = Dispatcher::new(Arc::new(RwLock::new(node)));
-                let dispatcher = Arc::new(TestDispatcher::new(dispatcher, msg_tracker.clone()));
+                let (dispatcher, _) = Dispatcher::new();
+                let dispatcher =
+                    Arc::new(TestDispatcher::new(node, dispatcher, msg_tracker.clone()));
                 ((prefix, name), dispatcher)
             })
             .collect::<BTreeMap<(Prefix, XorName), Arc<TestDispatcher>>>();
         let mut comm_receivers = BTreeMap::new();
-        for (name, node) in node_instances.iter() {
-            let pk = node.node().read().await.info().public_key();
+        for (name, dispatcher) in node_instances.iter() {
+            let pk = dispatcher.node().read().await.info().public_key();
             let comm = env.take_comm_rx(pk);
             let _ = comm_receivers.insert(*name, comm);
         }

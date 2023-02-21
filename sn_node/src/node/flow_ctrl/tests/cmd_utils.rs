@@ -40,6 +40,7 @@ pub(crate) async fn handle_online_cmd(
     peer: &Peer,
     sk_set: &bls::SecretKeySet,
     dispatcher: &Dispatcher,
+    node: Arc<RwLock<MyNode>>,
 ) -> Result<JoinApprovalSent> {
     let node_state = NodeState::joined(*peer, None);
     let membership_decision = section_decision(sk_set, node_state);
@@ -47,6 +48,7 @@ pub(crate) async fn handle_online_cmd(
     let mut all_cmds = ProcessAndInspectCmds::new(
         Cmd::HandleMembershipDecision(membership_decision),
         dispatcher,
+        node,
     );
 
     let mut approval_sent = JoinApprovalSent(false);
@@ -82,19 +84,21 @@ pub(crate) struct ProcessAndInspectCmds<'a> {
     pending_cmds: VecDeque<Cmd>,
     index_inspected: usize,
     dispatcher: &'a Dispatcher,
+    node: Arc<RwLock<MyNode>>,
 }
 
 impl<'a> ProcessAndInspectCmds<'a> {
-    pub(crate) fn new(cmd: Cmd, dispatcher: &'a Dispatcher) -> Self {
-        Self::from(vec![cmd], dispatcher)
+    pub(crate) fn new(cmd: Cmd, dispatcher: &'a Dispatcher, node: Arc<RwLock<MyNode>>) -> Self {
+        Self::from(vec![cmd], dispatcher, node)
     }
 
-    fn from(cmds: Vec<Cmd>, dispatcher: &'a Dispatcher) -> Self {
+    fn from(cmds: Vec<Cmd>, dispatcher: &'a Dispatcher, node: Arc<RwLock<MyNode>>) -> Self {
         // We initialise `index_inspected` with MAX value, it will wraparound to 0 upon the first
         // call to `next()` method, thus making sure the first cmd is inspected in first iteration.
         let index_inspected = usize::MAX;
 
         Self {
+            node,
             pending_cmds: VecDeque::from(cmds),
             index_inspected,
             dispatcher,
@@ -109,9 +113,10 @@ impl<'a> ProcessAndInspectCmds<'a> {
     pub(crate) async fn new_from_client_msg(
         msg: ClientMsg,
         dispatcher: &'a Dispatcher,
+        node: Arc<RwLock<MyNode>>,
         mut comm_rx: Receiver<CommEvent>,
     ) -> crate::node::error::Result<ProcessAndInspectCmds> {
-        let context = dispatcher.node().read().await.context();
+        let context = node.read().await.context();
         let (msg_id, serialised_payload, msg_kind, _auth) =
             get_client_msg_parts_for_handling(&msg)?;
 
@@ -153,9 +158,9 @@ impl<'a> ProcessAndInspectCmds<'a> {
                 send_stream: Some(send_stream),
                 ..
             })) => {
-                let cmds = MyNode::handle_msg(dispatcher.node(), peer, wire_msg, Some(send_stream))
-                    .await?;
-                Ok(Self::from(cmds, dispatcher))
+                let cmds =
+                    MyNode::handle_msg(node.clone(), peer, wire_msg, Some(send_stream)).await?;
+                Ok(Self::from(cmds, dispatcher, node))
             }
             _ => Err(crate::node::error::Error::NoClientResponseStream),
         }
@@ -178,7 +183,7 @@ impl<'a> ProcessAndInspectCmds<'a> {
                     | Cmd::SendDataResponse { .. }
                     | Cmd::SendAndForwardResponseToClient { .. }
             ) {
-                let new_cmds = self.dispatcher.process_cmd(cmd).await?;
+                let new_cmds = self.dispatcher.process_cmd(cmd, self.node.clone()).await?;
                 self.pending_cmds.extend(new_cmds);
 
                 if next_index < self.pending_cmds.len() {
@@ -221,28 +226,34 @@ pub(crate) fn get_client_msg_parts_for_handling(
 /// NodeMsgs during tests
 pub(crate) struct TestDispatcher {
     pub(crate) dispatcher: Arc<Dispatcher>,
+    pub(crate) node: Arc<RwLock<MyNode>>,
     pub(crate) msg_tracker: Arc<RwLock<TestMsgTracker>>,
 }
 
 impl TestDispatcher {
-    pub(crate) fn new(dispatcher: Dispatcher, msg_tracker: Arc<RwLock<TestMsgTracker>>) -> Self {
+    pub(crate) fn new(
+        node: MyNode,
+        dispatcher: Dispatcher,
+        msg_tracker: Arc<RwLock<TestMsgTracker>>,
+    ) -> Self {
         Self {
+            node: Arc::new(RwLock::new(node)),
             dispatcher: Arc::new(dispatcher),
             msg_tracker,
         }
-    }
-
-    pub(crate) fn node(&self) -> Arc<RwLock<MyNode>> {
-        self.dispatcher.node()
     }
 
     /// Tracks the cmds before executing them
     pub(crate) async fn process_cmd(&self, cmd: Cmd) -> Result<Vec<Cmd>> {
         self.msg_tracker.write().await.track(&cmd);
         self.dispatcher
-            .process_cmd(cmd)
+            .process_cmd(cmd, self.node.clone())
             .await
             .wrap_err("Failed to process {cmd}")
+    }
+
+    pub(crate) fn node(&self) -> Arc<RwLock<MyNode>> {
+        self.node.clone()
     }
 
     /// Handle and keep track of Msg from Peers
@@ -259,7 +270,7 @@ impl TestDispatcher {
         if let Some(old_name) = relocation_old_name {
             untracked = untracked || self.msg_tracker.write().await.untrack(msg_id, &old_name);
         }
-        let our_name = self.dispatcher.node().read().await.name();
+        let our_name = self.node().read().await.name();
         untracked = untracked || self.msg_tracker.write().await.untrack(msg_id, &our_name);
         assert!(untracked);
 
@@ -269,7 +280,7 @@ impl TestDispatcher {
             send_stream: msg.send_stream,
         };
         self.dispatcher
-            .process_cmd(handle_node_msg_cmd)
+            .process_cmd(handle_node_msg_cmd, self.node())
             .await
             .expect("Error while handling node msg")
     }

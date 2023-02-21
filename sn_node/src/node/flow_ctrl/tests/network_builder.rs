@@ -24,14 +24,10 @@ use std::{
     collections::{btree_map::Entry, BTreeMap, BTreeSet},
     iter,
     net::{Ipv4Addr, SocketAddr},
-    sync::Arc,
 };
 use tokio::{
     runtime::Handle,
-    sync::{
-        mpsc::{self, Receiver},
-        RwLock,
-    },
+    sync::mpsc::{self, Receiver},
 };
 use xor_name::Prefix;
 
@@ -607,18 +603,18 @@ impl TestNetwork {
     ///
     /// If the Prefix contains multiple churn events (multiple SAPs), provide the churn_idx to get a specific
     /// SAP, else the latest SAP for the prefix is used.
-    pub(crate) fn get_dispatchers(
+    pub(crate) fn get_dispatchers_and_nodes(
         &self,
         prefix: Prefix,
         elder_count: usize,
         adult_count: usize,
         churn_idx: Option<usize>,
-    ) -> Vec<Dispatcher> {
+    ) -> Vec<(Dispatcher, MyNode)> {
         self.get_nodes(prefix, elder_count, adult_count, churn_idx)
             .into_iter()
             .map(|node| {
-                let (dispatcher, _) = Dispatcher::new(Arc::new(RwLock::new(node)));
-                dispatcher
+                let (dispatcher, _) = Dispatcher::new();
+                (dispatcher, node)
             })
             .collect()
     }
