@@ -1125,9 +1125,9 @@ dependencies = [
 
 [[package]]
 name = "curl-sys"
-version = "0.4.59+curl-7.86.0"
+version = "0.4.60+curl-7.88.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6cfce34829f448b08f55b7db6d0009e23e2e86a34e8c2b366269bf5799b4a407"
+checksum = "717abe2cb465a5da6ce06617388a3980c9a2844196734bec8ccb8e575250f13f"
 dependencies = [
  "cc",
  "libc",
@@ -3112,9 +3112,9 @@ dependencies = [
 
 [[package]]
 name = "qp2p"
-version = "0.36.1"
+version = "0.36.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9de0c18272c3e765c7fa2b94b50091cc12466f2b8d877e6b6af1ebbaa364fc3a"
+checksum = "9ead603d74cd4e173f642f0afe647e2fe4fa761f35ec2e688e528ca3233795c6"
 dependencies = [
  "bincode",
  "bytes",
