@@ -134,13 +134,15 @@ impl FlowCtrl {
             // It's the initial name... but will not change for the entire statemap
             while let Some((cmd, cmd_id)) = incoming_cmds_from_apis.recv().await {
                 trace!("Taking cmd off stack: {cmd:?}");
-                cmd_ctrl.process_cmd_job(
-                    cmd,
-                    cmd_id,
-                    node_identifier,
-                    cmd_channel.clone(),
-                    rejoin_network_tx.clone(),
-                )
+                cmd_ctrl
+                    .process_cmd_job(
+                        cmd,
+                        cmd_id,
+                        node_identifier,
+                        cmd_channel.clone(),
+                        rejoin_network_tx.clone(),
+                    )
+                    .await
             }
         });
 
