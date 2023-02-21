@@ -201,11 +201,12 @@ jobs:
       - name: Start the network
         run: ./artifacts/testnet --interval 30000
         env:
-          RUST_LOG: "sn_node,sn_comms,sn_consensus,sn_fault_detection=trace,sn_interface=trace"
+          RUST_LOG: "sn_node,sn_comms,sn_consensus,sn_fault_detection, sn_interface=trace"
+          NODE_COUNT: 35
 
-      - name: Wait for all nodes to join
+      - name: Wait for section split
         shell: bash
-        run: ./resources/scripts/wait_for_nodes_to_join.sh
+        run: ./resources/scripts/wait_for_section_split.sh
         timeout-minutes: 5
 
       - name: Check we have expected elders
@@ -238,6 +239,10 @@ jobs:
         shell: bash
         # we just want to print out the info. If there is none, an exit code of 1 is returned, so here we return true
         run: rg "Membership - decided" $HOME/.safe/node/local-test-network | rg Left || true
+
+      - name: Restore NODE_COUNT environment variable
+        env:
+          NODE_COUNT: 15
 
       - name: Are nodes still running...?
         shell: bash

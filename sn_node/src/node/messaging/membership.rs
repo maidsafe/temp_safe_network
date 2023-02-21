@@ -274,7 +274,7 @@ impl MyNode {
     }
 
     pub(crate) fn is_startup_joining_allowed(&self) -> bool {
-        const TEMP_SECTION_LIMIT: usize = 20;
+        const TEMP_SECTION_LIMIT: usize = 35;
 
         let is_first_section = self.network_knowledge.prefix().is_empty();
         let members_count = self.network_knowledge.members().len();
