@@ -23,7 +23,7 @@ mod signature;
 mod streams;
 mod update_section;
 
-use crate::node::{flow_ctrl::cmds::Cmd, Error, MyNode, Result};
+use crate::node::{core::NodeContext, flow_ctrl::cmds::Cmd, Error, MyNode, Result};
 
 use qp2p::SendStream;
 use sn_interface::{
@@ -31,8 +31,7 @@ use sn_interface::{
     types::{log_markers::LogMarker, Peer},
 };
 
-use std::{collections::BTreeSet, sync::Arc};
-use tokio::sync::RwLock;
+use std::collections::BTreeSet;
 
 #[derive(Debug, Clone)]
 pub(crate) enum Peers {
@@ -65,9 +64,9 @@ impl IntoIterator for Peers {
 
 // Message handling
 impl MyNode {
-    #[instrument(skip(node, wire_msg, send_stream))]
+    #[instrument(skip(wire_msg, send_stream))]
     pub(crate) async fn handle_msg(
-        node: Arc<RwLock<MyNode>>,
+        context: NodeContext,
         origin: Peer,
         wire_msg: WireMsg,
         send_stream: Option<SendStream>,
@@ -77,7 +76,6 @@ impl MyNode {
 
         trace!("Handling msg {msg_id:?}. from {origin:?} Checking for AE first...");
 
-        let context = node.read().await.context();
         trace!("[NODE READ]: Handle msg read lock attempt success");
 
         // alternatively we could flag in msg kind for this...
@@ -131,11 +129,15 @@ impl MyNode {
 
         // if we got here, we are the destination
         match msg_type {
-            NetworkMsg::Node(msg) => {
-                MyNode::handle_node_msg(node, context, msg_id, msg, origin, send_stream).await
-            }
+            NetworkMsg::Node(msg) => Ok(vec![Cmd::ProcessNodeMsg {
+                msg_id,
+                msg,
+                origin,
+                send_stream,
+            }]),
             NetworkMsg::Client { msg, auth, .. } => {
                 trace!("Client msg {msg_id:?} reached its destination.");
+
                 // TODO: clarify this err w/ peer
                 let Some(stream) = send_stream else {
                     error!("No stream for client tho....");
@@ -143,14 +145,18 @@ impl MyNode {
                 };
                 MyNode::handle_client_msg_for_us(context, msg_id, msg, auth, origin, stream).await
             }
+
             NetworkMsg::AntiEntropy(AntiEntropyMsg::AntiEntropy {
                 section_tree_update,
                 kind,
-            }) => {
-                trace!("Handling msg: AE from {origin}: {msg_id:?}");
-                MyNode::handle_anti_entropy_msg(node, context, section_tree_update, kind, origin)
-                    .await
-            }
+            }) => Ok(vec![Cmd::ProcessAeMsg {
+                msg_id,
+                section_tree_update,
+                kind,
+                origin,
+            }]), //     trace!("Handling msg: AE from {origin}: {msg_id:?}");
+            //     MyNode::handle_anti_entropy_msg(node, context, section_tree_update, kind, origin)
+            //         .await
             // Respond to a probe msg
             // We always respond to probe msgs if we're an elder as health checks use this to see if a node is alive
             // and repsonsive, as well as being a method of keeping nodes up to date.
@@ -173,8 +179,8 @@ impl MyNode {
             }
             other @ NetworkMsg::DataResponse { .. } => {
                 error!(
-                    "Data response {msg_id:?}, from {}, has been dropped since it's not \
-                    meant to be handled this way (it is directly forwarded to client): {other:?}",
+                    "Client data response {msg_id:?}, from {}, has been dropped since it's not \
+                    meant to be handled by a node: {other:?}",
                     origin.addr()
                 );
                 Ok(vec![])

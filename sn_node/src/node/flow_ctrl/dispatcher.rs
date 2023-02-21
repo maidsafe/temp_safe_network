@@ -44,6 +44,7 @@ impl Dispatcher {
     ) -> Result<Vec<Cmd>> {
         let start = Instant::now();
         let cmd_string = format!("{}", cmd);
+        let context = node.read().await.context();
         let result = match cmd {
             Cmd::TryJoinNetwork => {
                 info!("[NODE READ]: getting lock for try_join_section");
@@ -168,11 +169,36 @@ impl Dispatcher {
                 node.track_node_issue(name, issue);
                 Ok(vec![])
             }
+            Cmd::ProcessNodeMsg {
+                msg_id,
+                msg,
+                origin,
+                send_stream,
+            } => {
+                MyNode::handle_node_msg(node.clone(), context, msg_id, msg, origin, send_stream)
+                    .await
+            }
+            Cmd::ProcessAeMsg {
+                msg_id,
+                kind,
+                section_tree_update,
+                origin,
+            } => {
+                trace!("Handling msg: AE from {origin}: {msg_id:?}");
+                MyNode::handle_anti_entropy_msg(
+                    node.clone(),
+                    context,
+                    section_tree_update,
+                    kind,
+                    origin,
+                )
+                .await
+            }
             Cmd::HandleMsg {
                 origin,
                 wire_msg,
                 send_stream,
-            } => MyNode::handle_msg(node.clone(), origin, wire_msg, send_stream).await,
+            } => MyNode::handle_msg(context, origin, wire_msg, send_stream).await,
             Cmd::UpdateNetworkAndHandleValidClientMsg {
                 proof_chain,
                 signed_sap,

@@ -13,7 +13,7 @@ use sn_consensus::Decision;
 use sn_fault_detection::IssueType;
 use sn_interface::{
     messaging::{
-        data::{DataResponse, ClientMsg},
+        data::{ClientMsg, DataResponse},
         system::{NodeMsg, SectionSig, SectionSigned},
         AntiEntropyKind, AuthorityProof, ClientAuth, MsgId, NetworkMsg, WireMsg,
     },
@@ -222,7 +222,11 @@ impl Cmd {
         Cmd::send_network_msg(NetworkMsg::Node(msg), recipients, context)
     }
 
-    pub(crate) fn send_network_msg(msg: NetworkMsg, recipients: Peers, context: NodeContext) -> Self {
+    pub(crate) fn send_network_msg(
+        msg: NetworkMsg,
+        recipients: Peers,
+        context: NodeContext,
+    ) -> Self {
         let msg_id = MsgId::new();
         debug!("Sending msg {msg_id:?} to {recipients:?}: {msg:?}");
         Cmd::SendMsg {
