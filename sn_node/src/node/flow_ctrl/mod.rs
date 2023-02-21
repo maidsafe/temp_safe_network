@@ -90,7 +90,7 @@ impl FlowCtrl {
     ) -> (Sender<(Cmd, Vec<usize>)>, Receiver<RejoinReason>) {
         trace!("[NODE READ]: flowctrl node context lock got");
         let node_context = node.read().await.context();
-        let (cmd_sender_channel, mut incoming_cmds_from_apis) = mpsc::channel(CMD_CHANNEL_SIZE);
+        let (cmd_sender_channel, incoming_cmds_from_apis) = mpsc::channel(CMD_CHANNEL_SIZE);
         let (rejoin_network_tx, rejoin_network_rx) = mpsc::channel(STANDARD_CHANNEL_SIZE);
 
         let all_members = node_context
@@ -170,16 +170,6 @@ impl FlowCtrl {
         (cmd_sender_channel, rejoin_network_rx)
     }
 
-    fn get_cmds(incoming_cmds_from_apis: Receiver<(Cmd, Vec<usize>)>) -> Option<(Cmd, Vec<usize>)> {
-        match incoming_cmds_from_apis.try_recv() {
-            Ok(cmd) => Some(cmd),
-            Err(e) => {
-                // nothing atm
-                None
-            }
-        }
-    }
-
     /// This is a never ending loop as long as the node is live.
     /// This loop drives the periodic events internal to the node.
     async fn process_cmds_and_periodic_checks(
@@ -192,12 +182,21 @@ impl FlowCtrl {
     ) {
         // starting context
         let mut latest_context = node.read().await.context();
-        let mut we_joined = false;
+        let mut is_member = false;
         let cmd_channel = self.cmd_sender_channel.clone();
 
         loop {
+
+            // let cmds = match incoming_cmds_from_apis.try_recv() {
+            //     Ok(cmd) => Some(cmd),
+            //     Err(e) => {
+            //         // nothing atm
+            //         None
+            //     }
+            // };
+
             // first do any pending processing
-            while let Some((cmd, cmd_id)) = Self::get_cmds(incoming_cmds_from_apis) {
+            while let Ok((cmd, cmd_id)) = incoming_cmds_from_apis.try_recv() {
                 trace!("Taking cmd off stack: {cmd:?}");
                 let may_modify = cmd.may_modify();
                 cmd_ctrl
@@ -219,8 +218,8 @@ impl FlowCtrl {
 
             // second, check if we've joined... if not fire off cmds for that
             // this must come _after_ clearing the cmd channel
-            if !we_joined {
-                debug!("we'rennot joined so firing off cmd");
+            if !is_member {
+                debug!("we're not joined so firing off cmd");
                 // send the join message...
                 if let Err(error) = cmd_channel
                     .send((Cmd::TryJoinNetwork, vec![]))
@@ -237,21 +236,27 @@ impl FlowCtrl {
                 debug!("we'rennot joined cmd is away");
 
                 // await for join retry time
-                let result =
-                    tokio::time::timeout(join_retry_timeout, Self::await_join(node.clone())).await;
+                // let result =
+                //     tokio::time::timeout(join_retry_timeout, Self::await_join(node.clone())).await;
+                let read_only = node.read().await;
+                let our_name = read_only.name();
+                is_member = read_only.network_knowledge.is_section_member(&our_name);
+                // tokio::time::sleep(Duration::from_millis(100)).await;
 
-                if result.is_err() {
-                    error!("Join not accepted in {join_retry_timeout:?}. Will try and join again. Error was: {:?}", result);
+
+                // skip periodics
+                if !is_member {
+                    error!("Join not accepted in. Will try and join again.");
                     continue;
                 }
 
                 debug!("we joined!!!");
-                we_joined = true;
+                is_member = true;
             }
 
             // lastly perform periodics
             self.perform_periodic_checks(node.clone()).await;
-            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+            tokio::time::sleep(tokio::time::Duration::from_millis(5)).await;
         }
 
         error!("Processing loop dead");
