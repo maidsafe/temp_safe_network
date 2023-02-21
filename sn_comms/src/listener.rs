@@ -5,7 +5,6 @@
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
-
 use super::{CommEvent, MsgFromPeer};
 
 use sn_interface::{
@@ -59,7 +58,6 @@ pub(crate) async fn listen_for_msgs(
                 debug!(
                     "New msg arrived over conn_id={conn_id} from {remote_address:?}{stream_info}"
                 );
-
                 let wire_msg = match WireMsg::from(msg_bytes.0) {
                     Ok(wire_msg) => wire_msg,
                     Err(error) => {
@@ -79,10 +77,10 @@ pub(crate) async fn listen_for_msgs(
                 let peer = Peer::new(src_name, remote_address);
                 let msg_id = wire_msg.msg_id();
                 debug!(
-                    "Msg {msg_id:?} received, over conn_id={conn_id}, from: {peer:?}{stream_info} was: {wire_msg:?}"
-                );
+                        "Msg {msg_id:?} received, over conn_id={conn_id}, from: {peer:?}{stream_info} was: {wire_msg:?}"
+                    );
 
-                msg_received(wire_msg, peer, send_stream, comm_events.clone());
+                msg_received(wire_msg, peer, send_stream, comm_events.clone()).await;
             }
             Err(error) => {
                 warn!("Error on connection {conn_id} with {remote_address}: {error:?}");
@@ -93,7 +91,7 @@ pub(crate) async fn listen_for_msgs(
     trace!(%conn_id, %remote_address, "{}", LogMarker::ConnectionClosed);
 }
 
-pub(crate) fn msg_received(
+pub(crate) async fn msg_received(
     wire_msg: WireMsg,
     peer: Peer,
     send_stream: Option<qp2p::SendStream>,
@@ -105,11 +103,9 @@ pub(crate) fn msg_received(
         wire_msg,
         send_stream,
     });
-    // move this channel sending off thread so we don't hold up incoming msgs at all.
-    let _handle = tokio::spawn(async move {
-        // handle the message first
-        if let Err(error) = comm_events.send(msg_event).await {
-            error!("Error pushing msg {msg_id:?} onto internal msg handling channel: {error:?}");
-        }
-    });
+
+    // handle the message first
+    if let Err(error) = comm_events.send(msg_event).await {
+        error!("Error pushing msg {msg_id:?} onto internal msg handling channel: {error:?}");
+    }
 }
