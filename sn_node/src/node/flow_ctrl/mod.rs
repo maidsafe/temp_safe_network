@@ -186,10 +186,12 @@ impl FlowCtrl {
         let cmd_channel = self.cmd_sender_channel.clone();
         let mut last_join_attempt = Instant::now() - (join_retry_timeout * 2) ;
         loop {
+            let mut processed = false;
             // debug!("boop");
             // first do any pending processing
             while let Ok((cmd, cmd_id)) = incoming_cmds_from_apis.try_recv() {
                 trace!("Taking cmd off stack: {cmd:?}");
+                processed = true;
                 latest_context = node.read().await.context();
                 let may_modify = cmd.may_modify();
                 cmd_ctrl
@@ -258,7 +260,10 @@ impl FlowCtrl {
 
             // lastly perform periodics
             self.perform_periodic_checks(node.clone()).await;
-            tokio::time::sleep(tokio::time::Duration::from_millis(5)).await;
+
+            if !processed {
+                tokio::time::sleep(tokio::time::Duration::from_millis(5)).await;
+            }
         }
 
         error!("Processing loop dead");

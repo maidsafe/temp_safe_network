@@ -89,11 +89,16 @@ impl FlowCtrl {
             );
         }
 
-        for cmd in cmds {
-            if let Err(error) = self.cmd_sender_channel.send((cmd, vec![])).await {
-                error!("Error queuing periodic check: {error:?}");
+        // move cmd spawn off thread to not block
+        let sender_channel = self.cmd_sender_channel.clone();
+        let _handle = tokio::spawn(async move {
+            for cmd in cmds {
+
+                if let Err(error) = sender_channel.send((cmd, vec![])).await {
+                    error!("Error queuing periodic check: {error:?}");
+                }
             }
-        }
+        });
     }
 
     /// Periodic tasks run for both elders and adults
@@ -343,7 +348,7 @@ impl FlowCtrl {
     }
 
     /// Checks the interval since last dkg vote received
-    async fn check_for_missed_dkg_messages(node: Arc<RwLock<MyNode>>, cmd_channel: CmdChannel) {
+    async fn check_for_missed_dkg_messages(node: Arc<RwLock<MyNode>>, sender_channel: CmdChannel) {
         info!("Checking for DKG missed messages");
 
         // DKG checks can be long running, move off thread to unblock the main loop
@@ -363,11 +368,16 @@ impl FlowCtrl {
                         debug!("Dkg msg resending cmd, as Dkg voting appears stalled...");
                     }
 
-                    for cmd in cmds {
-                        if let Err(error) = cmd_channel.send((cmd, vec![])).await {
-                            error!("Error sending DKG gossip msgs {error:?}");
+                    // move cmd spawn off thread to not block
+                    let _handle = tokio::spawn(async move {
+                        for cmd in cmds {
+
+                            if let Err(error) = sender_channel.send((cmd, vec![])).await {
+                                error!("Error sending DKG gossip msgs {error:?}");
+                            }
                         }
-                    }
+                    });
+
                 }
             }
         });
