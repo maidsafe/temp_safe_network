@@ -92,8 +92,6 @@ impl FlowCtrl {
         let (cmd_sender_channel, mut incoming_cmds_from_apis) = mpsc::channel(CMD_CHANNEL_SIZE);
         let (rejoin_network_tx, rejoin_network_rx) = mpsc::channel(STANDARD_CHANNEL_SIZE);
 
-        let node_identifier = node_context.info.name();
-
         let all_members = node_context
             .network_knowledge
             .adults()
@@ -117,6 +115,7 @@ impl FlowCtrl {
         };
 
         let node_arc_for_processing = node.clone();
+        let node_arc_for_periodics = node.clone();
 
         let flow_ctrl = Self {
             node,
@@ -125,30 +124,37 @@ impl FlowCtrl {
             timestamps: PeriodicChecksTimestamps::now(),
         };
 
-        let _handle = tokio::task::spawn(flow_ctrl.process_messages_and_periodic_checks());
+        let _handle = tokio::task::spawn(flow_ctrl.process_cmds_and_periodic_checks(
+            node_arc_for_periodics,
+            cmd_ctrl,
+            incoming_cmds_from_apis,
+            rejoin_network_tx,
+        ));
 
         let cmd_channel = cmd_sender_channel.clone();
         let cmd_channel_for_msgs = cmd_sender_channel.clone();
 
-        // start a new thread to kick off incoming cmds
-        let _handle = tokio::task::spawn(async move {
-            // Get a stable identifier for statemap naming. This is NOT the node's current name.
-            // It's the initial name... but will not change for the entire statemap
-            let the_node = node_arc_for_processing.clone();
-            while let Some((cmd, cmd_id)) = incoming_cmds_from_apis.recv().await {
-                trace!("Taking cmd off stack: {cmd:?}");
-                cmd_ctrl
-                    .process_cmd_job(
-                        the_node.clone(),
-                        cmd,
-                        cmd_id,
-                        node_identifier,
-                        cmd_channel.clone(),
-                        rejoin_network_tx.clone(),
-                    )
-                    .await
-            }
-        });
+        // // start a new thread to kick off incoming cmds
+        // let _handle = tokio::task::spawn(async move {
+        //     // Get a stable identifier for statemap naming. This is NOT the node's current name.
+        //     // It's the initial name... but will not change for the entire statemap
+        //     let the_node = node_arc_for_processing.clone();
+        //     let latest_context = node_context.clone();
+        //     while let Some((cmd, cmd_id)) = incoming_cmds_from_apis.recv().await {
+        //         trace!("Taking cmd off stack: {cmd:?}");
+        //         cmd_ctrl
+        //             .process_cmd_job(
+        //                 the_node.clone(),
+        //                 node_context,
+        //                 cmd,
+        //                 cmd_id,
+        //                 node_identifier,
+        //                 cmd_channel.clone(),
+        //                 rejoin_network_tx.clone(),
+        //             )
+        //             .await
+        //     }
+        // });
 
         Self::send_out_data_for_replication(
             node_context.data_storage,
@@ -160,6 +166,45 @@ impl FlowCtrl {
         Self::listen_for_comm_events(incoming_msg_events, cmd_channel_for_msgs);
 
         (cmd_sender_channel, rejoin_network_rx)
+    }
+
+    /// This is a never ending loop as long as the node is live.
+    /// This loop drives the periodic events internal to the node.
+    async fn process_cmds_and_periodic_checks(
+        mut self,
+        node: Arc<RwLock<MyNode>>,
+        cmd_ctrl: CmdCtrl,
+        mut incoming_cmds_from_apis: Receiver<(Cmd, Vec<usize>)>,
+        rejoin_network_tx: Sender<RejoinReason>,
+    ) {
+        // starting context
+        let mut latest_context = node.read().await.context();
+        // let cmd_ctrl = self.
+        // the internal process loop
+
+        let cmd_channel = self.cmd_sender_channel.clone();
+
+        loop {
+            // let the_node = node_arc_for_processing.clone();
+
+            // first do any pending processing
+            while let Some((cmd, cmd_id)) = incoming_cmds_from_apis.recv().await {
+                trace!("Taking cmd off stack: {cmd:?}");
+                cmd_ctrl
+                    .process_cmd_job(
+                        node.clone(),
+                        latest_context.clone(),
+                        cmd,
+                        cmd_id,
+                        cmd_channel.clone(),
+                        rejoin_network_tx.clone(),
+                    )
+                    .await
+            }
+
+            self.perform_periodic_checks(node.clone()).await;
+            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        }
     }
 
     /// Listens on data_replication_receiver on a new thread, sorts and batches data, generating SendMsg Cmds
@@ -206,16 +251,6 @@ impl FlowCtrl {
                 });
             }
         });
-    }
-
-    /// This is a never ending loop as long as the node is live.
-    /// This loop drives the periodic events internal to the node.
-    async fn process_messages_and_periodic_checks(mut self) {
-        // the internal process loop
-        loop {
-            self.perform_periodic_checks().await;
-            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-        }
     }
 
     // starts a new thread to convert comm event to cmds

@@ -6,7 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{messaging::Peers, Cmd, Error, MyNode, Result, STANDARD_CHANNEL_SIZE};
+use crate::node::{
+    core::NodeContext, messaging::Peers, Cmd, Error, MyNode, Result, STANDARD_CHANNEL_SIZE,
+};
 
 use sn_interface::{
     messaging::{AntiEntropyMsg, NetworkMsg},
@@ -41,10 +43,11 @@ impl Dispatcher {
         &self,
         cmd: Cmd,
         node: Arc<RwLock<MyNode>>,
+        context: NodeContext,
     ) -> Result<Vec<Cmd>> {
         let start = Instant::now();
         let cmd_string = format!("{}", cmd);
-        let context = node.read().await.context();
+        // let context = node.read().await.context();
         let result = match cmd {
             Cmd::TryJoinNetwork => Ok(MyNode::try_join_section(context, None)
                 .into_iter()
