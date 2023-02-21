@@ -171,6 +171,7 @@ async fn bootstrap_node(
     let (dispatcher, data_replication_receiver) = Dispatcher::new(node.clone());
     let cmd_ctrl = CmdCtrl::new(dispatcher);
     let (cmd_channel, rejoin_network_rx) = FlowCtrl::start(
+        node,
         cmd_ctrl,
         incoming_msg_receiver,
         data_replication_receiver,

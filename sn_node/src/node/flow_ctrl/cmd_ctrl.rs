@@ -44,6 +44,7 @@ impl CmdCtrl {
     /// Processes the passed in cmd on a new task
     pub(crate) async fn process_cmd_job(
         &self,
+        node: Arc<RwLock<MyNode>>,
         cmd: Cmd,
         mut id: Vec<usize>,
         node_identifier: XorName,
@@ -61,7 +62,7 @@ impl CmdCtrl {
         #[cfg(feature = "statemap")]
         sn_interface::statemap::log_state(node_identifier.to_string(), cmd.statemap_state());
 
-        match dispatcher.process_cmd(cmd).await {
+        match dispatcher.process_cmd(cmd, node).await {
             Ok(cmds) => {
                 let _handle = tokio::task::spawn(async move {
                     for (child_nr, cmd) in cmds.into_iter().enumerate() {
