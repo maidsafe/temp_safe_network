@@ -150,7 +150,6 @@ impl MyNode {
         kind: AntiEntropyKind,
         sender: Peer,
     ) -> Result<Vec<Cmd>> {
-        trace!("[NODE READ]: handling AE read gottt...");
         let sap = section_tree_update.signed_sap.value.clone();
 
         let members = if let AntiEntropyKind::Update { members } = &kind {
@@ -173,8 +172,6 @@ impl MyNode {
                 )?;
 
             if should_update {
-                // let mut write_locked_node = node;
-                trace!("[NODE WRITE]: handling AE write gottt...");
                 let updated = node.network_knowledge.update_knowledge_if_valid(
                     section_tree_update,
                     members,
@@ -190,10 +187,8 @@ impl MyNode {
             }
         };
 
-        trace!("[NODE READ] Latest context read");
         // mut here to update comms
         let latest_context = node.context();
-        trace!("[NODE READ] Latest context got.");
 
         // Only trigger reorganize data when there is a membership change happens.
         if updated {

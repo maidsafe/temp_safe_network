@@ -42,7 +42,7 @@ impl CmdCtrl {
     pub(crate) async fn process_cmd_job(
         &self,
         node: &mut MyNode,
-        context: NodeContext,
+        // context: NodeContext,
         cmd: Cmd,
         mut id: Vec<usize>,
         cmd_process_api: mpsc::Sender<(Cmd, Vec<usize>)>,

@@ -117,10 +117,6 @@ impl MyNode {
         // We propose membership
         let node_state = NodeState::joined(peer, previous_name);
 
-        trace!("[NODE WRITE]: join propose membership write...");
-        // let mut node = node.write().await;
-        trace!("[NODE WRITE]: join propose membership write gottt...");
-
         if let Some(cmd) = node.propose_membership_change(node_state) {
             cmds.push(cmd);
         }
