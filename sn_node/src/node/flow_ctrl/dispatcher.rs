@@ -185,9 +185,6 @@ impl Dispatcher {
                 origin,
                 send_stream,
             } => {
-                // MyNode::handle_node_msg(node.clone(), context, msg_id, msg, origin, send_stream)
-                //     .await
-                // NetworkMsg::Client { msg, auth, .. } => {
                     trace!("Client msg {msg_id:?} reached its destination.");
 
                     // TODO: clarify this err w/ peer
@@ -196,7 +193,6 @@ impl Dispatcher {
                         return Err(Error::NoClientResponseStream);
                     };
                     MyNode::handle_client_msg_for_us(context, msg_id, msg, auth, origin, stream).await
-                // }
             }
             Cmd::ProcessAeMsg {
                 msg_id,
@@ -323,7 +319,7 @@ impl Dispatcher {
         };
 
         let elapsed = start.elapsed();
-        trace!("Cmd {cmd_string:?} took {:?}", elapsed);
+        trace!("Cmd processing took: {cmd_string:?}  {:?}", elapsed);
 
         result
     }

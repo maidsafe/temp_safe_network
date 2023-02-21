@@ -76,8 +76,6 @@ impl MyNode {
 
         trace!("Handling msg {msg_id:?}. from {origin:?} Checking for AE first...");
 
-        trace!("[NODE READ]: Handle msg read lock attempt success");
-
         // alternatively we could flag in msg kind for this...
         // todo: this peer is actually client + forwarder ip....
 
