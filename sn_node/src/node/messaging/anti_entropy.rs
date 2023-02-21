@@ -23,7 +23,7 @@ use sn_interface::{
 use bls::PublicKey as BlsPublicKey;
 use itertools::Itertools;
 use qp2p::SendStream;
-use std::{collections::BTreeSet, sync::Arc};
+use std::{collections::BTreeSet, sync::{Arc, Mutex}};
 use tokio::sync::RwLock;
 use xor_name::XorName;
 
@@ -141,7 +141,7 @@ impl MyNode {
 
     #[instrument(skip_all)]
     pub(crate) async fn handle_anti_entropy_msg(
-        node: Arc<RwLock<MyNode>>,
+        node: &mut MyNode,
         starting_context: NodeContext,
         section_tree_update: SectionTreeUpdate,
         kind: AntiEntropyKind,
@@ -170,9 +170,9 @@ impl MyNode {
                 )?;
 
             if should_update {
-                let mut write_locked_node = node.write().await;
+                // let mut write_locked_node = node;
                 trace!("[NODE WRITE]: handling AE write gottt...");
-                let updated = write_locked_node
+                let updated = node
                     .network_knowledge
                     .update_knowledge_if_valid(
                         section_tree_update,
@@ -182,7 +182,7 @@ impl MyNode {
                 debug!("net knowledge updated");
                 // always run this, only changes will trigger events
                 cmds.extend(
-                    write_locked_node
+                    node
                         .update_on_section_change(&starting_context)
                         .await?,
                 );
@@ -195,7 +195,7 @@ impl MyNode {
 
         trace!("[NODE READ] Latest context read");
         // mut here to update comms
-        let latest_context = node.read().await.context();
+        let latest_context = node.context();
         trace!("[NODE READ] Latest context got.");
 
         // Only trigger reorganize data when there is a membership change happens.

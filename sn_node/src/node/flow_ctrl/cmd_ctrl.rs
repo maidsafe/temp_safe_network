@@ -41,7 +41,7 @@ impl CmdCtrl {
     /// Processes the passed in cmd on a new task
     pub(crate) async fn process_cmd_job(
         &self,
-        node: Arc<RwLock<MyNode>>,
+        node: &mut MyNode,
         context: NodeContext,
         cmd: Cmd,
         mut id: Vec<usize>,

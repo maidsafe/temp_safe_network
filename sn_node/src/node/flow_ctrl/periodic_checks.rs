@@ -72,14 +72,14 @@ impl PeriodicChecksTimestamps {
 
 impl FlowCtrl {
     /// Generate and fire commands for all types of periodic checks
-    pub(super) async fn perform_periodic_checks(&mut self, node: Arc<RwLock<MyNode>>) {
+    pub(super) async fn perform_periodic_checks(&mut self, node: &mut MyNode) {
         if !self.timestamps.something_expired() {
             return;
         }
-        let context = node.read().await.context();
+        let context = node.context();
         let mut cmds = vec![];
 
-        cmds.extend(self.enqueue_cmds_for_node_periodic_checks(&context).await);
+        cmds.extend(self.enqueue_cmds_for_node_periodic_checks(&context, node).await);
         if !context.is_elder {
             // self.enqueue_cmds_for_adult_periodic_checks(&context).await;
         } else {
@@ -102,7 +102,7 @@ impl FlowCtrl {
     }
 
     /// Periodic tasks run for both elders and adults
-    async fn enqueue_cmds_for_node_periodic_checks(&mut self, context: &NodeContext) -> Vec<Cmd> {
+    async fn enqueue_cmds_for_node_periodic_checks(&mut self, context: &NodeContext, node: &mut MyNode) -> Vec<Cmd> {
         let mut cmds = vec![];
 
         // check if we can request for relocation
@@ -141,8 +141,8 @@ impl FlowCtrl {
                 } else {
                     info!("{}", LogMarker::RelocateEnd);
                     info!("We've joined a section, dropping the relocation proof.");
-                    let mut node = self.node.write().await;
-                    trace!("[NODE WRITE]: handling relocation periodic check write gottt...");
+                    // let mut node = self.node.write().await;
+                    // trace!("[NODE WRITE]: handling relocation periodic check write gottt...");
                     node.relocation_state = None;
                 }
             }
@@ -167,7 +167,7 @@ impl FlowCtrl {
     async fn enqueue_cmds_for_elder_periodic_checks(
         &mut self,
         context: &NodeContext,
-        node: Arc<RwLock<MyNode>>,
+        node: &MyNode,
     ) -> Vec<Cmd> {
         let now = Instant::now();
         let mut cmds = vec![];
@@ -208,18 +208,17 @@ impl FlowCtrl {
 
         if self.timestamps.last_vote_check.elapsed() > MISSING_VOTE_INTERVAL {
             self.timestamps.last_vote_check = now;
-            let read_locked_node = node.read().await;
+            // let read_locked_node = node.read().await;
 
             trace!(" ----> vote periodics start");
-            cmds.extend(self.check_for_missed_votes(context, &read_locked_node.membership));
+            cmds.extend(self.check_for_missed_votes(context, &node.membership));
             trace!(" ----> vote periodics done");
         }
 
         if self.timestamps.last_dkg_msg_check.elapsed() > MISSING_DKG_MSG_INTERVAL {
             trace!(" ----> dkg msg periodics start");
             self.timestamps.last_dkg_msg_check = now;
-            Self::check_for_missed_dkg_messages(self.node.clone(), self.cmd_sender_channel.clone())
-                .await;
+            Self::check_for_missed_dkg_messages(node, self.cmd_sender_channel.clone());
             trace!(" ----> dkg msg periodics done");
         }
 
@@ -232,7 +231,7 @@ impl FlowCtrl {
     }
 
     // /// Initiates and generates all the subsequent Cmds to perform a healthcheck
-    // async fn perform_health_checks(node: Arc<RwLock<MyNode>>) -> Result<Vec<Cmd>> {
+    // async fn perform_health_checks(node: &MyNode) -> Result<Vec<Cmd>> {
     //     info!("Starting to check the section's health");
     //     let node = node.read().await;
     //     let our_prefix = node.network_knowledge.prefix();
@@ -348,14 +347,14 @@ impl FlowCtrl {
     }
 
     /// Checks the interval since last dkg vote received
-    async fn check_for_missed_dkg_messages(node: Arc<RwLock<MyNode>>, sender_channel: CmdChannel) {
+    fn check_for_missed_dkg_messages(node: &MyNode, sender_channel: CmdChannel) {
         info!("Checking for DKG missed messages");
 
         // DKG checks can be long running, move off thread to unblock the main loop
-        let _handle = tokio::task::spawn(async move {
-            trace!("[NODE READ]: dkg msg lock attempt");
-            let node = node.read().await;
-            trace!("[NODE READ]: dkg msg lock got");
+        // let _handle = tokio::task::spawn(async move {
+            // trace!("[NODE READ]: dkg msg lock attempt");
+            // let node = node.read().await;
+            // trace!("[NODE READ]: dkg msg lock got");
 
             let dkg_voter = &node.dkg_voter;
 
@@ -369,7 +368,7 @@ impl FlowCtrl {
                     }
 
                     // move cmd spawn off thread to not block
-                    let _handle = tokio::spawn(async move {
+                    let _handle = tokio::spawn(async {
                         for cmd in cmds {
 
                             if let Err(error) = sender_channel.send((cmd, vec![])).await {
@@ -380,7 +379,7 @@ impl FlowCtrl {
 
                 }
             }
-        });
+        // });
     }
 
     async fn vote_out_faulty_nodes(&mut self) -> Vec<Cmd> {

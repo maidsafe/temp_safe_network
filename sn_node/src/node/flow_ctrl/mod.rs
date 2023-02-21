@@ -71,7 +71,7 @@ impl RejoinReason {
 /// Listens for incoming msgs and forms Cmds for each,
 /// Periodically triggers other Cmd Processes (eg health checks, fault detection etc)
 pub(crate) struct FlowCtrl {
-    node: Arc<RwLock<MyNode>>,
+    // node: Arc<RwLock<MyNode>>,
     cmd_sender_channel: Sender<(Cmd, Vec<usize>)>,
     fault_channels: FaultChannels,
     timestamps: PeriodicChecksTimestamps,
@@ -81,7 +81,7 @@ impl FlowCtrl {
     /// Constructs a FlowCtrl instance, spawnning a task which starts processing messages,
     /// returning the channel where it can receive commands on
     pub(crate) async fn start(
-        node: Arc<RwLock<MyNode>>,
+        node: MyNode,
         cmd_ctrl: CmdCtrl,
         join_retry_timeout: Duration,
         incoming_msg_events: Receiver<CommEvent>,
@@ -89,7 +89,7 @@ impl FlowCtrl {
         fault_cmds_channels: (Sender<FaultsCmd>, Receiver<FaultsCmd>),
     ) -> (Sender<(Cmd, Vec<usize>)>, Receiver<RejoinReason>) {
         trace!("[NODE READ]: flowctrl node context lock got");
-        let node_context = node.read().await.context();
+        let node_context = node.context();
         let (cmd_sender_channel, incoming_cmds_from_apis) = mpsc::channel(CMD_CHANNEL_SIZE);
         let (rejoin_network_tx, rejoin_network_rx) = mpsc::channel(STANDARD_CHANNEL_SIZE);
 
@@ -115,18 +115,18 @@ impl FlowCtrl {
             }
         };
 
-        let node_arc_for_processing = node.clone();
-        let node_arc_for_periodics = node.clone();
+        // let node_arc_for_processing = node.clone();
+        // let node_arc_for_periodics = node.clone();
 
         let flow_ctrl = Self {
-            node,
+            // node,
             cmd_sender_channel: cmd_sender_channel.clone(),
             fault_channels,
             timestamps: PeriodicChecksTimestamps::now(),
         };
 
         let _handle = tokio::task::spawn(flow_ctrl.process_cmds_and_periodic_checks(
-            node_arc_for_periodics,
+            node,
             cmd_ctrl,
             join_retry_timeout,
             incoming_cmds_from_apis,
@@ -174,14 +174,14 @@ impl FlowCtrl {
     /// This loop drives the periodic events internal to the node.
     async fn process_cmds_and_periodic_checks(
         mut self,
-        node: Arc<RwLock<MyNode>>,
+        mut node: MyNode,
         cmd_ctrl: CmdCtrl,
         join_retry_timeout: Duration,
         mut incoming_cmds_from_apis: Receiver<(Cmd, Vec<usize>)>,
         rejoin_network_tx: Sender<RejoinReason>,
     ) {
         // starting context
-        let mut latest_context = node.read().await.context();
+        let mut latest_context = node.context();
         let mut is_member = false;
         let cmd_channel = self.cmd_sender_channel.clone();
         let mut last_join_attempt = Instant::now() - (join_retry_timeout * 2) ;
@@ -192,11 +192,11 @@ impl FlowCtrl {
             while let Ok((cmd, cmd_id)) = incoming_cmds_from_apis.try_recv() {
                 trace!("Taking cmd off stack: {cmd:?}");
                 processed = true;
-                latest_context = node.read().await.context();
+                latest_context = node.context();
                 let may_modify = cmd.may_modify();
                 cmd_ctrl
                     .process_cmd_job(
-                        node.clone(),
+                        &mut node,
                         latest_context.clone(),
                         cmd,
                         cmd_id,
@@ -259,7 +259,7 @@ impl FlowCtrl {
             }
 
             // lastly perform periodics
-            self.perform_periodic_checks(node.clone()).await;
+            self.perform_periodic_checks(&mut node).await;
 
             if !processed {
                 tokio::time::sleep(tokio::time::Duration::from_millis(5)).await;

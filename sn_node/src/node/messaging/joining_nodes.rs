@@ -26,7 +26,7 @@ use tokio::sync::RwLock;
 // Message handling
 impl MyNode {
     pub(crate) async fn handle_join(
-        node: Arc<RwLock<MyNode>>,
+        node: &mut MyNode,
         context: &NodeContext,
         peer: Peer,
         correlation_id: MsgId,
@@ -118,7 +118,7 @@ impl MyNode {
         let node_state = NodeState::joined(peer, previous_name);
 
         trace!("[NODE WRITE]: join propose membership write...");
-        let mut node = node.write().await;
+        // let mut node = node.write().await;
         trace!("[NODE WRITE]: join propose membership write gottt...");
 
         if let Some(cmd) = node.propose_membership_change(node_state) {

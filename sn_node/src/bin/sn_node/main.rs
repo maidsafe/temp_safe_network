@@ -128,7 +128,7 @@ fn create_runtime_and_node(config: &Config) -> Result<()> {
         })?;
 
         match outcome {
-            Ok((_node, mut rejoin_network_rx)) => {
+            Ok((mut rejoin_network_rx)) => {
                 let join_future = async {
                     // Simulate failed node starts, and ensure that
                     #[cfg(feature = "chaos")]
