@@ -13,7 +13,7 @@ use sn_consensus::Decision;
 use sn_fault_detection::IssueType;
 use sn_interface::{
     messaging::{
-        data::{ClientMsg, DataResponse},
+        data::{DataResponse, ClientMsg},
         system::{NodeMsg, SectionSig, SectionSigned},
         AntiEntropyKind, AuthorityProof, ClientAuth, MsgId, NetworkMsg, WireMsg,
     },
@@ -57,6 +57,20 @@ pub(crate) enum Cmd {
         origin: Peer,
         wire_msg: WireMsg,
         send_stream: Option<SendStream>,
+    },
+    /// Process a deserialised node msg (after AE checks etc)
+    ProcessNodeMsg {
+        msg_id: MsgId,
+        msg: NodeMsg,
+        origin: Peer,
+        send_stream: Option<SendStream>,
+    },
+    /// Process a deserialised AntiEntropy msg
+    ProcessAeMsg {
+        msg_id: MsgId,
+        kind: AntiEntropyKind,
+        section_tree_update: SectionTreeUpdate,
+        origin: Peer,
     },
     /// Allows joining of new nodes.
     SetJoinsAllowed(bool),
@@ -208,11 +222,7 @@ impl Cmd {
         Cmd::send_network_msg(NetworkMsg::Node(msg), recipients, context)
     }
 
-    pub(crate) fn send_network_msg(
-        msg: NetworkMsg,
-        recipients: Peers,
-        context: NodeContext,
-    ) -> Self {
+    pub(crate) fn send_network_msg(msg: NetworkMsg, recipients: Peers, context: NodeContext) -> Self {
         let msg_id = MsgId::new();
         debug!("Sending msg {msg_id:?} to {recipients:?}: {msg:?}");
         Cmd::SendMsg {
@@ -271,6 +281,8 @@ impl Cmd {
             | Cmd::SendAndForwardResponseToClient { .. }
             | Cmd::HandleCommsError { .. } => State::Comms,
             Cmd::HandleMsg { .. } => State::HandleMsg,
+            Cmd::ProcessNodeMsg { .. } => State::HandleMsg,
+            Cmd::ProcessAeMsg { .. } => State::HandleMsg,
             Cmd::UpdateNetworkAndHandleValidClientMsg { .. } => State::ClientMsg,
             Cmd::TrackNodeIssue { .. } => State::FaultDetection,
             Cmd::HandleSectionDecisionAgreement { .. } => State::Agreement,
@@ -285,6 +297,41 @@ impl Cmd {
             Cmd::TryJoinNetwork => State::Join,
         }
     }
+
+    /// Check if this Cmd may modify our NodeContext
+    pub(crate) fn may_modify(&self) -> bool {
+        // TODO: this could well be brittle if we miss one...
+        // what's a better way?
+        matches!(
+            self,
+            Cmd::UpdateNetworkAndHandleValidClientMsg { .. }
+                | Cmd::HandleSectionDecisionAgreement { .. }
+                | Cmd::HandleMembershipDecision { .. }
+                | Cmd::HandleNewEldersAgreement { .. }
+                | Cmd::HandleNewSectionsAgreement { .. }
+                | Cmd::HandleDkgOutcome { .. }
+                | Cmd::ProposeVoteNodesOffline { .. }
+                | Cmd::SetJoinsAllowed { .. }
+                | Cmd::SetJoinsAllowedUntilSplit { .. }
+                | Cmd::ProcessAeMsg { .. }
+                | Cmd::ProcessNodeMsg {
+                    msg: NodeMsg::TryJoin(_)
+                        | NodeMsg::BeginRelocating(_)
+                        | NodeMsg::RelocationRequest { .. }
+                        | NodeMsg::Relocate(_)
+                        | NodeMsg::HandoverVotes(_)
+                        | NodeMsg::MembershipVotes(_)
+                        | NodeMsg::DkgStart(_, _)
+                        | NodeMsg::ProposeSectionState { .. }
+                        | NodeMsg::DkgEphemeralPubKey { .. }
+                        | NodeMsg::DkgVotes { .. }
+                        | NodeMsg::RequestHandover { .. }
+                        | NodeMsg::SectionHandoverPromotion { .. }
+                        | NodeMsg::SectionSplitPromotion { .. },
+                    ..
+                }
+        )
+    }
 }
 
 impl fmt::Display for Cmd {
@@ -292,6 +339,12 @@ impl fmt::Display for Cmd {
         match self {
             Cmd::HandleMsg { wire_msg, .. } => {
                 write!(f, "HandleMsg {:?}", wire_msg.msg_id())
+            }
+            Cmd::ProcessNodeMsg { msg_id, .. } => {
+                write!(f, "ProcessNodeMsg {:?}", msg_id)
+            }
+            Cmd::ProcessAeMsg { msg_id, .. } => {
+                write!(f, "ProcessAeMsg {:?}", msg_id)
             }
             Cmd::UpdateNetworkAndHandleValidClientMsg { msg_id, msg, .. } => {
                 write!(f, "UpdateAndHandleValidClientMsg {msg_id:?}: {msg:?}")
