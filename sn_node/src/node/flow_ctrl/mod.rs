@@ -186,15 +186,6 @@ impl FlowCtrl {
         let cmd_channel = self.cmd_sender_channel.clone();
 
         loop {
-
-            // let cmds = match incoming_cmds_from_apis.try_recv() {
-            //     Ok(cmd) => Some(cmd),
-            //     Err(e) => {
-            //         // nothing atm
-            //         None
-            //     }
-            // };
-
             // first do any pending processing
             while let Ok((cmd, cmd_id)) = incoming_cmds_from_apis.try_recv() {
                 trace!("Taking cmd off stack: {cmd:?}");
@@ -220,28 +211,30 @@ impl FlowCtrl {
             // this must come _after_ clearing the cmd channel
             if !is_member {
                 debug!("we're not joined so firing off cmd");
-                // send the join message...
-                if let Err(error) = cmd_channel
-                    .send((Cmd::TryJoinNetwork, vec![]))
-                    .await
-                    .map_err(|e| {
-                        error!("Failed join: {:?}", e);
-                        Error::JoinTimeout
-                    })
-                {
-                    error!("Could not joing the network: {error:?}");
 
-                    break;
-                }
+                let cmd_channel_clone = cmd_channel.clone();
+                let _handle =tokio::spawn(async move {
+                    // send the join message...
+                    if let Err(error) = cmd_channel_clone
+                        .send((Cmd::TryJoinNetwork, vec![]))
+                        .await
+                        .map_err(|e| {
+                            error!("Failed join: {:?}", e);
+                            Error::JoinTimeout
+                        })
+                    {
+                        error!("Could not joing the network: {error:?}");
+                    }
+                });
                 debug!("we'rennot joined cmd is away");
 
                 // await for join retry time
                 // let result =
                 //     tokio::time::timeout(join_retry_timeout, Self::await_join(node.clone())).await;
-                let read_only = node.read().await;
-                let our_name = read_only.name();
-                is_member = read_only.network_knowledge.is_section_member(&our_name);
-                // tokio::time::sleep(Duration::from_millis(100)).await;
+                // let read_only = node.read().await;
+                let our_name = latest_context.name;
+                is_member = latest_context.network_knowledge.is_section_member(&our_name);
+                tokio::time::sleep(join_retry_timeout).await;
 
 
                 // skip periodics

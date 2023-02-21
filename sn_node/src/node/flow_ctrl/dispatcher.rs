@@ -101,6 +101,7 @@ impl Dispatcher {
                 msg_id,
                 recipients,
             } => {
+                debug!("send msg enque cmd...?");
                 MyNode::send_and_enqueue_any_response(msg, msg_id, context, recipients)?;
                 Ok(vec![])
             }
