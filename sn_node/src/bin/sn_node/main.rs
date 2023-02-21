@@ -164,7 +164,7 @@ fn create_runtime_and_node(config: &Config) -> Result<()> {
                         let mut rng = rand::thread_rng();
                         let x: f64 = rng.gen_range(0.0..1.0);
 
-                        if !config.is_first() && x > 0.6 {
+                        if config.first().is_none() && x > 0.6 {
                             println!(
                                "\n =========== [Chaos] (PID: {our_pid}): Startup chaos crash w/ x of: {x}. ============== \n",
                            );
