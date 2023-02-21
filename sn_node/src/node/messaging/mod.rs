@@ -92,7 +92,6 @@ impl MyNode {
             if let Some((update, ae_kind)) = entropy {
                 debug!("bailing early, AE found for {msg_id:?}");
                 return MyNode::generate_anti_entropy_cmds(
-                    &context,
                     &wire_msg,
                     origin,
                     update,
@@ -133,7 +132,7 @@ impl MyNode {
                 origin,
                 send_stream,
             }]),
-            NetworkMsg::Client{auth, msg} => Ok(vec![Cmd::ProcessClientMsg {
+            NetworkMsg::Client { auth, msg } => Ok(vec![Cmd::ProcessClientMsg {
                 msg_id,
                 msg,
                 auth,
