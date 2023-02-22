@@ -118,7 +118,7 @@ pub enum SubCommands {
     #[clap(name = "update", global_settings(&[AppSettings::DisableVersion]))]
     /// Update the application to the latest available version
     Update {
-        /// Remove prompt to confirm the update.
+        /// Do not prompt to confirm the update
         #[clap(short = 'y', long = "no-confirm")]
         no_confirm: bool,
     },

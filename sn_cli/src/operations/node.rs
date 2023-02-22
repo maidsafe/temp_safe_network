@@ -54,8 +54,7 @@ pub fn node_version(node_path: Option<PathBuf>) -> Result<()> {
 }
 
 pub fn node_install(target_dir_path: PathBuf, version: Option<String>) -> Result<()> {
-    let _ =
-        download_and_install_node(target_dir_path, SN_NODE_EXECUTABLE, "safe_network", version)?;
+    download_and_install_node(target_dir_path, SN_NODE_EXECUTABLE, "safe_network", version)?;
     Ok(())
 }
 

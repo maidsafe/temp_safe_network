@@ -45,7 +45,7 @@ impl Dispatcher {
     /// Handles a single cmd.
     pub(crate) async fn process_cmd(&self, cmd: Cmd) -> Result<Vec<Cmd>> {
         let start = Instant::now();
-        let cmd_string = format!("{}", cmd);
+        let cmd_string = format!("{cmd}");
         let result = match cmd {
             Cmd::TryJoinNetwork => {
                 info!("[NODE READ]: getting lock for try_join_section");

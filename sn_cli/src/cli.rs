@@ -122,10 +122,7 @@ async fn process_commands(mut safe: &mut Safe, args: CmdArgs, config: &mut Confi
             // the self_update crate as it seems to be creating its own runtime.
             // The use of the move keyword is required for the closure to take ownership of
             // the no_confirm flag.
-            let handler = std::thread::spawn(move || {
-                update_commander(no_confirm)
-                    .map_err(|err| eyre!("Error performing update: {}", err))
-            });
+            let handler = std::thread::spawn(move || update_commander(no_confirm));
             handler
                 .join()
                 .map_err(|err| eyre!("Failed to run self update: {:?}", err))?
