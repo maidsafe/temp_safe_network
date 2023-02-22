@@ -158,12 +158,12 @@ impl FlowCtrl {
         //     }
         // });
 
-        Self::send_out_data_for_replication(
-            node_context.data_storage,
-            data_replication_receiver,
-            cmd_sender_channel.clone(),
-        )
-        .await;
+        // Self::send_out_data_for_replication(
+        //     node_context.data_storage,
+        //     data_replication_receiver,
+        //     cmd_sender_channel.clone(),
+        // )
+        // .await;
 
         Self::listen_for_comm_events(incoming_msg_events, cmd_channel_for_msgs);
 

@@ -84,10 +84,10 @@ impl Dispatcher {
                     recipient,
                     data_batch,
                 } => {
-                    data_replication_sender
-                        .send((data_batch, recipient))
-                        .await
-                        .map_err(|_| Error::DataReplicationChannel)?;
+                    // data_replication_sender
+                    //     .send((data_batch, recipient))
+                    //     .await
+                    //     .map_err(|_| Error::DataReplicationChannel)?;
                     Ok(vec![])
                 }
                 Cmd::SendMsg {
