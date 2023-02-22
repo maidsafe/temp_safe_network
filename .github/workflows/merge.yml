@@ -268,7 +268,19 @@ jobs:
         timeout-minutes: 50
 
       - name: Run client tests
+        if: matrix.os != 'macos-latest'
         env:
+          SN_CMD_TIMEOUT: 13
+          SN_QUERY_TIMEOUT: 13
+          RUST_LOG: "sn_client=trace,qp2p=debug"
+        run: cd sn_client && cargo test --release --features check-replicas
+        timeout-minutes: 7
+
+      - name: Run client tests (macos)
+        if: matrix.os == 'macos-latest'
+        env:
+          SN_CMD_TIMEOUT: 30
+          SN_QUERY_TIMEOUT: 30
           RUST_LOG: "sn_client=trace,qp2p=debug"
         run: cd sn_client && cargo test --release --features check-replicas
         timeout-minutes: 10
@@ -396,7 +408,19 @@ jobs:
         timeout-minutes: 50
 
       - name: Run client tests
+        if: matrix.os != 'macos-latest'
         env:
+          SN_CMD_TIMEOUT: 13
+          SN_QUERY_TIMEOUT: 13
+          RUST_LOG: "sn_client=trace,qp2p=debug"
+        run: cd sn_client && cargo test --release --features msg-happy-path
+        timeout-minutes: 7
+
+      - name: Run client tests (macos)
+        if: matrix.os == 'macos-latest'
+        env:
+          SN_CMD_TIMEOUT: 30
+          SN_QUERY_TIMEOUT: 30
           RUST_LOG: "sn_client=trace,qp2p=debug"
         run: cd sn_client && cargo test --release --features msg-happy-path
         timeout-minutes: 10
