@@ -49,7 +49,7 @@ mod log;
 fn main() -> Result<()> {
     color_eyre::install()?;
 
-    let mut config = futures::executor::block_on(Config::new())?;
+    let mut config = Config::new()?;
 
     #[cfg(not(feature = "otlp"))]
     let _log_guard = log::init_node_logging(&config)?;
@@ -96,7 +96,7 @@ fn main() -> Result<()> {
         std::thread::sleep(Duration::from_secs(1));
 
         // pull config again in case it has been updated meanwhile
-        config = futures::executor::block_on(Config::new())?;
+        config = Config::new()?;
     }
 }
 

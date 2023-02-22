@@ -103,7 +103,7 @@ pub struct Config {
 impl Config {
     /// Returns a new `Config` instance.  Tries to read from the default node config file location,
     /// and overrides values with any equivalent cmd line args.
-    pub async fn new() -> Result<Self, Error> {
+    pub fn new() -> Result<Self, Error> {
         let mut config = Config::default();
 
         let cmd_line_args = Config::parse();
@@ -111,9 +111,9 @@ impl Config {
 
         config.merge(cmd_line_args);
 
-        config.clear_data_from_disk().await.unwrap_or_else(|_| {
-            error!("Error deleting data file from disk");
-        });
+        if let Err(err) = config.clear_data_from_disk() {
+            error!("Error clearing the data from disk: {err:?}");
+        }
 
         info!("Node config to be used: {:?}", config);
         Ok(config)
@@ -283,14 +283,18 @@ impl Config {
         self.update_only
     }
 
-    // Clear data from of a previous node running on the same PC
-    async fn clear_data_from_disk(&self) -> Result<()> {
-        if self.clear_data {
-            let path = project_dirs()?.join(self.root_dir()?);
-            if path.exists() {
-                fs::remove_dir_all(&path).await?;
-            }
+    // Clear data from of a previous node running on the same PC, if the config flag is set to do so.
+    fn clear_data_from_disk(&self) -> Result<()> {
+        // Only clear the data if we are configured to do so.
+        if !self.clear_data {
+            return Ok(());
         }
+
+        let path = project_dirs()?.join(self.root_dir()?);
+        if path.exists() {
+            std::fs::remove_dir_all(&path)?;
+        }
+
         Ok(())
     }
 
