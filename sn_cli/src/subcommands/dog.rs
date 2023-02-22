@@ -6,6 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+#![cfg(feature = "data-network")]
+
 use super::{
     helpers::{
         get_from_arg_or_stdin, get_target_url, print_nrs_map, serialise_output, xorname_to_hex,

@@ -66,6 +66,7 @@ features = [
 default = [ "self-update", "limit-client-upload-size" ]
 check-replicas = [ "sn_api/check-replicas" ]
 cmd-happy-path = [ "sn_api/cmd-happy-path" ]
+data-network = []
 query-happy-path = [ "sn_api/query-happy-path" ]
 msg-happy-path = [ "sn_api/msg-happy-path" ]
 limit-client-upload-size = ["sn_api/limit-client-upload-size"]
@@ -95,3 +96,6 @@ harness = false
 [[bench]]
 name = "keys"
 harness = false
+
+[package.metadata.cargo-udeps.ignore]
+normal = ["ansi_term", "pretty-hex"]  # these are used under feature flag, which `cargo-udeps` cannot check.

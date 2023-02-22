@@ -6,16 +6,20 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+#[cfg(feature = "data-network")]
+use super::helpers::print_nrs_map;
 use super::{
-    helpers::{
-        gen_wallet_table, get_from_arg_or_stdin, get_target_url, print_nrs_map, serialise_output,
-    },
+    helpers::{gen_wallet_table, get_from_arg_or_stdin, get_target_url, serialise_output},
     OutputFmt,
 };
 use clap::Args;
-use color_eyre::{eyre::WrapErr, Result};
+#[cfg(feature = "data-network")]
+use color_eyre::eyre::WrapErr;
+use color_eyre::Result;
+#[cfg(feature = "data-network")]
 use comfy_table::Table;
 use sn_api::{resolver::SafeData, ContentType, Safe, SafeUrl};
+#[cfg(feature = "data-network")]
 use std::io::{self, Write};
 use tracing::debug;
 
@@ -28,6 +32,44 @@ pub struct CatCommands {
     hexdump: bool,
 }
 
+#[cfg(not(feature = "data-network"))]
+pub async fn cat_commander(cmd: CatCommands, output_fmt: OutputFmt, safe: &Safe) -> Result<()> {
+    let link = get_from_arg_or_stdin(cmd.location, None)?;
+    let url = get_target_url(&link)?;
+    debug!("Running cat for: {}", &url.to_string());
+
+    match safe.fetch(&url.to_string(), None).await? {
+        SafeData::Multimap { xorurl, data, .. } => {
+            let safeurl = SafeUrl::from_xorurl(&xorurl)?;
+            if safeurl.content_type() == ContentType::Wallet {
+                if OutputFmt::Pretty == output_fmt {
+                    println!("Spendable balances of wallet at \"{xorurl}\":");
+                    let table = gen_wallet_table(safe, &data).await?;
+                    println!("{table}");
+                } else {
+                    println!("{}", serialise_output(&(url.to_string(), data), output_fmt));
+                }
+            } else {
+                println!("Type of content not supported yet by 'cat' command.");
+            }
+        }
+        SafeData::SafeKey { .. } => {
+            println!("No content to show since the URL targets a SafeKey. Use the 'dog' command to obtain additional information about the targeted SafeKey.");
+        }
+        SafeData::NrsEntry { .. } | SafeData::Register { .. } => {
+            println!("Type of content not supported yet by 'cat' command.");
+        }
+        SafeData::FilesContainer { .. }
+        | SafeData::PublicFile { .. }
+        | SafeData::NrsMapContainer { .. } => {
+            println!("Type of content not supported by 'cat' command without 'data-network' feature enabled.");
+        }
+    }
+
+    Ok(())
+}
+
+#[cfg(feature = "data-network")]
 pub async fn cat_commander(cmd: CatCommands, output_fmt: OutputFmt, safe: &Safe) -> Result<()> {
     let link = get_from_arg_or_stdin(cmd.location, None)?;
     let url = get_target_url(&link)?;
