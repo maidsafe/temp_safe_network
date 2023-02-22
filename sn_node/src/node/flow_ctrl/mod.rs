@@ -83,14 +83,14 @@ impl FlowCtrl {
     /// returning the channel where it can receive commands on
     pub(crate) async fn start(
         node: MyNode,
-        cmd_ctrl: CmdCtrl,
+        mut cmd_ctrl: CmdCtrl,
         join_retry_timeout: Duration,
         incoming_msg_events: Receiver<CommEvent>,
         data_replication_receiver: Receiver<(Vec<DataAddress>, Peer)>,
         fault_cmds_channels: (Sender<FaultsCmd>, Receiver<FaultsCmd>),
     ) -> (Sender<(Cmd, Vec<usize>)>, Receiver<RejoinReason>) {
         let node_context = node.context();
-        let (cmd_sender_channel, incoming_cmds_from_apis) = mpsc::channel(CMD_CHANNEL_SIZE);
+        let (cmd_sender_channel, mut incoming_cmds_from_apis) = mpsc::channel(CMD_CHANNEL_SIZE);
         let (rejoin_network_tx, rejoin_network_rx) = mpsc::channel(STANDARD_CHANNEL_SIZE);
 
         let all_members = node_context
@@ -125,16 +125,31 @@ impl FlowCtrl {
             timestamps: PeriodicChecksTimestamps::now(),
         };
 
+        // first start listening for msgs
+        let cmd_channel_for_msgs = cmd_sender_channel.clone();
+        Self::listen_for_comm_events(incoming_msg_events, cmd_channel_for_msgs);
+
+        // second do this until join
+        // let _handle = tokio::task::spawn(
+        let node = flow_ctrl
+            .join_processing(
+                node,
+                &mut cmd_ctrl,
+                join_retry_timeout,
+                &mut incoming_cmds_from_apis,
+                &rejoin_network_tx,
+            )
+            .await;
+        // /);
+
         let _handle = tokio::task::spawn(flow_ctrl.process_cmds_and_periodic_checks(
             node,
             cmd_ctrl,
-            join_retry_timeout,
             incoming_cmds_from_apis,
             rejoin_network_tx,
         ));
 
-        let _cmd_channel = cmd_sender_channel.clone();
-        let cmd_channel_for_msgs = cmd_sender_channel.clone();
+        // let _cmd_channel = cmd_sender_channel.clone();
 
         // // start a new thread to kick off incoming cmds
         // let _handle = tokio::task::spawn(async move {
@@ -165,21 +180,19 @@ impl FlowCtrl {
         // )
         // .await;
 
-        Self::listen_for_comm_events(incoming_msg_events, cmd_channel_for_msgs);
-
         (cmd_sender_channel, rejoin_network_rx)
     }
 
     /// This is a never ending loop as long as the node is live.
     /// This loop drives the periodic events internal to the node.
-    async fn process_cmds_and_periodic_checks(
-        mut self,
+    async fn join_processing(
+        &self,
         mut node: MyNode,
-        cmd_ctrl: CmdCtrl,
+        cmd_ctrl: &mut CmdCtrl,
         join_retry_timeout: Duration,
-        mut incoming_cmds_from_apis: Receiver<(Cmd, Vec<usize>)>,
-        rejoin_network_tx: Sender<RejoinReason>,
-    ) {
+        incoming_cmds_from_apis: &mut Receiver<(Cmd, Vec<usize>)>,
+        rejoin_network_tx: &Sender<RejoinReason>,
+    ) -> MyNode {
         // starting context
         // let mut latest_context = node.context();
         let mut is_member = false;
@@ -202,9 +215,15 @@ impl FlowCtrl {
                     .await;
             }
 
+            if is_member {
+                debug!("we joined; breaking join loop!!!");
+
+                break;
+            }
+
             // second, check if we've joined... if not fire off cmds for that
             // this must come _after_ clearing the cmd channel
-            if !is_member && last_join_attempt.elapsed() > join_retry_timeout {
+            if last_join_attempt.elapsed() > join_retry_timeout {
                 last_join_attempt = Instant::now();
 
                 debug!("we're not joined so firing off cmd");
@@ -227,15 +246,47 @@ impl FlowCtrl {
             }
 
             // cheeck if we are a member
-            if !is_member {
-                // await for join retry time
-                let our_name = node.info().name();
-                is_member = node.network_knowledge.is_section_member(&our_name);
+            // await for join retry time
+            let our_name = node.info().name();
+            is_member = node.network_knowledge.is_section_member(&our_name);
 
-                // skip periodics
-                if is_member {
-                    debug!("we joined!!!");
-                }
+            // skip periodics
+            if is_member {
+                debug!("we joined!!!");
+            }
+
+            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        }
+
+        node
+        // error!("Processing loop dead");
+    }
+
+    /// This is a never ending loop as long as the node is live.
+    /// This loop drives the periodic events internal to the node.
+    async fn process_cmds_and_periodic_checks(
+        mut self,
+        mut node: MyNode,
+        cmd_ctrl: CmdCtrl,
+        mut incoming_cmds_from_apis: Receiver<(Cmd, Vec<usize>)>,
+        rejoin_network_tx: Sender<RejoinReason>,
+    ) {
+        let cmd_channel = self.cmd_sender_channel.clone();
+        loop {
+            let mut processed = false;
+            // first do any pending processing
+            while let Ok((cmd, cmd_id)) = incoming_cmds_from_apis.try_recv() {
+                trace!("Taking cmd off stack: {cmd:?}");
+                processed = true;
+                cmd_ctrl
+                    .process_cmd_job(
+                        &mut node,
+                        cmd,
+                        cmd_id,
+                        cmd_channel.clone(),
+                        rejoin_network_tx.clone(),
+                    )
+                    .await;
             }
 
             // lastly perform periodics
