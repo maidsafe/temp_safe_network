@@ -29,6 +29,7 @@ const DEFAULT_ROOT_DIR_NAME: &str = "root_dir";
 /// Node configuration
 #[derive(Default, Clone, Debug, Serialize, Deserialize, clap::StructOpt)]
 #[clap(rename_all = "kebab-case", bin_name = "sn_node", version)]
+#[clap(global_settings = &[clap::AppSettings::ColoredHelp])]
 pub struct Config {
     /// The address to be credited when this node farms SafeCoin.
     /// A hex formatted BLS public key.
@@ -63,12 +64,12 @@ pub struct Config {
     /// Number of rotated files left not compressed
     #[clap(long, default_value = "100")] // 100*10mb files by default
     pub logs_uncompressed: usize,
-    /// Attempt to self-update?
+    /// Update sn_node to the latest available version
     #[clap(long)]
     pub update: bool,
-    /// Attempt to self-update without starting the node process
-    #[clap(long)]
-    pub update_only: bool,
+    /// Do not prompt to confirm the update
+    #[clap(short = 'y', long = "no-confirm")]
+    pub no_confirm: bool,
     /// Outputs logs in json format for easier processing
     #[clap(short, long)]
     pub json_logs: bool,
@@ -105,16 +106,11 @@ impl Config {
     /// and overrides values with any equivalent cmd line args.
     pub fn new() -> Result<Self, Error> {
         let mut config = Config::default();
-
         let cmd_line_args = Config::parse();
-        cmd_line_args.validate()?;
-
         config.merge(cmd_line_args);
-
         if let Err(err) = config.clear_data_from_disk() {
             error!("Error clearing the data from disk: {err:?}");
         }
-
         info!("Node config to be used: {:?}", config);
         Ok(config)
     }
@@ -278,9 +274,9 @@ impl Config {
         self.update
     }
 
-    /// Attempt to self-update without starting the node process
-    pub fn update_only(&self) -> bool {
-        self.update_only
+    /// Do not prompt for confirmation
+    pub fn no_confirm(&self) -> bool {
+        self.no_confirm
     }
 
     // Clear data from of a previous node running on the same PC, if the config flag is set to do so.

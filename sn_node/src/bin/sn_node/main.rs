@@ -29,12 +29,12 @@
 )]
 
 use sn_node::node::{start_new_node, Config, Error as NodeError, RejoinReason};
+use sn_updater::{update_binary, UpdateType};
 
 use clap::{CommandFactory, Parser};
 use clap_complete::{generate, Shell};
 use color_eyre::{Section, SectionExt};
 use eyre::{eyre, ErrReport, Result};
-use self_update::{cargo_crate_version, Status};
 use std::{io::Write, process::exit};
 use tokio::runtime::Runtime;
 use tokio::time::Duration;
@@ -112,21 +112,19 @@ fn create_runtime_and_node(config: &Config) -> Result<()> {
         return Ok(());
     }
 
-    if config.update() || config.update_only() {
-        match update() {
-            Ok(status) => {
-                if let Status::Updated { .. } = status {
-                    println!("Node has been updated. Please restart.");
-                    exit(0);
-                }
+    if config.update() {
+        match update(config.no_confirm()) {
+            Ok(()) => {
+                exit(0);
             }
-            Err(e) => println!("Updating node failed: {e:?}"),
-        }
-
-        if config.update_only() {
-            exit(0);
+            Err(e) => {
+                println!("{e:?}");
+                exit(1);
+            }
         }
     }
+
+    config.validate()?;
 
     let our_pid = std::process::id();
     let join_timeout = Duration::from_secs(JOIN_TIMEOUT_SEC);
@@ -252,44 +250,10 @@ fn create_runtime_and_node(config: &Config) -> Result<()> {
     }
 }
 
-fn update() -> Result<Status, Box<dyn (::std::error::Error)>> {
-    info!("Checking for updates...");
-    let target = self_update::get_target();
-
-    let releases = self_update::backends::github::ReleaseList::configure()
-        .repo_owner("maidsafe")
-        .repo_name("safe_network")
-        .with_target(target)
-        .build()?
-        .fetch()?;
-
-    if releases.is_empty() {
-        println!("Current version is '{}'", cargo_crate_version!());
-        println!("No releases are available for updates");
-        return Ok(Status::UpToDate(
-            "No releases are available for updates".to_string(),
-        ));
-    }
-
-    tracing::debug!("Target for update is {}", target);
-    tracing::debug!("Found releases: {:#?}\n", releases);
-    let bin_name = if target.contains("pc-windows") {
-        "sn_node.exe"
-    } else {
-        "sn_node"
-    };
-    let status = self_update::backends::github::Update::configure()
-        .repo_owner("maidsafe")
-        .repo_name("safe_network")
-        .target(target)
-        .bin_name(bin_name)
-        .show_download_progress(true)
-        .no_confirm(true)
-        .current_version(cargo_crate_version!())
-        .build()?
-        .update()?;
-    println!("Update status: '{}'!", status.version());
-    Ok(status)
+fn update(no_confirm: bool) -> Result<()> {
+    let current_version = env!("CARGO_PKG_VERSION");
+    update_binary(UpdateType::Node, current_version, !no_confirm)
+        .map_err(|e| eyre!(format!("Failed to update sn_node: {e}")))
 }
 
 fn gen_completions_for_shell(shell: Shell, mut cmd: clap::Command) -> Result<Vec<u8>, String> {
