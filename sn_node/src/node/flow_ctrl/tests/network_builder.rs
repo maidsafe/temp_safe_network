@@ -721,7 +721,7 @@ impl TestNetwork {
     fn build_network_knowledge(
         &self,
         sap: &SectionSigned<SectionAuthorityProvider>,
-        sk_set: &SecretKeySet,
+        _sk_set: &SecretKeySet,
     ) -> Result<NetworkKnowledge> {
         let gen_sap = self
             .get_sap_single_churn(Prefix::default(), Some(0))?
@@ -748,16 +748,11 @@ impl TestNetwork {
                 .update_the_section_tree(update)
                 .wrap_err("Error updating the SectionTree")?;
         };
+
         let mut nw = NetworkKnowledge::new(sap.prefix(), tree)
             .wrap_err("Failed to create NetworkKnowledge")?;
-
-        for node_state in sap.members().cloned() {
-            let sig = TestKeys::get_section_sig(&sk_set.secret_key(), &node_state)?;
-            let _updated = nw.update_member(SectionSigned {
-                value: node_state,
-                sig,
-            });
-        }
+        let initial_members: BTreeSet<_> = sap.members().cloned().collect();
+        nw.reset_initial_members(initial_members);
 
         Ok(nw)
     }

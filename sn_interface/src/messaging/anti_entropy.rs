@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::system::SectionMembers;
+use super::system::SectionDecisions;
 
 use crate::network_knowledge::SectionTreeUpdate;
 
@@ -47,5 +47,5 @@ pub enum AntiEntropyKind {
         bounced_msg: UsrMsgBytes,
     },
     /// This AE message is sent to update a node or client when we notice they are behind
-    Update { members: SectionMembers },
+    Update { section_decisions: SectionDecisions },
 }

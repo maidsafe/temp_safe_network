@@ -251,13 +251,14 @@ mod tests {
     /// to (or greater that) `age`.
     fn create_relocation_trigger(
         sk_set: &bls::SecretKeySet,
+        gen: u64,
         age: u8,
         prefix: Prefix,
     ) -> Result<(Decision<NodeState>, MyNodeInfo, Comm, Receiver<CommEvent>)> {
         loop {
             let (info, comm, comm_rx) = gen_info_with_comm(MIN_ADULT_AGE, Some(prefix));
             if let Some((_trigger, decision)) =
-                try_create_relocation_trigger(info.id(), sk_set, age)?
+                try_create_relocation_trigger(info.id(), sk_set, gen, age)?
             {
                 return Ok((decision, info, comm, comm_rx));
             }
@@ -279,14 +280,13 @@ mod tests {
 
         let relocated_node = gen_node_id_in_prefix(MIN_ADULT_AGE - 1, prefix);
         let node_state = NodeState::joined(relocated_node, None);
-        let signed_node_state =
-            TestKeys::get_section_signed(&sk_set.secret_key(), node_state.clone())?;
-        assert!(section.update_member(signed_node_state));
+        let node_state = TestKeys::get_decision(&sk_set, 1, node_state)?;
+        assert!(section.try_update_member(node_state)?);
         // update our node with the new network_knowledge
         node.network_knowledge = section.clone();
 
         let (membership_decision, ..) =
-            create_relocation_trigger(&sk_set, relocated_node.age(), prefix)?;
+            create_relocation_trigger(&sk_set, 2, relocated_node.age(), prefix)?;
 
         let mut cmds =
             ProcessAndInspectCmds::new(Cmd::HandleMembershipDecision(membership_decision));
@@ -360,7 +360,7 @@ mod tests {
 
         // Find a node, that when joined will trigger the relocation of our relocation_node
         let (_, trig_info, trig_comm, trig_comm_rx) =
-            create_relocation_trigger(&sk_set, relocation_node_age, Prefix::default())?;
+            create_relocation_trigger(&sk_set, 1, relocation_node_age, Prefix::default())?;
         let trig_node = build_a_node_instance(&trig_info, &trig_comm, &network_knowledge)?;
         let trig_node = Arc::new(RwLock::new(TestNode::new(trig_node, msg_tracker.clone())));
         let _ = node_instances.insert((Prefix::default(), trig_info.name()), trig_node);
@@ -492,7 +492,7 @@ mod tests {
 
         // Find a node, that when joined will trigger the relocation of our relocation_node
         let (_, trig_info, trig_comm, trig_comm_rx) =
-            create_relocation_trigger(&sk_set, relocation_node_age, prefix0)?;
+            create_relocation_trigger(&sk_set, 1, relocation_node_age, prefix0)?;
         let trig_node = build_a_node_instance(&trig_info, &trig_comm, &network_knowledge_0)?;
         let trig_node = Arc::new(RwLock::new(TestNode::new(trig_node, msg_tracker.clone())));
         let _ = node_instances.insert((prefix0, trig_info.name()), trig_node);

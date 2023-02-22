@@ -212,11 +212,6 @@ impl Membership {
         }
     }
 
-    pub(crate) fn current_section_members(&self) -> BTreeMap<XorName, NodeState> {
-        self.joined_section_members_at_gen(self.gen)
-            .unwrap_or_default()
-    }
-
     pub(crate) fn archived_members(&self) -> BTreeSet<XorName> {
         let mut members = BTreeSet::from_iter(
             self.bootstrap_members
@@ -246,11 +241,8 @@ impl Membership {
         members
     }
 
-    /// get only section members reporting Joined at gen
-    pub(crate) fn joined_section_members_at_gen(
-        &self,
-        gen: Generation,
-    ) -> Result<BTreeMap<XorName, NodeState>> {
+    /// get only section members reporting Joined till gen
+    fn section_members(&self, gen: Generation) -> Result<BTreeMap<XorName, NodeState>> {
         let mut members = BTreeMap::from_iter(
             self.bootstrap_members
                 .iter()
@@ -439,10 +431,8 @@ impl Membership {
             .consensus_at_gen(signed_vote.vote.gen)
             .map_err(|_| Error::RequestAntiEntropy)?;
 
-        let members = BTreeMap::from_iter(
-            self.joined_section_members_at_gen(signed_vote.vote.gen - 1)?
-                .into_iter(),
-        );
+        let members =
+            BTreeMap::from_iter(self.section_members(signed_vote.vote.gen - 1)?.into_iter());
 
         let archived_members = self.archived_members();
 

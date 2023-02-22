@@ -74,7 +74,7 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
         gen_addr(),
     );
 
-    let (relocation_trigger, _) = create_relocation_trigger(&sk_set, old_info.age() + 1)?;
+    let (relocation_trigger, _) = create_relocation_trigger(&sk_set, 1, old_info.age() + 1)?;
     let relocated_state = NodeState::relocated(old_info.id(), Some(old_name), relocation_trigger);
     let section_signed_state = TestKeys::get_section_signed(&sk_set.secret_key(), relocated_state)?;
 
@@ -123,7 +123,7 @@ async fn handle_agreement_on_online() -> Result<()> {
     let mut approval_sent = false;
     let new_node_state = NodeState::joined(new_node_id, None);
 
-    let membership_decision = section_decision(&sk_set, new_node_state.clone())?;
+    let membership_decision = section_decision(&sk_set, 1, new_node_state.clone())?;
     let mut all_cmds =
         ProcessAndInspectCmds::new(Cmd::HandleMembershipDecision(membership_decision));
 
@@ -177,7 +177,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
     let new_node = gen_node_id(MIN_ADULT_AGE + 1);
     let node_state = NodeState::joined(new_node, None);
 
-    let membership_decision = section_decision(&sk_set, node_state.clone())?;
+    let membership_decision = section_decision(&sk_set, 1, node_state.clone())?;
 
     // Force this node to join
     node.membership
@@ -362,7 +362,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
         AntiEntropyMsg::AntiEntropy {
             section_tree_update,
             kind: AntiEntropyKind::Update {
-                members: BTreeSet::default(),
+                section_decisions: Default::default(),
             },
         },
     )?;
@@ -423,7 +423,7 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
         AntiEntropyMsg::AntiEntropy {
             section_tree_update: bogus_section_tree_update,
             kind: AntiEntropyKind::Update {
-                members: BTreeSet::default(),
+                section_decisions: Default::default(),
             },
         },
     )?;
@@ -633,10 +633,13 @@ async fn handle_demote_during_split() -> Result<()> {
         .sap_with_members(
             prefix0,
             nodes_a.iter().cloned().chain(iter::once(node_c.clone())),
-            members.clone(),
+            nodes_a
+                .iter()
+                .cloned()
+                .chain([info.clone(), node_c.clone()]),
         )
         // post-split prefix-1
-        .sap_with_members(prefix1, nodes_b.clone(), members)
+        .sap_with_members(prefix1, nodes_b.clone(), nodes_b.clone())
         .build()?;
 
     let sk_set_gen = env.get_secret_key_set(Prefix::default(), None)?;

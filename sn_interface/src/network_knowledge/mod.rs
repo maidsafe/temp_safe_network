@@ -34,7 +34,7 @@ use self::{node_state::ChurnId, section_member_history::SectionMemberHistory};
 
 use crate::{
     messaging::{
-        system::{SectionMembers, SectionSig, SectionSigned},
+        system::{SectionDecisions, SectionSig, SectionSigned},
         AntiEntropyMsg, Dst, NetworkMsg,
     },
     types::NodeId,
@@ -157,16 +157,6 @@ pub struct NetworkKnowledge {
     section_tree: SectionTree,
 }
 
-// Convert SectionSigned to Decision
-fn section_signed_to_decision(section_signed: SectionSigned<NodeState>) -> Decision<NodeState> {
-    let mut proposals = BTreeMap::new();
-    let _ = proposals.insert(section_signed.value, section_signed.sig.signature);
-    Decision {
-        generation: 0,
-        proposals,
-    }
-}
-
 impl NetworkKnowledge {
     /// Creates a new `NetworkKnowledge` instance. The prefix is used to choose the
     /// `signed_sap` from the provided SectionTree
@@ -201,16 +191,10 @@ impl NetworkKnowledge {
         };
         let mut network_knowledge = Self::new(Prefix::default(), section_tree)?;
 
-        for node_id in network_knowledge.signed_sap.elders() {
-            let node_state = NodeState::joined(*node_id, None);
-            let sig = create_first_sig(&public_key_set, &secret_key_share, &node_state)?;
-            let _changed = network_knowledge
-                .section_members
-                .update(section_signed_to_decision(SectionSigned {
-                    value: node_state,
-                    sig,
-                }));
-        }
+        let initial_members = BTreeSet::from_iter([NodeState::joined(node_id, None)]);
+        network_knowledge
+            .section_members
+            .reset_initial_members(initial_members);
 
         let section_key_share = SectionKeyShare {
             public_key_set,
@@ -257,6 +241,10 @@ impl NetworkKnowledge {
                 info!("Updated network section tree with SAP for {:?}", sap_prefix);
                 // update the signed_sap only if the prefix matches
                 if sap_prefix.matches(our_name) {
+                    // Our section SAP is changed, reset the bootstrap members
+                    let bootstrap_members: BTreeSet<_> = signed_sap.members().cloned().collect();
+                    self.reset_initial_members(bootstrap_members);
+
                     let our_prev_prefix = self.prefix();
                     // Remove any node which doesn't belong to our new section's prefix
                     self.section_members.retain(&sap_prefix);
@@ -287,17 +275,17 @@ impl NetworkKnowledge {
         Ok(there_was_an_update)
     }
 
-    /// Update our network knowledge with the provided `SectionTreeUpdate`
+    /// Update our section members with the provided `SectionDecisions`
     pub fn update_section_member_knowledge(
         &mut self,
-        updated_members: Option<SectionMembers>,
+        updated_members: Option<SectionDecisions>,
     ) -> Result<bool> {
-        trace!("Attempting to update section member's knowledge");
+        trace!("Attempting to update section members` knowledge");
         let mut there_was_an_update = false;
 
         // Update members if changes were provided
         if let Some(members) = updated_members {
-            if !members.is_empty() && self.merge_members(members)? {
+            if self.update_members(members)? {
                 there_was_an_update = true;
                 let prefix = self.prefix();
                 info!(
@@ -328,6 +316,11 @@ impl NetworkKnowledge {
     // Returns reference to network section tree
     pub fn section_tree(&self) -> &SectionTree {
         &self.section_tree
+    }
+
+    // Returns section decisions since last SAP change
+    pub fn section_decisions(&self) -> SectionDecisions {
+        self.section_members.section_decisions()
     }
 
     // Returns mutable reference to network section tree
@@ -432,51 +425,27 @@ impl NetworkKnowledge {
         self.section_tree.get_sections_dag().has_key(section_key)
     }
 
-    /// Try to merge this `NetworkKnowledge` members with `nodes`.
-    /// Checks if we're already up to date before attempting to verify and merge members
-    pub fn merge_members(&mut self, nodes: BTreeSet<Decision<NodeState>>) -> Result<bool> {
-        let mut there_was_an_update = false;
-
-        for decision in &nodes {
-            // TODO: Decisioin requires the PublicKeySet to validate,
-            //       however NetworkKnowledge only retains the PublicKey info
-            // if !decision.validate(&self.section_chain()).is_ok() {
-            //     error!("Can't update decision {decision:?}");
-            //     continue;
-            // }
-
-            trace!("Updating decision {decision:?}",);
-            there_was_an_update |= self.section_members.update(decision.clone());
-        }
-
-        self.section_members.retain(&self.prefix());
-
-        Ok(there_was_an_update)
+    /// This function shall only get called at the time of SAP change
+    pub fn reset_initial_members(&mut self, new_initial_members: BTreeSet<NodeState>) {
+        self.section_members
+            .reset_initial_members(new_initial_members)
     }
 
-    /// Update the member. Returns whether it actually updated it.
-    pub fn update_member(&mut self, node_state: SectionSigned<NodeState>) -> bool {
-        let node_name = node_state.name();
-        trace!(
-            "Updating section member state, name: {node_name:?}, new state: {:?}",
-            node_state.state()
-        );
-
-        // let's check the node state is properly signed by one of the keys in our chain
-        if !node_state.verify(&self.section_chain()) {
-            error!(
-                "Can't update section member, name: {node_name:?}, new state: {:?}",
-                node_state.state()
-            );
-            return false;
+    /// Try to merge this `NetworkKnowledge` members with `peers`.
+    /// Checks if we're already up to date before attempting to verify and merge members
+    pub fn update_members(&mut self, peers: SectionDecisions) -> Result<bool> {
+        for decision in peers.iter() {
+            // The update will be terminated on any of failed validation.
+            decision.validate(&self.signed_sap.public_key_set())?;
         }
 
-        let updated = self
-            .section_members
-            .update(section_signed_to_decision(node_state));
-        trace!("Section member state, name: {node_name:?}, updated: {updated}");
+        Ok(self.section_members.update_peers(peers))
+    }
 
-        updated
+    /// Try update one member with the incoming decision. Returns whether it actually updated.
+    pub fn try_update_member(&mut self, decision: Decision<NodeState>) -> Result<bool> {
+        decision.validate(&self.signed_sap.public_key_set())?;
+        self.section_members.update(decision)
     }
 
     /// Returns the members of our section
@@ -525,9 +494,9 @@ impl NetworkKnowledge {
         self.section_members.members()
     }
 
-    /// Returns joined members with Decision info.
-    pub fn section_members_with_decision(&self) -> BTreeSet<Decision<NodeState>> {
-        self.section_members.section_members_with_decision()
+    /// Returns joined members at the specific generation.
+    pub fn members_at_gen(&self, gen: u64) -> BTreeMap<XorName, NodeState> {
+        self.section_members.members_at_gen(gen)
     }
 
     /// Returns the list of members that have left our section

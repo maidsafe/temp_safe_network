@@ -22,11 +22,12 @@ pub(super) mod signature;
 pub mod test_utils {
     use crate::{
         messaging::system::{SectionSig, SectionSigned},
-        network_knowledge::{SectionAuthUtils, SectionKeyShare},
+        network_knowledge::{NodeState, SectionAuthUtils, SectionKeyShare},
     };
     use bls::{blstrs::Scalar, poly::Poly, SecretKey, SecretKeySet, Signature};
     use eyre::{eyre, Context, Result};
     use serde::Serialize;
+    use sn_consensus::{Ballot, Decision, SignedVote, Vote};
     use std::collections::{BTreeMap, BTreeSet};
 
     /// bls key related test utilities
@@ -69,6 +70,40 @@ pub mod test_utils {
         ) -> Result<SectionSigned<T>> {
             let sig = Self::get_section_sig(secret_key, &payload)?;
             Ok(SectionSigned::new(payload, sig))
+        }
+
+        /// Create decision for the given payload using provided `bls::SecretKey` and generation
+        pub fn get_decision(
+            sk_set: &SecretKeySet,
+            gen: u64,
+            node_state: NodeState,
+        ) -> Result<Decision<NodeState>> {
+            let secret_key = sk_set.secret_key();
+            let mut proposals = BTreeMap::new();
+            let section_signed = Self::get_section_signed(&secret_key, node_state.clone())?;
+            let _ = proposals.insert(section_signed.value, section_signed.sig.signature);
+
+            let vote = Vote {
+                gen,
+                ballot: Ballot::Propose(node_state),
+                faults: BTreeSet::new(),
+            };
+            let sig = sk_set
+                .secret_key_share(0)
+                .sign(bincode::serialize(&vote).expect("Cannot serialise vote"));
+            let signed_vote = SignedVote {
+                voter: 0,
+                sig,
+                vote,
+            };
+            let mut votes = BTreeSet::new();
+            let _ = votes.insert(signed_vote);
+
+            Ok(Decision::<NodeState> {
+                votes,
+                proposals,
+                faults: BTreeSet::new(),
+            })
         }
 
         /// Generate a `SectionKeyShare` from the `bls::SecretKeySet` and given index

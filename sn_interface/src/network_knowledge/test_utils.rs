@@ -104,6 +104,7 @@ pub fn expand_age_pattern(age_pattern: Option<&[u8]>, len: usize) -> Vec<u8> {
 
 pub fn section_decision<P: Proposition>(
     secret_key_set: &bls::SecretKeySet,
+    gen: u64,
     proposal: P,
 ) -> Result<Decision<P>> {
     let n = secret_key_set.threshold() + 1;
@@ -114,7 +115,7 @@ pub fn section_decision<P: Proposition>(
 
     let first_vote = nodes[0]
         .sign_vote(Vote {
-            gen: 0,
+            gen,
             ballot: Ballot::Propose(proposal),
             faults: Default::default(),
         })
@@ -293,12 +294,13 @@ where
 pub fn try_create_relocation_trigger(
     node_id: NodeId,
     sk_set: &bls::SecretKeySet,
+    gen: u64,
     age: u8,
 ) -> Result<Option<(RelocationTrigger, Decision<NodeState>)>> {
     use super::relocation_check;
 
     let node_state = NodeState::joined(node_id, None);
-    let decision = section_decision(sk_set, node_state)?;
+    let decision = section_decision(sk_set, gen, node_state)?;
     let relocation_trigger = RelocationTrigger::new(decision.clone());
     let churn_id = relocation_trigger.churn_id();
 
@@ -316,11 +318,13 @@ pub fn try_create_relocation_trigger(
 /// to (or greater that) `age`.
 pub fn create_relocation_trigger(
     sk_set: &bls::SecretKeySet,
+    gen: u64,
     age: u8,
 ) -> Result<(RelocationTrigger, Decision<NodeState>)> {
     loop {
         let node_id = gen_node_id(MIN_ADULT_AGE);
-        if let Some((trigger, decision)) = try_create_relocation_trigger(node_id, sk_set, age)? {
+        if let Some((trigger, decision)) = try_create_relocation_trigger(node_id, sk_set, gen, age)?
+        {
             return Ok((trigger, decision));
         }
     }

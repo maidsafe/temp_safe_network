@@ -28,13 +28,13 @@ use bls::PublicKey as BlsPublicKey;
 use ed25519::Signature;
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::BTreeMap,
     fmt::{Display, Formatter},
 };
 use xor_name::XorName;
 
-/// List of nodes of a section
-pub type SectionMembers = BTreeSet<Decision<NodeState>>;
+/// List of section decisions since the last SAP change
+pub type SectionDecisions = Vec<Decision<NodeState>>;
 
 #[derive(Clone, PartialEq, Serialize, Deserialize, custom_debug::Debug)]
 #[allow(clippy::large_enum_variant, clippy::derive_partial_eq_without_eq)]
