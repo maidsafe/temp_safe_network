@@ -13,6 +13,7 @@ use std::{
     fs::{create_dir_all, File},
     path::PathBuf,
 };
+use url::Url;
 
 const BASE_DOWNLOAD_URL: &str = "https://sn-node.s3.eu-west-2.amazonaws.com";
 
@@ -30,8 +31,8 @@ pub fn download_and_install_node(
     exec_file_name: &str,
     repo_name: &str,
     version: Option<String>,
-) -> Result<String> {
-    let target = get_target();
+) -> Result<()> {
+    let target = get_target_platform();
     let updater = self_update::backends::github::Update::configure()
         .repo_owner("maidsafe")
         .repo_name(repo_name)
@@ -50,12 +51,13 @@ pub fn download_and_install_node(
             .wrap_err("Failed to obtain the latest release from Github")?;
         get_version_from_release_version(&release.version)?
     };
-    download_and_install_bin(target_path, &target, &version, exec_file_name)
+    let url = format!("{BASE_DOWNLOAD_URL}/sn_cli-{version}-{target}.tar.gz");
+    let target_path = target_path.join(exec_file_name);
+    download_and_install_bin(&url, target_path)?;
+    Ok(())
 }
 
-// Private helpers
-
-fn get_target() -> String {
+pub fn get_target_platform() -> String {
     let target = self_update::get_target();
     if target.contains("linux") {
         // For now, all of our Linux builds are using musl, so we can make this
@@ -66,16 +68,23 @@ fn get_target() -> String {
     }
 }
 
-fn download_and_install_bin(
-    target_path: PathBuf,
-    target: &str,
-    version: &str,
-    exec_file_name: &str,
-) -> Result<String> {
-    println!("Downloading sn_node version: {version}");
+pub fn download_and_install_bin(url: &str, target_file_path: PathBuf) -> Result<()> {
+    println!("Downloading release from: {url}");
+    let url = Url::parse(url)?;
+    let archive_file_name = match url.path_segments() {
+        Some(mut segments) => match segments.next_back() {
+            Some(file_name) => file_name,
+            None => {
+                return Err(eyre!("No filename in URL"));
+            }
+        },
+        None => {
+            return Err(eyre!("No path in URL"));
+        }
+    };
+
     let tmp_dir = std::env::temp_dir();
-    let archive_file_name = format!("sn_node-{version}-{target}.tar.gz");
-    let tmp_tarball_path = tmp_dir.join(&archive_file_name);
+    let tmp_tarball_path = tmp_dir.join(archive_file_name);
     let tmp_tarball = File::create(&tmp_tarball_path).wrap_err_with(|| {
         format!(
             "Error creating temp file ('{}') for downloading the release",
@@ -83,38 +92,47 @@ fn download_and_install_bin(
         )
     })?;
 
-    let download_url = format!("{BASE_DOWNLOAD_URL}/{archive_file_name}");
-    println!("Downloading {download_url}...");
-    self_update::Download::from_url(&download_url)
+    self_update::Download::from_url(url.as_ref())
         .show_progress(true)
         .download_to(&tmp_tarball)
-        .wrap_err_with(|| format!("Error downloading release from '{download_url}'"))?;
+        .wrap_err_with(|| format!("Error downloading release from '{url}'"))?;
 
-    if !target_path.exists() {
-        println!("Creating '{}' folder", target_path.display());
-        create_dir_all(target_path.clone())
+    let target_dir_path = target_file_path
+        .parent()
+        .ok_or_else(|| eyre!("Could not obtain parent from target path"))?;
+    if !target_dir_path.exists() {
+        println!("Creating parent directory at {}", target_dir_path.display());
+        create_dir_all(target_dir_path)
             .wrap_err("Couldn't create target path to install binary")?;
     }
 
+    let bin_name = target_file_path
+        .file_name()
+        .ok_or_else(|| eyre!("Could not obtain file name from target file path"))?
+        .to_str()
+        .ok_or_else(|| eyre!("Could not obtain str from OsStr"))?;
     println!(
-        "Installing {} binary at {} ...",
-        exec_file_name,
-        target_path.display()
+        "Extracting {} binary to {}...",
+        bin_name,
+        target_file_path.display()
     );
     self_update::Extract::from_source(&tmp_tarball_path)
-        .extract_file(target_path.as_path(), exec_file_name)
+        .extract_file(target_dir_path, bin_name)
         .wrap_err_with(|| {
             format!(
-                "Error extracting binary from downloaded asset '{}'",
+                "Error extracting binary from '{}'",
                 tmp_tarball_path.display(),
             )
         })?;
 
-    set_exec_perms(target_path.join(exec_file_name))?;
-
+    set_exec_perms(target_file_path)?;
     println!("Done!");
-    Ok(target_path.display().to_string())
+    Ok(())
 }
+
+///
+/// Private Helpers
+///
 
 #[cfg(target_os = "windows")]
 #[allow(clippy::unnecessary_wraps)]
@@ -166,7 +184,7 @@ fn set_exec_perms(file_path: PathBuf) -> Result<()> {
 ///
 /// The `release_version` input is in the form "0.17.1-0.15.3-0.2.1-0.78.2-0.73.3-0.76.1-0.69.0",
 /// which is the `sn_interface`, `sn_fault_detection`, `sn_comms`, `sn_client`, `sn_node`,
-/// `sn_api`, `sn_cli` respectively. This function will return the `safe_network` part.
+/// `sn_api`, `sn_cli` respectively. This function will return the `sn_node` part.
 fn get_version_from_release_version(release_version: &str) -> Result<String> {
     let mut parts = release_version.split('-');
     parts.next();

@@ -118,7 +118,7 @@ impl Config {
     /// Validate configuration that came from the cmd line.
     ///
     /// `StructOpt` doesn't support validation that crosses multiple field values.
-    fn validate(&self) -> Result<(), Error> {
+    pub fn validate(&self) -> Result<(), Error> {
         if !(self.first.is_some() ^ self.network_contacts_file.is_some()) {
             return Err(Error::Configuration(
                 "Either the --first or --network-contacts-file argument is required, and they \
@@ -162,7 +162,7 @@ impl Config {
         self.logs_uncompressed = config.logs_uncompressed();
 
         self.update = config.update || self.update;
-        self.update_only = config.update_only || self.update_only;
+        self.no_confirm = config.no_confirm || self.no_confirm;
         self.clear_data = config.clear_data || self.clear_data;
         if config.first.is_some() {
             self.first = config.first;
