@@ -3991,6 +3991,7 @@ dependencies = [
  "sn_cmd_test_utilities",
  "sn_dbc",
  "sn_launch_tool",
+ "sn_updater",
  "tempfile",
  "tokio",
  "tracing",
@@ -4255,6 +4256,7 @@ dependencies = [
  "sn_fault_detection",
  "sn_interface",
  "sn_sdkg",
+ "sn_updater",
  "strum",
  "strum_macros",
  "sysinfo",
@@ -4288,6 +4290,15 @@ dependencies = [
  "serde",
  "thiserror",
  "tiny-keccak",
+]
+
+[[package]]
+name = "sn_updater"
+version = "0.1.0"
+dependencies = [
+ "self_update",
+ "thiserror",
+ "url",
 ]
 
 [[package]]

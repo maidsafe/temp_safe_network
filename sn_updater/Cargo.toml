@@ -1,0 +1,24 @@
+[package]
+authors = ["MaidSafe Developers <dev@maidsafe.net>"]
+description = "Provides utilities for updating Safe-related command line interfaces."
+documentation = "https://docs.rs/sn_node"
+edition = "2021"
+homepage = "https://maidsafe.net"
+license = "GPL-3.0"
+name = "sn_updater"
+readme = "README.md"
+repository = "https://github.com/maidsafe/safe_network"
+version = "0.1.0"
+
+[dependencies]
+thiserror = "1.0.23"
+url = "2.2.2"
+
+[dependencies.self_update]
+version = "0.32"
+default-features = false
+features = [
+    "rustls",
+    "archive-tar",
+    "compression-flate2",
+]
