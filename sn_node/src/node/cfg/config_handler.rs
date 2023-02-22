@@ -43,7 +43,7 @@ pub struct Config {
     #[clap(short, long, parse(from_os_str))]
     pub root_dir: Option<PathBuf>,
     /// Verbose output. `-v` is equivalent to logging with `warn`, `-vv` to `info`, `-vvv` to
-    /// `debug`, `-vvvv` to `trace`. This flag overrides RUST_LOG.
+    /// `debug`, `-vvvv` to `trace`. This is overridden by the `RUST_LOG` environment variable.
     #[clap(short, long, parse(from_occurrences))]
     pub verbose: u8,
     /// dump shell completions for: [bash, fish, zsh, powershell, elvish]
