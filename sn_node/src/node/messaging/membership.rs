@@ -186,8 +186,14 @@ impl MyNode {
             Vec::from_iter(leaving_nodes.iter().map(|(n, _)| n.name()))
         );
 
-        for (new_info, signature) in joining_nodes.iter().cloned() {
-            cmds.extend(self.handle_node_joined(new_info, signature).await);
+        if let Err(_err) = self.network_knowledge.try_update_member(decision.clone()) {
+            error!("Ignored decision {decision:?} as we are lagging");
+            cmds.push(Self::generate_probe_msg(&self.context())?);
+            return Ok(cmds);
+        }
+
+        for (new_info, _signature) in joining_nodes.iter().cloned() {
+            cmds.extend(self.handle_node_joined(new_info).await);
         }
 
         for (new_info, signature) in leaving_nodes.iter().cloned() {
@@ -284,25 +290,10 @@ impl MyNode {
         }
     }
 
-    async fn handle_node_joined(&mut self, new_state: NodeState, signature: Signature) -> Vec<Cmd> {
-        let sig = SectionSig {
-            public_key: self.network_knowledge.section_key(),
-            signature,
-        };
+    async fn handle_node_joined(&mut self, new_info: NodeState) -> Vec<Cmd> {
+        self.add_new_adult_to_trackers(new_info.name()).await;
 
-        let new_state = SectionSigned {
-            value: new_state,
-            sig,
-        };
-
-        if !self.network_knowledge.update_member(new_state.clone()) {
-            info!("ignore Online: {}", new_state.node_id());
-            return vec![];
-        }
-
-        self.add_new_adult_to_trackers(new_state.name()).await;
-
-        info!("handle Online: {:?}", new_state.value);
+        info!("handle Online: {:?}", new_info);
 
         vec![]
     }
@@ -329,18 +320,6 @@ impl MyNode {
         node_state: NodeState,
         signature: Signature,
     ) -> Option<Cmd> {
-        let sig = SectionSig {
-            public_key: self.network_knowledge.section_key(),
-            signature,
-        };
-
-        let node_state = SectionSigned {
-            value: node_state,
-            sig,
-        };
-
-        let _ = self.network_knowledge.update_member(node_state.clone());
-
         info!(
             "{}: {}",
             LogMarker::AcceptedNodeAsOffline,
@@ -353,6 +332,16 @@ impl MyNode {
         if node_state.is_relocated() {
             let node_id = *node_state.node_id();
             info!("Notify relocation to node {node_id:?}");
+
+            let sig = SectionSig {
+                public_key: self.network_knowledge.section_key(),
+                signature,
+            };
+
+            let node_state = SectionSigned {
+                value: node_state,
+                sig,
+            };
             let msg = NodeMsg::CompleteRelocation(node_state);
             Some(Cmd::send_msg(
                 msg,

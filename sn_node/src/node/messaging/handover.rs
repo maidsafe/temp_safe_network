@@ -311,11 +311,12 @@ impl MyNode {
 
     /// get joined members at gen
     fn get_members_at_gen(&self, gen: Generation) -> Result<BTreeMap<XorName, NodeState>> {
-        if let Some(m) = self.membership.as_ref() {
-            Ok(m.joined_section_members_at_gen(gen)?)
+        let members = self.network_knowledge.members_at_gen(gen);
+        if members.is_empty() {
+            error!("Failed to fetch members at generation {gen:?}");
+            Err(Error::InvalidMembershipGeneration)
         } else {
-            error!("Missing membership instance when checking handover SAP candidates");
-            Err(Error::MissingMembershipInstance)
+            Ok(members)
         }
     }
 

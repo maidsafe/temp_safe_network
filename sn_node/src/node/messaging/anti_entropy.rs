@@ -67,11 +67,12 @@ impl MyNode {
         recipients: Recipients,
         section_pk: BlsPublicKey,
     ) -> Cmd {
-        let members = context.network_knowledge.section_members_with_decision();
+        // TODO: only send out segment of decisions instead of whole
+        let section_decisions = context.network_knowledge.section_decisions();
 
         let ae_msg = NetworkMsg::AntiEntropy(AntiEntropyMsg::AntiEntropy {
             section_tree_update: MyNode::generate_ae_section_tree_update(context, Some(section_pk)),
-            kind: AntiEntropyKind::Update { members },
+            kind: AntiEntropyKind::Update { section_decisions },
         });
 
         Cmd::send_network_msg(ae_msg, recipients)
@@ -147,8 +148,8 @@ impl MyNode {
     ) -> Result<Vec<Cmd>> {
         let sap = section_tree_update.signed_sap.value.clone();
 
-        let members = if let AntiEntropyKind::Update { members } = &kind {
-            Some(members.clone())
+        let section_decisions = if let AntiEntropyKind::Update { section_decisions } = &kind {
+            Some(section_decisions.clone())
         } else {
             None
         };
@@ -160,10 +161,9 @@ impl MyNode {
             let updated_knowledge = node
                 .network_knowledge
                 .update_sap_knowledge_if_valid(section_tree_update, &starting_context.name)?;
-
             let updated_members = node
                 .network_knowledge
-                .update_section_member_knowledge(members)?;
+                .update_section_member_knowledge(section_decisions)?;
 
             if updated_members {
                 node.remove_dkg_sessions_with_missing_members();

@@ -72,4 +72,6 @@ pub enum Error {
     Consensus(#[from] sn_consensus::Error),
     #[error("An archived node attempted to rejoin the section")]
     ArchivedNodeRejoined,
+    #[error("We are behind, need to request AE update")]
+    AEOutdated,
 }

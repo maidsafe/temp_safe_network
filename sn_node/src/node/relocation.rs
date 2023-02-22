@@ -106,7 +106,7 @@ mod tests {
         let age = signature_trailing_zeros;
         let sk_set = bls::SecretKeySet::random(0, &mut thread_rng());
         let sk = sk_set.secret_key();
-        let (relocation_trigger, _) = create_relocation_trigger(&sk_set, age)?;
+        let (relocation_trigger, _) = create_relocation_trigger(&sk_set, 1, age)?;
         let churn_id = relocation_trigger.churn_id();
 
         // Create `Section` with `nodes` as its members and set the `elder_count()` oldest nodes as
@@ -123,15 +123,13 @@ mod tests {
             sk_set.public_keys(),
             0,
         );
+        let initial_members: BTreeSet<_> = sap.members().cloned().collect();
+
         let sap = TestKeys::get_section_signed(&sk, sap)?;
         let tree = SectionTree::new(sap)?;
         let mut network_knowledge = NetworkKnowledge::new(Prefix::default(), tree)?;
 
-        for node_id in &nodes {
-            let info = NodeState::joined(*node_id, None);
-            let info = TestKeys::get_section_signed(&sk, info)?;
-            assert!(network_knowledge.update_member(info));
-        }
+        network_knowledge.reset_initial_members(initial_members);
 
         let relocations =
             find_nodes_to_relocate(&network_knowledge, &relocation_trigger, BTreeSet::default());

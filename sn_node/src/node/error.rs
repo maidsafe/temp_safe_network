@@ -166,9 +166,9 @@ pub enum Error {
     /// Request Handover Anti Entropy
     #[error("RequestHandoverAntiEntropy {0}")]
     RequestHandoverAntiEntropy(u64),
-    /// Missing Membership Instance when checking a Handover vote's SAP
-    #[error("MissingMembershipInstance")]
-    MissingMembershipInstance,
+    /// Invalid membership generation, could be due to lagging
+    #[error("InvalidMembershipGeneration")]
+    InvalidMembershipGeneration,
     /// Failed to get parent SAP in chain when checking a Handover vote's SAP
     #[error("FailedToGetSAPforPrefix {0:?}")]
     FailedToGetSAPforPrefix(Prefix),
