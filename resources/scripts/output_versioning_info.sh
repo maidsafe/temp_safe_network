@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+sn_updater_version=""
 sn_fault_detection_version=""
 sn_interface_version=""
 sn_comms_version=""
@@ -9,6 +10,8 @@ sn_api_version=""
 sn_cli_version=""
 
 function get_crate_versions() {
+  sn_updater_version=$( \
+    grep "^version" < sn_updater/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
   sn_fault_detection_version=$( \
     grep "^version" < sn_fault_detection/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
   sn_interface_version=$( \
@@ -23,7 +26,8 @@ function get_crate_versions() {
 }
 
 function build_release_name() {
-  gh_release_name="Safe Network v$sn_fault_detection_version/"
+  gh_release_name="Safe Network v$sn_updater_version/"
+  gh_release_name="${gh_release_name}v$sn_fault_detection_version/"
   gh_release_name="${gh_release_name}v$sn_interface_version/"
   gh_release_name="${gh_release_name}v$sn_comms_version/"
   gh_release_name="${gh_release_name}v$sn_client_version/"
@@ -33,7 +37,8 @@ function build_release_name() {
 }
 
 function build_release_tag_name() {
-  gh_release_tag_name="$sn_interface_version-"
+  gh_release_tag_name="$sn_updater_version-"
+  gh_release_tag_name="${gh_release_tag_name}$sn_interface_version-"
   gh_release_tag_name="${gh_release_tag_name}$sn_fault_detection_version-"
   gh_release_tag_name="${gh_release_tag_name}$sn_comms_version-"
   gh_release_tag_name="${gh_release_tag_name}$sn_client_version-"
@@ -43,6 +48,7 @@ function build_release_tag_name() {
 }
 
 function output_version_info() {
+  echo "sn_updater_version=$sn_updater_version" >> $GITHUB_OUTPUT
   echo "sn_fault_detection_version=$sn_fault_detection_version" >> $GITHUB_OUTPUT
   echo "sn_interface_version=$sn_interface_version" >> $GITHUB_OUTPUT
   echo "sn_comms_version=$sn_comms_version" >> $GITHUB_OUTPUT
