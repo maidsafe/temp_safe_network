@@ -67,8 +67,8 @@ impl Dispatcher {
                     // TODO: clarify this err w/ peer
                     let Some(stream) = send_stream else {
                         error!("No stream for client tho....");
-                        return ;
-                        // return Err(Error::NoClientResponseStream);
+                        // return ;
+                        return Err(Error::NoClientResponseStream);
                     };
                     MyNode::handle_client_msg_for_us(context, msg_id, msg, auth, origin, stream)
                         .await
@@ -79,6 +79,73 @@ impl Dispatcher {
                     wire_msg,
                     send_stream,
                 } => MyNode::handle_msg(context, origin, wire_msg, send_stream).await,
+
+                Cmd::SendMsg {
+                    msg,
+                    msg_id,
+                    recipients,
+                } => {
+                    MyNode::send_msg(msg, msg_id, recipients, context)?;
+                    Ok(vec![])
+                }
+                Cmd::SendMsgEnqueueAnyResponse {
+                    msg,
+                    msg_id,
+                    recipients,
+                } => {
+                    debug!("send msg enque cmd...?");
+                    MyNode::send_and_enqueue_any_response(msg, msg_id, context, recipients)?;
+                    Ok(vec![])
+                }
+                Cmd::SendAndForwardResponseToClient {
+                    wire_msg,
+                    targets,
+                    client_stream,
+                    source_client,
+                } => {
+                    MyNode::send_and_forward_response_to_client(
+                        wire_msg,
+                        context,
+                        targets,
+                        client_stream,
+                        source_client,
+                    )?;
+                    Ok(vec![])
+                }
+                Cmd::SendNodeMsgResponse {
+                    msg,
+                    msg_id,
+                    correlation_id,
+                    recipient,
+                    send_stream,
+                } => Ok(MyNode::send_node_msg_response(
+                    msg,
+                    msg_id,
+                    correlation_id,
+                    recipient,
+                    context,
+                    send_stream,
+                )
+                .await?
+                .into_iter()
+                .collect()),
+                Cmd::SendDataResponse {
+                    msg,
+                    msg_id,
+                    correlation_id,
+                    send_stream,
+                    source_client,
+                } => Ok(MyNode::send_data_response(
+                    msg,
+                    msg_id,
+                    correlation_id,
+                    send_stream,
+                    context,
+                    source_client,
+                )
+                .await?
+                .into_iter()
+                .collect()),
                 cmd => {
                     error!("Cmd should not be moved off thread. It was not processsed {cmd:?}");
 
@@ -114,6 +181,8 @@ impl Dispatcher {
                     }
                 }
             }
+
+            Ok::<(), Error>(())
         });
     }
 

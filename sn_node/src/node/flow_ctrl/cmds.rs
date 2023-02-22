@@ -289,9 +289,14 @@ impl Cmd {
     // Should this Cmd be punted off thread (is it long running or likely frequent)
     pub(crate) fn can_go_off_thread(&self) -> bool {
         match self {
-            Cmd::HandleMsg { .. } | Cmd::TrackNodeIssue { .. } | Cmd::ProcessClientMsg { .. } => {
-                true
-            }
+            Cmd::HandleMsg { .. }
+            | Cmd::TrackNodeIssue { .. }
+            | Cmd::ProcessClientMsg { .. }
+            | Cmd::SendAndForwardResponseToClient { .. }
+            | Cmd::SendDataResponse { .. }
+            | Cmd::SendMsg { .. }
+            | Cmd::SendMsgEnqueueAnyResponse { .. }
+            | Cmd::SendNodeMsgResponse { .. } => true,
             _ => false,
         }
     }
