@@ -204,11 +204,9 @@ impl FlowCtrl {
             while let Ok((cmd, cmd_id)) = incoming_cmds_from_apis.try_recv() {
                 trace!("Taking cmd off stack: {cmd:?}");
                 processed = true;
-                let context = node.context();
                 cmd_ctrl
                     .process_cmd_job(
                         &mut node,
-                        &context,
                         cmd,
                         cmd_id,
                         cmd_channel.clone(),
@@ -275,7 +273,6 @@ impl FlowCtrl {
     ) {
         let cmd_channel = self.cmd_sender_channel.clone();
         // loop {
-        let mut latest_context = node.context();
         // first do any pending processing
         while let Some((cmd, cmd_id)) = incoming_cmds_from_apis.recv().await {
             trace!("Taking cmd off stack: {cmd:?}");
@@ -285,18 +282,12 @@ impl FlowCtrl {
             cmd_ctrl
                 .process_cmd_job(
                     &mut node,
-                    &latest_context,
                     cmd,
                     cmd_id,
                     cmd_channel.clone(),
                     rejoin_network_tx.clone(),
                 )
                 .await;
-
-            if may_modify_node {
-                // update our context
-                latest_context = node.context();
-            }
 
             // also see if we need to do any of thissss
             self.perform_periodic_checks(&mut node).await;
