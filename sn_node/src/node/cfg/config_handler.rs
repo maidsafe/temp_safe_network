@@ -29,7 +29,6 @@ const DEFAULT_ROOT_DIR_NAME: &str = "root_dir";
 /// Node configuration
 #[derive(Default, Clone, Debug, Serialize, Deserialize, clap::StructOpt)]
 #[clap(rename_all = "kebab-case", bin_name = "sn_node", version)]
-#[clap(global_settings = &[clap::AppSettings::ColoredHelp])]
 pub struct Config {
     /// The address to be credited when this node farms SafeCoin.
     /// A hex formatted BLS public key.
@@ -43,7 +42,7 @@ pub struct Config {
     #[clap(short, long, parse(from_os_str))]
     pub root_dir: Option<PathBuf>,
     /// Verbose output. `-v` is equivalent to logging with `warn`, `-vv` to `info`, `-vvv` to
-    /// `debug`, `-vvvv` to `trace`. This flag overrides RUST_LOG.
+    /// `debug`, `-vvvv` to `trace`. This is overridden by the `RUST_LOG` environment variable.
     #[clap(short, long, parse(from_occurrences))]
     pub verbose: u8,
     /// dump shell completions for: [bash, fish, zsh, powershell, elvish]
@@ -104,7 +103,7 @@ pub struct Config {
 impl Config {
     /// Returns a new `Config` instance.  Tries to read from the default node config file location,
     /// and overrides values with any equivalent cmd line args.
-    pub async fn new() -> Result<Self, Error> {
+    pub fn new() -> Result<Self, Error> {
         let mut config = Config::default();
 
         let cmd_line_args = Config::parse();
@@ -112,9 +111,9 @@ impl Config {
 
         config.merge(cmd_line_args);
 
-        config.clear_data_from_disk().await.unwrap_or_else(|_| {
-            error!("Error deleting data file from disk");
-        });
+        if let Err(err) = config.clear_data_from_disk() {
+            error!("Error clearing the data from disk: {err:?}");
+        }
 
         info!("Node config to be used: {:?}", config);
         Ok(config)
@@ -284,14 +283,18 @@ impl Config {
         self.update_only
     }
 
-    // Clear data from of a previous node running on the same PC
-    async fn clear_data_from_disk(&self) -> Result<()> {
-        if self.clear_data {
-            let path = project_dirs()?.join(self.root_dir()?);
-            if path.exists() {
-                fs::remove_dir_all(&path).await?;
-            }
+    // Clear data from of a previous node running on the same PC, if the config flag is set to do so.
+    fn clear_data_from_disk(&self) -> Result<()> {
+        // Only clear the data if we are configured to do so.
+        if !self.clear_data {
+            return Ok(());
         }
+
+        let path = project_dirs()?.join(self.root_dir()?);
+        if path.exists() {
+            std::fs::remove_dir_all(&path)?;
+        }
+
         Ok(())
     }
 

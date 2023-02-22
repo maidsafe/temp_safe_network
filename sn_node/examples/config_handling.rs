@@ -21,7 +21,7 @@ use tokio::{fs::remove_file, io};
 #[tokio::main]
 async fn main() -> Result<()> {
     // Create some config and write it to disk
-    let file_config = Config::new().await?;
+    let file_config = Config::new()?;
 
     // TODO: Uncomment the below lines once we enable reading config from disk
     // file_config.local_addr = Some("127.0.0.1".parse()?);
@@ -34,7 +34,7 @@ async fn main() -> Result<()> {
     // This should load the config from disk and
     // use the command line arguments to overwrite the config
     // with any provided arguments
-    let config = Config::new().await?;
+    let config = Config::new()?;
 
     let command_line_args = Config::from_args();
 
