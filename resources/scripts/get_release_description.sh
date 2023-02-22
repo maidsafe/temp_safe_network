@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+sn_updater_version=$( \
+  grep "^version" < sn_updater/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
 sn_fault_detection_version=$( \
   grep "^version" < sn_fault_detection/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
 sn_interface_version=$( \
@@ -15,6 +17,7 @@ sn_cli_version=$(grep "^version" < sn_cli/Cargo.toml | head -n 1 | awk '{ print 
 # The single quotes around EOF is to stop attempted variable and backtick expansion.
 read -r -d '' release_description << 'EOF'
 This release of Safe Network consists of:
+* Safe Updater v__SN_UPDATER_VERSION__
 * Safe Node Fault Detection v__SN_FAULT_DETECTION_VERSION__
 * Safe Network Interface v__SN_INTERFACE_VERSION__
 * Safe Node Comms v__SN_COMMS_VERSION__
@@ -22,6 +25,10 @@ This release of Safe Network consists of:
 * Safe Node v__SN_NODE_VERSION__
 * Safe API v__SN_API_VERSION__
 * Safe CLI v__SN_CLI_VERSION__
+
+## Safe Updater Changelog
+
+__SN_UPDATER_CHANGELOG_TEXT__
 
 ## Safe Network Interface Changelog
 
@@ -180,6 +187,7 @@ sn_cli_tar_aarch64_checksum=$(sha256sum \
     "./deploy/prod/safe/sn_cli-$sn_cli_version-aarch64-unknown-linux-musl.tar.gz" | \
     awk '{ print $1 }')
 
+release_description=$(sed "s/__SN_UPDATER_VERSION__/$sn_updater_version/g" <<< "$release_description")
 release_description=$(sed "s/__SN_FAULT_DETECTION_VERSION__/$sn_fault_detection_version/g" <<< "$release_description")
 release_description=$(sed "s/__SN_INTERFACE_VERSION__/$sn_interface_version/g" <<< "$release_description")
 release_description=$(sed "s/__SN_COMMS_VERSION__/$sn_comms_version/g" <<< "$release_description")

@@ -73,8 +73,8 @@ async fn main() -> Result<()> {
         file_config.update || command_line_args.update
     );
     assert_eq!(
-        config.update_only,
-        file_config.update_only || command_line_args.update_only
+        config.no_confirm,
+        file_config.no_confirm || command_line_args.no_confirm
     );
     assert_eq!(
         config.clear_data,
