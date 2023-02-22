@@ -29,7 +29,6 @@ const DEFAULT_ROOT_DIR_NAME: &str = "root_dir";
 /// Node configuration
 #[derive(Default, Clone, Debug, Serialize, Deserialize, clap::StructOpt)]
 #[clap(rename_all = "kebab-case", bin_name = "sn_node", version)]
-#[clap(global_settings = &[clap::AppSettings::ColoredHelp])]
 pub struct Config {
     /// The address to be credited when this node farms SafeCoin.
     /// A hex formatted BLS public key.
