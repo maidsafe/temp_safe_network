@@ -295,6 +295,8 @@ impl Cmd {
             | Cmd::SendAndForwardResponseToClient { .. }
             | Cmd::SendDataResponse { .. }
             | Cmd::SendMsg { .. }
+            | Cmd::HandleCommsError { .. }
+            | Cmd::EnqueueDataForReplication { .. }
             | Cmd::SendMsgEnqueueAnyResponse { .. }
             | Cmd::SendNodeMsgResponse { .. } => true,
             _ => false,

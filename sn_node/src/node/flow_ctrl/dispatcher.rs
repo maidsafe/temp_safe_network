@@ -46,6 +46,7 @@ impl Dispatcher {
         cmd_process_api: Sender<(Cmd, Vec<usize>)>,
         rejoin_network_sender: Sender<RejoinReason>,
     ) {
+        let data_replication_sender = self.data_replication_sender.clone();
         let _handle = tokio::spawn(async move {
             trace!("Moving Cmd onto a new thread: {cmd:?}");
             let start = Instant::now();
@@ -79,7 +80,16 @@ impl Dispatcher {
                     wire_msg,
                     send_stream,
                 } => MyNode::handle_msg(context, origin, wire_msg, send_stream).await,
-
+                Cmd::EnqueueDataForReplication {
+                    recipient,
+                    data_batch,
+                } => {
+                    data_replication_sender
+                        .send((data_batch, recipient))
+                        .await
+                        .map_err(|_| Error::DataReplicationChannel)?;
+                    Ok(vec![])
+                }
                 Cmd::SendMsg {
                     msg,
                     msg_id,
@@ -146,6 +156,48 @@ impl Dispatcher {
                 .await?
                 .into_iter()
                 .collect()),
+                Cmd::HandleCommsError { peer, error } => {
+                    trace!("Comms error {error}");
+                    MyNode::handle_comms_error(context, peer, error);
+                    Ok(vec![])
+                }
+                Cmd::UpdateCaller {
+                    caller,
+                    correlation_id,
+                    kind,
+                    section_tree_update,
+                } => {
+                    info!("Sending ae response msg for {correlation_id:?}");
+                    Ok(vec![Cmd::send_network_msg(
+                        NetworkMsg::AntiEntropy(AntiEntropyMsg::AntiEntropy {
+                            section_tree_update,
+                            kind,
+                        }),
+                        Peers::Single(caller),
+                    )])
+                }
+                Cmd::UpdateCallerOnStream {
+                    caller,
+                    msg_id,
+                    kind,
+                    section_tree_update,
+                    correlation_id,
+                    stream,
+                } => Ok(MyNode::send_ae_response(
+                    AntiEntropyMsg::AntiEntropy {
+                        kind,
+                        section_tree_update,
+                    },
+                    msg_id,
+                    caller,
+                    correlation_id,
+                    stream,
+                    context,
+                )
+                .await?
+                .into_iter()
+                .collect()),
+
                 cmd => {
                     error!("Cmd should not be moved off thread. It was not processsed {cmd:?}");
 
@@ -195,134 +247,13 @@ impl Dispatcher {
             Cmd::TryJoinNetwork => Ok(MyNode::try_join_section(context, None)
                 .into_iter()
                 .collect()),
-            Cmd::UpdateCaller {
-                caller,
-                correlation_id,
-                kind,
-                section_tree_update,
-            } => {
-                info!("Sending ae response msg for {correlation_id:?}");
-                Ok(vec![Cmd::send_network_msg(
-                    NetworkMsg::AntiEntropy(AntiEntropyMsg::AntiEntropy {
-                        section_tree_update,
-                        kind,
-                    }),
-                    Peers::Single(caller),
-                )])
-            }
-            Cmd::UpdateCallerOnStream {
-                caller,
-                msg_id,
-                kind,
-                section_tree_update,
-                correlation_id,
-                stream,
-            } => Ok(MyNode::send_ae_response(
-                AntiEntropyMsg::AntiEntropy {
-                    kind,
-                    section_tree_update,
-                },
-                msg_id,
-                caller,
-                correlation_id,
-                stream,
-                context,
-            )
-            .await?
-            .into_iter()
-            .collect()),
-            Cmd::SendMsg {
-                msg,
-                msg_id,
-                recipients,
-            } => {
-                MyNode::send_msg(msg, msg_id, recipients, context)?;
-                Ok(vec![])
-            }
-            Cmd::SendMsgEnqueueAnyResponse {
-                msg,
-                msg_id,
-                recipients,
-            } => {
-                debug!("send msg enque cmd...?");
-                MyNode::send_and_enqueue_any_response(msg, msg_id, context, recipients)?;
-                Ok(vec![])
-            }
-            Cmd::SendAndForwardResponseToClient {
-                wire_msg,
-                targets,
-                client_stream,
-                source_client,
-            } => {
-                MyNode::send_and_forward_response_to_client(
-                    wire_msg,
-                    context,
-                    targets,
-                    client_stream,
-                    source_client,
-                )?;
-                Ok(vec![])
-            }
-            Cmd::SendNodeMsgResponse {
-                msg,
-                msg_id,
-                correlation_id,
-                recipient,
-                send_stream,
-            } => Ok(MyNode::send_node_msg_response(
-                msg,
-                msg_id,
-                correlation_id,
-                recipient,
-                context,
-                send_stream,
-            )
-            .await?
-            .into_iter()
-            .collect()),
-            Cmd::SendDataResponse {
-                msg,
-                msg_id,
-                correlation_id,
-                send_stream,
-                source_client,
-            } => Ok(MyNode::send_data_response(
-                msg,
-                msg_id,
-                correlation_id,
-                send_stream,
-                context,
-                source_client,
-            )
-            .await?
-            .into_iter()
-            .collect()),
-            Cmd::TrackNodeIssue { name, issue } => {
-                context.track_node_issue(name, issue);
-                Ok(vec![])
-            }
             Cmd::ProcessNodeMsg {
                 msg_id,
                 msg,
                 origin,
                 send_stream,
             } => MyNode::handle_node_msg(node, context, msg_id, msg, origin, send_stream).await,
-            Cmd::ProcessClientMsg {
-                msg_id,
-                msg,
-                auth,
-                origin,
-                send_stream,
-            } => {
-                trace!("Client msg {msg_id:?} reached its destination.");
 
-                // TODO: clarify this err w/ peer
-                let Some(stream) = send_stream else {
-                        error!("No stream for client tho....");
-                        return Err(Error::NoClientResponseStream);
-                    };
-                MyNode::handle_client_msg_for_us(context, msg_id, msg, auth, origin, stream).await
-            }
             Cmd::ProcessAeMsg {
                 msg_id,
                 kind,
@@ -333,11 +264,6 @@ impl Dispatcher {
                 MyNode::handle_anti_entropy_msg(node, context, section_tree_update, kind, origin)
                     .await
             }
-            Cmd::HandleMsg {
-                origin,
-                wire_msg,
-                send_stream,
-            } => MyNode::handle_msg(context, origin, wire_msg, send_stream).await,
             Cmd::UpdateNetworkAndHandleValidClientMsg {
                 proof_chain,
                 signed_sap,
@@ -382,25 +308,12 @@ impl Dispatcher {
                 node.handle_new_sections_agreement(sap1, sig1, sap2, sig2)
                     .await
             }
-            Cmd::HandleCommsError { peer, error } => {
-                trace!("Comms error {error}");
-                node.handle_comms_error(peer, error);
-                Ok(vec![])
-            }
+
             Cmd::HandleDkgOutcome {
                 section_auth,
                 outcome,
             } => node.handle_dkg_outcome(section_auth, outcome).await,
-            Cmd::EnqueueDataForReplication {
-                recipient,
-                data_batch,
-            } => {
-                self.data_replication_sender
-                    .send((data_batch, recipient))
-                    .await
-                    .map_err(|_| Error::DataReplicationChannel)?;
-                Ok(vec![])
-            }
+
             Cmd::ProposeVoteNodesOffline(names) => node.cast_offline_proposals(&names),
             Cmd::SetJoinsAllowed(joins_allowed) => {
                 node.joins_allowed = joins_allowed;
@@ -409,6 +322,10 @@ impl Dispatcher {
             Cmd::SetJoinsAllowedUntilSplit(joins_allowed_until_split) => {
                 node.joins_allowed = joins_allowed_until_split;
                 node.joins_allowed_until_split = joins_allowed_until_split;
+                Ok(vec![])
+            }
+            cmd => {
+                warn!("Processing a cmd that should be sent off thread;: {cmd:?}");
                 Ok(vec![])
             }
         };
