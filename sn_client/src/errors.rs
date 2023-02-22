@@ -166,8 +166,10 @@ pub enum Error {
         peers: Vec<Peer>,
     },
     /// Timeout when awaiting command ACK from Elders.
-    #[error("Timeout after {elapsed:?} when awaiting command ACK from Elders for {msg_id:?}, data address {dst_address}")]
+    #[error("Timeout after {elapsed:?} when awaiting command ACK from Elders for {msg_id:?}, data address {dst_address}, from {src_address}")]
     CmdAckValidationTimeout {
+        /// source
+        src_address: std::net::SocketAddr,
         /// MsgId of the msg sent
         msg_id: MsgId,
         /// Time elapsed before timing out

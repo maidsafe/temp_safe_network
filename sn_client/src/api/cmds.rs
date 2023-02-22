@@ -51,6 +51,7 @@ impl Client {
             })
             .await
             .map_err(|_| Error::CmdAckValidationTimeout {
+                src_address: self.session.endpoint.local_addr(),
                 msg_id,
                 elapsed: cmd_timeout,
                 dst_address,

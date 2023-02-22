@@ -149,7 +149,8 @@ impl MyNode {
         source_client: Peer,
         client_stream: SendStream,
     ) -> Result<Vec<Cmd>> {
-        debug!("{msg_id:?} Forwarding on RegisterCmd for Spentbook msg");
+        let members = context.network_knowledge.members();
+        debug!("{msg_id:?} Forwarding on RegisterCmd for Spentbook msg among members: {members:?}");
         let name = *data.address().name();
         let node_msg = NodeMsg::NodeDataCmd(NodeDataCmd::StoreData(data));
         let section_key = context

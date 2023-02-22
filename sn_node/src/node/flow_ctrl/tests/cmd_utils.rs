@@ -143,7 +143,7 @@ impl<'a> ProcessAndInspectCmds<'a> {
         // move send msg off thread so send / receive can both complete
         let _handle = tokio::spawn(async move {
             let _ = send_stream
-                .send_user_msg(user_msg)
+                .send_user_msg(user_msg, msg_id.as_ref())
                 .await
                 .context("Could not send user msg");
         });
