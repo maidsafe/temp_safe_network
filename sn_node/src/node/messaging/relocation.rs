@@ -175,9 +175,8 @@ mod tests {
     use crate::node::{
         flow_ctrl::{
             cmds::Cmd,
-            dispatcher::Dispatcher,
             tests::{
-                cmd_utils::{get_next_msg, ProcessAndInspectCmds, TestDispatcher, TestMsgTracker},
+                cmd_utils::{get_next_msg, ProcessAndInspectCmds, TestMsgTracker, TestNode},
                 network_builder::TestNetworkBuilder,
             },
         },
@@ -236,7 +235,7 @@ mod tests {
         let env = TestNetworkBuilder::new(rand::thread_rng())
             .sap(prefix, elder_count(), adults, None, None)
             .build();
-        let (dispatcher, mut node) = env.get_dispatchers_and_nodes(prefix, 1, 0, None).remove(0);
+        let mut node = env.get_nodes(prefix, 1, 0, None).remove(0);
         let mut section = env.get_network_knowledge(prefix, None);
         let sk_set = env.get_secret_key_set(prefix, None);
 
@@ -251,10 +250,8 @@ mod tests {
 
         let node = Arc::new(RwLock::new(node));
 
-        let mut cmds = ProcessAndInspectCmds::new(
-            Cmd::HandleMembershipDecision(membership_decision),
-            &dispatcher,
-        );
+        let mut cmds =
+            ProcessAndInspectCmds::new(Cmd::HandleMembershipDecision(membership_decision));
 
         let mut trigger_is_sent = false;
         while let Some(cmd) = cmds.next().await? {
@@ -294,11 +291,10 @@ mod tests {
                 let prefix = node.network_knowledge().prefix();
                 let name = node.name();
                 let (dispatcher, _) = Dispatcher::new();
-                let dispatcher =
-                    Arc::new(TestDispatcher::new(node, dispatcher, msg_tracker.clone()));
+                let dispatcher = Arc::new(TestNode::new(node, dispatcher, msg_tracker.clone()));
                 ((prefix, name), dispatcher)
             })
-            .collect::<BTreeMap<(Prefix, XorName), Arc<TestDispatcher>>>();
+            .collect::<BTreeMap<(Prefix, XorName), Arc<TestNode>>>();
         let mut comm_receivers = BTreeMap::new();
         for (name, dispatcher) in node_instances.iter() {
             let pk = dispatcher.node().info().public_key();
@@ -409,11 +405,10 @@ mod tests {
                         .expect("Section tree update failed");
                 }
                 let (dispatcher, _) = Dispatcher::new();
-                let dispatcher =
-                    Arc::new(TestDispatcher::new(node, dispatcher, msg_tracker.clone()));
+                let dispatcher = Arc::new(TestNode::new(node, dispatcher, msg_tracker.clone()));
                 ((prefix, name), (node, dispatcher))
             })
-            .collect::<BTreeMap<(Prefix, XorName), (MyNode, Arc<TestDispatcher>)>>();
+            .collect::<BTreeMap<(Prefix, XorName), (MyNode, Arc<TestNode>)>>();
         let mut comm_receivers = BTreeMap::new();
         for (name, (node, dispatcher)) in node_instances.iter() {
             let pk = dispatcher.node().info().public_key();
@@ -493,7 +488,7 @@ mod tests {
 
     // Propose NodeIsOffline(relocation) for the provided node
     async fn initialize_relocation(
-        dispatcher: Arc<TestDispatcher>,
+        dispatcher: Arc<TestNode>,
         relocation_node_name: XorName,
         dst_prefix: Prefix,
         node: &mut MyNode,
@@ -527,7 +522,7 @@ mod tests {
 
     /// Main loop that sends and processes Cmds
     async fn relocation_loop(
-        node_instances: &BTreeMap<(Prefix, XorName), Arc<TestDispatcher>>,
+        node_instances: &BTreeMap<(Prefix, XorName), Arc<TestNode>>,
         comm_receivers: &mut BTreeMap<(Prefix, XorName), Receiver<CommEvent>>,
         from_section_n_elders: usize,
         msg_tracker: Arc<RwLock<TestMsgTracker>>,
