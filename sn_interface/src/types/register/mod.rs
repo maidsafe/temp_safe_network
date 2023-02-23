@@ -96,11 +96,6 @@ impl Register {
         self.crdt.size()
     }
 
-    /// Return true if the register is empty.
-    pub fn is_empty(&self) -> bool {
-        self.size() == 0
-    }
-
     /// Return a value corresponding to the provided 'hash', if present.
     pub fn get(&self, hash: EntryHash) -> Result<&Entry> {
         self.crdt.get(hash).ok_or(Error::NoSuchEntry(hash))

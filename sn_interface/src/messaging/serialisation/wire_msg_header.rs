@@ -154,11 +154,4 @@ impl WireMsgHeader {
 
         Ok(buffer_writer.into_inner().freeze())
     }
-
-    // Message Pack uses type tags, but also variable length encoding, so we expect that serialized
-    // `MsgEnvelope`s size will typically be ≤ their in-memory size. This should only be relied on
-    // as a 'ballpark' estimate.
-    pub fn max_size() -> u16 {
-        (HeaderMeta::SIZE + size_of::<MsgEnvelope>()) as u16
-    }
 }

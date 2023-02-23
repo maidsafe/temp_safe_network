@@ -41,10 +41,6 @@ impl Peer {
         calc_age(&self.name)
     }
 
-    pub fn id(&self) -> (XorName, SocketAddr) {
-        (self.name, self.addr)
-    }
-
     pub fn from(addr: SocketAddr, public_key: ed25519_dalek::PublicKey) -> Peer {
         Peer {
             addr,

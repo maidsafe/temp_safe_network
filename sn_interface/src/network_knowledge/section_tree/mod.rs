@@ -507,23 +507,6 @@ pub mod test_utils {
                 .expect("Failed to insert into proof_chain");
             SectionTreeUpdate::new(sap.clone(), proof_chain)
         }
-
-        /// Generate a proof chain from the provided `genesis_key` followed by all keys provided in `other_keys`
-        pub fn gen_proof_chain(
-            genesis_key: &bls::SecretKey,
-            other_keys: &Vec<bls::SecretKey>,
-        ) -> SectionsDAG {
-            let mut proof_chain = SectionsDAG::new(genesis_key.public_key());
-            let mut parent = genesis_key.clone();
-            for key in other_keys {
-                let sig = parent.sign(key.public_key().to_bytes());
-                proof_chain
-                    .verify_and_insert(&parent.public_key(), key.public_key(), sig)
-                    .expect("Failed to insert into proof_chain");
-                parent = key.clone();
-            }
-            proof_chain
-        }
     }
 }
 

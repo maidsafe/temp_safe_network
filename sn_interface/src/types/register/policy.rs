@@ -28,11 +28,6 @@ impl Permissions {
         }
     }
 
-    /// Sets permissions.
-    pub fn set_perms(&mut self, write: impl Into<Option<bool>>) {
-        self.write = write.into();
-    }
-
     /// Returns `Some(true)` if `action` is allowed and `Some(false)` if it's not permitted.
     /// `None` means that default permissions should be applied.
     pub fn is_allowed(self, action: Action) -> Option<bool> {

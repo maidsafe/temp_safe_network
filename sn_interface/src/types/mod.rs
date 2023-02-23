@@ -98,30 +98,4 @@ impl ReplicatedData {
             }
         }
     }
-
-    pub fn size(&self) -> u64 {
-        let length = match self {
-            Self::Chunk(chunk) => chunk.payload_size(),
-            Self::RegisterWrite(_) | Self::SpentbookWrite(_) => REGISTER_CMD_SIZE,
-            Self::RegisterLog(log) | Self::SpentbookLog(log) => {
-                REGISTER_CMD_SIZE * log.op_log.len()
-            }
-        };
-        length as u64
-    }
-
-    pub fn error_response(&self, error: DataError) -> Result<CmdResponse> {
-        match self {
-            Self::Chunk(_) => Ok(CmdResponse::StoreChunk(Err(error))),
-            Self::RegisterWrite(RegisterCmd::Create { .. }) => {
-                Ok(CmdResponse::CreateRegister(Err(error)))
-            }
-            Self::RegisterWrite(RegisterCmd::Edit { .. }) => {
-                Ok(CmdResponse::EditRegister(Err(error)))
-            }
-            Self::SpentbookWrite(_) => Ok(CmdResponse::SpendKey(Err(error))),
-            Self::SpentbookLog(_) => Err(Error::NoCmdResponseForTheVariant), // should be unreachable, since `SpentbookLog` is not resulting from a cmd.
-            Self::RegisterLog(_) => Err(Error::NoCmdResponseForTheVariant), // should be unreachable, since `RegisterLog` is not resulting from a cmd.,
-        }
-    }
 }

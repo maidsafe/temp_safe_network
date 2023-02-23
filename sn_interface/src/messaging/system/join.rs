@@ -18,16 +18,6 @@ pub struct JoinRequest {
     pub section_key: bls::PublicKey,
 }
 
-impl JoinRequest {
-    pub fn section_key(&self) -> bls::PublicKey {
-        self.section_key
-    }
-
-    pub fn set_section_key(&mut self, section_key: bls::PublicKey) {
-        self.section_key = section_key;
-    }
-}
-
 /// Response to a request to join a section
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum JoinResponse {

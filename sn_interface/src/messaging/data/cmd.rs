@@ -35,15 +35,6 @@ pub enum DataCmd {
 }
 
 impl DataCmd {
-    /// Returns the address of the corresponding variant.
-    pub fn address(&self) -> DataAddress {
-        match self {
-            Self::StoreChunk(chunk) => DataAddress::Bytes(*chunk.address()),
-            Self::Register(register_cmd) => DataAddress::Register(register_cmd.dst_address()),
-            Self::Spentbook(spentbook_cmd) => DataAddress::Spentbook(spentbook_cmd.dst_address()),
-        }
-    }
-
     /// Returns the xorname of the data for this cmd.
     pub fn dst_name(&self) -> XorName {
         use DataCmd::*;

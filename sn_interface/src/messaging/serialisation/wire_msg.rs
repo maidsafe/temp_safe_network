@@ -79,24 +79,6 @@ impl WireMsg {
         Self::serialize_dst_payload(&self.dst)
     }
 
-    /// Serialize into a WireMsg for Node Join
-    pub fn single_src_node(name: XorName, dst: Dst, msg: NodeMsg) -> Result<WireMsg> {
-        let msg_payload = WireMsg::serialize_msg_payload(&msg)
-            .map_err(|_| Error::Serialisation("Could not serialise node msg".to_string()))?;
-
-        let wire_msg = WireMsg::new_msg(
-            MsgId::new(),
-            msg_payload,
-            MsgKind::Node {
-                name,
-                is_join: msg.is_join(),
-            },
-            dst,
-        );
-
-        Ok(wire_msg)
-    }
-
     /// Creates a new `WireMsg` with the provided serialized payload and `MsgKind`.
     pub fn new_msg(msg_id: MsgId, payload: Bytes, kind: MsgKind, dst: Dst) -> Self {
         Self {
@@ -232,11 +214,6 @@ impl WireMsg {
         &self.header.msg_envelope.kind
     }
 
-    /// Return the destination section `PublicKey` for this message
-    pub fn dst_section_key(&self) -> bls::PublicKey {
-        self.dst.section_key
-    }
-
     /// Return the dst of this msg
     pub fn dst(&self) -> &Dst {
         &self.dst
@@ -288,7 +265,7 @@ mod tests {
         assert_eq!(deserialized, wire_msg);
         assert_eq!(deserialized.msg_id(), wire_msg.msg_id());
         assert_eq!(deserialized.dst(), &dst);
-        assert_eq!(deserialized.dst_section_key(), dst.section_key);
+        assert_eq!(deserialized.dst().section_key, dst.section_key);
 
         // test deserialisation of payload
         assert_eq!(deserialized.into_msg()?, NetworkMsg::Node(msg),);
@@ -330,7 +307,7 @@ mod tests {
         assert_eq!(deserialized, wire_msg);
         assert_eq!(deserialized.msg_id(), wire_msg.msg_id());
         assert_eq!(deserialized.dst(), &dst);
-        assert_eq!(deserialized.dst_section_key(), dst.section_key);
+        assert_eq!(deserialized.dst().section_key, dst.section_key);
 
         // test deserialisation of payload
         assert_eq!(

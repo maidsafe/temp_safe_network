@@ -422,11 +422,6 @@ impl NetworkKnowledge {
         self.section_tree.get_sections_dag().has_key(section_key)
     }
 
-    /// Return the set of known keys
-    pub fn known_keys(&self) -> BTreeSet<bls::PublicKey> {
-        self.section_tree.get_sections_dag().keys().collect()
-    }
-
     /// Try to merge this `NetworkKnowledge` members with `peers`.
     /// Checks if we're already up to date before attempting to verify and merge members
     pub fn merge_members(&mut self, peers: BTreeSet<Decision<NodeState>>) -> Result<bool> {
@@ -530,33 +525,14 @@ impl NetworkKnowledge {
         self.section_peers.archived_members()
     }
 
-    /// Returns current section size, i.e. number of peers in the section.
-    pub fn section_size(&self) -> usize {
-        self.section_peers.num_of_members()
-    }
-
     /// Get info for the member with the given name.
     pub fn get_section_member(&self, name: &XorName) -> Option<NodeState> {
         self.section_peers.get(name)
     }
 
-    /// Get info for the member with the given name either from current members list,
-    /// or from the archive of left/relocated members
-    pub fn is_either_member_or_archived(&self, name: &XorName) -> Option<NodeState> {
-        self.section_peers.is_either_member_or_archived(name)
-    }
-
     /// Get info for the member with the given name.
     pub fn is_section_member(&self, name: &XorName) -> bool {
         self.section_peers.is_member(name)
-    }
-
-    pub fn find_member_by_addr(&self, addr: &SocketAddr) -> Option<Peer> {
-        self.section_peers
-            .members()
-            .into_iter()
-            .find(|info| info.addr() == *addr)
-            .map(|info| *info.peer())
     }
 
     pub fn anti_entropy_probe(&self) -> NetworkMsg {

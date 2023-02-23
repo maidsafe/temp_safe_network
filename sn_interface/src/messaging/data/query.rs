@@ -36,33 +36,12 @@ pub enum DataQuery {
 }
 
 impl DataQuery {
-    /// Creates a Response containing an error, with the Response variant corresponding to the
-    /// Request.
-    pub fn to_error_response(&self, error: Error) -> QueryResponse {
-        match self {
-            Self::GetChunk(_) => QueryResponse::GetChunk(Err(error)),
-            Self::Register(q) => q.to_error_response(error),
-            Self::Spentbook(q) => q.to_error_response(error),
-        }
-    }
-
     /// Returns the xorname of the data destination for `request`.
     pub fn dst_name(&self) -> XorName {
         match self {
             Self::GetChunk(address) => *address.name(),
             Self::Register(q) => q.dst_name(),
             Self::Spentbook(q) => q.dst_name(),
-        }
-    }
-
-    /// Returns the address of the data
-    pub fn address(&self) -> DataAddress {
-        match self {
-            Self::GetChunk(address) => DataAddress::Bytes(*address),
-            Self::Register(read) => DataAddress::Register(read.dst_address()),
-            Self::Spentbook(read) => {
-                DataAddress::Spentbook(SpentbookAddress::new(*read.dst_address().name()))
-            }
         }
     }
 }

@@ -134,33 +134,6 @@ impl NodeMsg {
     }
 }
 
-impl NodeMsg {
-    pub fn statemap_states(&self) -> crate::statemap::State {
-        use crate::statemap::State;
-        match self {
-            Self::Relocate(_) => State::Relocate,
-            Self::BeginRelocating(_) => State::Relocate,
-            Self::RelocationRequest { .. } => State::Relocate,
-            Self::MembershipAE(_) => State::Membership,
-            Self::MembershipVotes(_) => State::Membership,
-            Self::TryJoin(_) => State::Join,
-            Self::JoinResponse(_) => State::Join,
-            Self::DkgStart { .. } => State::Dkg,
-            Self::DkgEphemeralPubKey { .. } => State::Dkg,
-            Self::DkgVotes { .. } => State::Dkg,
-            Self::DkgAE { .. } => State::Dkg,
-            Self::RequestHandover { .. } => State::Dkg,
-            Self::HandoverVotes(_) => State::Handover,
-            Self::HandoverAE(_) => State::Handover,
-            Self::SectionHandoverPromotion { .. } => State::Handover,
-            Self::SectionSplitPromotion { .. } => State::Handover,
-            Self::ProposeNodeOff { .. } => State::Propose,
-            Self::NodeEvent(_) => State::Node,
-            Self::NodeDataCmd(_) => State::Node,
-        }
-    }
-}
-
 impl Display for NodeMsg {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
