@@ -131,8 +131,8 @@ fn get_target_platform() -> String {
 
 /// Gets the version number from the full version number string.
 ///
-/// The `release_version` input is in the form "0.17.1-0.15.3-0.2.1-0.78.2-0.73.3-0.76.1-0.69.0",
-/// which is the `sn_interface`, `sn_fault_detection`, `sn_comms`, `sn_client`, `sn_node`,
+/// The `release_version` input is in the form "0.1.0-0.17.1-0.15.3-0.2.1-0.78.2-0.73.3-0.76.1-0.69.0",
+/// which is the `sn_updater`, `sn_interface`, `sn_fault_detection`, `sn_comms`, `sn_client`, `sn_node`,
 /// `sn_api`, `sn_cli` respectively.
 ///
 /// Returns either the `sn_node` or `sn_cli` part.
@@ -144,6 +144,7 @@ fn get_version_from_release_version(source: &UpdateType, release_version: &str) 
             .ok_or_else(|| Error::InvalidReleaseVersionFormat(release_version.to_string()))?
             .to_string(),
         UpdateType::Node => {
+            parts.next();
             parts.next();
             parts.next();
             parts.next();
