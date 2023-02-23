@@ -19,7 +19,7 @@ env:
 jobs:
 
   cargo-udeps:
-    if: github.event.name == 'push' || github.event.name == 'merge_group' || github.event.comment && contains(github.event.comment.body, 'test+')
+    if: github.event.comment && contains(github.event.comment.body, 'test+') || true
     name: Unused dependency check
     runs-on: ubuntu-latest
     steps:
@@ -39,7 +39,7 @@ jobs:
   # TODO: Reenable when blst has been updated and this isn't just red the whole time.
 
   # cargo-deny:
-  #   if: github.event.name == 'push' || github.event.name == 'merge_group' || github.event.comment && contains(github.event.comment.body, 'test+')
+  #   if: github.event.comment && contains(github.event.comment.body, 'test+') || true
   #   runs-on: ubuntu-latest
   #   steps:
   #   - uses: actions/checkout@v2
@@ -60,7 +60,7 @@ jobs:
       - uses: wagoid/commitlint-github-action@f114310111fdbd07e99f47f9ca13d62b3ec98372
 
   checks:
-    if: github.event.name == 'push' || github.event.name == 'merge_group' || github.event.comment && contains(github.event.comment.body, 'test+')
+    if: github.event.comment && contains(github.event.comment.body, 'test+') || true
     name: Run rustfmt and clippy
     runs-on: ubuntu-latest
     steps:
@@ -119,7 +119,7 @@ jobs:
             !artifacts/.cargo-lock
 
   unit:
-    if: github.event.name == 'push' || github.event.name == 'merge_group' || github.event.comment && contains(github.event.comment.body, 'test+')
+    if: github.event.comment && contains(github.event.comment.body, 'test+') || true
     name: Unit Tests
     runs-on: ${{ matrix.os }}
     strategy:
@@ -181,7 +181,7 @@ jobs:
         run: cd sn_cli && cargo test --release --bin safe --features data-network
 
   e2e:
-    if: github.event.name == 'push' || github.event.name == 'merge_group' || github.event.comment && contains(github.event.comment.body, 'test+')
+    if: github.event.comment && contains(github.event.comment.body, 'test+') || true
     name: E2E tests
     runs-on: ${{ matrix.os }}
     strategy:
@@ -309,7 +309,7 @@ jobs:
         continue-on-error: true
 
   e2e-msg-happy-path:
-    if: github.event.name == 'push' || github.event.name == 'merge_group' || github.event.comment && contains(github.event.comment.body, 'test+')
+    if: github.event.comment && contains(github.event.comment.body, 'test+') || true
     name: E2E tests (msg happy path)
     runs-on: ${{ matrix.os }}
     strategy:
@@ -437,7 +437,7 @@ jobs:
         continue-on-error: true
 
   e2e-churn:
-    if: github.event.name == 'push' || github.event.name == 'merge_group' || github.event.comment && contains(github.event.comment.body, 'test+')
+    if: github.event.comment && contains(github.event.comment.body, 'test+') || true
     name: E2E Churn test
     runs-on: ubuntu-latest
     steps:
@@ -509,7 +509,7 @@ jobs:
         continue-on-error: true
 
   # e2e-split:
-  #   #if: github.event.name == 'push' || github.event.name == 'merge_group' || github.event.comment && contains(github.event.comment.body, 'test+')
+  #   #if: github.event.comment && contains(github.event.comment.body, 'test+') || true
   #   # disabled temporarily since `self-hosted-ubuntu` runner not available for NodeRefactorBranch branch
   #   if: false
   #   name: E2E tests w/ full network
@@ -683,7 +683,7 @@ jobs:
   #         rm -rf ~/.safe
 
   api:
-    if: github.event.name == 'push' || github.event.name == 'merge_group' || github.event.comment && contains(github.event.comment.body, 'test+')
+    if: github.event.comment && contains(github.event.comment.body, 'test+') || true
     name: Run API tests
     runs-on: ${{ matrix.os }}
     strategy:
@@ -801,7 +801,7 @@ jobs:
         continue-on-error: true
 
   cli:
-    if: github.event.name == 'push' || github.event.name == 'merge_group' || github.event.comment && contains(github.event.comment.body, 'test+')
+    if: github.event.comment && contains(github.event.comment.body, 'test+') || true
     name: Run CLI tests
     runs-on: ${{ matrix.os }}
     strategy:
