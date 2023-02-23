@@ -103,12 +103,6 @@ impl FaultDetection {
         }
     }
 
-    /// Set to track provided elders
-    pub fn update_elders(&mut self, elders: BTreeSet<NodeIdentifier>) {
-        info!("Setting elder nodes:{elders:?} in FaultDetection tracker");
-        self.elders = elders
-    }
-
     /// Adds an issue to the fault tracker.
     ///
     /// The `op_id` only applies when adding an operational issue.

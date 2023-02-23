@@ -145,22 +145,6 @@ pub enum QueryResponse {
 }
 
 impl QueryResponse {
-    /// Returns true if the result returned is a success or not
-    pub fn is_success(&self) -> bool {
-        use QueryResponse::*;
-        matches!(
-            self,
-            GetChunk(Ok(_))
-                | GetRegister(Ok(_))
-                | GetRegisterEntry(Ok(_))
-                | GetRegisterOwner(Ok(_))
-                | ReadRegister(Ok(_))
-                | GetRegisterPolicy(Ok(_))
-                | GetRegisterUserPermissions(Ok(_))
-                | SpentProofShares(Ok(_))
-        )
-    }
-
     /// Returns true if the result returned is DataNotFound
     pub fn is_data_not_found(&self) -> bool {
         use QueryResponse::*;
@@ -237,11 +221,6 @@ impl CmdResponse {
             ReplicatedData::SpentbookLog(_) => return Err(Error::NoCorrespondingCmdError), // this should be unreachable, since `SpentbookLog` is not resulting from a cmd.
         };
         Ok(res)
-    }
-
-    /// Returns true if the result returned is a success or not
-    pub fn is_success(&self) -> bool {
-        self.result().is_ok()
     }
 
     /// Returns the result

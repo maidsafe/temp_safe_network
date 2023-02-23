@@ -47,13 +47,6 @@ impl MsgKind {
             _ => false,
         }
     }
-    /// is a client query msg
-    pub fn is_client_query(&self) -> bool {
-        match self {
-            Self::Client { query_index, .. } => query_index.is_some(),
-            _ => false,
-        }
-    }
     /// return query index
     pub fn query_index(&self) -> &Option<usize> {
         match self {

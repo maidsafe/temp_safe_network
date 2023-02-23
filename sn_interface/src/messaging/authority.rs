@@ -39,21 +39,6 @@ pub struct NodeSig {
     pub signature: EdSignature,
 }
 
-impl NodeSig {
-    /// Construct verified node authority by signing a payload.
-    pub fn authorize(
-        section_pk: BlsPublicKey,
-        keypair: &EdKeypair,
-        payload: impl AsRef<[u8]>,
-    ) -> AuthorityProof<Self> {
-        AuthorityProof(Self {
-            section_pk,
-            node_ed_pk: keypair.public,
-            signature: keypair.sign(payload.as_ref()),
-        })
-    }
-}
-
 /// Verified authority.
 ///
 /// Values of this type constitute a proof that the signature is valid for a particular payload.

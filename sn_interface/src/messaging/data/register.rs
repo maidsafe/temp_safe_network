@@ -224,15 +224,4 @@ impl RegisterCmd {
             Self::Edit(cmd) => cmd.dst_address(),
         }
     }
-
-    /// Owner of the Register
-    pub fn owner(&self) -> Option<User> {
-        match self {
-            Self::Create {
-                cmd: SignedRegisterCreate { op, .. },
-                ..
-            } => Some(op.owner()),
-            _ => None,
-        }
-    }
 }

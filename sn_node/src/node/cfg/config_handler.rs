@@ -212,16 +212,6 @@ impl Config {
         })
     }
 
-    /// Set the root directory for dbs and cached state.
-    pub fn set_root_dir<P: Into<PathBuf>>(&mut self, path: P) {
-        self.root_dir = Some(path.into())
-    }
-
-    /// Set the directory to write the logs.
-    pub fn set_log_dir<P: Into<PathBuf>>(&mut self, path: P) {
-        self.log_dir = Some(path.into())
-    }
-
     /// Get the log level.
     pub fn verbose(&self) -> Level {
         match self.verbose {
@@ -292,34 +282,6 @@ impl Config {
         }
 
         Ok(())
-    }
-
-    /// Reads the default node config file.
-    #[allow(unused)]
-    async fn read_from_file() -> Result<Option<Config>> {
-        let path = project_dirs()?.join(CONFIG_FILE);
-
-        match fs::read(path.clone()).await {
-            Ok(content) => {
-                debug!("Reading settings from {}", path.display());
-
-                serde_json::from_slice(&content).map_err(|err| {
-                    warn!(
-                        "Could not parse content of config file '{:?}': {:?}",
-                        path, err
-                    );
-                    err.into()
-                })
-            }
-            Err(error) => {
-                if error.kind() == std::io::ErrorKind::NotFound {
-                    warn!("No config file available at {:?}", path);
-                    Ok(None)
-                } else {
-                    Err(error.into())
-                }
-            }
-        }
     }
 
     /// Writes the config file to disk

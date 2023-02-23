@@ -34,27 +34,6 @@ pub struct DkgSessionId {
     pub membership_gen: Generation,
 }
 impl DkgSessionId {
-    pub fn new(
-        prefix: Prefix,
-        elders: BTreeMap<XorName, SocketAddr>,
-        section_chain_len: u64,
-        bootstrap_members: BTreeSet<NodeState>,
-        membership_gen: Generation,
-    ) -> Self {
-        assert!(elders
-            .keys()
-            .all(|e| bootstrap_members.iter().any(|m| &m.name() == e)));
-
-        // Calculate the hash without involving serialization to avoid having to return `Result`.
-        Self {
-            prefix,
-            elders,
-            section_chain_len,
-            bootstrap_members,
-            membership_gen,
-        }
-    }
-
     pub fn hash(&self) -> Digest256 {
         let mut hasher = Sha3::v256();
         self.hash_update(&mut hasher);
@@ -95,9 +74,5 @@ impl DkgSessionId {
 
     pub fn elder_index(&self, elder: XorName) -> Option<usize> {
         self.elder_names().sorted().position(|p| p == elder)
-    }
-
-    pub fn contains_elder(&self, elder: XorName) -> bool {
-        self.elder_names().any(|e| e == elder)
     }
 }

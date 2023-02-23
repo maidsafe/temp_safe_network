@@ -723,33 +723,6 @@ mod core {
             });
         }
 
-        #[allow(unused)]
-        pub(crate) fn section_key_by_name(&self, name: &XorName) -> Result<PublicKey> {
-            if self.network_knowledge.prefix().matches(name) {
-                Ok(self.network_knowledge.section_key())
-            } else if let Ok(sap) = self.network_knowledge.section_auth_by_name(name) {
-                Ok(sap.section_key())
-            } else if self.network_knowledge.prefix().sibling().matches(name) {
-                // For sibling with unknown key, use the previous key in our chain under the assumption
-                // that it's the last key before the split and therefore the last key of theirs we know.
-                // In case this assumption is not correct (because we already progressed more than one
-                // key since the split) then this key would be unknown to them and they would send
-                // us back their whole section chain. However, this situation should be rare.
-
-                // section_chain contains a single leaf key
-                let leaf_key = self.network_knowledge.section_chain().last_key()?;
-                match self.section_chain().get_parent_key(&leaf_key) {
-                    Ok(prev_pk) => Ok(prev_pk.unwrap_or(*self.section_chain().genesis_key())),
-                    Err(_) => {
-                        error!("SectionsDAG fields went out of sync");
-                        Ok(leaf_key)
-                    }
-                }
-            } else {
-                Ok(*self.network_knowledge.genesis_key())
-            }
-        }
-
         pub(crate) fn log_network_stats(&self) {
             info!(
                 "{}",

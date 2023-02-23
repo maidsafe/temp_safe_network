@@ -55,18 +55,6 @@ pub fn max_num_faulty_elders() -> usize {
     elder_count() / 3
 }
 
-/// Max number of faulty Elders is assumed to be less than 1/3.
-/// So it's no more than 2 with 7 Elders.
-pub fn max_num_faulty_elders_for_sap(sap: SectionAuthorityProvider) -> usize {
-    sap.elder_count() / 3
-}
-
-/// The least number of Elders to select, to be "guaranteed" one correctly functioning Elder.
-/// This number will be 3 with 7 Elders.
-pub fn at_least_one_correct_elder() -> usize {
-    max_num_faulty_elders() + 1
-}
-
 /// Get the expected chunk copy count for our network.
 /// Defaults to `DEFAULT_DATA_COPY_COUNT`, but can be overridden by the env var `SN_DATA_COPY_COUNT`.
 pub fn data_copy_count() -> usize {

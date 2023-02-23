@@ -48,16 +48,6 @@ impl DataAddress {
     pub fn bytes(name: XorName) -> Self {
         Self::Bytes(ChunkAddress(name))
     }
-
-    ///
-    pub fn safe_key(name: XorName) -> Self {
-        Self::SafeKey(name)
-    }
-
-    ///
-    pub fn spentbook(name: XorName) -> Self {
-        Self::Spentbook(SpentbookAddress::new(name))
-    }
 }
 
 /// Address of a Chunk.
