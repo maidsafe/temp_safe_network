@@ -11,6 +11,14 @@ on:
   # we can trigger this with a comment on a branch (for testing etc)
   pull_request_review_comment:
     types: [created]
+  pull_request:
+    branches: ["*"]
+
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 
 env:
   CARGO_INCREMENTAL: 0 # bookkeeping for incremental builds has overhead, not useful in CI.
@@ -185,7 +193,6 @@ jobs:
     name: E2E tests
     runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
@@ -313,7 +320,6 @@ jobs:
     name: E2E tests (msg happy path)
     runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
@@ -687,7 +693,6 @@ jobs:
     name: Run API tests
     runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
@@ -805,7 +810,6 @@ jobs:
     name: Run CLI tests
     runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
