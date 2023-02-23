@@ -3,7 +3,7 @@ name: Merge Flow. Run All Tests
 
 on:
   push:
-    branches: [staging, trying]
+    branches: [staging, trying, main]
 
 # this should prevent bors merge run, and main release/commits from running concurrently
 #(as long as both are sporting this check)
