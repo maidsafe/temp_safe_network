@@ -1,12 +1,8 @@
 name: Version Bump
 
-# this should prevent bors merge run, and main release/commits from running concurrently
-#(as long as both are sporting this check)
-# this group name is referencing the bors "staging" branch, whose name we use in merge.yml
-# this means that we should _not_ run this flow if a bors/staging flow is underway
-# (but we can run if a `bors try` is underway)
+# this should prevent concurrent version bumps
 concurrency:
-  group: "blocking-main-merge"
+  group: "version-bumping"
 
 on:
   push:
