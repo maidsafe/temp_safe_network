@@ -63,11 +63,6 @@ impl SectionPeers {
         node_state_list
     }
 
-    /// Returns the number of current members.
-    pub(super) fn num_of_members(&self) -> usize {
-        self.members().len()
-    }
-
     /// Get the `NodeState` for the member with the given name.
     pub(super) fn get(&self, name: &XorName) -> Option<NodeState> {
         self.members()
@@ -79,18 +74,6 @@ impl SectionPeers {
     /// Returns whether the given peer is currently a member of our section.
     pub(super) fn is_member(&self, name: &XorName) -> bool {
         self.get(name).is_some()
-    }
-
-    /// Get section signed `NodeState` for the member with the given name.
-    pub(super) fn is_either_member_or_archived(&self, name: &XorName) -> Option<NodeState> {
-        if let Some(member) = self.get(name) {
-            Some(member)
-        } else {
-            self.archived_members()
-                .iter()
-                .find(|node_state| node_state.name() == *name)
-                .cloned()
-        }
     }
 
     /// Update a member of our section.

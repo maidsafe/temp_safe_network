@@ -53,7 +53,7 @@ mod core {
             handover::Handover,
             membership::{elder_candidates, try_split_dkg, Membership},
             messaging::Peers,
-            DataStorage, Error, Result, XorName,
+            DataStorage, Result, XorName,
         },
         UsedSpace,
     };
@@ -142,16 +142,6 @@ mod core {
     }
 
     impl NodeContext {
-        /// Returns the SAP of the section matching the name.
-        pub(crate) fn section_sap_matching_name(
-            &self,
-            name: &XorName,
-        ) -> Result<SectionAuthorityProvider> {
-            self.network_knowledge
-                .section_auth_by_name(name)
-                .map_err(Error::from)
-        }
-
         /// Log an issue in dysfunction
         /// Spawns a process to send this incase the channel may be full, we don't hold up
         /// processing around this (as this can be called during dkg eg)
