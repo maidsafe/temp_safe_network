@@ -43,7 +43,7 @@ use tokio::sync::{
 use xor_name::XorName;
 
 /// Keep this as 1 so we properly feedback if we're not popping things out of the channel fast enough
-const CMD_CHANNEL_SIZE: usize = 1;
+const CMD_CHANNEL_SIZE: usize = 100;
 
 /// Sent via the rejoin_network_tx to restart the join process.
 /// This would only occur when joins are not allowed, or non-recoverable states.
