@@ -2,38 +2,24 @@
 name: Run All Tests
 
 on:
+  # on main, we want to know that all commits are passing at a glance, any deviation should help debugging errors at a glance
+  push:
+    branches: [main]
+  # tests must run for a PR to be valid and pass merge queue muster
   merge_group:
     branches: [main]
+  # we can trigger this with a comment on a branch (for testing etc)
+  pull_request_review_comment:
+    types: [created]
 
 env:
   CARGO_INCREMENTAL: 0 # bookkeeping for incremental builds has overhead, not useful in CI.
   NODE_COUNT: 15
 
 jobs:
-  # bors Continuous Integration
-  ci-success:
-    # refereneced in bors.toml
-    name: ci
-    if: ${{ success() }}
-    # github jobs that need to have passed for bors to give the all clear
-    needs:
-      - cargo-udeps
-      # - cargo-deny
-      - e2e
-      - api
-      - cli
-      # - e2e-split
-      - unit
-      - checks
-      - lint
-      - e2e-churn
-    runs-on: ubuntu-latest
-    steps:
-      - name: CI succeeded
-        run: exit 0
 
   cargo-udeps:
-    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    if: github.event.name == push || github.event.name == merge_group || github.event.comment && contains(github.event.comment.body, 'test+')
     name: Unused dependency check
     runs-on: ubuntu-latest
     steps:
@@ -53,7 +39,7 @@ jobs:
   # TODO: Reenable when blst has been updated and this isn't just red the whole time.
 
   # cargo-deny:
-  #   if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+  #   if: github.event.name == push || github.event.name == merge_group || github.event.comment && contains(github.event.comment.body, 'test+')
   #   runs-on: ubuntu-latest
   #   steps:
   #   - uses: actions/checkout@v2
@@ -74,7 +60,7 @@ jobs:
       - uses: wagoid/commitlint-github-action@f114310111fdbd07e99f47f9ca13d62b3ec98372
 
   checks:
-    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    if: github.event.name == push || github.event.name == merge_group || github.event.comment && contains(github.event.comment.body, 'test+')
     name: Run rustfmt and clippy
     runs-on: ubuntu-latest
     steps:
@@ -133,7 +119,7 @@ jobs:
             !artifacts/.cargo-lock
 
   unit:
-    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    if: github.event.name == push || github.event.name == merge_group || github.event.comment && contains(github.event.comment.body, 'test+')
     name: Unit Tests
     runs-on: ${{ matrix.os }}
     strategy:
@@ -195,7 +181,7 @@ jobs:
         run: cd sn_cli && cargo test --release --bin safe --features data-network
 
   e2e:
-    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    if: github.event.name == push || github.event.name == merge_group || github.event.comment && contains(github.event.comment.body, 'test+')
     name: E2E tests
     runs-on: ${{ matrix.os }}
     strategy:
@@ -323,7 +309,7 @@ jobs:
         continue-on-error: true
 
   e2e-msg-happy-path:
-    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    if: github.event.name == push || github.event.name == merge_group || github.event.comment && contains(github.event.comment.body, 'test+')
     name: E2E tests (msg happy path)
     runs-on: ${{ matrix.os }}
     strategy:
@@ -451,7 +437,7 @@ jobs:
         continue-on-error: true
 
   e2e-churn:
-    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    if: github.event.name == push || github.event.name == merge_group || github.event.comment && contains(github.event.comment.body, 'test+')
     name: E2E Churn test
     runs-on: ubuntu-latest
     steps:
@@ -523,7 +509,7 @@ jobs:
         continue-on-error: true
 
   # e2e-split:
-  #   #if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+  #   #if: github.event.name == push || github.event.name == merge_group || github.event.comment && contains(github.event.comment.body, 'test+')
   #   # disabled temporarily since `self-hosted-ubuntu` runner not available for NodeRefactorBranch branch
   #   if: false
   #   name: E2E tests w/ full network
@@ -697,7 +683,7 @@ jobs:
   #         rm -rf ~/.safe
 
   api:
-    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    if: github.event.name == push || github.event.name == merge_group || github.event.comment && contains(github.event.comment.body, 'test+')
     name: Run API tests
     runs-on: ${{ matrix.os }}
     strategy:
@@ -815,7 +801,7 @@ jobs:
         continue-on-error: true
 
   cli:
-    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    if: github.event.name == push || github.event.name == merge_group || github.event.comment && contains(github.event.comment.body, 'test+')
     name: Run CLI tests
     runs-on: ${{ matrix.os }}
     strategy:
