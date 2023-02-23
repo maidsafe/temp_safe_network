@@ -48,7 +48,6 @@ use sn_consensus::Decision;
 use std::{
     collections::{BTreeMap, BTreeSet},
     iter,
-    net::SocketAddr,
 };
 use xor_name::{Prefix, XorName};
 

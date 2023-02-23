@@ -6,8 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{register::RegisterQuery, spentbook::SpentbookQuery, Error, QueryResponse};
-use crate::types::{ChunkAddress, DataAddress, SpentbookAddress};
+use super::{register::RegisterQuery, spentbook::SpentbookQuery};
+use crate::types::ChunkAddress;
 use serde::{Deserialize, Serialize};
 use xor_name::XorName;
 
@@ -25,7 +25,7 @@ pub enum DataQuery {
     /// This should eventually lead to a [`GetChunk`] response.
     ///
     /// [`Chunk`]:  crate::types::Chunk
-    /// [`GetChunk`]: QueryResponse::GetChunk
+    /// [`GetChunk`]: super::QueryResponse::GetChunk
     GetChunk(ChunkAddress),
     /// [`Register`] read operation.
     ///
