@@ -3,7 +3,7 @@ name: Run All Tests
 
 on:
   merge_group:
-    types: [checks_requested]
+    branches: [main]
 
 env:
   CARGO_INCREMENTAL: 0 # bookkeeping for incremental builds has overhead, not useful in CI.
