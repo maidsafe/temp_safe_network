@@ -10,10 +10,7 @@ pub use super::system::{SectionSig, SectionSigShare};
 use super::{Error, Result};
 use crate::types::{PublicKey, Signature};
 use bls::PublicKey as BlsPublicKey;
-use ed25519_dalek::{
-    Keypair as EdKeypair, PublicKey as EdPublicKey, Signature as EdSignature, Signer as _,
-    Verifier as _,
-};
+use ed25519_dalek::{PublicKey as EdPublicKey, Signature as EdSignature, Verifier as _};
 use serde::{Deserialize, Serialize};
 
 /// Authority of a network peer.

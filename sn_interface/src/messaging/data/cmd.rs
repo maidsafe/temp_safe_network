@@ -7,10 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{Error, RegisterCmd, SpentbookCmd};
-use crate::{
-    messaging::data::CmdResponse,
-    types::{Chunk, DataAddress},
-};
+use crate::{messaging::data::CmdResponse, types::Chunk};
 use serde::{Deserialize, Serialize};
 use xor_name::XorName;
 

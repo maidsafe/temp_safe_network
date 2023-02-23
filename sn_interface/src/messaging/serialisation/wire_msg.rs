@@ -18,7 +18,6 @@ use bytes::{BufMut, Bytes, BytesMut};
 use custom_debug::Debug;
 use qp2p::UsrMsgBytes;
 use serde::Serialize;
-use xor_name::XorName;
 
 /// In order to send a message over the wire, it needs to be serialized
 /// along with a header (`WireMsgHeader`) which contains the information needed

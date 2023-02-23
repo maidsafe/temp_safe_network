@@ -74,8 +74,9 @@ impl std::str::FromStr for FileExistsAction {
 }
 
 // What type of Progress Indicator to display.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub enum ProgressIndicator {
+    #[default]
     Text,
     None,
 }
@@ -91,12 +92,6 @@ impl std::str::FromStr for ProgressIndicator {
                 "'{other}' not supported. Supported values are bars, text, and none",
             )),
         }
-    }
-}
-
-impl Default for ProgressIndicator {
-    fn default() -> Self {
-        ProgressIndicator::Text
     }
 }
 

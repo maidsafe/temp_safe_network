@@ -23,7 +23,6 @@ mod chunk;
 mod errors;
 mod peer;
 
-use crate::messaging::data::CmdResponse;
 pub use crate::messaging::{
     data::{Error as DataError, RegisterCmd},
     SectionSig,
