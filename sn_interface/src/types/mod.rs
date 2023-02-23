@@ -47,8 +47,6 @@ use xor_name::XorName;
 // still not implemented, it uses a Public Register for now.
 pub const SPENTBOOK_TYPE_TAG: u64 = 0;
 
-const REGISTER_CMD_SIZE: usize = 300;
-
 /// Register data exchange.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ReplicatedRegisterLog {
