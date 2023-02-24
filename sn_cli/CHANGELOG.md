@@ -4,20 +4,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
-## v0.70.0 (2023-02-16)
-
 ## v0.69.3 (2023-02-14)
-
-<csr-id-b50fa2c502915fbca752354f271ee0d370f5b06e/>
-<csr-id-933164e253fb43ec1177ddc56a576b35c3d85bfa/>
 
 ### Chore
 
  - <csr-id-b50fa2c502915fbca752354f271ee0d370f5b06e/> update sn_launch_tool
-
-### Chore
-
- - <csr-id-a7799933cfeadfb70fdb7c1b20ebef9982ea9a41/> sn_client-0.78.7/sn_node-0.74.13/sn_cli-0.69.3
 
 ### Refactor
 
@@ -27,9 +18,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 <csr-read-only-do-not-edit/>
 
- - 3 commits contributed to the release.
+ - 2 commits contributed to the release.
  - 7 days passed between releases.
- - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -39,14 +30,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <details><summary>view details</summary>
 
  * **Uncategorized**
-    - sn_client-0.78.7/sn_node-0.74.13/sn_cli-0.69.3 ([`a779993`](https://github.com/maidsafe/safe_network/commit/a7799933cfeadfb70fdb7c1b20ebef9982ea9a41))
     - update sn_launch_tool ([`b50fa2c`](https://github.com/maidsafe/safe_network/commit/b50fa2c502915fbca752354f271ee0d370f5b06e))
     - remove skip port forward flag ([`933164e`](https://github.com/maidsafe/safe_network/commit/933164e253fb43ec1177ddc56a576b35c3d85bfa))
 </details>
 
 ## v0.69.2 (2023-02-06)
-
-<csr-id-e967cc4d827c460bb47748decdf564c9cf7e1e6d/>
 
 ### Chore
 
