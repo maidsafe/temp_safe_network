@@ -168,9 +168,10 @@ async fn bootstrap_node(
 
     let node_name = node.name();
     let node = Arc::new(RwLock::new(node));
-    let (dispatcher, data_replication_receiver) = Dispatcher::new(node.clone());
+    let (dispatcher, data_replication_receiver) = Dispatcher::new();
     let cmd_ctrl = CmdCtrl::new(dispatcher);
     let (cmd_channel, rejoin_network_rx) = FlowCtrl::start(
+        node.clone(),
         cmd_ctrl,
         incoming_msg_receiver,
         data_replication_receiver,

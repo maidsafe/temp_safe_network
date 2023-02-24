@@ -81,13 +81,14 @@ impl FlowCtrl {
     /// Constructs a FlowCtrl instance, spawnning a task which starts processing messages,
     /// returning the channel where it can receive commands on
     pub(crate) async fn start(
+        node: Arc<RwLock<MyNode>>,
         cmd_ctrl: CmdCtrl,
         incoming_msg_events: Receiver<CommEvent>,
         data_replication_receiver: Receiver<(Vec<DataAddress>, Peer)>,
         fault_cmds_channels: (Sender<FaultsCmd>, Receiver<FaultsCmd>),
     ) -> (Sender<(Cmd, Vec<usize>)>, Receiver<RejoinReason>) {
         trace!("[NODE READ]: flowctrl node context lock got");
-        let node_context = cmd_ctrl.node().read().await.context();
+        let node_context = node.read().await.context();
         let (cmd_sender_channel, mut incoming_cmds_from_apis) = mpsc::channel(CMD_CHANNEL_SIZE);
         let (rejoin_network_tx, rejoin_network_rx) = mpsc::channel(STANDARD_CHANNEL_SIZE);
 
@@ -115,8 +116,11 @@ impl FlowCtrl {
             }
         };
 
+        let node_arc_for_replication = node.clone();
+        let node_arc_for_processing = node.clone();
+
         let flow_ctrl = Self {
-            node: cmd_ctrl.node(),
+            node,
             cmd_sender_channel: cmd_sender_channel.clone(),
             fault_channels,
             timestamps: PeriodicChecksTimestamps::now(),
@@ -127,15 +131,16 @@ impl FlowCtrl {
         let cmd_channel = cmd_sender_channel.clone();
         let cmd_channel_for_msgs = cmd_sender_channel.clone();
 
-        let node_arc_for_replication = cmd_ctrl.node();
         // start a new thread to kick off incoming cmds
         let _handle = tokio::task::spawn(async move {
             // Get a stable identifier for statemap naming. This is NOT the node's current name.
             // It's the initial name... but will not change for the entire statemap
+            let the_node = node_arc_for_processing.clone();
             while let Some((cmd, cmd_id)) = incoming_cmds_from_apis.recv().await {
                 trace!("Taking cmd off stack: {cmd:?}");
                 cmd_ctrl
                     .process_cmd_job(
+                        the_node.clone(),
                         cmd,
                         cmd_id,
                         node_identifier,

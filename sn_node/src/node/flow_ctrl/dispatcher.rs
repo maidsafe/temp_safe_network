@@ -22,34 +22,32 @@ use tokio::sync::{
 
 // Cmd Dispatcher.
 pub(crate) struct Dispatcher {
-    node: Arc<RwLock<MyNode>>,
     data_replication_sender: Sender<(Vec<DataAddress>, Peer)>,
 }
 
 impl Dispatcher {
     /// Creates dispatcher and returns a receiver for enqueing DataAddresses for replication to specific peers
-    pub(crate) fn new(node: Arc<RwLock<MyNode>>) -> (Self, Receiver<(Vec<DataAddress>, Peer)>) {
+    pub(crate) fn new() -> (Self, Receiver<(Vec<DataAddress>, Peer)>) {
         let (data_replication_sender, data_replication_receiver) = channel(STANDARD_CHANNEL_SIZE);
         let dispatcher = Self {
-            node,
             data_replication_sender,
         };
 
         (dispatcher, data_replication_receiver)
     }
 
-    pub(crate) fn node(&self) -> Arc<RwLock<MyNode>> {
-        self.node.clone()
-    }
-
     /// Handles a single cmd.
-    pub(crate) async fn process_cmd(&self, cmd: Cmd) -> Result<Vec<Cmd>> {
+    pub(crate) async fn process_cmd(
+        &self,
+        cmd: Cmd,
+        node: Arc<RwLock<MyNode>>,
+    ) -> Result<Vec<Cmd>> {
         let start = Instant::now();
         let cmd_string = format!("{cmd}");
         let result = match cmd {
             Cmd::TryJoinNetwork => {
                 info!("[NODE READ]: getting lock for try_join_section");
-                let context = self.node().read().await.context();
+                let context = node.read().await.context();
                 info!("[NODE READ]: got lock for try_join_section");
                 Ok(MyNode::try_join_section(context, None)
                     .into_iter()
@@ -165,7 +163,7 @@ impl Dispatcher {
             .into_iter()
             .collect()),
             Cmd::TrackNodeIssue { name, issue } => {
-                let node = self.node.read().await;
+                let node = node.read().await;
                 trace!("[NODE READ]: fault tracking read got");
                 node.track_node_issue(name, issue);
                 Ok(vec![])
@@ -174,7 +172,7 @@ impl Dispatcher {
                 origin,
                 wire_msg,
                 send_stream,
-            } => MyNode::handle_msg(self.node.clone(), origin, wire_msg, send_stream).await,
+            } => MyNode::handle_msg(node.clone(), origin, wire_msg, send_stream).await,
             Cmd::UpdateNetworkAndHandleValidClientMsg {
                 proof_chain,
                 signed_sap,
@@ -188,7 +186,7 @@ impl Dispatcher {
                 debug!("Updating network knowledge before handling message");
                 // we create a block to make sure the node's lock is released
                 let updated = {
-                    let mut node = self.node.write().await;
+                    let mut node = node.write().await;
                     let name = node.name();
                     trace!("[NODE WRITE]: update client write got");
                     node.network_knowledge.update_knowledge_if_valid(
@@ -204,19 +202,19 @@ impl Dispatcher {
             }
             Cmd::HandleSectionDecisionAgreement { proposal, sig } => {
                 trace!("[NODE WRITE]: section decision agreements node write...");
-                let mut node = self.node.write().await;
+                let mut node = node.write().await;
                 trace!("[NODE WRITE]: section decision agreements node write got");
                 node.handle_section_decision_agreement(proposal, sig)
             }
             Cmd::HandleMembershipDecision(decision) => {
                 trace!("[NODE WRITE]: membership decision agreements write...");
-                let mut node = self.node.write().await;
+                let mut node = node.write().await;
                 trace!("[NODE WRITE]: membership decision agreements write got...");
                 node.handle_membership_decision(decision).await
             }
             Cmd::HandleNewEldersAgreement { new_elders, sig } => {
                 trace!("[NODE WRITE]: new elders decision agreements write...");
-                let mut node = self.node.write().await;
+                let mut node = node.write().await;
                 trace!("[NODE WRITE]: new elders decision agreements write got...");
                 node.handle_new_elders_agreement(new_elders, sig).await
             }
@@ -227,14 +225,14 @@ impl Dispatcher {
                 sig2,
             } => {
                 trace!("[NODE WRITE]: new sections decision agreements write...");
-                let mut node = self.node.write().await;
+                let mut node = node.write().await;
                 trace!("[NODE WRITE]: new sections decision agreements write got...");
                 node.handle_new_sections_agreement(sap1, sig1, sap2, sig2)
                     .await
             }
             Cmd::HandleCommsError { peer, error } => {
                 trace!("Comms error {error}");
-                let node = self.node.read().await;
+                let node = node.read().await;
                 debug!("[NODE READ]: HandleCommsError read got...");
                 node.handle_comms_error(peer, error);
                 Ok(vec![])
@@ -244,7 +242,7 @@ impl Dispatcher {
                 outcome,
             } => {
                 trace!("[NODE WRITE]: HandleDKg agreements write...");
-                let mut node = self.node.write().await;
+                let mut node = node.write().await;
                 trace!("[NODE WRITE]: HandleDKg agreements write got...");
                 node.handle_dkg_outcome(section_auth, outcome).await
             }
@@ -259,18 +257,18 @@ impl Dispatcher {
                 Ok(vec![])
             }
             Cmd::ProposeVoteNodesOffline(names) => {
-                let mut node = self.node.write().await;
+                let mut node = node.write().await;
                 trace!("[NODE WRITE]: propose offline write got");
                 node.cast_offline_proposals(&names)
             }
             Cmd::SetJoinsAllowed(joins_allowed) => {
-                let mut node = self.node.write().await;
+                let mut node = node.write().await;
                 trace!("[NODE WRITE]: Setting joins allowed..");
                 node.joins_allowed = joins_allowed;
                 Ok(vec![])
             }
             Cmd::SetJoinsAllowedUntilSplit(joins_allowed_until_split) => {
-                let mut node = self.node.write().await;
+                let mut node = node.write().await;
                 trace!("[NODE WRITE]: Setting joins allowed until split..");
                 node.joins_allowed = joins_allowed_until_split;
                 node.joins_allowed_until_split = joins_allowed_until_split;
