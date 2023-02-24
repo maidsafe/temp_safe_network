@@ -256,7 +256,7 @@ jobs:
       - name: Wait for all nodes to join
         shell: bash
         run: ./resources/scripts/wait_for_nodes_to_join.sh
-        timeout-minutes: 5
+        timeout-minutes: 10
 
       - name: Check we have expected elders
         shell: bash
@@ -394,7 +394,7 @@ jobs:
       - name: Wait for all nodes to join
         shell: bash
         run: ./resources/scripts/wait_for_nodes_to_join.sh
-        timeout-minutes: 5
+        timeout-minutes: 10
 
       - name: Check we have expected elders
         shell: bash
@@ -781,7 +781,7 @@ jobs:
       - name: Wait for all nodes to join
         shell: bash
         run: ./resources/scripts/wait_for_nodes_to_join.sh
-        timeout-minutes: 5
+        timeout-minutes: 10
 
       - name: Build all tests before running
         run: cd sn_api && cargo test --no-run --release --features check-replicas
@@ -899,7 +899,7 @@ jobs:
       - name: Wait for all nodes to join
         shell: bash
         run: ./resources/scripts/wait_for_nodes_to_join.sh
-        timeout-minutes: 5
+        timeout-minutes: 10
 
       - name: Generate keys for test run
         run: cargo run --package sn_cli --release -- keys create --for-cli
