@@ -68,9 +68,19 @@ impl MyNode {
     /// On receiving the relocation trigger from the elders, the relocating node can
     /// request the section to do the relocation membership change.
     pub(crate) fn prepare_to_relocate(&mut self, dst: RelocationDst) -> Vec<Cmd> {
-        // store the `RelocationDst` to start polling the elders
-        self.relocation_state = Some(RelocationState::PreparingToRelocate(dst));
-        info!("{}", LogMarker::RelocateStart);
+        if self.relocation_state.is_none() {
+            // store the `RelocationDst` to start polling the elders
+            self.relocation_state = Some(RelocationState::PreparingToRelocate(dst));
+        } else {
+            warn!("Already prepared to relocate, ignoring additional request to prepare: {dst:?}");
+            return vec![];
+        }
+
+        info!(
+            "{} received for our node which is currently: {:?}",
+            LogMarker::RelocateStart,
+            self.name()
+        );
         info!("Sending request to proceed relocation of us to {:?}", dst);
         vec![MyNode::send_to_elders(
             &self.context(),
