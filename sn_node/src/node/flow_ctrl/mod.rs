@@ -43,7 +43,7 @@ use tokio::sync::{
 use xor_name::XorName;
 
 /// Keep this as 1 so we properly feedback if we're not popping things out of the channel fast enough
-const CMD_CHANNEL_SIZE: usize = 1;
+const CMD_CHANNEL_SIZE: usize = 100;
 
 /// Sent via the rejoin_network_tx to restart the join process.
 /// This would only occur when joins are not allowed, or non-recoverable states.
@@ -134,13 +134,15 @@ impl FlowCtrl {
             // It's the initial name... but will not change for the entire statemap
             while let Some((cmd, cmd_id)) = incoming_cmds_from_apis.recv().await {
                 trace!("Taking cmd off stack: {cmd:?}");
-                cmd_ctrl.process_cmd_job(
-                    cmd,
-                    cmd_id,
-                    node_identifier,
-                    cmd_channel.clone(),
-                    rejoin_network_tx.clone(),
-                )
+                cmd_ctrl
+                    .process_cmd_job(
+                        cmd,
+                        cmd_id,
+                        node_identifier,
+                        cmd_channel.clone(),
+                        rejoin_network_tx.clone(),
+                    )
+                    .await
             }
         });
 
