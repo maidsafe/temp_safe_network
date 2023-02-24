@@ -4,12 +4,23 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
+## v0.71.0 (2023-02-24)
+
 ## v0.70.0 (2023-02-24)
+
+<csr-id-202142e77a4adf0235bf63bb7323c4114dcc965c/>
+<csr-id-67867b1379b9225f4be3d584ea2df5c3b0afca3a/>
+<csr-id-d682cef91723d778501323aef1f03818d0425ee7/>
+<csr-id-e513ab35693a86393925ed5e529dcede1bdbe8b3/>
 
 ### Chore
 
  - <csr-id-202142e77a4adf0235bf63bb7323c4114dcc965c/> feat gate data
  - <csr-id-67867b1379b9225f4be3d584ea2df5c3b0afca3a/> sn_interface-0.17.10/sn_comms-0.3.5/sn_client-0.79.0/sn_node-0.75.0/sn_api-0.77.0/sn_cli-0.70.0
+
+### Chore
+
+ - <csr-id-0d55437399624692c6e5cfc8363a6a630ed13019/> sn_interface-0.17.10/sn_comms-0.3.5/sn_client-0.79.0/sn_node-0.75.0/sn_api-0.77.0/sn_cli-0.70.0
 
 ### New Features
 
@@ -48,9 +59,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 <csr-read-only-do-not-edit/>
 
- - 13 commits contributed to the release over the course of 8 calendar days.
- - 9 days passed between releases.
- - 7 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 14 commits contributed to the release over the course of 8 calendar days.
+ - 10 days passed between releases.
+ - 8 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -60,6 +71,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Sn_interface-0.17.10/sn_comms-0.3.5/sn_client-0.79.0/sn_node-0.75.0/sn_api-0.77.0/sn_cli-0.70.0 ([`0d55437`](https://github.com/maidsafe/safe_network/commit/0d55437399624692c6e5cfc8363a6a630ed13019))
     - Revert "chore(release): sn_interface-0.17.10/sn_comms-0.3.5/sn_client-0.79.0/sn_node-0.75.0/sn_api-0.77.0/sn_cli-0.70.0" ([`7d41c76`](https://github.com/maidsafe/safe_network/commit/7d41c763221d52e44e0f3faefbbb0a4d4aeca0a2))
     - Restore safe update command ([`29c9f3d`](https://github.com/maidsafe/safe_network/commit/29c9f3d4bfd5dd4d5a532ec796e1866b01cff07b))
     - Merge #2114 ([`a3dfb17`](https://github.com/maidsafe/safe_network/commit/a3dfb1741c68b2e1c5fd1570c8604cca28775209))
@@ -79,6 +91,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 <csr-id-b50fa2c502915fbca752354f271ee0d370f5b06e/>
 <csr-id-933164e253fb43ec1177ddc56a576b35c3d85bfa/>
+<csr-id-a7799933cfeadfb70fdb7c1b20ebef9982ea9a41/>
 
 ### Chore
 

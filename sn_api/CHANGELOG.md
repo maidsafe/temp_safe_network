@@ -5,11 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.78.0 (2023-02-24)
+
 ## v0.77.0 (2023-02-24)
+
+<csr-id-67867b1379b9225f4be3d584ea2df5c3b0afca3a/>
+<csr-id-05a2d1acf8e22fae86d3635038801aee94446491/>
 
 ### Chore
 
  - <csr-id-67867b1379b9225f4be3d584ea2df5c3b0afca3a/> sn_interface-0.17.10/sn_comms-0.3.5/sn_client-0.79.0/sn_node-0.75.0/sn_api-0.77.0/sn_cli-0.70.0
+
+### Chore
+
+ - <csr-id-0d55437399624692c6e5cfc8363a6a630ed13019/> sn_interface-0.17.10/sn_comms-0.3.5/sn_client-0.79.0/sn_node-0.75.0/sn_api-0.77.0/sn_cli-0.70.0
 
 ### New Features
 
@@ -28,9 +37,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 11 commits contributed to the release over the course of 21 calendar days.
+ - 12 commits contributed to the release over the course of 21 calendar days.
  - 21 days passed between releases.
- - 5 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 6 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -40,6 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Sn_interface-0.17.10/sn_comms-0.3.5/sn_client-0.79.0/sn_node-0.75.0/sn_api-0.77.0/sn_cli-0.70.0 ([`0d55437`](https://github.com/maidsafe/safe_network/commit/0d55437399624692c6e5cfc8363a6a630ed13019))
     - Revert "chore(release): sn_interface-0.17.10/sn_comms-0.3.5/sn_client-0.79.0/sn_node-0.75.0/sn_api-0.77.0/sn_cli-0.70.0" ([`7d41c76`](https://github.com/maidsafe/safe_network/commit/7d41c763221d52e44e0f3faefbbb0a4d4aeca0a2))
     - Merge #2087 #2107 ([`be64f75`](https://github.com/maidsafe/safe_network/commit/be64f75991cbe72899dd7bde6aab8c1ed66aaae9))
     - Merge branch 'main' into dbc_without_ringct ([`ca4781b`](https://github.com/maidsafe/safe_network/commit/ca4781b551fb40edc71f199c00097eb83ef7cb7b))
@@ -56,6 +66,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## v0.76.1 (2023-02-02)
 
 <csr-id-e706848522d6c52d6ed5eddf638376996cc947a9/>
+<csr-id-3831dae3e34623ef252298645a43cbafcc923a13/>
 
 ### Chore
 

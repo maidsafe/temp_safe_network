@@ -5,7 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.4.0 (2023-02-24)
+
 ## v0.3.5 (2023-02-24)
+
+<csr-id-c112a24847ec6800da444192b35a78a75af65de1/>
+<csr-id-5a29d0d8ad6853e4bb46bd4c122a8fe80dd2cde2/>
+<csr-id-67867b1379b9225f4be3d584ea2df5c3b0afca3a/>
+<csr-id-a6a04247785e973a639ed2a4ccc385d941d65756/>
+<csr-id-d682cef91723d778501323aef1f03818d0425ee7/>
+<csr-id-e513ab35693a86393925ed5e529dcede1bdbe8b3/>
+<csr-id-679591e53ed65fa3f0d78f15b5054cd05085e8d9/>
 
 ### Chore
 
@@ -13,6 +23,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-5a29d0d8ad6853e4bb46bd4c122a8fe80dd2cde2/> update for qp2p recv stream ownership changes
  - <csr-id-67867b1379b9225f4be3d584ea2df5c3b0afca3a/> sn_interface-0.17.10/sn_comms-0.3.5/sn_client-0.79.0/sn_node-0.75.0/sn_api-0.77.0/sn_cli-0.70.0
  - <csr-id-a6a04247785e973a639ed2a4ccc385d941d65756/> remove unnecessary clippy lints
+
+### Chore
+
+ - <csr-id-0d55437399624692c6e5cfc8363a6a630ed13019/> sn_interface-0.17.10/sn_comms-0.3.5/sn_client-0.79.0/sn_node-0.75.0/sn_api-0.77.0/sn_cli-0.70.0
 
 ### Refactor
 
@@ -36,9 +50,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 17 commits contributed to the release over the course of 8 calendar days.
+ - 18 commits contributed to the release over the course of 8 calendar days.
  - 10 days passed between releases.
- - 7 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 8 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -48,6 +62,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Sn_interface-0.17.10/sn_comms-0.3.5/sn_client-0.79.0/sn_node-0.75.0/sn_api-0.77.0/sn_cli-0.70.0 ([`0d55437`](https://github.com/maidsafe/safe_network/commit/0d55437399624692c6e5cfc8363a6a630ed13019))
     - Revert "chore(release): sn_interface-0.17.10/sn_comms-0.3.5/sn_client-0.79.0/sn_node-0.75.0/sn_api-0.77.0/sn_cli-0.70.0" ([`7d41c76`](https://github.com/maidsafe/safe_network/commit/7d41c763221d52e44e0f3faefbbb0a4d4aeca0a2))
     - Merge #2065 #2117 ([`7f4f814`](https://github.com/maidsafe/safe_network/commit/7f4f8144f68ea235e2508699a7e843d0004028e1))
     - Merge branch 'main' into UseParkingLotDeadlockDetection ([`4eddb41`](https://github.com/maidsafe/safe_network/commit/4eddb41639b8845ed7567d8518199944de62f907))
@@ -68,6 +83,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.3.4 (2023-02-14)
+
+<csr-id-b9478767acab3f612d97647384c171837cb15811/>
 
 ### Chore
 
