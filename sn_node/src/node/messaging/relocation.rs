@@ -69,7 +69,16 @@ impl MyNode {
     /// request the section to do the relocation membership change.
     pub(crate) fn prepare_to_relocate(&mut self, dst: RelocationDst) -> Vec<Cmd> {
         // store the `RelocationDst` to start polling the elders
-        self.relocation_state = Some(RelocationState::PreparingToRelocate(dst));
+        if self.relocation_state.is_none() {
+            // store the `RelocationState` locally to periodically request the elders
+            self.relocation_state = Some(RelocationState::PreparingToRelocate(dst));
+        } else {
+            warn!(
+                "Already trying to init relocation, so ignoring new relocation msg to dst: {dst:?}"
+            );
+            return vec![];
+        }
+
         info!("{}", LogMarker::RelocateStart);
         info!("Sending request to proceed relocation of us to {:?}", dst);
         vec![MyNode::send_to_elders(
