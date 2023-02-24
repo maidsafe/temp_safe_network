@@ -446,6 +446,8 @@ jobs:
     if: github.event.comment && contains(github.event.comment.body, 'test+') || true
     name: E2E Churn test
     runs-on: ubuntu-latest
+    env:
+      RUST_LOG: sn_node,sn_fault_detection,sn_comms,sn_interface
     steps:
       - uses: actions/checkout@v2
 
@@ -509,7 +511,7 @@ jobs:
       - name: Upload Node Logs
         uses: actions/upload-artifact@main
         with:
-          name: sn_node_logs_e2e_split_self_hosted_ubuntu
+          name: sn_node_logs_churn_self_hosted_ubuntu
           path: log_files.tar.gz
         if: failure()
         continue-on-error: true
