@@ -25,9 +25,8 @@ env:
   NODE_COUNT: 15
 
 jobs:
-
   cargo-udeps:
-    if: github.event.comment && contains(github.event.comment.body, 'test+') || true
+    if: "!startsWith(github.event.head_commit.message, 'chore(release):')"
     name: Unused dependency check
     runs-on: ubuntu-latest
     steps:
@@ -47,7 +46,7 @@ jobs:
   # TODO: Reenable when blst has been updated and this isn't just red the whole time.
 
   # cargo-deny:
-  #   if: github.event.comment && contains(github.event.comment.body, 'test+') || true
+#           if: "!startsWith(github.event.head_commit.message, 'chore(release):')"
   #   runs-on: ubuntu-latest
   #   steps:
   #   - uses: actions/checkout@v2
@@ -68,7 +67,7 @@ jobs:
       - uses: wagoid/commitlint-github-action@f114310111fdbd07e99f47f9ca13d62b3ec98372
 
   checks:
-    if: github.event.comment && contains(github.event.comment.body, 'test+') || true
+    if: "!startsWith(github.event.head_commit.message, 'chore(release):')"
     name: Run rustfmt and clippy
     runs-on: ubuntu-latest
     steps:
@@ -127,7 +126,7 @@ jobs:
             !artifacts/.cargo-lock
 
   unit:
-    if: github.event.comment && contains(github.event.comment.body, 'test+') || true
+    if: "!startsWith(github.event.head_commit.message, 'chore(release):')"
     name: Unit Tests
     runs-on: ${{ matrix.os }}
     strategy:
@@ -189,7 +188,7 @@ jobs:
         run: cd sn_cli && cargo test --release --bin safe --features data-network
 
   e2e:
-    if: github.event.comment && contains(github.event.comment.body, 'test+') || true
+    if: "!startsWith(github.event.head_commit.message, 'chore(release):')"
     name: E2E tests
     runs-on: ${{ matrix.os }}
     strategy:
@@ -326,7 +325,7 @@ jobs:
         continue-on-error: true
 
   e2e-msg-happy-path:
-    if: github.event.comment && contains(github.event.comment.body, 'test+') || true
+    if: "!startsWith(github.event.head_commit.message, 'chore(release):')"
     name: E2E tests (msg happy path)
     runs-on: ${{ matrix.os }}
     strategy:
@@ -463,7 +462,7 @@ jobs:
         continue-on-error: true
 
   e2e-churn:
-    if: github.event.comment && contains(github.event.comment.body, 'test+') || true
+    if: "!startsWith(github.event.head_commit.message, 'chore(release):')"
     name: E2E Churn test
     runs-on: ubuntu-latest
     env:
@@ -537,7 +536,7 @@ jobs:
         continue-on-error: true
 
   # e2e-split:
-  #   #if: github.event.comment && contains(github.event.comment.body, 'test+') || true
+#   #        if: "!startsWith(github.event.head_commit.message, 'chore(release):')"
   #   # disabled temporarily since `self-hosted-ubuntu` runner not available for NodeRefactorBranch branch
   #   if: false
   #   name: E2E tests w/ full network
@@ -711,7 +710,7 @@ jobs:
   #         rm -rf ~/.safe
 
   api:
-    if: github.event.comment && contains(github.event.comment.body, 'test+') || true
+    if: "!startsWith(github.event.head_commit.message, 'chore(release):')"
     name: Run API tests
     runs-on: ${{ matrix.os }}
     strategy:
@@ -828,7 +827,7 @@ jobs:
         continue-on-error: true
 
   cli:
-    if: github.event.comment && contains(github.event.comment.body, 'test+') || true
+    if: "!startsWith(github.event.head_commit.message, 'chore(release):')"
     name: Run CLI tests
     runs-on: ${{ matrix.os }}
     strategy:
