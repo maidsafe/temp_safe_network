@@ -8,30 +8,23 @@
 
 use crate::node::{core::NodeContext, flow_ctrl::cmds::Cmd, Error, MyNode, Result};
 
-use bytes::BufMut;
-use qp2p::SendStream;
 use sn_dbc::{
     get_public_commitments_from_transaction, Commitment, DbcTransaction, PublicKey, SpentProof,
     SpentProofShare,
 };
 use sn_interface::{
     messaging::{
-        data::{
-            ClientMsg, DataCmd, DataQuery, DataResponse, EditRegister, SignedRegisterEdit,
-            SpentbookCmd,
-        },
+        data::{ClientMsg, DataCmd, DataQuery, DataResponse, SpentbookCmd},
         AuthorityProof, ClientAuth, MsgId,
     },
-    network_knowledge::{section_keys::build_spent_proof_share, SectionTreeUpdate},
-    types::{
-        log_markers::LogMarker,
-        register::{Permissions, Policy, Register, User},
-        Keypair, Peer, RegisterCmd, ReplicatedData, SPENTBOOK_TYPE_TAG,
+    network_knowledge::{
+        section_keys::build_spent_proof_share, NetworkKnowledge, SectionTreeUpdate,
     },
+    types::{log_markers::LogMarker, register::User, Peer, ReplicatedData},
 };
 
-use std::collections::{BTreeMap, BTreeSet};
-use xor_name::XorName;
+use qp2p::SendStream;
+use std::collections::BTreeSet;
 
 impl MyNode {
     /// Forms a `CmdError` msg to send back to the client over the response stream
@@ -81,7 +74,7 @@ impl MyNode {
     /// the `data_copy_count()` nodes, then we will send a wiremsg
     /// to ourselves, among the msgs sent to the other holders.
     pub(crate) async fn handle_client_msg_for_us(
-        mut context: NodeContext,
+        context: NodeContext,
         msg_id: MsgId,
         msg: ClientMsg,
         auth: AuthorityProof<ClientAuth>,
@@ -92,7 +85,7 @@ impl MyNode {
 
         match msg {
             ClientMsg::Cmd(cmd) => {
-                MyNode::handle_data_cmd(&mut context, cmd, msg_id, origin, auth, send_stream).await
+                MyNode::handle_data_cmd(cmd, msg_id, origin, auth, send_stream, context).await
             }
             ClientMsg::Query(query) => Ok(MyNode::handle_data_query_where_stored(
                 msg_id,
@@ -108,15 +101,15 @@ impl MyNode {
 
     /// Handle the DataCmd variant
     async fn handle_data_cmd(
-        context: &mut NodeContext,
-        cmd: DataCmd,
+        data_cmd: DataCmd,
         msg_id: MsgId,
         origin: Peer,
         auth: AuthorityProof<ClientAuth>,
         send_stream: SendStream,
+        mut context: NodeContext,
     ) -> Result<Vec<Cmd>> {
         // extract the data from the request
-        let data_result = match cmd.clone() {
+        let data_result: Result<ReplicatedData> = match data_cmd.clone() {
             DataCmd::StoreChunk(chunk) => Ok(ReplicatedData::Chunk(chunk)),
             DataCmd::Register(cmd) => Ok(ReplicatedData::RegisterWrite(cmd)),
             DataCmd::Spentbook(cmd) => {
@@ -162,49 +155,65 @@ impl MyNode {
                         return Ok(vec![update_command]);
                     }
                 }
-                // THis is not being forwarded
-                MyNode::extract_spentproof_contents_as_replicated_data(context, cmd)
+
+                // first we validate it here at the Elder
+                let spent_share = match MyNode::validate_spentbook_cmd(cmd, &context) {
+                    Ok(share) => share,
+                    Err(e) => {
+                        return MyNode::send_error(
+                            msg_id,
+                            data_cmd,
+                            e,
+                            context,
+                            send_stream,
+                            origin,
+                        )
+                    }
+                };
+
+                // then we forward it to data holders
+                return MyNode::forward_spent_share(
+                    msg_id,
+                    spent_share,
+                    public_key,
+                    origin,
+                    send_stream,
+                    context,
+                );
             }
         };
 
-        // here we pull out spentbook writes and forward those as node data cmd
         match data_result {
             Ok(data) => {
-                // Spentbook register cmds now need to be sent on to data holders
-                if let ReplicatedData::SpentbookWrite(_) = &data {
-                    return MyNode::forward_on_spentbook_cmd(
-                        data,
-                        context,
-                        msg_id,
-                        origin,
-                        send_stream,
-                    );
-                }
-                // TODO: This would mean all spendbook is at elders...
-                MyNode::store_data_and_respond(context, data, send_stream, origin, msg_id).await
+                MyNode::store_data_and_respond(&context, data, send_stream, origin, msg_id).await
             }
-            Err(error) => {
-                let data_response = DataResponse::CmdResponse {
-                    response: cmd.to_error_response(error.into()),
-                    correlation_id: msg_id,
-                };
-
-                let cmd = MyNode::send_cmd_error_response_over_stream(
-                    context.clone(),
-                    data_response,
-                    msg_id,
-                    send_stream,
-                    origin,
-                );
-                Ok(vec![cmd])
-            }
+            Err(error) => MyNode::send_error(msg_id, data_cmd, error, context, send_stream, origin),
         }
     }
-    // helper to extract the contents of the cmd as ReplicatedData
-    fn extract_spentproof_contents_as_replicated_data(
-        context: &NodeContext,
-        cmd: SpentbookCmd,
-    ) -> Result<ReplicatedData> {
+
+    fn send_error(
+        msg_id: MsgId,
+        cmd: DataCmd,
+        error: Error,
+        context: NodeContext,
+        send_stream: SendStream,
+        origin: Peer,
+    ) -> Result<Vec<Cmd>> {
+        let data_response = DataResponse::CmdResponse {
+            response: cmd.to_error_response(error.into()),
+            correlation_id: msg_id,
+        };
+        let cmd = MyNode::send_cmd_error_response_over_stream(
+            context,
+            data_response,
+            msg_id,
+            send_stream,
+            origin,
+        );
+        Ok(vec![cmd])
+    }
+
+    fn validate_spentbook_cmd(cmd: SpentbookCmd, context: &NodeContext) -> Result<SpentProofShare> {
         let SpentbookCmd::Spend {
             public_key,
             tx,
@@ -216,52 +225,26 @@ impl MyNode {
         info!("Processing spend request for public key: {:?}", public_key);
 
         let spent_proof_share = MyNode::gen_spent_proof_share(
-            context,
             &public_key,
             &tx,
             &spent_proofs,
             &spent_transactions,
+            context,
         )?;
-        let reg_cmd = MyNode::gen_register_cmd(context, &public_key, &spent_proof_share)?;
-        Ok(ReplicatedData::SpentbookWrite(reg_cmd))
+
+        Ok(spent_proof_share)
     }
 
     /// Generate a spent proof share from the information provided by the client.
     fn gen_spent_proof_share(
-        context: &NodeContext,
         public_key: &PublicKey,
         tx: &DbcTransaction,
         spent_proofs: &BTreeSet<SpentProof>,
         spent_transactions: &BTreeSet<DbcTransaction>,
+        context: &NodeContext,
     ) -> Result<SpentProofShare> {
-        // Verify spent proof signatures are valid.
-        let mut spent_proofs_keys = BTreeSet::new();
-        for proof in spent_proofs.iter() {
-            if !proof
-                .spentbook_pub_key
-                .verify(&proof.spentbook_sig, proof.content.hash().as_ref())
-            {
-                let msg = format!(
-                    "Spent proof signature {:?} is invalid",
-                    proof.spentbook_pub_key
-                );
-                warn!("Dropping spend request: {msg}");
-                return Err(Error::SpentbookError(msg));
-            }
-            let _ = spent_proofs_keys.insert(proof.spentbook_pub_key);
-        }
-
-        // Verify each spent proof is signed by a known section key (or the genesis key).
-        for pk in &spent_proofs_keys {
-            if !context.network_knowledge.verify_section_key_is_known(pk) {
-                warn!(
-                    "Dropping spend request: spent proof is signed by unknown section with public \
-                    key {:?}",
-                    pk
-                );
-                return Err(Error::SpentProofUnknownSectionKey(*pk));
-            }
-        }
+        // verify the spent proofs
+        MyNode::verify_spent_proofs(spent_proofs, &context.network_knowledge)?;
 
         let public_commitments_info =
             get_public_commitments_from_transaction(tx, spent_proofs, spent_transactions)?;
@@ -300,53 +283,45 @@ impl MyNode {
             &context.section_keys_provider,
             public_commitment,
         )?;
+
         Ok(spent_proof_share)
     }
 
-    /// Generate the RegisterCmd to write the SpentProofShare as an entry in the Spentbook
-    /// (Register).
-    fn gen_register_cmd(
-        context: &NodeContext,
-        public_key: &PublicKey,
-        spent_proof_share: &SpentProofShare,
-    ) -> Result<RegisterCmd> {
-        let mut permissions = BTreeMap::new();
-        let _ = permissions.insert(User::Anyone, Permissions::new(true));
+    // Verify spent proof signatures are valid, and each spent proof is signed by a known section key.
+    fn verify_spent_proofs(
+        spent_proofs: &BTreeSet<SpentProof>,
+        network_knowledge: &NetworkKnowledge,
+    ) -> Result<()> {
+        let mut spent_proofs_keys = BTreeSet::new();
 
-        // use our own keypair for generating the register command
-        let own_keypair = Keypair::Ed25519(context.keypair.clone());
-        let owner = User::Key(own_keypair.public_key());
-        let policy = Policy { owner, permissions };
+        // Verify each spent proof signature is valid.
+        for proof in spent_proofs.iter() {
+            if !proof
+                .spentbook_pub_key
+                .verify(&proof.spentbook_sig, proof.content.hash().as_ref())
+            {
+                let msg = format!(
+                    "Spent proof signature {:?} is invalid",
+                    proof.spentbook_pub_key
+                );
+                warn!("Dropping spend request: {msg}");
+                return Err(Error::SpentbookError(msg));
+            }
+            let _ = spent_proofs_keys.insert(proof.spentbook_pub_key);
+        }
 
-        let mut register = Register::new(
-            owner,
-            XorName::from_content(&public_key.to_bytes()),
-            SPENTBOOK_TYPE_TAG,
-            policy,
-        );
-        let mut entry = vec![].writer();
-        rmp_serde::encode::write(&mut entry, spent_proof_share).map_err(|err| {
-            Error::SpentbookError(format!(
-                "Failed to serialise SpentProofShare to insert it into the spentbook (Register): {err:?}",
-            ))
-        })?;
+        // Verify each spent proof is signed by a known section key.
+        for pk in &spent_proofs_keys {
+            if !network_knowledge.verify_section_key_is_known(pk) {
+                warn!(
+                    "Dropping spend request: spent proof is signed by unknown section with public \
+                    key {:?}",
+                    pk
+                );
+                return Err(Error::SpentProofUnknownSectionKey(*pk));
+            }
+        }
 
-        let (_, op) = register.write(entry.into_inner(), BTreeSet::default())?;
-        let op = EditRegister {
-            address: *register.address(),
-            edit: op,
-        };
-
-        let signature = own_keypair.sign(&bincode::serialize(&op)?);
-        let signed_edit = SignedRegisterEdit {
-            op,
-            auth: ClientAuth {
-                public_key: own_keypair.public_key(),
-                signature,
-            },
-        };
-
-        debug!("Successfully generated spent proof share for spend request");
-        Ok(RegisterCmd::Edit(signed_edit))
+        Ok(())
     }
 }

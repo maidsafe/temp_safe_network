@@ -7,26 +7,32 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{
-    core::NodeContext, flow_ctrl::fault_detection::FaultsCmd, messaging::Peers, Cmd, MyNode, Result,
+    core::NodeContext, flow_ctrl::fault_detection::FaultsCmd, messaging::Peers, Cmd, Error, MyNode,
+    Result,
 };
 use crate::storage::{Error as StorageError, StorageLevel};
 
+use sn_dbc::SpentProofShare;
 use sn_interface::{
     data_copy_count,
     messaging::{
-        data::DataResponse,
+        data::{DataResponse, EditRegister, SignedRegisterEdit},
         system::{NodeDataCmd, NodeEvent, NodeMsg},
-        MsgId, MsgKind, WireMsg,
+        ClientAuth, MsgId, MsgKind, WireMsg,
     },
-    types::{log_markers::LogMarker, DataError, Keypair, Peer, PublicKey, ReplicatedData},
+    types::{
+        log_markers::LogMarker,
+        register::{Permissions, Policy, Register, User},
+        DataError, Keypair, Peer, PublicKey, RegisterCmd, ReplicatedData, SPENTBOOK_TYPE_TAG,
+    },
 };
 
-use qp2p::SendStream;
-use xor_name::XorName;
-
+use bytes::BufMut;
 use itertools::Itertools;
-use std::collections::BTreeSet;
+use qp2p::SendStream;
+use std::collections::{BTreeMap, BTreeSet};
 use tracing::info;
+use xor_name::XorName;
 
 impl MyNode {
     /// Find target node, sends a bidi msg, awaiting response, and then sends this on to the client
@@ -138,20 +144,23 @@ impl MyNode {
         };
     }
 
-    /// Serialise NodeMsg and select targets to send out NodeData msg for storing spentbook
-    /// on storage nodes.
-    ///
-    /// The response is forwarded back on to the client
-    pub(crate) fn forward_on_spentbook_cmd(
-        data: ReplicatedData,
-        context: &NodeContext,
+    /// Select targets to send out the SpentProofShare for storing to spentbook
+    /// on storage nodes. The response is then forwarded back on to the client.
+    pub(crate) fn forward_spent_share(
         msg_id: MsgId,
+        share: SpentProofShare,
+        public_key: bls::PublicKey,
         source_client: Peer,
         client_stream: SendStream,
+        context: NodeContext,
     ) -> Result<Vec<Cmd>> {
-        debug!("{msg_id:?} Forwarding on RegisterCmd for Spentbook msg");
-        let name = *data.address().name();
-        let node_msg = NodeMsg::NodeDataCmd(NodeDataCmd::StoreData(data));
+        debug!("{msg_id:?} Forwarding SpentProofShare for Spentbook.");
+
+        let reg_cmd = gen_register_cmd(share, public_key, &context)?;
+        let name = reg_cmd.name();
+        let node_msg = NodeMsg::NodeDataCmd(NodeDataCmd::StoreData(
+            ReplicatedData::SpentbookWrite(reg_cmd),
+        ));
         let section_key = context
             .network_knowledge
             .section_auth_by_name(&name)?
@@ -160,12 +169,8 @@ impl MyNode {
         let (kind, payload) = MyNode::serialize_node_msg(context.name, &node_msg)?;
         let wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
 
-        let targets = MyNode::target_data_holders(context, name, None);
-        debug!(
-            "{msg_id:?} Forwarding on RegisterCmd for Spentbook msg to data holders: {targets:?}"
-        );
-
-        let context = context.clone();
+        let targets = MyNode::target_data_holders(&context, name, None);
+        debug!("{msg_id:?} Forwarding SpentProofShare for Spentbook to data holders: {targets:?}");
 
         Ok(vec![Cmd::SendAndForwardResponseToClient {
             wire_msg,
@@ -285,4 +290,51 @@ impl MyNode {
 
         Ok(cmds)
     }
+}
+
+/// Generate the RegisterCmd to write the SpentProofShare as an entry in the Spentbook
+/// (Register).
+fn gen_register_cmd(
+    spent_proof_share: SpentProofShare,
+    public_key: bls::PublicKey,
+    context: &NodeContext,
+) -> Result<RegisterCmd> {
+    let mut permissions = BTreeMap::new();
+    let _ = permissions.insert(User::Anyone, Permissions::new(true));
+
+    // use our own keypair for generating the register command
+    let own_keypair = Keypair::Ed25519(context.keypair.clone());
+    let owner = User::Key(own_keypair.public_key());
+    let policy = Policy { owner, permissions };
+
+    let mut register = Register::new(
+        owner,
+        XorName::from_content(&public_key.to_bytes()),
+        SPENTBOOK_TYPE_TAG,
+        policy,
+    );
+    let mut entry = vec![].writer();
+    rmp_serde::encode::write(&mut entry, &spent_proof_share).map_err(|err| {
+        Error::SpentbookError(format!(
+            "Failed to serialise SpentProofShare to insert it into the spentbook (Register): {err:?}",
+        ))
+    })?;
+
+    let (_, op) = register.write(entry.into_inner(), BTreeSet::default())?;
+    let op = EditRegister {
+        address: *register.address(),
+        edit: op,
+    };
+
+    let signature = own_keypair.sign(&bincode::serialize(&op)?);
+    let signed_edit = SignedRegisterEdit {
+        op,
+        auth: ClientAuth {
+            public_key: own_keypair.public_key(),
+            signature,
+        },
+    };
+
+    debug!("Successfully generated spent proof share for spend request");
+    Ok(RegisterCmd::Edit(signed_edit))
 }
