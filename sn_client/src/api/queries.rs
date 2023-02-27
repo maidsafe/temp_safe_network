@@ -232,8 +232,12 @@ impl Client {
             Err(Error::DataReplicasCheck(
                 error @ crate::errors::DataReplicasCheckError::DifferentResponses { .. },
             )) => {
-                warn!("Different responses received for query, we'll retry to send it only once: {error:?}");
-                sleep(tokio::time::Duration::from_secs(10)).await;
+                warn!(
+                    "Different responses received for query, we'll retry (after {:?} delay) \
+                    to send it only once: {error:?}",
+                    self.max_backoff_interval
+                );
+                sleep(self.max_backoff_interval).await;
                 let response = self.query_all_data_replicas(query).await;
                 debug!("Second attempt to send query to check-replicas: {response:?}");
                 response
