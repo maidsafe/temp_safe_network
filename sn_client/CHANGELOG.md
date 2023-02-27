@@ -1113,9 +1113,62 @@ needed, as they keypair itself contains the Arcs we need.
     - Self authentication Example
     - Example to demonstrate Storage API
 
+## v0.81.1 (2023-02-27)
+
+### Bug Fixes
+
+ - <csr-id-87a5634612282c189f68293940d85830e8d65400/> use max_backoff_interval when retrying checking replicas
+   - Also, avoid retrying the query to check a chunk is stored. If the
+   'check-replicas' feature is enabled it will already retry upon receiving
+   different responses from replicas.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 1 commit contributed to the release.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Use max_backoff_interval when retrying checking replicas ([`87a5634`](https://github.com/maidsafe/safe_network/commit/87a5634612282c189f68293940d85830e8d65400))
+</details>
+
 ## v0.81.0 (2023-02-27)
 
+### Chore
+
+ - <csr-id-7b046d3bf9c2de4d7aea170197ba4f3e2392fe89/> sn_interface-0.19.0/sn_comms-0.5.0/sn_client-0.81.0/sn_node-0.77.0/sn_api-0.79.0/sn_cli-0.72.0
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 1 commit contributed to the release.
+ - 2 days passed between releases.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Sn_interface-0.19.0/sn_comms-0.5.0/sn_client-0.81.0/sn_node-0.77.0/sn_api-0.79.0/sn_cli-0.72.0 ([`7b046d3`](https://github.com/maidsafe/safe_network/commit/7b046d3bf9c2de4d7aea170197ba4f3e2392fe89))
+</details>
+
 ## v0.80.0 (2023-02-24)
+
+<csr-id-444e4e5969be16129fb87ae42927e183ac41982b/>
+<csr-id-d81aa0f7a16871360e0958109ea72b950d04762a/>
 
 ### Chore
 
@@ -1152,6 +1205,7 @@ needed, as they keypair itself contains the Arcs we need.
 <csr-id-d682cef91723d778501323aef1f03818d0425ee7/>
 <csr-id-e513ab35693a86393925ed5e529dcede1bdbe8b3/>
 <csr-id-679591e53ed65fa3f0d78f15b5054cd05085e8d9/>
+<csr-id-0d55437399624692c6e5cfc8363a6a630ed13019/>
 
 ### Chore
 
@@ -1241,9 +1295,6 @@ needed, as they keypair itself contains the Arcs we need.
     - Merge branch 'main' into dbc_without_ringct ([`f4bfef2`](https://github.com/maidsafe/safe_network/commit/f4bfef20db8c718aacef188f0150e07673eba1b0))
     - Dbcs without ringcts integration ([`9fc53e7`](https://github.com/maidsafe/safe_network/commit/9fc53e718889986f132daeac6df2b10d294094da))
 </details>
-
-<csr-unknown>
- dbcs without ringcts integration<csr-unknown/>
 
 ## v0.78.7 (2023-02-14)
 
