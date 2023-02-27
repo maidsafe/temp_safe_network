@@ -71,7 +71,6 @@ pub(super) fn find_nodes_to_relocate(
     candidates.sort_by(|lhs, rhs| target_name.cmp_distance(&lhs.name(), &rhs.name()));
 
     info!("Finding relocation candidates {candidates:?}");
-
     let max_age = if let Some(age) = candidates.iter().map(|info| info.age()).max() {
         age
     } else {
