@@ -23,7 +23,7 @@ use futures::future::join_all;
 use itertools::Itertools;
 use self_encryption::{self, ChunkInfo, DataMap, EncryptedChunk};
 use std::collections::BTreeMap;
-use tokio::{task, time::sleep};
+use tokio::task;
 use tracing::trace;
 use xor_name::XorName;
 
@@ -266,30 +266,16 @@ impl Client {
 
     // Verify a chunk is stored at provided address
     async fn verify_chunk_is_stored(&self, address: XorName) -> Result<()> {
-        if let Some(query_timeout) = self.query_timeout {
-            // `query_chunk` could return earlier than query_timeout
-            // with `DataNotFound` eg, but this could just mean that the data has not yet
-            // reached adults...and so, we retry once but within the timeout limit set
-            tokio::time::timeout(query_timeout, self.query_chunk_and_retry_once(address))
+        let _chunk = if let Some(query_timeout) = self.query_timeout {
+            tokio::time::timeout(query_timeout, self.get_chunk(&address))
                 .await
                 .map_err(|_| Error::ChunkUploadValidationTimeout {
                     elapsed: query_timeout,
                     address,
                 })??
         } else {
-            self.query_chunk_and_retry_once(address).await?
+            self.get_chunk(&address).await?
         };
-
-        Ok(())
-    }
-
-    // Attempt to get chunk, otherwise retry (once) after a backoff interval
-    async fn query_chunk_and_retry_once(&self, address: XorName) -> Result<()> {
-        if let Err(err) = self.get_chunk(&address).await {
-            error!("Error when attempting to verify chunk was stored at {address:?}: {err:?}",);
-            sleep(self.max_backoff_interval).await;
-            let _ = self.get_chunk(&address).await?;
-        }
 
         Ok(())
     }
