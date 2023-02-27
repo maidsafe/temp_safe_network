@@ -1113,7 +1113,45 @@ needed, as they keypair itself contains the Arcs we need.
     - Self authentication Example
     - Example to demonstrate Storage API
 
+## v0.81.0 (2023-02-27)
+
+## v0.80.0 (2023-02-24)
+
+### Chore
+
+ - <csr-id-444e4e5969be16129fb87ae42927e183ac41982b/> sn_interface-0.18.0/sn_comms-0.4.0/sn_client-0.80.0/sn_node-0.76.0/sn_api-0.78.0/sn_cli-0.71.0
+
+### Chore (BREAKING)
+
+ - <csr-id-d81aa0f7a16871360e0958109ea72b950d04762a/> sn-client e2e tests on Ubuntu to run with 10secs timeout for cmds/queries
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Sn_interface-0.18.0/sn_comms-0.4.0/sn_client-0.80.0/sn_node-0.76.0/sn_api-0.78.0/sn_cli-0.71.0 ([`444e4e5`](https://github.com/maidsafe/safe_network/commit/444e4e5969be16129fb87ae42927e183ac41982b))
+    - Sn-client e2e tests on Ubuntu to run with 10secs timeout for cmds/queries ([`d81aa0f`](https://github.com/maidsafe/safe_network/commit/d81aa0f7a16871360e0958109ea72b950d04762a))
+</details>
+
 ## v0.79.0 (2023-02-24)
+
+<csr-id-c112a24847ec6800da444192b35a78a75af65de1/>
+<csr-id-5a29d0d8ad6853e4bb46bd4c122a8fe80dd2cde2/>
+<csr-id-67867b1379b9225f4be3d584ea2df5c3b0afca3a/>
+<csr-id-d682cef91723d778501323aef1f03818d0425ee7/>
+<csr-id-e513ab35693a86393925ed5e529dcede1bdbe8b3/>
+<csr-id-679591e53ed65fa3f0d78f15b5054cd05085e8d9/>
 
 ### Chore
 
@@ -1121,13 +1159,18 @@ needed, as they keypair itself contains the Arcs we need.
  - <csr-id-5a29d0d8ad6853e4bb46bd4c122a8fe80dd2cde2/> update for qp2p recv stream ownership changes
  - <csr-id-67867b1379b9225f4be3d584ea2df5c3b0afca3a/> sn_interface-0.17.10/sn_comms-0.3.5/sn_client-0.79.0/sn_node-0.75.0/sn_api-0.77.0/sn_cli-0.70.0
 
+### Chore
+
+ - <csr-id-0d55437399624692c6e5cfc8363a6a630ed13019/> sn_interface-0.17.10/sn_comms-0.3.5/sn_client-0.79.0/sn_node-0.75.0/sn_api-0.77.0/sn_cli-0.70.0
+
 ### New Features
+
+<csr-id-9fc53e718889986f132daeac6df2b10d294094da/>
 
  - <csr-id-ab20e8f98a52021cb3e3caa5a33392e20ac6717f/> sn_client to not have any default cmd/query timeout value set
    - sn_client is now set to send msgs to the network without any default timeout
    values, the user of the lib can still set them with SN_CMD_TIMEOUT and
    SN_QUERY_TIMEOUT env vars according to its own requirements.
- - <csr-id-9fc53e718889986f132daeac6df2b10d294094da/> dbcs without ringcts integration
 
 ### Bug Fixes
 
@@ -1162,9 +1205,9 @@ needed, as they keypair itself contains the Arcs we need.
 
 <csr-read-only-do-not-edit/>
 
- - 22 commits contributed to the release over the course of 8 calendar days.
- - 9 days passed between releases.
- - 12 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 23 commits contributed to the release over the course of 8 calendar days.
+ - 10 days passed between releases.
+ - 13 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -1174,6 +1217,7 @@ needed, as they keypair itself contains the Arcs we need.
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Sn_interface-0.17.10/sn_comms-0.3.5/sn_client-0.79.0/sn_node-0.75.0/sn_api-0.77.0/sn_cli-0.70.0 ([`0d55437`](https://github.com/maidsafe/safe_network/commit/0d55437399624692c6e5cfc8363a6a630ed13019))
     - Revert "chore(release): sn_interface-0.17.10/sn_comms-0.3.5/sn_client-0.79.0/sn_node-0.75.0/sn_api-0.77.0/sn_cli-0.70.0" ([`7d41c76`](https://github.com/maidsafe/safe_network/commit/7d41c763221d52e44e0f3faefbbb0a4d4aeca0a2))
     - Merge #2065 #2117 ([`7f4f814`](https://github.com/maidsafe/safe_network/commit/7f4f8144f68ea235e2508699a7e843d0004028e1))
     - Merge branch 'main' into UseParkingLotDeadlockDetection ([`4eddb41`](https://github.com/maidsafe/safe_network/commit/4eddb41639b8845ed7567d8518199944de62f907))
@@ -1198,9 +1242,13 @@ needed, as they keypair itself contains the Arcs we need.
     - Dbcs without ringcts integration ([`9fc53e7`](https://github.com/maidsafe/safe_network/commit/9fc53e718889986f132daeac6df2b10d294094da))
 </details>
 
+<csr-unknown>
+ dbcs without ringcts integration<csr-unknown/>
+
 ## v0.78.7 (2023-02-14)
 
 <csr-id-b50fa2c502915fbca752354f271ee0d370f5b06e/>
+<csr-id-a7799933cfeadfb70fdb7c1b20ebef9982ea9a41/>
 
 ### Chore
 
