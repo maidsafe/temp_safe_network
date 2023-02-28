@@ -17,8 +17,12 @@ use hex_fmt::HexFmt;
 use serde::{Deserialize, Serialize};
 use xor_name::XorName;
 
-/// We are relocating to the section that matches the contained XorName.
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Debug)]
+/// A node relocates to the section that matches the contained `XorName`.
+/// The `RelocationDst` is sent by the elders to a node that has been selected for relocation.
+/// This is then used by the node to poll the elders asking them to run the relocation request through consensus.
+/// It will continue to poll until it receives the AE Update showing that relocation was decided (i.e. they are no longer members)
+/// and that it can start the join process at the target section, providing the decision as part of a proof that the relocation is valid.
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Debug)]
 pub struct RelocationDst(XorName);
 
 impl RelocationDst {
@@ -48,13 +52,6 @@ impl RelocationInfo {
             new_name,
         }
     }
-}
-
-/// The relocation trigger is sent by the elder nodes to the relocating nodes.
-/// This is then used by the relocating nodes to request the Section to propose a relocation membership change.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-pub struct RelocationTrigger {
-    pub dst: RelocationDst,
 }
 
 /// A relocation proof proves that a section started a relocation
@@ -134,8 +131,11 @@ impl RelocationProof {
 #[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug)]
 pub enum RelocationState {
-    /// If the node has the `RelocationTrigger` then it can request the section to relocate it.
-    RequestToRelocate(RelocationTrigger),
-    /// If the node has the `RelocationProof` then it can join the destination with the provided proof.
-    JoinAsRelocated(RelocationProof),
+    /// A relocation dst is sent from a section to one of its members, based upon
+    /// the node matching the trigger.
+    /// This is the elders asking the node to start polling
+    /// them for the decision to remove it from members as being relocated.
+    PreparingToRelocate(RelocationDst),
+    /// When the node has a `RelocationProof` it can join the dst section with the provided proof.
+    ReadyToJoinNewSection(RelocationProof),
 }

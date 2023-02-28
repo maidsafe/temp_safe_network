@@ -97,29 +97,26 @@ impl FlowCtrl {
     async fn enqueue_cmds_for_node_periodic_checks(&mut self, context: &NodeContext) -> Vec<Cmd> {
         let mut cmds = vec![];
 
-        // check if we can request for relocation
+        // check if we have been asked to prepare for relocation
         // The relocation_state will be changed into `JoinAsRelocated` once the request has been
         // approved by the section
-        if let Some(RelocationState::RequestToRelocate(trigger)) = &context.relocation_state {
+        if let Some(RelocationState::PreparingToRelocate(dst)) = &context.relocation_state {
             if self.timestamps.request_to_relocate_check.elapsed() > REQUEST_TO_RELOCATE_TIMEOUT_SEC
             {
                 info!(
                     "Periodic check: sending request to relocate our node to {:?}",
-                    trigger.dst
+                    dst
                 );
                 self.timestamps.request_to_relocate_check = Instant::now();
                 cmds.push(MyNode::send_to_elders(
                     context,
-                    NodeMsg::RelocationRequest {
-                        relocation_node: context.name,
-                        relocation_trigger: trigger.clone(),
-                    },
+                    NodeMsg::ProceedRelocation(*dst),
                 ));
             }
         }
 
         // check if we can join the dst section
-        if let Some(RelocationState::JoinAsRelocated(proof)) = &context.relocation_state {
+        if let Some(RelocationState::ReadyToJoinNewSection(proof)) = &context.relocation_state {
             if self.timestamps.join_as_relocated_check.elapsed() > JOIN_AS_RELOCATED_TIMEOUT_SEC {
                 self.timestamps.join_as_relocated_check = Instant::now();
                 if !context.network_knowledge.is_section_member(&context.name) {

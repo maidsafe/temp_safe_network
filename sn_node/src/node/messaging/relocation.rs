@@ -17,8 +17,8 @@ use sn_interface::{
     elder_count,
     messaging::system::{NodeMsg, SectionSigned},
     network_knowledge::{
-        node_state::{RelocationInfo, RelocationTrigger},
-        Error, MembershipState, NodeState, RelocationDst, RelocationProof, RelocationState,
+        node_state::{RelocationDst, RelocationInfo},
+        Error, MembershipState, NodeState, RelocationProof, RelocationState,
     },
     types::{keys::ed25519, log_markers::LogMarker},
 };
@@ -54,12 +54,8 @@ impl MyNode {
                 node_state.peer(),
             );
 
-            let relocation_trigger = RelocationTrigger {
-                dst: RelocationDst::new(relocation_dst),
-            };
-
             let cmd = Cmd::send_msg(
-                NodeMsg::BeginRelocating(relocation_trigger),
+                NodeMsg::PrepareToRelocate(RelocationDst::new(relocation_dst)),
                 Peers::Single(*node_state.peer()),
                 self.context(),
             );
@@ -69,35 +65,25 @@ impl MyNode {
         Ok(cmds)
     }
 
-    /// On receiving the relocation trigger from the elders, the relocating node can request the section for the
-    /// relocation membership change
-    pub(crate) fn handle_begin_relocating(
-        &mut self,
-        relocation_trigger: RelocationTrigger,
-    ) -> Vec<Cmd> {
-        // store the `RelocationTrigger` to periodically request the elders
-        self.relocation_state = Some(RelocationState::RequestToRelocate(
-            relocation_trigger.clone(),
-        ));
+    /// On receiving the relocation trigger from the elders, the relocating node can
+    /// request the section to do the relocation membership change.
+    pub(crate) fn prepare_to_relocate(&mut self, dst: RelocationDst) -> Vec<Cmd> {
+        // store the `RelocationDst` to start polling the elders
+        self.relocation_state = Some(RelocationState::PreparingToRelocate(dst));
         info!("{}", LogMarker::RelocateStart);
-        info!(
-            "Sending request to relocate our node to {:?}",
-            relocation_trigger.dst
-        );
+        info!("Sending request to proceed relocation of us to {:?}", dst);
         vec![MyNode::send_to_elders(
             &self.context(),
-            NodeMsg::RelocationRequest {
-                relocation_node: self.info().name(),
-                relocation_trigger,
-            },
+            NodeMsg::ProceedRelocation(dst),
         )]
     }
 
-    /// The elder proposes a relocation membership change on receiving the relocation request
-    pub(crate) fn handle_relocation_request(
+    /// The elder proposes a relocation membership change on receiving the
+    /// proceed request from a node that was previously asked to prepare for relocation.
+    pub(crate) fn proceed_relocation(
         &mut self,
         relocation_node: XorName,
-        relocation_trigger: RelocationTrigger,
+        relocation_dst: RelocationDst,
     ) -> Result<Vec<Cmd>> {
         // Todo: Verify the relocation trigger here
         let node_state = self
@@ -106,7 +92,7 @@ impl MyNode {
             .ok_or(Error::NotAMember)?;
 
         Ok(self
-            .propose_membership_change(node_state.relocate(relocation_trigger.dst))
+            .propose_membership_change(node_state.relocate(relocation_dst))
             .map_or_else(Vec::new, |cmd| vec![cmd]))
     }
 
@@ -170,7 +156,7 @@ impl MyNode {
 
         let proof = RelocationProof::new(info, node_sig, original_info.keypair.public);
         // we cache the proof so that we can retry if the join times out
-        self.relocation_state = Some(RelocationState::JoinAsRelocated(proof.clone()));
+        self.relocation_state = Some(RelocationState::ReadyToJoinNewSection(proof.clone()));
 
         Ok(MyNode::try_join_section(self.context(), Some(proof)))
     }
@@ -273,8 +259,8 @@ mod tests {
                 _ => continue,
             };
 
-            // Verify that the `RelocationTrigger` is sent to the relocating node
-            if let NodeMsg::BeginRelocating(_trigger) = msg {
+            // Verify that the node has been asked to prepare for relocation.
+            if let NodeMsg::PrepareToRelocate(_dst) = msg {
                 trigger_is_sent = true;
             }
         }
@@ -614,7 +600,7 @@ mod tests {
                                 assert_eq!(send_cmds.len(), 3);
                                 let send_cmd = send_cmds.remove(0);
                                 assert_matches!(&send_cmd, Cmd::SendMsg { msg: NetworkMsg::Node(msg), .. } => {
-                                    assert_matches!(msg, NodeMsg::Relocate(_));
+                                    assert_matches!(msg, NodeMsg::CompleteRelocation(_));
                                 });
                                 assert!(dispatcher.process_cmd(send_cmd).await?.is_empty());
 
