@@ -5,7 +5,113 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.77.1 (2023-02-28)
+
+### Refactor
+
+ - <csr-id-9a2f912effa46112c8481dd259c9f203ee775e2e/> remove more unused pub
+ - <csr-id-5fcb6700fa26c0825191feb87c8d4a4653e50eef/> fix clippy lints; fmt
+ - <csr-id-3fda80a40c508d16fbe097091252a98b01f8f339/> remove unused pub fn/methods
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Remove more unused pub ([`9a2f912`](https://github.com/maidsafe/safe_network/commit/9a2f912effa46112c8481dd259c9f203ee775e2e))
+    - Fix clippy lints; fmt ([`5fcb670`](https://github.com/maidsafe/safe_network/commit/5fcb6700fa26c0825191feb87c8d4a4653e50eef))
+    - Remove unused pub fn/methods ([`3fda80a`](https://github.com/maidsafe/safe_network/commit/3fda80a40c508d16fbe097091252a98b01f8f339))
+</details>
+
+## v0.77.0 (2023-02-27)
+
+### Chore
+
+ - <csr-id-7b046d3bf9c2de4d7aea170197ba4f3e2392fe89/> sn_interface-0.19.0/sn_comms-0.5.0/sn_client-0.81.0/sn_node-0.77.0/sn_api-0.79.0/sn_cli-0.72.0
+
+### New Features (BREAKING)
+
+ - <csr-id-5f7eb4b93fe506aa46b4c8b3613216086ec670b9/> remove joins allowed voting
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 2 days passed between releases.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Sn_interface-0.19.0/sn_comms-0.5.0/sn_client-0.81.0/sn_node-0.77.0/sn_api-0.79.0/sn_cli-0.72.0 ([`7b046d3`](https://github.com/maidsafe/safe_network/commit/7b046d3bf9c2de4d7aea170197ba4f3e2392fe89))
+    - Remove joins allowed voting ([`5f7eb4b`](https://github.com/maidsafe/safe_network/commit/5f7eb4b93fe506aa46b4c8b3613216086ec670b9))
+</details>
+
+## v0.76.0 (2023-02-24)
+
+### Chore
+
+ - <csr-id-444e4e5969be16129fb87ae42927e183ac41982b/> sn_interface-0.18.0/sn_comms-0.4.0/sn_client-0.80.0/sn_node-0.76.0/sn_api-0.78.0/sn_cli-0.71.0
+
+### Chore (BREAKING)
+
+ - <csr-id-d81aa0f7a16871360e0958109ea72b950d04762a/> sn-client e2e tests on Ubuntu to run with 10secs timeout for cmds/queries
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Sn_interface-0.18.0/sn_comms-0.4.0/sn_client-0.80.0/sn_node-0.76.0/sn_api-0.78.0/sn_cli-0.71.0 ([`444e4e5`](https://github.com/maidsafe/safe_network/commit/444e4e5969be16129fb87ae42927e183ac41982b))
+    - Sn-client e2e tests on Ubuntu to run with 10secs timeout for cmds/queries ([`d81aa0f`](https://github.com/maidsafe/safe_network/commit/d81aa0f7a16871360e0958109ea72b950d04762a))
+</details>
+
 ## v0.75.0 (2023-02-24)
+
+<csr-id-56e688ffbcd199680d298208364e75451583cde9/>
+<csr-id-f9c32ce99f6aab961b771e780c54b8913740c608/>
+<csr-id-4b951857219b7734481a1797a3052d80305b9282/>
+<csr-id-0c15656c85bed3d1fa251c85938d244732e75282/>
+<csr-id-c112a24847ec6800da444192b35a78a75af65de1/>
+<csr-id-5a29d0d8ad6853e4bb46bd4c122a8fe80dd2cde2/>
+<csr-id-a7d2b19a05c0348840a2f933214f5b23dad2d3a0/>
+<csr-id-5ecb0428a3a664764246e17e0a12fd5ca136175c/>
+<csr-id-7dfaeea3251c5ffd3088cb3045fd11334d7946ad/>
+<csr-id-67867b1379b9225f4be3d584ea2df5c3b0afca3a/>
+<csr-id-a6a04247785e973a639ed2a4ccc385d941d65756/>
+<csr-id-f9c2c6f51c4dc533b5dbba0cadab4b4351448d6f/>
+<csr-id-567f8d7207523603aa0820d1eb4ab543e9b3350d/>
+<csr-id-d682cef91723d778501323aef1f03818d0425ee7/>
+<csr-id-e513ab35693a86393925ed5e529dcede1bdbe8b3/>
+<csr-id-679591e53ed65fa3f0d78f15b5054cd05085e8d9/>
+<csr-id-82f26428ea07326e82e0a0d88487f34af9582819/>
+<csr-id-c7858f6bc2f780f887b1aea96f5fec63a1a99ace/>
 
 ### Chore
 
@@ -25,6 +131,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-7dfaeea3251c5ffd3088cb3045fd11334d7946ad/> fix + move relocation test
  - <csr-id-67867b1379b9225f4be3d584ea2df5c3b0afca3a/> sn_interface-0.17.10/sn_comms-0.3.5/sn_client-0.79.0/sn_node-0.75.0/sn_api-0.77.0/sn_cli-0.70.0
  - <csr-id-a6a04247785e973a639ed2a4ccc385d941d65756/> remove unnecessary clippy lints
+
+### Chore
+
+ - <csr-id-0d55437399624692c6e5cfc8363a6a630ed13019/> sn_interface-0.17.10/sn_comms-0.3.5/sn_client-0.79.0/sn_node-0.75.0/sn_api-0.77.0/sn_cli-0.70.0
 
 ### Documentation
 
@@ -107,9 +217,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 45 commits contributed to the release over the course of 8 calendar days.
+ - 46 commits contributed to the release over the course of 8 calendar days.
  - 9 days passed between releases.
- - 28 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 29 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -119,6 +229,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Sn_interface-0.17.10/sn_comms-0.3.5/sn_client-0.79.0/sn_node-0.75.0/sn_api-0.77.0/sn_cli-0.70.0 ([`0d55437`](https://github.com/maidsafe/safe_network/commit/0d55437399624692c6e5cfc8363a6a630ed13019))
     - Revert "chore(release): sn_interface-0.17.10/sn_comms-0.3.5/sn_client-0.79.0/sn_node-0.75.0/sn_api-0.77.0/sn_cli-0.70.0" ([`7d41c76`](https://github.com/maidsafe/safe_network/commit/7d41c763221d52e44e0f3faefbbb0a4d4aeca0a2))
     - Pull MyNode up out of dispatcher ([`56e688f`](https://github.com/maidsafe/safe_network/commit/56e688ffbcd199680d298208364e75451583cde9))
     - Increase cmd buffer ([`f9c32ce`](https://github.com/maidsafe/safe_network/commit/f9c32ce99f6aab961b771e780c54b8913740c608))
@@ -169,6 +280,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## v0.74.14 (2023-02-15)
 
 <csr-id-ebef737f7da6aa2ba1f77a54262f8aad77f999e1/>
+<csr-id-c56e8d8c41fc5dad199901d67488d78b3695e74e/>
 
 ### Test
 
@@ -6844,6 +6956,460 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <csr-id-54000b43cdd3688e6c691bef9dedc299da3c22aa/>
 <csr-id-1f3af46aea59ebeb1b6a4b736e80e86ce2f724d8/>
 <csr-id-cbf5d45ec4522961fc7ef0860d86cc7d5e0ecca8/>
+<csr-id-74fc4ddf31af51e0036eb164e6b5c4f0864bd08c/>
+<csr-id-fa6014e581f52615971701572a1635dfde922fb6/>
+<csr-id-959e909d8c61230ea143702858cb7b4c42caffbf/>
+<csr-id-f22e4dce22492079170cbaeb8c29b3911faaf89a/>
+<csr-id-e9a9cc1096e025d88f19390ad6ba7398f71bc800/>
+<csr-id-1188ed58eed443b4b8c65b591376f2f9a21acc0d/>
+<csr-id-ee165d41ca40be378423394b6422570d1d47727c/>
+<csr-id-00acf0c0d8a65bdd5355ba909d73e74729a27044/>
+<csr-id-7d5d5e11fef39a6dc1b89c972e42772db807374c/>
+<csr-id-855b8ff87217e92a5f7d55fb78ab73c9d81f75a2/>
+<csr-id-23b8a08e97fa415b9216caac5da18cb97ede980f/>
+<csr-id-61dec0fd90b4df6b0695a7ba46da86999d199d4a/>
+<csr-id-49c76d13a91474038bd8cb005959a37a7d4c6603/>
+<csr-id-c5d2e31a5f0cea381bb60dc1f896dbbda5038506/>
+<csr-id-0cb790f5c3712e357f685bfb88cd237c5b5f76c5/>
+<csr-id-b3ce84012e6cdf4c87d6d4a3137ab6506264e949/>
+<csr-id-ecf0bc9a9736167edb15db7ff4e3cf5dc388dd22/>
+<csr-id-8f58c5d900ce00d90bf7421f34122f4ca5ff5601/>
+<csr-id-88c78e8129e5092bd120d0fc6c9696673550be9d/>
+<csr-id-f3d3ab2b059040ff08b6239c8a6583c64eac160e/>
+<csr-id-86ce41ca31508dbaf2de56fc81e1ca3146f863dc/>
+<csr-id-c45f6e362257ba9378547a8f1fd508a5e680cb0a/>
+<csr-id-96bf83f8635004fa23e6b5b870cac27bd5b42332/>
+<csr-id-25259b221120c8c9258ffdfae8883c65ead38677/>
+<csr-id-37d2522619e49212572aa37034e0ba1857679dc7/>
+<csr-id-edb8de8b4d923e97d68eed40a7953f38461b0281/>
+<csr-id-7eda2760da82b3079d5eee2f97e2d15ac8da0d57/>
+<csr-id-1b7f5d6e198eb286034e12eed3fa4fc63b927e0f/>
+<csr-id-9581fcf27765752f6b556d632e8396e93d0f15e0/>
+<csr-id-a03d2cef55665759ddfeb40972676c87b17ccfa8/>
+<csr-id-bde3cd5eac75cc41a3a9ffefb091584273575f68/>
+<csr-id-e24763e604e6a25ee1b211af6cf3cdd388ec0978/>
+<csr-id-98a0eb988ab819ffce4727a9b823709efdc18dab/>
+<csr-id-bf7de428cd1e091ef2a6e616c07fd6596d711992/>
+<csr-id-ba0a26db12823bd2de51a4c75c5e7c4875c8f3f5/>
+<csr-id-94d58d565d9a6870e334bb2ca249f26ac3f8a327/>
+<csr-id-7b213d7bb1eaf208f35fc4c0c3f4a71a1da5aca3/>
+<csr-id-c52de7a75ce4bbf872b215a14258b5e7778bfb34/>
+<csr-id-b1d35af9c2ae6cb386c6726a432c02b9d44973c2/>
+<csr-id-565711d4bc58f18181d279e5f29d9adb3acb051a/>
+<csr-id-4eef4d3a9356d6a0724c0c670809e8d9fd1f11c0/>
+<csr-id-c222370b52befaedebe895fcf7feb2c1da99aeaa/>
+<csr-id-7928ce6411d237078f7ed3ba83823f438f3a991f/>
+<csr-id-81282318ae2da1793e66f28f0c8b3c0b2272a529/>
+<csr-id-da3bbe16084b71ec42343035087848c8f6996ec4/>
+<csr-id-c790077bebca691f974000278d5525f4b011b8a7/>
+<csr-id-838c495c8858b85c693da1a3e45baafa57ba03ea/>
+<csr-id-be8989971c68ac5aee43380223000a1f400252fc/>
+<csr-id-92cdb53391652651bfe9a47c5a0261ba10f38148/>
+<csr-id-0f2786483016adb2f44199cd4e5bf55e8c54adc3/>
+<csr-id-ee6431e9509dd5b02ec2eca4c10ea17c7dddcfc9/>
+<csr-id-d73deebbf94e65898d29455d6d4ed951ca59b814/>
+<csr-id-3fa2957fe4f4a1f14b9001e101270dec4e386c14/>
+<csr-id-612f8437429d4d9852f54fa0e297b059b8e86827/>
+<csr-id-0ab3c35e424e60ffbed0edf8c1f71da48daa0978/>
+<csr-id-c7b9d748b12e6d1e23d2a2972f2553af50343b22/>
+<csr-id-d85d896ceaa68785797b1c525ae8653ef26f2708/>
+<csr-id-1c5929bcc0638e8ff05dd495b3cedfdeff7540aa/>
+<csr-id-ddd3726a0a2a131ae7c05a4190edb8bdc7fa3665/>
+<csr-id-52a39b4c41b09ec33c60bc09c55fc63484e524cf/>
+<csr-id-f69c0e319b639b678b46b73724a77ed7172cfec3/>
+<csr-id-bf0488d239fc52ce03c1f380ae0986810d753007/>
+<csr-id-aca0fb7a451ffc25c6e34479cc9201fef42796be/>
+<csr-id-c34c28dd8776196a6c1c475b7f3ec3be709c0b6d/>
+<csr-id-b456f2f610ea57e5d8a4811fbca5a26175434645/>
+<csr-id-950a4eece1a11f70b2aef71cc11404603bb2ec5c/>
+<csr-id-f73364efa66718b92e04f24d4546c1e248198ce8/>
+<csr-id-b1297f2e42cdd7f7945c9fd5b4012086f8298b85/>
+<csr-id-680f9431bc75efea455dd7c6985e41c11740dc3e/>
+<csr-id-eb0291082e49d1114c853b214f55b8a25e18d1e1/>
+<csr-id-93bffbf1343621a8d5187649d1bb6d2a81cba793/>
+<csr-id-1268fb6e46e4ba061ba7f724917371d8e0db0092/>
+<csr-id-b70a1053adc267780215636dd80a759c45d533d5/>
+<csr-id-1d62fcefd5d44ef0df84b8126ba88de1127bd2bd/>
+<csr-id-20c1d7bf22907a44be2cc9585dd2ac55dd2985bf/>
+<csr-id-182c4db4531c77fa6c67b8267cd7895b49f26ae1/>
+<csr-id-02f1325c18779ff02e6bb7d903fda4519ca87231/>
+<csr-id-1bf17662ecae4e1f3e9969ac03a8f543f57f2cd0/>
+<csr-id-90f2979a5bcb7f8e1786b5bdd868793d2fe924b4/>
+<csr-id-1389ffa00762e126047a206abc475599c277930c/>
+<csr-id-0a5027cd9b2c62833ccf70e2bcca5ab22625a840/>
+<csr-id-645047b231eaf69f1299dee22ff2079feb7f5a95/>
+<csr-id-0e2b01bb7e9c32f0bc5c1c6fd616acfcc5c45020/>
+<csr-id-1568adb28a2a6a3cdf8a9737e098a5ea7bb2c419/>
+<csr-id-7d5212a2b916a8e540403346e0770cee1a446884/>
+<csr-id-109843c67ffd4ac4675cdfe56d7fcdaf97664007/>
+<csr-id-6bb5e64b3b0eb518719581278551272ae8f2b2ed/>
+<csr-id-e47e9ecb0c7f23209a9c1eb58c248fdf2facfd4a/>
+<csr-id-3b728b65a07a33019e06dd6f3da9fd334e6da9e1/>
+<csr-id-87c62d39d240afc01118135bc18d22fe23fc421c/>
+<csr-id-d7972da6abd3001e75019bf72aae6a98919ed1db/>
+<csr-id-49e2d14a1c5f8fd83aa4b9a5abe67e23fca9f966/>
+<csr-id-5326de5f658dfe75d1f5c44224d8623123848b08/>
+<csr-id-9a3cffc52589e8adf6dac75ae6aab4c184118648/>
+<csr-id-c2df9db2fe9e99450cc16060ff034289ab683783/>
+<csr-id-2fc2f0e6fbb5f7b05e61281e90992053ef5f0f5d/>
+<csr-id-432e36de012695c6c5e20bd704dc184db9c5c4d6/>
+<csr-id-9cc16296db7241819e17dd2673c7b3cb9fe2ead8/>
+<csr-id-c49f9a16c9e0912bf581a2afef22ac4806898ade/>
+<csr-id-9cd2d37dafb95a2765d5c7801a7bb0c58286c47c/>
+<csr-id-b719b74abdd1cd84b3813ec7046f4fdf99cde6a2/>
+<csr-id-efccd8f58e69d404d5445c0c8b86bac0612a6879/>
+<csr-id-255fede53b457a4594444dd493b71e48e5d07e78/>
+<csr-id-be98776c1734c1106f997559359ca4c21eaf9519/>
+<csr-id-b62ad80298eb4b3e2f9810d20dd553aaf802408b/>
+<csr-id-c8f4eed0406253cc4c253292bc82e7320fdcbf70/>
+<csr-id-aa82ab7d691cca3990ece4e56d75cd63fda2fe15/>
+<csr-id-196b32f348d3f5ce2a63c24877acb1a0a7f449e3/>
+<csr-id-df330fa0de1e334e55863828fb743131ab629a18/>
+<csr-id-a3a2bbfbaf3be846a1c1f22a74aee2f961341685/>
+<csr-id-d8c57e082b52196cc538271bc25a88e3efd2a97c/>
+<csr-id-77d45d7498facb18a611a8edcf608a3c0ff0b2c8/>
+<csr-id-d84ac520676b83f39d5cf356e89ac3ec2d6478cc/>
+<csr-id-fdda641b3874c425616352daf7db7429219bb858/>
+<csr-id-893df83ec9a1c4231f09b4e7bad9c15ef2944036/>
+<csr-id-f1afc5933dc782bc6a7840cd12cebb32a189a5df/>
+<csr-id-2ebd1b4fcab47bc86980860379891bb041ff2aa4/>
+<csr-id-b35d0ccd0305e3e87a9070bc2a57287dbe6b2633/>
+<csr-id-36ba7d5e85e304d6d0ff3210429923beed77d25b/>
+<csr-id-d364a7e364827b2d71f196a9f897b7d613bbab94/>
+<csr-id-0da3c99785e026075214b7cfa7933f64420aa00f/>
+<csr-id-7ae741f93f39c437618bde150458eedd7663b512/>
+<csr-id-ad1617f96954a810898484e5b00b5b8b12495f4e/>
+<csr-id-d8ec5a81ae566e8d7068592e01cff4e808b1cad1/>
+<csr-id-14328b3d5b2579e4f038624c2353ec36c45fa9ed/>
+<csr-id-4f5e84da96d7277dfc4e385ff03edf6c1d84991e/>
+<csr-id-3703819c7f0da220c8ff21169ca1e8161a20157b/>
+<csr-id-d0134e870bb097e095e1c8a33e607cf7994e6491/>
+<csr-id-88421d9cb7872b6397283a0035130bc14de6d4ff/>
+<csr-id-4881a6674296e8fb7f3cd998c39963710e9f80f4/>
+<csr-id-9ea06ffe9339d3927897f010314b1be1bf7026bf/>
+<csr-id-7b8ce1c9d980015768a300ac99d07f69cc1f5ae3/>
+<csr-id-bc6d861706e57d6cc80bfde2b876ba9ce57efb09/>
+<csr-id-8494a01d9be3dddc0d0f4c2c37cdc4d6c3e54521/>
+<csr-id-c4e3de1d9715c6e3618a763fa857feca4258248f/>
+<csr-id-0a719147ae567b41ba2fcbf4c3c0b44e6d1955d1/>
+<csr-id-03258b3777644de7799e9563df35afc5e8531be2/>
+<csr-id-b471b5c9f539933dd12de7af3473d2b0f61d7f28/>
+<csr-id-c0806e384d99b94480e8f8e0322a6f5a6bd3636a/>
+<csr-id-dabdc555d70be79b910c5fe2b2647ca85f2319f9/>
+<csr-id-907c7d3ef4f65df5566627938154dfca1e2fdc05/>
+<csr-id-90712c91368b4d88537acc65a3ccc5478fe38d2c/>
+<csr-id-51d534d39caf3a4c029f7d1a9c87a3edf3192b2f/>
+<csr-id-b239e6b38a99afda7a945a51d3f6e00841730a8f/>
+<csr-id-aafb6d2a458fc4e2dc94ea3a08cb519fe52bc131/>
+<csr-id-6e897d0bc93256f5ab72350c9774f9a33937da1b/>
+<csr-id-224079f66832c0a914fd20af4fc2f9e90dc9c9c9/>
+<csr-id-453b246c002f9e964896876c254e6c31f1f6045d/>
+<csr-id-0cad4c981dbdf9eee58fc28b4637f136b817c384/>
+<csr-id-43489f6170ce13ea05148a52422fbff6bdb91f19/>
+<csr-id-1ea4b4413fee11fde2b69086caeb69cc191fe277/>
+<csr-id-2ac9edab88602fa2aeb148baf6566cab876dc2af/>
+<csr-id-e4a7c564180cb3b81601950c4f7623dfcdcd7650/>
+<csr-id-80c2ea0c2863ba8cc3500a1880337285e40fdf4c/>
+<csr-id-a49ea81658b15280c23e93b1945f67aeb43a5962/>
+<csr-id-6b83f38f17c241c00b70480a18a47b04d9a51ee1/>
+<csr-id-a6e2e0c5eec5c2e88842d18167128991b76ecbe8/>
+<csr-id-d3989bdd95129999996e58736ec2553242697f2c/>
+<csr-id-a741d930b906054d09f1311ddcf35479aa1aa3ee/>
+<csr-id-20c057c72fdcacc0bcda6da1f97eb6fab1a0cf4c/>
+<csr-id-8c3bcc2bb64063e646d368d90fff98420ab22dce/>
+<csr-id-784870abfdd5620da6839e7fd7df80702e0f3afa/>
+<csr-id-df398e1017221c0027542b597c8f7c38c1828723/>
+<csr-id-7cf7fd675beec5e7aa122f0f127402b636e659b7/>
+<csr-id-43a42657ff18409dd83bba03135cd013c1298dc3/>
+<csr-id-7cb5ffd03f9bfce6ebe74f66dcabddef661cf94d/>
+<csr-id-000fc62a87dac3cd41bb6ced59596635f056ff29/>
+<csr-id-0ff76c44aeddedd765fa4933c0841539feabaae5/>
+<csr-id-6970533f288ff867a702d3dbc5424314b3639674/>
+<csr-id-51b3d75fc7389de647f6df230bff32e8c7d7267c/>
+<csr-id-634010fd79ce1487abbff5adf3d15da59709dd95/>
+<csr-id-85e513670aa61f8acb3e3302ee4b39763ade036e/>
+<csr-id-d5e6f462615de830cd9c27dba49a34ba2da13b81/>
+<csr-id-b44ac353e254d8d67996c3185dc40e5e99c0e4c7/>
+<csr-id-c086db96c09a77c43777783f614ca6a43eff7cdd/>
+<csr-id-705995ef67b3d4c45c95689c4a675e1063467ec9/>
+<csr-id-f8bfe9efe68593ceb4f968a6d2a396c431ad6429/>
+<csr-id-61068aaf3e9cd1c7513b58c073c55004697fdf6f/>
+<csr-id-ea2ba0afa036b6abab35db9a76488d052e7682d6/>
+<csr-id-912a2f8d2da4159fcf40567666b3b14024e8c0da/>
+<csr-id-35a46f06e6233aff25d03350abaefacbe57ad25c/>
+<csr-id-fc074ab28d3c8c011016e6598cf840fc38026418/>
+<csr-id-222742f7c57a4b451af354d33015974d0d7a3561/>
+<csr-id-ea0387b43233f95d10f19d403d289f272f42336f/>
+<csr-id-149665a53c00f62be0e8c8ec340b951a06346848/>
+<csr-id-9fb73957fbba99929911296305bfd66dbaa4d15a/>
+<csr-id-3a427eb33dd0a81f8dc77521a88eba2112bec778/>
+<csr-id-c184c49cd9d71e657a4b5349940eb23810749132/>
+<csr-id-ceaf43916dfac62213ea23bde35c3f931cdd8c37/>
+<csr-id-b161e038bf30e0a50a7103eaad80ef2368b6689d/>
+<csr-id-7e15db2de4d99d84126e7087d838047bae7a009b/>
+<csr-id-bd19e9e6eae4ce6068e1bee2d89528d36fce5329/>
+<csr-id-a56399864e18f2b2de7ba033497c5bbbe3e5394e/>
+<csr-id-07dc30b281f3c67cb5598aaaf72ba5c668353bf7/>
+<csr-id-03cf556d1b73565d520e2c5b82ab1482b076e639/>
+<csr-id-7068445cad25b0273c841c5072055833df9b8229/>
+<csr-id-d3dd663cfd6f3d0b0943ff49b1eed8c6b37d6263/>
+<csr-id-d6e788221f332c3ff3a22eec39af428eebf5e75f/>
+<csr-id-283ff34f03dbf783b2299a3c7eb7a183c1e3c0a6/>
+<csr-id-e9e249a674d4a64078a519b7e20baf6f0759c1c9/>
+<csr-id-a398c4f8d72828db0fc8c6d5825ead62ba85db64/>
+<csr-id-8f580200ba5b8b67f36977fb59d6d48e7613e176/>
+<csr-id-1f57e30a206998a03b2201f4b57b372ebe9ae828/>
+<csr-id-1dfb651e72f38743645afbbee62c7e6e7fbb0fb2/>
+<csr-id-5869662a29c4bd8dfe0d7bf07a30f10d89b450ad/>
+<csr-id-f1e0e4564c2b581352f6dc6a0ba32259452494c5/>
+<csr-id-1c78a27d31bb6530274d4ac5cecbce817fad5313/>
+<csr-id-473e4b0ca27767f4e1326629670f43ff5de5bc86/>
+<csr-id-064a7ed00ca84edd5b5f86640ae868c1cb202590/>
+<csr-id-2cc7323ec8b62f89f2e4247c5d6ab56f78eda2ce/>
+<csr-id-d42b34d54adfc16b7947fa5728fcde80ad4f49c7/>
+<csr-id-3f75bf8da770a6167c396080b3ad8b54cfeb27e2/>
+<csr-id-d56f3c7c0bfc7bd6d045eb80a68a885615e73115/>
+<csr-id-a0e9c52951e81018249a3bcf3b6300b3ad592136/>
+<csr-id-dab972dccdf968e706f0c7599154e188dc74bf48/>
+<csr-id-86975f228f31303597a707e158005e44c86de1cc/>
+<csr-id-2746cff087fd33aff523bc2df07a3462d05c6de1/>
+<csr-id-637ec03f9922e5d3dd0c8703eba5019256f4ec06/>
+<csr-id-7cd63377de16dd2962961f2dd936df3276fe8d6d/>
+<csr-id-f73e00cc67fae6090b9c991ac4e06999ea28f22e/>
+<csr-id-2479daea6b05c7b680bf6062407f507ad8692d57/>
+<csr-id-81298bb8ce1d93d7a418ff340d866fc00d9f60a4/>
+<csr-id-2ec86e28246031084d603768ffa1fddf320a10a2/>
+<csr-id-366eee25f4b982d5a20d90168368a1aa14aa3181/>
+<csr-id-0c4c7d8c973bdb1e1d055798c17be2065f0334e2/>
+<csr-id-90cdbce964c8fd293d85b9a28f1b0d2d2a046b08/>
+<csr-id-1ff0ab735994f8cbfae6abd58fea0e71a90f742c/>
+<csr-id-d59999adcecd36380ed3a6855fdedfbef8107914/>
+<csr-id-9d3a164efa7f38b7eeafc3936160458871956f5b/>
+<csr-id-5a90ec673edcb36ae954b0af6144bae7d8243cd7/>
+<csr-id-4e517a1fd57e63a3b5381ecd0cdf9db4f762e03f/>
+<csr-id-274cc12ca37da5ff536a7b4ab59f803546ccefe9/>
+<csr-id-99df748624a36e1d2457cb81f74e8cd8accb8633/>
+<csr-id-0190f0305980bdaee30f9f2ab5eb5510149916db/>
+<csr-id-3dc23278c6a4fabc250b27f4312f5c51f0f271a4/>
+<csr-id-1b3c0eb4443cff3f4575164907a7a1fbf92cebe2/>
+<csr-id-d96ded11ca74e75dde3dcc0d0b865712895d3dcc/>
+<csr-id-923930acb3769cfa7047954a1fee1853ec9e3062/>
+<csr-id-82f39977ec965429269a31639ce83be9749b5d80/>
+<csr-id-96a955e5b124db3250c3d0fd09926cec10322632/>
+<csr-id-f7f59369d09a4d25a94328d031f00cc61b187eed/>
+<csr-id-7a7752f830785ec39d301e751dc75f228d43d595/>
+<csr-id-b06bc6eb0fd210b6abc9039d1f20ab8d93befc16/>
+<csr-id-941b83f3960c84cfee86a8c818233fbbc403c189/>
+<csr-id-9f1bd81b269ec06fd5d379ab4b07f18f814da865/>
+<csr-id-57749b7d0671423fe205447bc84d9f8bfc99f54b/>
+<csr-id-026458c6afa9848bb58a694da6ae4b81196b8f19/>
+<csr-id-40b00cbd899c72889439b9f94b34b173ff3af837/>
+<csr-id-252f81e155dce2b8d774c8999b730e763674d93f/>
+<csr-id-56bed01344ca5ec74a49c2a41116ef76fb33e3b4/>
+<csr-id-155ee032ee56cbbb34928f2d14529273ccb69559/>
+<csr-id-4f29c285a0b48220df1f1c6c52c4b487350eae08/>
+<csr-id-99d012ef529df78ef4c84f5e6ea99d3a77414797/>
+<csr-id-bf16c5ea7051386064233443921438cbbd79d907/>
+<csr-id-7b0cd4d183a9f82d1d78dbb56572e5bf36714a0a/>
+<csr-id-a64c7e0414b77f545cb8cdbf64af0fb7212d1f2e/>
+<csr-id-5214d5e7f84a3c1cf213097a5d55bfb293f03324/>
+<csr-id-233e64af3b2af63bbba06ba8f43d0a7becece913/>
+<csr-id-012e91a60e01cd2ce9155d5c56045f211865ff2c/>
+<csr-id-40d1844e0b28578e8b8c6b270151dbb86961a766/>
+<csr-id-0a70425fb314de4c165da54fdc29a127ae900d81/>
+<csr-id-6ccb792c18481ffd8218cd7c27b28d8a10d1f528/>
+<csr-id-ab00eca916d6ed8a0a137004a6b9fd24e7217a70/>
+<csr-id-0a5fca96af4d2627b842591775e77c09201ed655/>
+<csr-id-db515397771f117b3bf095e1a4afb897eb4acafe/>
+<csr-id-4bb2adf52efdac6187fffc299018bf13f3398e14/>
+<csr-id-3af8ddbee91f3403b86914d352a970e366d1fa40/>
+<csr-id-bd0382fef77947935584418ee91720001f5f269c/>
+<csr-id-1caad35e0e744e50b2bd15dda8dbd3adbacb87c7/>
+<csr-id-78e41a3d8387f9b53bfd5e078ae7aa44fe1ea6d4/>
+<csr-id-04ee3e74e5573f903be29cd89416ce9e5758cf00/>
+<csr-id-a9913a0f7140d302fcaf24264fc1982f2ad3d06b/>
+<csr-id-97171142548772a466188f2e6d9f24072f28640d/>
+<csr-id-a7e7908537d63e4071323a59cbbd036edcff41ab/>
+<csr-id-18cee44f08aa4f83ad477cc82a29525e9d339e0c/>
+<csr-id-1d19c02668dfa3739a350b15c7310daec93d9837/>
+<csr-id-2492ea84e9fcba5d19022e171ec6b60c341ee59b/>
+<csr-id-8884f9453a859bd63b378337aab326889d153768/>
+<csr-id-690b24f14c3183640d04d048c2a7f4ac79f6e6c7/>
+<csr-id-3b3a38130bd6943b7c53b1cf74321d89dd4af1da/>
+<csr-id-8effd08c16cfd2e0715ee0d00092e267f72a8cf0/>
+<csr-id-292466119e2d99c36043e7f2247b1bde9ec9ced9/>
+<csr-id-d54c955aa768ab08ef8193b7e36cb96822bc6cb8/>
+<csr-id-72f79d46fc56fdda9215f8a9d6f95bcdf323a66f/>
+<csr-id-d490127b17d53a7648f9e97aae690b232188b034/>
+<csr-id-e38925e07d69432db310fc8ec9803200ea964ab2/>
+<csr-id-48ef44e9db01d74119a2b1c9f7e7dae4ce988c57/>
+<csr-id-619d142de8999d536e41ac5fe402a94d934689fb/>
+<csr-id-6b59ad852f89f033caf2b3c7dfcfa3019f8129e8/>
+<csr-id-c76c3ab638188cba38911f037829c209fcc45fc3/>
+<csr-id-07e19b53cd8eaa777f4c83369d2ee1076c75fe4f/>
+<csr-id-069013b032b7fd8d8a58ca0d75f6ea357abf5593/>
+<csr-id-79b2d0a3f52de0335323773936dee9bdbe12a0cf/>
+<csr-id-45df3d71cc4b3185602b9d27b8cb0f5bf65a4b43/>
+<csr-id-9cf7c72a94386f2cbe6f803be970c6debfbcb99b/>
+<csr-id-17d7906656bec401d6b39cc3551141112a3d77c4/>
+<csr-id-9be440b36db07e1c04ab688b44ef91e4a56ed576/>
+<csr-id-595541b83284a5c5b60fbc00e47b1146117d7613/>
+<csr-id-f522d9aad0071cd3b47b1a3e4c178b0100ec71d6/>
+<csr-id-dcbb67fc699d7cb1f3a2c4632bcb8a5738916091/>
+<csr-id-e52a0c063f747e0be1525f07f8f759f4b9d042a7/>
+<csr-id-df87fcf42c46dc28e6926394c120fbf2c715e54a/>
+<csr-id-c685838d8f9c10b0f4e7541fe201862bb84e8555/>
+<csr-id-7c34940401b0115105d9b818b9f93c39d7669eed/>
+<csr-id-653f653a775a101679904ab75c8012a72dfdedfb/>
+<csr-id-36ca20e606899ecbdea24d845c34ba11ab889cf7/>
+<csr-id-62d747969b739172910aabca6fcb273d2827fc8a/>
+<csr-id-dd50d1d860aa4ca60b6c0d5a525b45d88ddf432e/>
+<csr-id-69ae8c20e91dd9959ebfa5456efdf9c218a9d66f/>
+<csr-id-2e7bc0b782da6231f54edc440fa555fa754d294c/>
+<csr-id-6f5516d8bb677462ea6def46aa65a1094767d68c/>
+<csr-id-1a81c8f04f947d2b83d3cd726c00ad66927f5225/>
+<csr-id-a569474a8be9c11ab73ec7ad1ad157f69827b4d3/>
+<csr-id-9eff03598ba09aa339180d7ecd57b50174180095/>
+<csr-id-58632a27d271140fc4d777f25a76b0daea582426/>
+<csr-id-0d4343c8fa56749d3ec9390e298d1d6384573a67/>
+<csr-id-85709655b0ce38246515658b956aa9b8f67cb55a/>
+<csr-id-b5e9dcc5b13b1eda711d4760d9feb8dc929a0c43/>
+<csr-id-05f6d98cf21f0158f4b5161484c7c15a0561b6f4/>
+<csr-id-86577846e845c110c49e15c95c6bd5595db51773/>
+<csr-id-de3051e7e809a8f75507c54f3cf053a4244fdf19/>
+<csr-id-69e9be2a1567bfa211af7e9d7595381d9a0a3b38/>
+<csr-id-260eaabd2d1b0c26dec9febc963929e65d7ec912/>
+<csr-id-b4f0306fb945cce096de7f68c3cf6ece6905786d/>
+<csr-id-204f927220c8bd1829ac89feaed1c48a8034e80b/>
+<csr-id-2ef8e45f53ff6925e56321ed0ebc922d2d4dd9b9/>
+<csr-id-1eea84476294c1dbfbfe72fe0e9acdb997762595/>
+<csr-id-bf55f9b7e3b96319de4423e19333bf3b16fd1c78/>
+<csr-id-8ea94983b37b1d559358a62d6ca075b97c193f0d/>
+<csr-id-3f77429e8bd659a5b2e7aa377437fac1b3d709c0/>
+<csr-id-a7e058536ae6ae27228bd2254ea6465c5eface35/>
+<csr-id-aaab10b3a5a44d9ec844757c71ac091016f51fd1/>
+<csr-id-9deb9e7e2ae5d909eeb745e9021cf7660ed55dc3/>
+<csr-id-984c5f83e3f4d889dc4e0583b09571e540357cf9/>
+<csr-id-e841ae0cf3caf852e8a48b559dcffb64b7fcecad/>
+<csr-id-ec3dd4991535bb22235e2d1d413dd93489b8aedf/>
+<csr-id-9885536afe337bf109e3ab18eec054100bf3fd82/>
+<csr-id-cf67a374ae5aa5a9f95d39357fdbd937eb5e1a1a/>
+<csr-id-51b0f0068c9a279da9a1edf45509cf80a90e663d/>
+<csr-id-a3c5ef63f37ec0d2f98d45176e27da7de31baabc/>
+<csr-id-14c84c9db23557626e4889eff0ff403a574dccad/>
+<csr-id-10e135b4f77dcd30de99eb7bc370ba1e15bbd148/>
+<csr-id-75a4b537573d4e5e8767e38fa7d1b1126dffe148/>
+<csr-id-c78f4703a970e8b7466b091ad331d0f2233aa9a3/>
+<csr-id-2003e34cc26c450486151fa1df74ffea61c8c9ae/>
+<csr-id-016b7d47f708308490c1883db4ba239fc2add59b/>
+<csr-id-580f2e26baf787bdee64c093a03ae9470668619d/>
+<csr-id-da39113a7f97f6881643e66a48e19f2e06368e8d/>
+<csr-id-ca21d1e97fcd28ca351887636affffff78e3aeb3/>
+<csr-id-bad083332fdcc3a0bc3c3f13628c00315f1b2519/>
+<csr-id-8b8a3616673405005d77868dc397bd7542ab3ea7/>
+<csr-id-4b72bfc9a6c3a0db4821e7ebf1f4b5daa7cc56d1/>
+<csr-id-df25e4920c570771f6813ca03da02f6dfc8e59fb/>
+<csr-id-9d657249f3d0391e7c3bbeae6f81909993802cc7/>
+<csr-id-a973039178af33b859d421cf36571de49cceff17/>
+<csr-id-62aa668d5777058ae617f8952cfcb62be002abf3/>
+<csr-id-63432eb2e528401ae67da8eea0c82837ab42fc18/>
+<csr-id-7a875a88c911b5a9db59a55b81c94b995e2b95ae/>
+<csr-id-5514d9c06ee400e983a258ba2eb37bff1abf0dd0/>
+<csr-id-1848189aa780f2f6aabddb3564b816c72f9bee6e/>
+<csr-id-14fdaa6537619483e94424ead5751d5ab41c8a01/>
+<csr-id-dbdda1392325e8a08a6a28988208769552d5e543/>
+<csr-id-e8e44fb69dae7fe1cae3bbf39f7b03a90df44dd7/>
+<csr-id-86c83bedf061b285b0d4f3effb54cc89a9fbd84d/>
+<csr-id-590bfea538bb78fd20bb9574c3ea9ed6dcceced0/>
+<csr-id-85f2b5fd2adbf1f57e184c9e687fd14929b911e7/>
+<csr-id-14c6ab95da62a144a798665ade6da626fb5ee6f2/>
+<csr-id-30d220c180c7586de56282fafe52b54c8b619860/>
+<csr-id-6c0209187797bb27fa1529dd2f0ee8116975a02d/>
+<csr-id-a328d70720a795b62ac05a68454abf1034e97b9d/>
+<csr-id-a98cc810409a4ccc78e3c7a36b38b5f00cfcb23a/>
+<csr-id-da1fe8dda6325e05b4d976d2b77d084c06d98cb0/>
+<csr-id-078f45148af2da8d1690490720ef5f95555d42cd/>
+<csr-id-4c9b20ee58be9ca3579c7d1f4edd09452d59d38c/>
+<csr-id-49d3a298be19a46dcb6232ee8087c9bf0381db23/>
+<csr-id-cdc31cb44af8b6dc2393a0f15c98c0be364db6ff/>
+<csr-id-bc717073fde5fef59cbbe670ab6b7a9d66253d3b/>
+<csr-id-189aeb6941d277f94e47ade0e851696206aaa146/>
+<csr-id-9d5baf83c630e597407e5c5d4a47fc7f34805696/>
+<csr-id-9aaccb8784afd03454cd69f599dc2b7822ca130c/>
+<csr-id-8f1cc32b87a9e333f32399020339dd41e2d0b049/>
+<csr-id-1fbc9b24d14460c6a88a064297c3a327ca9182aa/>
+<csr-id-4e7da0aeddba7287c1556ca318d9cdd8459000d2/>
+<csr-id-456c022ddf66af5f991e6aca2240d2ab73f8241d/>
+<csr-id-ccb7efda1ee0c6303ac537ca9edd4b6c5cfcc5f2/>
+<csr-id-d55978b38c9f69c0e31b335909ca650758c522c1/>
+<csr-id-9a149113d6ffa4d4e5564ad8ba274117a4522685/>
+<csr-id-f8de28a8e040439fcf83f217261facb934cacd51/>
+<csr-id-231bde07064d6597867b5668a1e5ff319de3a202/>
+<csr-id-3b7091bd8b45fc5bbfa6f1714ec56e123d76c647/>
+<csr-id-3b4e2e33285f4b1a53bd52b147dc85c570ed2f6e/>
+<csr-id-345033abe74a86c212e3b38fc0f6b655216b63b0/>
+<csr-id-4a1349c5e99fdc45c038afdd2dac24486ee625ea/>
+<csr-id-d6732833db0bb13d8414f99758e8767ab8ab2bdd/>
+<csr-id-d75e5c65d04c60dca477cca4e704308198cfd6cf/>
+<csr-id-70015730c3e08881f803e9ce59be7ca16185ae11/>
+<csr-id-ab00cf08d217654c57449437348b73576a65e89f/>
+<csr-id-5a3b70e9721fcdfdd809d2a6bd85968446b4e9a3/>
+<csr-id-08629e583a03852d9f02b0e7ff66a829e3056d9b/>
+<csr-id-5a81d874cf8040ff81a602bc8c5707a4ba6c64ff/>
+<csr-id-8aa27b01f8043e98953971d1623aaf8b07d1596e/>
+<csr-id-48a7d0062f259b362eb745e1bd59e77df514f1b8/>
+<csr-id-008f36317f440579fe952325ccb97c9b5a547165/>
+<csr-id-213cb39be8fbfdf614f3eb6248b14fe161927a14/>
+<csr-id-cbdf0236f7cd241e7addb1afe75ed5e5cfac00ab/>
+<csr-id-a7968dd17927e346b3d32bb5971ed6457aea6606/>
+<csr-id-b66444c7d7a10c9a26db30fe5ce8e91984031624/>
+<csr-id-c5aae59a4eac6c3285bc45845433d23fc96d155f/>
+<csr-id-723618d0e3ad77eb26a3c698f9545490166b7ee0/>
+<csr-id-80ce4ca9376b99037b9377425c477ea3a7493e54/>
+<csr-id-616c024f2280fc99de063026756a9c938f78b885/>
+<csr-id-cf5a041742844b8b3d5e71c3e895018367b76013/>
+<csr-id-ed6d2f09c12b72446f0f55ecacb5fc4f35278575/>
+<csr-id-9350f273a5afec88120fe79fe85ceaf8027d691e/>
+<csr-id-a54c4426caccf71d28b2697094135892ec4a5e16/>
+<csr-id-8eedb660461b13b236545643fa21868eb6613826/>
+<csr-id-abfe7378604a74119accd7b9f86bef5682b0784a/>
+<csr-id-0399a9e76547a03f1e3902aec30ecbd57ed437c7/>
+<csr-id-23f53a339a5fe0d2f2e5d415bfc01e646a81a5c8/>
+<csr-id-5232bf51c738197339ac70ee4f46adee4fa87179/>
+<csr-id-f9cd39b6d3b1877fa0f3fa73bd6e3a796cae3b08/>
+<csr-id-208abdd108654ab83e8bee763793201e6f7b5eb2/>
+<csr-id-fc10d037d64efc86796f1b1c6f255a4c7f91d3e1/>
+<csr-id-12c673e7f52ed1c4cbe15c14fe6eb4e68b986e18/>
+<csr-id-9d27749bc7d59ee499980044f57eab86d2e63d04/>
+<csr-id-aaa0af4d1685c65a3c166070a590c10e9fd54765/>
+<csr-id-73b405d1228244a2b984e1294d5e8542f8691cef/>
+<csr-id-0c9c1f2edd9e872b9ba1642ac50f59a63f68b488/>
+<csr-id-9bdd68f313b3b7881cb39db02026184bbab0bfb0/>
+<csr-id-8b7b66450349b669e023539e92c77f9a3b830948/>
+<csr-id-7fc29f8187a29c2eeff8bbb5e09f068414bb8b93/>
+<csr-id-4415c9b1d166f7e53032a0100d829e8581255a1e/>
+<csr-id-8eb1877effb8cf0bfc8986c23d49d727500087dd/>
+<csr-id-0b8413998f018d7d577f2248e36e21f6c2744116/>
+<csr-id-aaa6903e612178ce59481b2e81fe3bd0d1cc2617/>
+<csr-id-2651423c61b160841557d279c9b706abdaab4cdf/>
+<csr-id-20461a84dbc0fc373b184a3982a79affad0544f6/>
+<csr-id-6a8f5a1f41e5a0f4c0cce6914d4b330b68f5e5d8/>
+<csr-id-da70738ff0e24827b749a970f466f3983b70442c/>
+<csr-id-0387123114ff6ae42920577706497319c8a888cb/>
+<csr-id-7b430a54f50846a8475cec804bc24552043558b7/>
+<csr-id-fe62ad9f590f151dd20a6832dfab81d34fc9c020/>
+<csr-id-ca074b92b31add1ad6d0db50f2ba3b3d1ae25d5a/>
+<csr-id-7ddf2f850441e6596133ab7a596eb766380008c3/>
+<csr-id-aa17309092211e8d1ba36d4aaf50c4677a461594/>
+<csr-id-9e3cb4e7e4dc3d1b8fa23455151de60d5ea03d4d/>
+<csr-id-37aec09a555d428c730cdd982d06cf5cb58b60b1/>
+<csr-id-810fe0797a4f23a6bb2586d901ccac9272a9beb2/>
+<csr-id-993d564f0ad5d8cac8d9a32b8c6c8d1dd00c3fd9/>
+<csr-id-fd8e8f3fb22f8592a45db33e75f237ef22cd1f5b/>
+<csr-id-c1c2bcac021dda4bf18a4d80ad2f86370d56efa7/>
+<csr-id-e2727b91c836619dadf2e464ee7c57b338427f22/>
+<csr-id-148140f1d932e6c4b30122ebcca3450ab6c84544/>
+<csr-id-225432908839359800d301d9e5aa8274e4652ee1/>
 
 ### Chore
 
@@ -6955,6 +7521,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### New Features (BREAKING)
 
+<csr-id-06b57d587da4882bfce1b0acd09faf9129306ab2/>
+<csr-id-20895dd4326341de4d44547861ac4a57ae8531cf/>
+
  - <csr-id-c1ee1dbb50fb8128776b4ba0a821e23056801201/> integrate membership into safe-network
  - <csr-id-4e7bc8bbb3f521324edf0e4a6e329271b7f854f6/> remove always-joinable feature flag
  - <csr-id-0b5ebece1240deb56360b238b96e2aece4a6d314/> fix typo
@@ -6965,15 +7534,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-3a59ee3b532bbc26388780ddc2f5b51ddae61d4c/> include section chain in AE-Redirect messages
  - <csr-id-9b8ddfde0287e47b6f18a77a8e8847d80ee84bcd/> provide the SAP proof chain in JoinResponse::Retry msgs
    - Joining node now makes use of the NetworkPrefixMap to validate and
-     accept new SAPs using the proof chain provided in JoinResponse::Retry.
-   - Expected age of joining node for genesis section is now calculated
+   accept new SAPs using the proof chain provided in JoinResponse::Retry.
+- Expected age of joining node for genesis section is now calculated
      in a deterministic way using the peer's address.
- - <csr-id-06b57d587da4882bfce1b0acd09faf9129306ab2/> add log markers for connection open/close
-   We can detect connection open/close easily in the connection listener
-   tasks, since these are started as soon as a connection is opened, and
-   finish when there are no more incoming connections (e.g. connection has
-   closed).
- - <csr-id-20895dd4326341de4d44547861ac4a57ae8531cf/> the JoinResponse::Retry message now provides the expected age for the joining node
 
 ### Chore (BREAKING)
 
@@ -7958,6 +8521,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### New Features
 
+<csr-id-65c3adc8dd45368260bf60ef83d44a99eb6ee7ca/>
+<csr-id-d3fd698b756d100daa12230fb944129529b773fb/>
+<csr-id-a3a28bd7c816582218bea5dbf0f7e141b3ae2c76/>
+<csr-id-070c146ea287db9bf708b11fbaaa177422cea73d/>
+<csr-id-076d5e3cfd64d7bd677c9e6d34baf93f2eb49b4a/>
+<csr-id-5b530fec3cd6d182f4dba89e2144826977404aa9/>
+<csr-id-928600b13fdb1a31498cc27cba968a8e3eba598c/>
+<csr-id-0bc50ae33ccb934016ac425e7bb2eca90a4b06e3/>
+<csr-id-0c04071e2184c4e74fa8c9f264a380585e84369e/>
+<csr-id-b2b0520630774d935aca1f2b602a1de9479ba6f9/>
+<csr-id-65282654943bdf156f144e0449a85dc4e2956f58/>
+<csr-id-d88890261c2ca06498914714eefb56aff61673d5/>
+<csr-id-939f353ed399d0148ba52225ca6d1676d3d7c04b/>
+<csr-id-b33b7dcb7fa6eb976bff7f38ac3d6ddc62e1977a/>
+<csr-id-67a3313105b31cee9ddd58de6e510384b8ae1397/>
+<csr-id-61e87de077bd47b3dd106dc1e1dd65aa1f5b2d0e/>
+<csr-id-a02f5f0de50c7c58b1cda55a14cb63d805c772c5/>
+<csr-id-f81ade56b2b43cfbf81c6112d4c687d5b540b101/>
+<csr-id-5cf1dc87b67e9af9e50299a75cdaf9d571408e10/>
+<csr-id-878e4bb43865933502a22f7cefb861bb6d72195c/>
+<csr-id-1b8681838d810aa2b4ef0abfaf9106678ff7cebb/>
+<csr-id-fff2d52b700dfe7ec9a8909a0d5adf176de4c5c7/>
+<csr-id-a7531b434591c39fc91bdffc413fcb2d6ed47e7a/>
+<csr-id-19d7d3ad04a428485738ffc916b4f14388ad10d5/>
+<csr-id-cc2c55a24bbe3edc63fd6a3a8553b10330960495/>
+<csr-id-158043cba04983a35f66df825dc803c68f3ea454/>
+<csr-id-01ea1017749a1644737ff8654378f9db70b8a988/>
+<csr-id-3058bf1a50be8a88ac0c8cb4a66278db7e186957/>
+<csr-id-eb30133e773124b46cdad6e6fa7f3c65f066946a/>
+<csr-id-5fadc027b4b7dd942275ef6041b2bdb92b062bed/>
+<csr-id-7f1ead2f0f33558583989a7314d2c121a6f1280a/>
+<csr-id-1078e59be3a58ffedcd3c1460385b4bf00f18f6b/>
+<csr-id-3e91a43676e1252a872a24872db8f91c729bfb15/>
+<csr-id-591ce5f6dfa14143114fbd16c1d632a8dbe4a2d1/>
+<csr-id-86ba4234a29137518c73b18becbf018993e104a8/>
+<csr-id-99add55c5ca5a3e3da2130797083dd449da2f7cd/>
+<csr-id-2bdc03578f3d9144a097a947ab44d0c1286f6180/>
+<csr-id-35467d3e886d2824c4f9e4586666cab7a7960e54/>
+<csr-id-fd31bd2ef5ccc9149f8f0a2844c52af60bff3840/>
+<csr-id-84ebec0e1b2b3e1107d673734125aadbdb108472/>
+<csr-id-5b003745ce3421b0554f35a6198d58cf67a1f4c6/>
+<csr-id-24f1aa0208e3e474862c18b21ea9f048cb6abf25/>
+<csr-id-d2c352198c0e421cf4b7327a17c4343dc693b2dd/>
+<csr-id-cc256bdf3f493f8841be07b9d7634c486e21a1cf/>
+<csr-id-60e6a5b1c1db4011c6bcdb473be3dbfea8858d6a/>
+<csr-id-a8c0e645d9bf11834557049045cca95f8d715a77/>
+<csr-id-b96034796d479352340caaf3d6e6b6d7e6e425ad/>
+<csr-id-f29c94d7dfab2e82b9db70fcfeddc4a71d987abb/>
+<csr-id-46ea542731fa3e2cede4ce9357783d3681434643/>
+<csr-id-20bda03e07985114b8a54c866755be8a240c2504/>
+<csr-id-f6a3f78156b9cc0f934c19e5d4c0004238a593e4/>
+<csr-id-ae5fc40e29161652306b2e42b92d2a80fc746708/>
+<csr-id-b8b0097ac86645f0c7a7352f2bf220279068228c/>
+<csr-id-044fd61950be76e3207694094dcec81313937403/>
+<csr-id-a3552ae2dd0f727a71505d832c1ed2520283e8c8/>
+<csr-id-ba5f28475048bfaebcc37c660bec65644e4e52fe/>
+<csr-id-1e92fa5a2ae4931f6265d82af121125495f58655/>
+<csr-id-56f3b514fceccbc1cc47256410b4f2119bb8affd/>
+<csr-id-ddad0b8ce37d3537a9e9ed66da18758b6b3ace68/>
+<csr-id-cfaed1ece5120d60e9f352b4e9ef70448e2ed3f2/>
+<csr-id-60239655dba08940bd293b3c9243ac732923acfe/>
+<csr-id-4cafe78e3fdb60d144e8cf810788116ce01de025/>
+<csr-id-d1ecf96a6d965928d434810ccc9c89d1bc7fac4e/>
+<csr-id-958e38ecd3b4e4dc908913192a1d43b83e082d08/>
+
  - <csr-id-5df610c93b76cfc3a6f09734476240313b16bee6/> compare against all nodes in section
    When calculating scores, we compare against the average of all the nodes in the section, rather than
    the 'neighbours' of the node. As a consequence, the `DysfunctionDetection` struct becomes simpler,
@@ -8031,156 +8659,80 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-d6e601a3c18dc2b7f60c297f5c794883952e1d14/> prune parent whenever a child inserted
  - <csr-id-7a1065c46f5d72f6997a504c984a70493e197a5b/> impl throttled message sending
    - adds a new command that given sends messages in a throttled fashion
-   - makes use of the new command to throttle replication messages to avoid message explosion
- - <csr-id-65c3adc8dd45368260bf60ef83d44a99eb6ee7ca/> batch-up data for replication
- - <csr-id-d3fd698b756d100daa12230fb944129529b773fb/> impl pull model data replication
- - <csr-id-a3a28bd7c816582218bea5dbf0f7e141b3ae2c76/> init data replicator module
- - <csr-id-070c146ea287db9bf708b11fbaaa177422cea73d/> nodes retry link.send_with once blindly
- - <csr-id-076d5e3cfd64d7bd677c9e6d34baf93f2eb49b4a/> clients should retry message sending when Conn errors encountered
- - <csr-id-5b530fec3cd6d182f4dba89e2144826977404aa9/> add basic PeerLink cleanup
-   prior to this client Peer Links were held forever. Now we trigger
-   a Cmd to clean them up if they're not waiting on any other response from
-   the network.
-   
-   We do this every X time
- - <csr-id-928600b13fdb1a31498cc27cba968a8e3eba598c/> republish data actively when deviant nodes are detected
- - <csr-id-0bc50ae33ccb934016ac425e7bb2eca90a4b06e3/> resolve nrs map container content
-   The resolver can now return `NrsMapContainer` content, which can then be displayed by the CLI with
-   the `cat` and `dog` commands. This functionality was unintentionally broken at some point.
-   
-   The first change introduced an `NrsEntry` field in `SafeData`, and modified the `NrsMapContainer` to
-   remove its `resolve_into` and `public_name` fields. The intention is for the resolver to return
-   `NrsMapContainer` data when a container XOR-URL is used, but when using an NRS URL, an `NrsEntry`
-   will be returned. The `NrsMapContainer` data will have the NRS map, whereas the `NrsEntry` will only
-   contain the target link and subname version. It's worth noting, the `NrsEntry` doesn't have an
-   XOR-URL because the entries are still stored in the map. An NRS URL still has an `NrsMapContainer`
-   content type and that content is retrieved during the resolution process.
-   
-   This brings us to the next change. The `nrs_get` API was modified to return an `Option<SafeUrl>`,
-   where `None` will now be returned if the container XOR-URL is used. In this case, the resolver will
-   know to return `NrsMapContainer` data, otherwise, it will return the `NrsEntry` with the target URL.
-   One exception is worth mentioning: if the NRS URL uses the registered topname and that topname
-   *doesn't* link to anything, `NrsMapContainer` data will also be returned. To make these extensions,
-   small unit tests were added to the `NrsMap` and several tests were added to the resolver to cover
-   these scenarios.
-   
-   With these changes in place, the CLI could then be updated. The `cat` and `dog` commands were
-   modified to print the NRS map when `NrsMapContainer` data was returned. Previously, the map was
-   printed as a table, but this isn't really suitable for presentation because the table crate doesn't
-   have the ability to use multi-line cells and the target links are too large, so I changed it to
-   print a list. Test cases were added for both commands, which should hopefully prevent us breaking
-   the feature again.
-   
-   Finally, some usability changes were also made to `nrs` commands to give the user the XOR-URL of the
-   container. This can be useful to them if they want to list all the entries in a map.
- - <csr-id-0c04071e2184c4e74fa8c9f264a380585e84369e/> add `flame` arg to use cargo flamegraph
-   uses the launcher option to enable flamegraph generation per node
- - <csr-id-b2b0520630774d935aca1f2b602a1de9479ba6f9/> enable cmd retries
-   Previously a command error would simply error out and fail.
-   Now we use an exponential backoff to retry incase errors
-   can be overcome
- - <csr-id-65282654943bdf156f144e0449a85dc4e2956f58/> randomize elder contact on cmd.
-   Priously we always took the first 3 from the SAP's elders vec. This should spread
-   commands out over all elders more fairly.
- - <csr-id-d88890261c2ca06498914714eefb56aff61673d5/> counting ACK/Err cmd response together and notify error to upper layer
- - <csr-id-939f353ed399d0148ba52225ca6d1676d3d7c04b/> timeout on waiting CmdAcks
- - <csr-id-b33b7dcb7fa6eb976bff7f38ac3d6ddc62e1977a/> send CmdAck on client cmd
- - <csr-id-67a3313105b31cee9ddd58de6e510384b8ae1397/> randomize elder contact on cmd.
-   Priously we always took the first 3 from the SAP's elders vec. This should spread
-   commands out over all elders more fairly.
- - <csr-id-61e87de077bd47b3dd106dc1e1dd65aa1f5b2d0e/> retry intial client contact if it fails
-   Previously we tried to connect to all known nodes, but if we reached the end of the list, we'd keep hitting the same nodes over and over.
-   Now we fail after trying all candidates, and retry with a new xorname to get new candidates (if we know a prefixmap).
-   We also mark the attempted connections as failed, so the client attempts to create
-   fresh new connections instead of using possibly dead connections
- - <csr-id-a02f5f0de50c7c58b1cda55a14cb63d805c772c5/> clients mark closed connections as such
-   And now check that the current connection is valid before trying to use it.
-   Otherwise they reconnect
- - <csr-id-f81ade56b2b43cfbf81c6112d4c687d5b540b101/> verify blobs QueryResponse from adults and penalise if faulty
- - <csr-id-5cf1dc87b67e9af9e50299a75cdaf9d571408e10/> Add jitter into client query request timing
-   This should help prevent nodes being hammered over the same period.
-   This PR also increases the default client query time to 500s.
- - <csr-id-878e4bb43865933502a22f7cefb861bb6d72195c/> locally track query listeners to avoid overwrite/removal
-   Previously each query for an op_id overwrote the listener.
-   This could lead to odd behaviour for parallel requests in the same client.
-   Now we only remove the listener for our msg_id even if it's the same
-   operation_id
- - <csr-id-1b8681838d810aa2b4ef0abfaf9106678ff7cebb/> impl Ordering for NetworkPrefixMap based on it's length
- - <csr-id-fff2d52b700dfe7ec9a8909a0d5adf176de4c5c7/> substract space from used_space on register delete
- - <csr-id-a7531b434591c39fc91bdffc413fcb2d6ed47e7a/> restore NotEnoughSpace checks and reunite reg and chunk storage tracking
- - <csr-id-19d7d3ad04a428485738ffc916b4f14388ad10d5/> optimise disk space checks by doing them less often
- - <csr-id-cc2c55a24bbe3edc63fd6a3a8553b10330960495/> discard JoinResponse messages in dispatcher
-   Dispatcher is only created when we have joined the network already. Therefore we can safely ignore JoinResponses there.
-   
-   We now error out of the msg handling flow and so will log this unexpected message at the node.
- - <csr-id-158043cba04983a35f66df825dc803c68f3ea454/> Move command limit to service msgs only.
-   Require a permit or drop a service msg level command. This should _hopefully_ stop mem leak due to waiting to handle messages coming in from clients
- - <csr-id-01ea1017749a1644737ff8654378f9db70b8a988/> Add hard limit to concurrent commands
-   It may be that nodes can be overwhelmed when too many messages come in.
-   
-   Here there's a naiive impl to drop commands (and msgs) from being handled when we're overwhelmed
- - <csr-id-3058bf1a50be8a88ac0c8cb4a66278db7e186957/> reenable using constants for message priority
-   and wait on higher priority message completion before spawning new
-   Command tasks
-   
-   This reverts commit 6d1cdc64078de06a43281d924f58d01b615e9268.
- - <csr-id-eb30133e773124b46cdad6e6fa7f3c65f066946a/> make read and delete async
- - <csr-id-5fadc027b4b7dd942275ef6041b2bdb92b062bed/> remove unused kv store, cleanup chunk store
- - <csr-id-7f1ead2f0f33558583989a7314d2c121a6f1280a/> disk chunk store
- - <csr-id-1078e59be3a58ffedcd3c1460385b4bf00f18f6b/> use upload_and_verify by default in safe_client
- - <csr-id-3e91a43676e1252a872a24872db8f91c729bfb15/> keeping Chunks wich were retrieved in a local client cache
- - <csr-id-591ce5f6dfa14143114fbd16c1d632a8dbe4a2d1/> Use Peers to ensure connection reuse
- - <csr-id-86ba4234a29137518c73b18becbf018993e104a8/> on initial contact put all known elders into the contact pool.
-   Previously if we knew a sap, we only took 3 nodes
- - <csr-id-99add55c5ca5a3e3da2130797083dd449da2f7cd/> make contact via register get
-   We previously use a chunk get, but this in itself will cause more network messaging than a simple register get which can be dealt with by elders only
- - <csr-id-2bdc03578f3d9144a097a947ab44d0c1286f6180/> use backoff during make contact instead of standard_wait.
-   This should help aleviate any pressure on already struggling nodes, especially if a low wait was set to make tests run faster eg (where ae may not always be needed
- - <csr-id-35467d3e886d2824c4f9e4586666cab7a7960e54/> limit the relocations at one time
- - <csr-id-fd31bd2ef5ccc9149f8f0a2844c52af60bff3840/> use Vec of DataCmd instead of wrapper struct
- - <csr-id-84ebec0e1b2b3e1107d673734125aadbdb108472/> upgrade batch to write ahead log with index
- - <csr-id-5b003745ce3421b0554f35a6198d58cf67a1f4c6/> aggregate joins per section key
-   Previously we only did one aggregation. But errors could arise if we had to resend and scrap aggregation.
-   
-   This means we can aggregate any number of churning section keys.
- - <csr-id-24f1aa0208e3e474862c18b21ea9f048cb6abf25/> expose API for calculate Blob/Spot address without a network connection
- - <csr-id-d2c352198c0e421cf4b7327a17c4343dc693b2dd/> start a fresh round of joins when aggregation is erroring.
-   Aggregation may error, perhaps due to section churn. If we half or more bad signaturs that would prevent aggregation. We clean the slate and start a fresh round of aggregation and join messaging.
- - <csr-id-cc256bdf3f493f8841be07b9d7634c486e21a1cf/> avoid broadcasting DKG messages
- - <csr-id-60e6a5b1c1db4011c6bcdb473be3dbfea8858d6a/> revamp joins/rejoins to follow BRB
- - <csr-id-a8c0e645d9bf11834557049045cca95f8d715a77/> deduce expected_prefix from expected_age
- - <csr-id-b96034796d479352340caaf3d6e6b6d7e6e425ad/> adapt registers to hold vec u8 instead of Url in sn
- - <csr-id-f29c94d7dfab2e82b9db70fcfeddc4a71d987abb/> use AE to progress various intra-DKG phases
-   sometimes a DKG session might receive DKG messages from a further phase
-   that it has not reached yet. eg. it might receive Proposal messages
-   while in the Initialization phase. When this happens, the DKG can
-   respond with a DkgNotReady message to the message source which will sent
-   a list of 'DKG Messages' that can be applied to an existing DKG process
-   so it can progress to the next phase.
-   
-   note that this does not solve the case where the DKG session has not yet
-   started. that will need to be handled separately. they are currently
-   pushed to the backlog and handled later
- - <csr-id-46ea542731fa3e2cede4ce9357783d3681434643/> allow ELDER_COUNT to be overridden by env var SN_ELDER_COUNT
- - <csr-id-20bda03e07985114b8a54c866755be8a240c2504/> retry client queires if elder conns fail
- - <csr-id-f6a3f78156b9cc0f934c19e5d4c0004238a593e4/> verify and use SAP received in AE-Redirect to update client's network knowledge
- - <csr-id-ae5fc40e29161652306b2e42b92d2a80fc746708/> verify and use SAP received in AE-Redirect to update our network knowledge
- - <csr-id-b8b0097ac86645f0c7a7352f2bf220279068228c/> support `--json-logs` in `testnet`
-   This makes it easier to enable JSON logs for local testnets.
- - <csr-id-044fd61950be76e3207694094dcec81313937403/> allow to change the default interval for testnet nodes
- - <csr-id-a3552ae2dd0f727a71505d832c1ed2520283e8c8/> add network health check script to easily wait until we're ready+healthy
- - <csr-id-ba5f28475048bfaebcc37c660bec65644e4e52fe/> cache prefix_map for clients
-   - also refactors methods for writing data to disk
- - <csr-id-1e92fa5a2ae4931f6265d82af121125495f58655/> add more prioritiy leves for different types of messages
- - <csr-id-56f3b514fceccbc1cc47256410b4f2119bb8affd/> stepped fixed age during first section
- - <csr-id-ddad0b8ce37d3537a9e9ed66da18758b6b3ace68/> read prefix_map from disk if available
- - <csr-id-cfaed1ece5120d60e9f352b4e9ef70448e2ed3f2/> use tokio::semaphore for limiting concurrent joins
- - <csr-id-60239655dba08940bd293b3c9243ac732923acfe/> add AE backoff before resending messages to a node
- - <csr-id-4cafe78e3fdb60d144e8cf810788116ce01de025/> backoff during join request looping
- - <csr-id-d1ecf96a6d965928d434810ccc9c89d1bc7fac4e/> make subcommand optional, to get stats quickly
- - <csr-id-958e38ecd3b4e4dc908913192a1d43b83e082d08/> enable pleasant span viewing for node logs
+- makes use of the new command to throttle replication messages to avoid message explosion
+- also refactors methods for writing data to disk
 
 ### Bug Fixes
+
+<csr-id-661e994cb452242a1d7c831ab88b9a66a244faff/>
+<csr-id-58bd78e8a4fc34e7f76a9f449301b9216cb6a1d4/>
+<csr-id-ddde0d6767f5230eca7a760423538fa5e4f640a2/>
+<csr-id-1ea33e0c63fead5097b57496b2fd997201a2c531/>
+<csr-id-8e480e5eb5cd38f9bfb3b723aa1d0dd5e4be3122/>
+<csr-id-fdc4ba6bb36dff85126c8273cdfc67f9b07e2175/>
+<csr-id-01a5c961fc02f9ca8d6f60286306d5efba460e4e/>
+<csr-id-27868bc51ba2dd12cc584396c53a158706d0c07b/>
+<csr-id-8de5ecf50008793546760621d906f23e8fe9791f/>
+<csr-id-8cfc5a4adf8a31bf6916273597cf4c18aa5adc46/>
+<csr-id-758661d87edfef0fee6676993f1e96b3fd2d26bb/>
+<csr-id-b79e8d6dbd18a4a0787d326a6b10146fa6b90f30/>
+<csr-id-5523d0fcca7bbbbd05b6d125692f5fbd1a8f50d7/>
+<csr-id-0e505be2f57ab427cd3ed8c9564fd8b84909f6f3/>
+<csr-id-23bd9b23243da1d20cee8e7f06adc90f0894c2e7/>
+<csr-id-5dd0961c5172ed890b2453eb33332380e4757ad3/>
+<csr-id-1822857e35b888df75bea652a2858cfd34b8c2fc/>
+<csr-id-9a82649f0ca01c6d2eae57f260d2f98246724556/>
+<csr-id-d3b88f749ca6ee53f65e200105aeeea691581e83/>
+<csr-id-35a8fdb9dca60ca268d536958a9d32ce0a876792/>
+<csr-id-c27d7e997c5a7812f995f113f31edf30c2c21272/>
+<csr-id-55eb0f259a83faff470dbfdeb9365d314ed6a697/>
+<csr-id-42d90b763606e2d324c5ce1235fc801105c07acb/>
+<csr-id-302ce4e605d72a0925509bfe3220c2b1ddac677d/>
+<csr-id-c78513903457a701096b5c542f15012e71d33c46/>
+<csr-id-ad633e1b6882db1aac0cb1a530300d9e4d666fd8/>
+<csr-id-366ad9a42034fe450c30908d372fede0ff92f655/>
+<csr-id-c4a42fb5965c79aaae2a0ef2ae62fcb987c37525/>
+<csr-id-adf9feac964fb7f690bd43aeef3270c82fde419c/>
+<csr-id-e406a9a61bb313dcd445d639e82fa8ae1ff99964/>
+<csr-id-db76c5ee5b2efc35214d12df0a2aa4e137231fa6/>
+<csr-id-5b596a444d24f7021db9d3c322bafa33d49dcfae/>
+<csr-id-d44fd8d5888c554bf1aa0d56e08471cfe90bd988/>
+<csr-id-a927d9e27d831a48348eab6d41e0f4231b0e62c7/>
+<csr-id-42a3123b0aa4f01daedc2faebd3fa3430dbc1618/>
+<csr-id-9214dff1541b28577c44d8cbbebeec0b80598653/>
+<csr-id-bc47eed7e327a8e02fff1d385648c752ad33b8f1/>
+<csr-id-27e8d895983d236a0949354219c4adbe3f1e22a0/>
+<csr-id-e45dd10ac770ed41431f0e8758a6228fc4dfbe3c/>
+<csr-id-a0806aa624384ccb437bc8b4b2d108523ea5c068/>
+<csr-id-57b736a8901ed76c402460fcf1799162cfdb3c37/>
+<csr-id-6eb389acfb3adcec0be07ee990106ed19a7f78f5/>
+<csr-id-b53a86b9ba0bfb33ab9cccaecb383bcce0acf233/>
+<csr-id-5f985342239b74963f89e627e28031f8817c0d3d/>
+<csr-id-a1910095d4b7a749186d614e04dad2b64a1eabff/>
+<csr-id-ab98ec2076c1f6c60899c505ed85aaefa5359278/>
+<csr-id-96519e26ef9adf6360b6a8f79ca73ab4bc7b627b/>
+<csr-id-3569939ff83978ba50039588eb87d4e6da4fedd2/>
+<csr-id-f615aacdb4cd972545ba88c927cfb5a9b357fb9a/>
+<csr-id-51ea358eff0edee0b27c5e21af4f38a7ee09422c/>
+<csr-id-0df6615df2fdb88d7fd89f9751c6b88e1b7ebb5f/>
+<csr-id-b0319628d587a2caeb1aa5be52505cbb6ede40d3/>
+<csr-id-20a69ccb6c6b1f466b519318dd85ef11e7700027/>
+<csr-id-0d3fe1a6e02f6d83115e9098c706a98cb688d41d/>
+<csr-id-c360dc61bd7d4ce1745ba7bfbe9d032fedac067a/>
+<csr-id-0ea37af54f761b2a1a5137463637736c6be25206/>
+<csr-id-fd4513f054e282218797208dcac1de6903e94f2c/>
+<csr-id-7ff7557850460d98b526646b21da635381a70e2a/>
+<csr-id-084926e045952670295eb666c82f1d77ff88f1be/>
+<csr-id-3a19e42770a12885659d653b98511378dad8015f/>
+<csr-id-2d807cb4b75bfd52d9dde7b91214bd3dc5a6d992/>
+<csr-id-c765828018158bda663f937a73bcc47ab358884c/>
+<csr-id-ba7c4c609150839825a4992c08e3bdd00b698269/>
+<csr-id-104ed366dbaafd98fd3ef67899e27540894a959c/>
+<csr-id-0033fc65db266d92623f53628f9f5b6e6069920d/>
+<csr-id-ec3f16a8c33e8afbdfffb392466ba422216d3f68/>
+<csr-id-73c5baf94dd37346c6c9987aa51ca26f3a2fea1f/>
+<csr-id-6aa1130a7b380dc3d1ad12f3054cda3a390ff20d/>
+<csr-id-c88a1bc5fda40093bb129b4351eef73d2eb7c041/>
 
  - <csr-id-9aa65d92e1d806150401f8bdefa1ead2e3cafd42/> use the config verbosity if no env var present
  - <csr-id-1e7c4ab6d56304f99d11396e0eee5109eb4dda04/> update some instances of safe_network->sn_node
@@ -8264,114 +8816,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-d8ad6a9b1d6a530b7f597bccf6a6bed6d8546ac0/> populate client sender success counter
  - <csr-id-8955fcf9d69e869725177340d1de6b6b1e7a203b/> read_from client API was incorrectly using provided length value as an end index
    - Minor refactoring in sn_api moving the SafeData struct into its own file.
-   - Re-enabling the only two fetch API tests which are now passsing with this fix.
- - <csr-id-661e994cb452242a1d7c831ab88b9a66a244faff/> avoid change name by mistake when Join
- - <csr-id-58bd78e8a4fc34e7f76a9f449301b9216cb6a1d4/> complete the relocation flow
- - <csr-id-ddde0d6767f5230eca7a760423538fa5e4f640a2/> order of target length in ElderConn error corrected
- - <csr-id-1ea33e0c63fead5097b57496b2fd997201a2c531/> keep trying even with connection error w/ always-joinable flag
- - <csr-id-8e480e5eb5cd38f9bfb3b723aa1d0dd5e4be3122/> aovid overwrite pervious session by  accident
- - <csr-id-fdc4ba6bb36dff85126c8273cdfc67f9b07e2175/> multiple fixes for DKG-AE
-   - discard DKG session info for older sessions
-   - skip DkgStart and DkgRetry messages for expired sessions
- - <csr-id-01a5c961fc02f9ca8d6f60286306d5efba460e4e/> avoid network_knowledge loopup when sending DkgRetry or DkgSessionInfo
- - <csr-id-27868bc51ba2dd12cc584396c53a158706d0c07b/> avoid network_knowledge lookup when sending DKGNotReady or DkgSessionUnknown
- - <csr-id-8de5ecf50008793546760621d906f23e8fe9791f/> make has_split.sh detect SplitSuccess correctly
- - <csr-id-8cfc5a4adf8a31bf6916273597cf4c18aa5adc46/> reduce backoff time; avoid start DKG shrink elders
- - <csr-id-758661d87edfef0fee6676993f1e96b3fd2d26bb/> don't crash node on failed signature aggregation on join
- - <csr-id-b79e8d6dbd18a4a0787d326a6b10146fa6b90f30/> retry joins on section key mismatch.
-   We could sometimes get a key sent from nodes with a newer section_pk
-   than we were expecting.
-   
-   We should then retry
- - <csr-id-5523d0fcca7bbbbd05b6d125692f5fbd1a8f50d7/> avoid use outdated keyshare status
- - <csr-id-0e505be2f57ab427cd3ed8c9564fd8b84909f6f3/> restore `ServiceMsg` authority check
-   The `AuthorityProof` struct is designed to be a proof of valid
-   authority, by ensuring all possible constructors either generate or
-   validate a signature. This can only be guaranteed if the field remains
-   module-private. At some point it seems the field was made `pub(crate)`,
-   which meant we were missing an authority check for some `ServiceMsg`s,
- - <csr-id-23bd9b23243da1d20cee8e7f06adc90f0894c2e7/> fix node joining age for genesis section Adults
- - <csr-id-5dd0961c5172ed890b2453eb33332380e4757ad3/> refactor join flows to use the new Peer type
- - <csr-id-1822857e35b888df75bea652a2858cfd34b8c2fc/> remove redundant send_node_approval
- - <csr-id-9a82649f0ca01c6d2eae57f260d2f98246724556/> multiples fixes for unit tests
-   - error instead of panicking if logger is already initialized
-   - use unique socker addrs for nodes
-   - print error returned from proptest
- - <csr-id-d3b88f749ca6ee53f65e200105aeeea691581e83/> send DkgRetry for DkgError::MissingPart as well
- - <csr-id-35a8fdb9dca60ca268d536958a9d32ce0a876792/> ensure client chunk count is 3 w/ 7 elders
- - <csr-id-c27d7e997c5a7812f995f113f31edf30c2c21272/> fix a compilation error introduced by merge
- - <csr-id-55eb0f259a83faff470dbfdeb9365d314ed6a697/> joining node age to genesis section shall be less than or equal to suggested age
- - <csr-id-42d90b763606e2d324c5ce1235fc801105c07acb/> use correct dst section key for AE-Update to siblings after split
- - <csr-id-302ce4e605d72a0925509bfe3220c2b1ddac677d/> raise SectionSplit event whenever prefix changed
- - <csr-id-c78513903457a701096b5c542f15012e71d33c46/> during bootstrap, handling the case prefix_map was loaded
- - <csr-id-ad633e1b6882db1aac0cb1a530300d9e4d666fd8/> avoid holding write lock on ae_backoff_cache during sleep
-   This could inadvertently be slowing down other joins if we're holding the write lock on the cache while we backoff
- - <csr-id-366ad9a42034fe450c30908d372fede0ff92f655/> draining backlog before process DKG message
- - <csr-id-c4a42fb5965c79aaae2a0ef2ae62fcb987c37525/> less DKG progression interval; switch SAP on DKGcompletion when OurElder already received
- - <csr-id-adf9feac964fb7f690bd43aeef3270c82fde419c/> fix `Eq` for `SectionPeers`
-   This would have always returned true, since it was comparing with
-   itself...
- - <csr-id-e406a9a61bb313dcd445d639e82fa8ae1ff99964/> refactor the Join process regarding used_recipients
- - <csr-id-db76c5ee5b2efc35214d12df0a2aa4e137231fa6/> if attempting to send a msg fails, continue with the rest of cmd processing instead of bailing out
- - <csr-id-5b596a444d24f7021db9d3c322bafa33d49dcfae/> client config test timeout/keepalive needed updating
- - <csr-id-d44fd8d5888c554bf1aa0d56e08471cfe90bd988/> routing test tweaks
- - <csr-id-a927d9e27d831a48348eab6d41e0f4231b0e62c7/> make health check tolerante of possible demotions
- - <csr-id-42a3123b0aa4f01daedc2faebd3fa3430dbc1618/> tesnet grep is_log_file check
- - <csr-id-9214dff1541b28577c44d8cbbebeec0b80598653/> node tests after removing blocking cmd layer
- - <csr-id-bc47eed7e327a8e02fff1d385648c752ad33b8f1/> fix windows grep lock error: dont search non log files
- - <csr-id-27e8d895983d236a0949354219c4adbe3f1e22a0/> readd keep alive for client
- - <csr-id-e45dd10ac770ed41431f0e8758a6228fc4dfbe3c/> update logs during AEUpdate
- - <csr-id-a0806aa624384ccb437bc8b4b2d108523ea5c068/> bring back elders len check during chain updates
- - <csr-id-57b736a8901ed76c402460fcf1799162cfdb3c37/> match on name
- - <csr-id-6eb389acfb3adcec0be07ee990106ed19a7f78f5/> make `KvStore::store` perform atomic immutable writes
-   `KvStore` is the database abstraction we use to persist chunks. This is
-   itself backed by `sled`. `sled` uses a log as one of the underlying
-   storage primitives, which means that all inserts (even overwrites) will
-   consume additional space (until the log is compacted, which may happen
-   irregularly).
-   
-   However, chunks themselves are write-once which means that we would only
-   ever need to write a value once. As such, we can use `compare_and_swap`
-   to write the value only if it's not currently set. Since chunks are
-   content-addressable, we furthermore don't need to do anything if the
-   value did already exist and wasn't written, since there is only one
-   possible value for a given key.
- - <csr-id-b53a86b9ba0bfb33ab9cccaecb383bcce0acf233/> fix test for `GetChunk` 'data not found' failures
- - <csr-id-5f985342239b74963f89e627e28031f8817c0d3d/> typo
- - <csr-id-a1910095d4b7a749186d614e04dad2b64a1eabff/> spot and blob management inconsistency add some comments
- - <csr-id-ab98ec2076c1f6c60899c505ed85aaefa5359278/> replace prefixmap check to ensure last proof chainkey is present on provided sap
- - <csr-id-96519e26ef9adf6360b6a8f79ca73ab4bc7b627b/> elders update uses correct key for prefixmap updates
- - <csr-id-3569939ff83978ba50039588eb87d4e6da4fedd2/> updated routing untrusted ae test for new error
- - <csr-id-f615aacdb4cd972545ba88c927cfb5a9b357fb9a/> provide valid proof chain to update prefix map during elders agreement handling
- - <csr-id-51ea358eff0edee0b27c5e21af4f38a7ee09422c/> keep section in sync on ae retry recevial at nodes
- - <csr-id-0df6615df2fdb88d7fd89f9751c6b88e1b7ebb5f/> ae blob tests dont have standard wait
- - <csr-id-b0319628d587a2caeb1aa5be52505cbb6ede40d3/> use client query in routing tests instead of bytes
- - <csr-id-20a69ccb6c6b1f466b519318dd85ef11e7700027/> don't bail out when handling ElderAgreement if prefix-map is not updated
- - <csr-id-0d3fe1a6e02f6d83115e9098c706a98cb688d41d/> allow to set the genesis key for Core and Section structs of first node
- - <csr-id-c360dc61bd7d4ce1745ba7bfbe9d032fedac067a/> prevent deadlock by dropping write locks in relocation
- - <csr-id-0ea37af54f761b2a1a5137463637736c6be25206/> enough having enough elders before split attempt
- - <csr-id-fd4513f054e282218797208dcac1de6903e94f2c/> build `sn_node` from inside `sn` directory
-   Since we moved to a workspace layout, the `testnet` binary has been
-   building more than necessary since it runs `cargo build` from the
-   workspace root. Additionally, cargo's feature resolution may behave
-   unexpectedly when executed from the workspace directory, so rather than
-   using `-p safe_network` we rather run `cargo build` from the `sn`
-   directory.
- - <csr-id-7ff7557850460d98b526646b21da635381a70e2a/> exit with error if `sn_node` build fails
-   We would previously ignore the result of trying to build the `sn_node`
-   binary, which would lead to either using the incorrect binary if one
-   existed, or a later error because the binary doesn't exist.
- - <csr-id-084926e045952670295eb666c82f1d77ff88f1be/> fix a possible panic when creating client
- - <csr-id-3a19e42770a12885659d653b98511378dad8015f/> improve join req handling for elders
- - <csr-id-2d807cb4b75bfd52d9dde7b91214bd3dc5a6d992/> maintain lexicographical order
- - <csr-id-c765828018158bda663f937a73bcc47ab358884c/> write to correct source
- - <csr-id-ba7c4c609150839825a4992c08e3bdd00b698269/> get more splits (at the cost of more join msgs)
- - <csr-id-104ed366dbaafd98fd3ef67899e27540894a959c/> dont wait before first join request
- - <csr-id-0033fc65db266d92623f53628f9f5b6e6069920d/> fix elders agreement routing tests using wrong command type
- - <csr-id-ec3f16a8c33e8afbdfffb392466ba422216d3f68/> missing post rebase async_trait dep
- - <csr-id-73c5baf94dd37346c6c9987aa51ca26f3a2fea1f/> only resend if we've had an update
- - <csr-id-6aa1130a7b380dc3d1ad12f3054cda3a390ff20d/> client config test
- - <csr-id-c88a1bc5fda40093bb129b4351eef73d2eb7c041/> resolution test except for the blob range tests
+- Re-enabling the only two fetch API tests which are now passsing with this fix.
+- discard DKG session info for older sessions
+- skip DkgStart and DkgRetry messages for expired sessions
+- error instead of panicking if logger is already initialized
+- use unique socker addrs for nodes
+- print error returned from proptest
 
 ### Other
 
@@ -9201,6 +9651,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Update actions workflows for workspace refactor ([`d0134e8`](https://github.com/maidsafe/safe_network/commit/d0134e870bb097e095e1c8a33e607cf7994e6491))
     - Move safe_network code into sn directory ([`2254329`](https://github.com/maidsafe/safe_network/commit/225432908839359800d301d9e5aa8274e4652ee1))
 </details>
+
+<csr-unknown>
+ add log markers for connection open/closeWe can detect connection open/close easily in the connection listenertasks, since these are started as soon as a connection is opened, andfinish when there are no more incoming connections (e.g. connection hasclosed). the JoinResponse::Retry message now provides the expected age for the joining node batch-up data for replication impl pull model data replication init data replicator module nodes retry link.send_with once blindly clients should retry message sending when Conn errors encountered add basic PeerLink cleanupprior to this client Peer Links were held forever. Now we triggera Cmd to clean them up if they’re not waiting on any other response fromthe network.We do this every X time republish data actively when deviant nodes are detected resolve nrs map container contentThe resolver can now return NrsMapContainer content, which can then be displayed by the CLI withthe cat and dog commands. This functionality was unintentionally broken at some point.The first change introduced an NrsEntry field in SafeData, and modified the NrsMapContainer toremove its resolve_into and public_name fields. The intention is for the resolver to returnNrsMapContainer data when a container XOR-URL is used, but when using an NRS URL, an NrsEntrywill be returned. The NrsMapContainer data will have the NRS map, whereas the NrsEntry will onlycontain the target link and subname version. It’s worth noting, the NrsEntry doesn’t have anXOR-URL because the entries are still stored in the map. An NRS URL still has an NrsMapContainercontent type and that content is retrieved during the resolution process.This brings us to the next change. The nrs_get API was modified to return an Option<SafeUrl>,where None will now be returned if the container XOR-URL is used. In this case, the resolver willknow to return NrsMapContainer data, otherwise, it will return the NrsEntry with the target URL.One exception is worth mentioning: if the NRS URL uses the registered topname and that topnamedoesn’t link to anything, NrsMapContainer data will also be returned. To make these extensions,small unit tests were added to the NrsMap and several tests were added to the resolver to coverthese scenarios.With these changes in place, the CLI could then be updated. The cat and dog commands weremodified to print the NRS map when NrsMapContainer data was returned. Previously, the map wasprinted as a table, but this isn’t really suitable for presentation because the table crate doesn’thave the ability to use multi-line cells and the target links are too large, so I changed it toprint a list. Test cases were added for both commands, which should hopefully prevent us breakingthe feature again.Finally, some usability changes were also made to nrs commands to give the user the XOR-URL of thecontainer. This can be useful to them if they want to list all the entries in a map. add flame arg to use cargo flamegraphuses the launcher option to enable flamegraph generation per node enable cmd retriesPreviously a command error would simply error out and fail.Now we use an exponential backoff to retry incase errorscan be overcome randomize elder contact on cmd.Priously we always took the first 3 from the SAP’s elders vec. This should spreadcommands out over all elders more fairly. counting ACK/Err cmd response together and notify error to upper layer timeout on waiting CmdAcks send CmdAck on client cmd randomize elder contact on cmd.Priously we always took the first 3 from the SAP’s elders vec. This should spreadcommands out over all elders more fairly. retry intial client contact if it failsPreviously we tried to connect to all known nodes, but if we reached the end of the list, we’d keep hitting the same nodes over and over.Now we fail after trying all candidates, and retry with a new xorname to get new candidates (if we know a prefixmap).We also mark the attempted connections as failed, so the client attempts to createfresh new connections instead of using possibly dead connections clients mark closed connections as suchAnd now check that the current connection is valid before trying to use it.Otherwise they reconnect verify blobs QueryResponse from adults and penalise if faulty Add jitter into client query request timingThis should help prevent nodes being hammered over the same period.This PR also increases the default client query time to 500s. locally track query listeners to avoid overwrite/removalPreviously each query for an op_id overwrote the listener.This could lead to odd behaviour for parallel requests in the same client.Now we only remove the listener for our msg_id even if it’s the sameoperation_id impl Ordering for NetworkPrefixMap based on it’s length substract space from used_space on register delete restore NotEnoughSpace checks and reunite reg and chunk storage tracking optimise disk space checks by doing them less often discard JoinResponse messages in dispatcherDispatcher is only created when we have joined the network already. Therefore we can safely ignore JoinResponses there.We now error out of the msg handling flow and so will log this unexpected message at the node. Move command limit to service msgs only.Require a permit or drop a service msg level command. This should hopefully stop mem leak due to waiting to handle messages coming in from clients Add hard limit to concurrent commandsIt may be that nodes can be overwhelmed when too many messages come in.Here there’s a naiive impl to drop commands (and msgs) from being handled when we’re overwhelmed reenable using constants for message priorityand wait on higher priority message completion before spawning newCommand tasksThis reverts commit 6d1cdc64078de06a43281d924f58d01b615e9268. make read and delete async remove unused kv store, cleanup chunk store disk chunk store use upload_and_verify by default in safe_client keeping Chunks wich were retrieved in a local client cache Use Peers to ensure connection reuse on initial contact put all known elders into the contact pool.Previously if we knew a sap, we only took 3 nodes make contact via register getWe previously use a chunk get, but this in itself will cause more network messaging than a simple register get which can be dealt with by elders only use backoff during make contact instead of standard_wait.This should help aleviate any pressure on already struggling nodes, especially if a low wait was set to make tests run faster eg (where ae may not always be needed limit the relocations at one time use Vec of DataCmd instead of wrapper struct upgrade batch to write ahead log with index aggregate joins per section keyPreviously we only did one aggregation. But errors could arise if we had to resend and scrap aggregation.This means we can aggregate any number of churning section keys. expose API for calculate Blob/Spot address without a network connection start a fresh round of joins when aggregation is erroring.Aggregation may error, perhaps due to section churn. If we half or more bad signaturs that would prevent aggregation. We clean the slate and start a fresh round of aggregation and join messaging. avoid broadcasting DKG messages revamp joins/rejoins to follow BRB deduce expected_prefix from expected_age adapt registers to hold vec u8 instead of Url in sn use AE to progress various intra-DKG phasessometimes a DKG session might receive DKG messages from a further phasethat it has not reached yet. eg. it might receive Proposal messageswhile in the Initialization phase. When this happens, the DKG canrespond with a DkgNotReady message to the message source which will senta list of ‘DKG Messages’ that can be applied to an existing DKG processso it can progress to the next phase.note that this does not solve the case where the DKG session has not yetstarted. that will need to be handled separately. they are currentlypushed to the backlog and handled later allow ELDER_COUNT to be overridden by env var SN_ELDER_COUNT retry client queires if elder conns fail verify and use SAP received in AE-Redirect to update client’s network knowledge verify and use SAP received in AE-Redirect to update our network knowledge support --json-logs in testnetThis makes it easier to enable JSON logs for local testnets. allow to change the default interval for testnet nodes add network health check script to easily wait until we’re ready+healthy cache prefix_map for clients add more prioritiy leves for different types of messages stepped fixed age during first section read prefix_map from disk if available use tokio::semaphore for limiting concurrent joins add AE backoff before resending messages to a node backoff during join request looping make subcommand optional, to get stats quickly enable pleasant span viewing for node logs avoid change name by mistake when Join complete the relocation flow order of target length in ElderConn error corrected keep trying even with connection error w/ always-joinable flag aovid overwrite pervious session by  accident multiple fixes for DKG-AE avoid network_knowledge loopup when sending DkgRetry or DkgSessionInfo avoid network_knowledge lookup when sending DKGNotReady or DkgSessionUnknown make has_split.sh detect SplitSuccess correctly reduce backoff time; avoid start DKG shrink elders don’t crash node on failed signature aggregation on join retry joins on section key mismatch.We could sometimes get a key sent from nodes with a newer section_pkthan we were expecting.We should then retry avoid use outdated keyshare status restore ServiceMsg authority checkThe AuthorityProof struct is designed to be a proof of validauthority, by ensuring all possible constructors either generate orvalidate a signature. This can only be guaranteed if the field remainsmodule-private. At some point it seems the field was made pub(crate),which meant we were missing an authority check for some ServiceMsgs, fix node joining age for genesis section Adults refactor join flows to use the new Peer type remove redundant send_node_approval multiples fixes for unit tests send DkgRetry for DkgError::MissingPart as well ensure client chunk count is 3 w/ 7 elders fix a compilation error introduced by merge joining node age to genesis section shall be less than or equal to suggested age use correct dst section key for AE-Update to siblings after split raise SectionSplit event whenever prefix changed during bootstrap, handling the case prefix_map was loaded avoid holding write lock on ae_backoff_cache during sleepThis could inadvertently be slowing down other joins if we’re holding the write lock on the cache while we backoff draining backlog before process DKG message less DKG progression interval; switch SAP on DKGcompletion when OurElder already received fix Eq for SectionPeersThis would have always returned true, since it was comparing withitself… refactor the Join process regarding used_recipients if attempting to send a msg fails, continue with the rest of cmd processing instead of bailing out client config test timeout/keepalive needed updating routing test tweaks make health check tolerante of possible demotions tesnet grep is_log_file check node tests after removing blocking cmd layer fix windows grep lock error: dont search non log files readd keep alive for client update logs during AEUpdate bring back elders len check during chain updates match on name make KvStore::store perform atomic immutable writesKvStore is the database abstraction we use to persist chunks. This isitself backed by sled. sled uses a log as one of the underlyingstorage primitives, which means that all inserts (even overwrites) willconsume additional space (until the log is compacted, which may happenirregularly).However, chunks themselves are write-once which means that we would onlyever need to write a value once. As such, we can use compare_and_swapto write the value only if it’s not currently set. Since chunks arecontent-addressable, we furthermore don’t need to do anything if thevalue did already exist and wasn’t written, since there is only onepossible value for a given key. fix test for GetChunk ‘data not found’ failures typo spot and blob management inconsistency add some comments replace prefixmap check to ensure last proof chainkey is present on provided sap elders update uses correct key for prefixmap updates updated routing untrusted ae test for new error provide valid proof chain to update prefix map during elders agreement handling keep section in sync on ae retry recevial at nodes ae blob tests dont have standard wait use client query in routing tests instead of bytes don’t bail out when handling ElderAgreement if prefix-map is not updated allow to set the genesis key for Core and Section structs of first node prevent deadlock by dropping write locks in relocation enough having enough elders before split attempt build sn_node from inside sn directorySince we moved to a workspace layout, the testnet binary has beenbuilding more than necessary since it runs cargo build from theworkspace root. Additionally, cargo’s feature resolution may behaveunexpectedly when executed from the workspace directory, so rather thanusing -p safe_network we rather run cargo build from the sndirectory. exit with error if sn_node build failsWe would previously ignore the result of trying to build the sn_nodebinary, which would lead to either using the incorrect binary if oneexisted, or a later error because the binary doesn’t exist. fix a possible panic when creating client improve join req handling for elders maintain lexicographical order write to correct source get more splits (at the cost of more join msgs) dont wait before first join request fix elders agreement routing tests using wrong command type missing post rebase async_trait dep only resend if we’ve had an update client config test resolution test except for the blob range tests<csr-unknown/>
 
 ## v0.58.13 (2022-04-23)
 

@@ -6,13 +6,50 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## v0.19.1 (2023-02-28)
+
+### Refactor
+
+ - <csr-id-9a2f912effa46112c8481dd259c9f203ee775e2e/> remove more unused pub
+ - <csr-id-5fcb6700fa26c0825191feb87c8d4a4653e50eef/> fix clippy lints; fmt
+ - <csr-id-3fda80a40c508d16fbe097091252a98b01f8f339/> remove unused pub fn/methods
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Remove more unused pub ([`9a2f912`](https://github.com/maidsafe/safe_network/commit/9a2f912effa46112c8481dd259c9f203ee775e2e))
+    - Fix clippy lints; fmt ([`5fcb670`](https://github.com/maidsafe/safe_network/commit/5fcb6700fa26c0825191feb87c8d4a4653e50eef))
+    - Remove unused pub fn/methods ([`3fda80a`](https://github.com/maidsafe/safe_network/commit/3fda80a40c508d16fbe097091252a98b01f8f339))
+</details>
+
 ## v0.17.10 (2023-02-24)
+
+<csr-id-5a29d0d8ad6853e4bb46bd4c122a8fe80dd2cde2/>
+<csr-id-67867b1379b9225f4be3d584ea2df5c3b0afca3a/>
+<csr-id-a6a04247785e973a639ed2a4ccc385d941d65756/>
+<csr-id-679591e53ed65fa3f0d78f15b5054cd05085e8d9/>
 
 ### Chore
 
  - <csr-id-5a29d0d8ad6853e4bb46bd4c122a8fe80dd2cde2/> update for qp2p recv stream ownership changes
  - <csr-id-67867b1379b9225f4be3d584ea2df5c3b0afca3a/> sn_interface-0.17.10/sn_comms-0.3.5/sn_client-0.79.0/sn_node-0.75.0/sn_api-0.77.0/sn_cli-0.70.0
  - <csr-id-a6a04247785e973a639ed2a4ccc385d941d65756/> remove unnecessary clippy lints
+
+### Chore
+
+ - <csr-id-0d55437399624692c6e5cfc8363a6a630ed13019/> sn_interface-0.17.10/sn_comms-0.3.5/sn_client-0.79.0/sn_node-0.75.0/sn_api-0.77.0/sn_cli-0.70.0
 
 ### New Features
 
@@ -34,9 +71,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 22 commits contributed to the release over the course of 8 calendar days.
+ - 23 commits contributed to the release over the course of 8 calendar days.
  - 14 days passed between releases.
- - 10 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 11 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -46,6 +83,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Sn_interface-0.17.10/sn_comms-0.3.5/sn_client-0.79.0/sn_node-0.75.0/sn_api-0.77.0/sn_cli-0.70.0 ([`0d55437`](https://github.com/maidsafe/safe_network/commit/0d55437399624692c6e5cfc8363a6a630ed13019))
     - Revert "chore(release): sn_interface-0.17.10/sn_comms-0.3.5/sn_client-0.79.0/sn_node-0.75.0/sn_api-0.77.0/sn_cli-0.70.0" ([`7d41c76`](https://github.com/maidsafe/safe_network/commit/7d41c763221d52e44e0f3faefbbb0a4d4aeca0a2))
     - Merge #2065 #2117 ([`7f4f814`](https://github.com/maidsafe/safe_network/commit/7f4f8144f68ea235e2508699a7e843d0004028e1))
     - Update for qp2p recv stream ownership changes ([`5a29d0d`](https://github.com/maidsafe/safe_network/commit/5a29d0d8ad6853e4bb46bd4c122a8fe80dd2cde2))
@@ -71,6 +109,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.17.9 (2023-02-09)
+
+<csr-id-17ca03749dc6eed8922cde5a7c3ef8a8e5505483/>
 
 ### Chore
 
@@ -359,6 +399,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Merge #2061 ([`bab8208`](https://github.com/maidsafe/safe_network/commit/bab82087260ac4f1f44e688db2e67ca2387a7175))
     - Add clippy check for unused async ([`e706848`](https://github.com/maidsafe/safe_network/commit/e706848522d6c52d6ed5eddf638376996cc947a9))
     - Merge branch 'main' into sap_change_force_dkg_termination ([`7d3665b`](https://github.com/maidsafe/safe_network/commit/7d3665bfe05f61d170229df9f4424c5663b116d5))
+</details>
+
+## v0.19.0 (2023-02-27)
+
+### Chore
+
+ - <csr-id-7b046d3bf9c2de4d7aea170197ba4f3e2392fe89/> sn_interface-0.19.0/sn_comms-0.5.0/sn_client-0.81.0/sn_node-0.77.0/sn_api-0.79.0/sn_cli-0.72.0
+
+### New Features (BREAKING)
+
+ - <csr-id-5f7eb4b93fe506aa46b4c8b3613216086ec670b9/> remove joins allowed voting
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 2 days passed between releases.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Sn_interface-0.19.0/sn_comms-0.5.0/sn_client-0.81.0/sn_node-0.77.0/sn_api-0.79.0/sn_cli-0.72.0 ([`7b046d3`](https://github.com/maidsafe/safe_network/commit/7b046d3bf9c2de4d7aea170197ba4f3e2392fe89))
+    - Remove joins allowed voting ([`5f7eb4b`](https://github.com/maidsafe/safe_network/commit/5f7eb4b93fe506aa46b4c8b3613216086ec670b9))
+</details>
+
+## v0.18.0 (2023-02-24)
+
+### Chore
+
+ - <csr-id-444e4e5969be16129fb87ae42927e183ac41982b/> sn_interface-0.18.0/sn_comms-0.4.0/sn_client-0.80.0/sn_node-0.76.0/sn_api-0.78.0/sn_cli-0.71.0
+
+### Chore (BREAKING)
+
+ - <csr-id-d81aa0f7a16871360e0958109ea72b950d04762a/> sn-client e2e tests on Ubuntu to run with 10secs timeout for cmds/queries
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Sn_interface-0.18.0/sn_comms-0.4.0/sn_client-0.80.0/sn_node-0.76.0/sn_api-0.78.0/sn_cli-0.71.0 ([`444e4e5`](https://github.com/maidsafe/safe_network/commit/444e4e5969be16129fb87ae42927e183ac41982b))
+    - Sn-client e2e tests on Ubuntu to run with 10secs timeout for cmds/queries ([`d81aa0f`](https://github.com/maidsafe/safe_network/commit/d81aa0f7a16871360e0958109ea72b950d04762a))
 </details>
 
 ## v0.17.0 (2023-02-01)
