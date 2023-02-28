@@ -188,11 +188,9 @@ impl MyNode {
         )?;
         let their_prefix = their_sap.prefix();
         let section_tree_update = SectionTreeUpdate::new(their_sap, parent_section_chain);
-        let updated = self.network_knowledge.update_knowledge_if_valid(
-            section_tree_update,
-            None,
-            &self.name(),
-        )?;
+        let updated = self
+            .network_knowledge
+            .update_sap_knowledge_if_valid(section_tree_update, &self.name())?;
         if updated {
             let context = self.context();
             info!("Updated our network knowledge for {:?}", their_prefix);
@@ -231,10 +229,10 @@ impl MyNode {
         let name = old_context.name;
         let updated = self
             .network_knowledge
-            .update_knowledge_if_valid(update, None, &name)?;
+            .update_sap_knowledge_if_valid(update, &name)?;
 
         if updated {
-            let cmds = self.update_on_section_change(&old_context).await;
+            let cmds = self.update_on_sap_change(&old_context).await;
 
             let latest_context = self.context();
             info!("Updated our network knowledge for {:?}", prefix);
