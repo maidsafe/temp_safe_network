@@ -548,6 +548,31 @@ mod core {
             }
         }
 
+        pub(crate) fn remove_dkg_sessions_with_missing_members(&mut self) {
+            let current_section_members: BTreeSet<_> = self
+                .network_knowledge
+                .members()
+                .iter()
+                .map(|m| m.name())
+                .collect();
+            let is_member = |m: &XorName| current_section_members.contains(m);
+            let missing_members_hashes = Vec::from_iter(
+                self.dkg_sessions_info
+                    .iter()
+                    .filter(|(_, info)| info.session_id.elders.keys().all(is_member))
+                    .map(|(hash, _)| *hash),
+            );
+            for hash in missing_members_hashes {
+                if let Some(info) = self.dkg_sessions_info.remove(&hash) {
+                    debug!(
+                        "Removed old DKG s{} containing members that are not in our section anymore.",
+                        info.session_id.sh(),
+                    );
+                }
+                self.dkg_voter.remove(&hash);
+            }
+        }
+
         /// Updates various state if elders SAP changed.
         pub(crate) async fn update_on_sap_change(&mut self, old: &NodeContext) -> Result<Vec<Cmd>> {
             let new = self.context();

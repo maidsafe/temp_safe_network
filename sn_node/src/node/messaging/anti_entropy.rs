@@ -188,6 +188,10 @@ impl MyNode {
                     .network_knowledge
                     .update_section_member_knowledge(members)?;
 
+                if updated_members {
+                    write_locked_node.remove_dkg_sessions_with_missing_members();
+                }
+
                 if updated_knowledge {
                     debug!("net knowledge updated");
                     cmds.extend(
