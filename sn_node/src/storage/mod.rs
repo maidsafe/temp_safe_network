@@ -169,6 +169,7 @@ impl DataStorage {
 
                                 proof_shares.push(spent_proof_share);
                             }
+                            proof_shares.sort_by_key(|s| s.spentbook_sig_share.threshold_crypto().0);
                             proof_shares
                         });
 
