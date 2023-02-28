@@ -5,20 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.77.1 (2023-02-28)
+## v0.77.2 (2023-02-28)
 
-### Refactor
+### Bug Fixes
 
- - <csr-id-9a2f912effa46112c8481dd259c9f203ee775e2e/> remove more unused pub
- - <csr-id-5fcb6700fa26c0825191feb87c8d4a4653e50eef/> fix clippy lints; fmt
- - <csr-id-3fda80a40c508d16fbe097091252a98b01f8f339/> remove unused pub fn/methods
+ - <csr-id-fe2f46bcb60185a2c2fd28c0dcc3befdeb9851c0/> ae updates and affects split into sap and member updates
+   We were only updating members if the SAP changed. We were attempting
+   to terminate DKG runs if members changed.
+   
+   Now those two flows are distinct
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 3 commits contributed to the release.
- - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 1 commit contributed to the release.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -28,12 +30,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Ae updates and affects split into sap and member updates ([`fe2f46b`](https://github.com/maidsafe/safe_network/commit/fe2f46bcb60185a2c2fd28c0dcc3befdeb9851c0))
+</details>
+
+## v0.77.1 (2023-02-28)
+
+<csr-id-9a2f912effa46112c8481dd259c9f203ee775e2e/>
+<csr-id-5fcb6700fa26c0825191feb87c8d4a4653e50eef/>
+<csr-id-3fda80a40c508d16fbe097091252a98b01f8f339/>
+
+### Refactor
+
+ - <csr-id-9a2f912effa46112c8481dd259c9f203ee775e2e/> remove more unused pub
+ - <csr-id-5fcb6700fa26c0825191feb87c8d4a4653e50eef/> fix clippy lints; fmt
+ - <csr-id-3fda80a40c508d16fbe097091252a98b01f8f339/> remove unused pub fn/methods
+
+### Chore
+
+ - <csr-id-558061d5eea7bc1f0feac310afb91ef9ca7c681e/> sn_interface-0.19.1/sn_fault_detection-0.15.5/sn_node-0.77.1/sn_cli-0.72.1
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 4 commits contributed to the release.
+ - 4 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Sn_interface-0.19.1/sn_fault_detection-0.15.5/sn_node-0.77.1/sn_cli-0.72.1 ([`558061d`](https://github.com/maidsafe/safe_network/commit/558061d5eea7bc1f0feac310afb91ef9ca7c681e))
     - Remove more unused pub ([`9a2f912`](https://github.com/maidsafe/safe_network/commit/9a2f912effa46112c8481dd259c9f203ee775e2e))
     - Fix clippy lints; fmt ([`5fcb670`](https://github.com/maidsafe/safe_network/commit/5fcb6700fa26c0825191feb87c8d4a4653e50eef))
     - Remove unused pub fn/methods ([`3fda80a`](https://github.com/maidsafe/safe_network/commit/3fda80a40c508d16fbe097091252a98b01f8f339))
 </details>
 
 ## v0.77.0 (2023-02-27)
+
+<csr-id-7b046d3bf9c2de4d7aea170197ba4f3e2392fe89/>
 
 ### Chore
 
@@ -64,6 +103,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.76.0 (2023-02-24)
+
+<csr-id-444e4e5969be16129fb87ae42927e183ac41982b/>
+<csr-id-d81aa0f7a16871360e0958109ea72b950d04762a/>
 
 ### Chore
 
@@ -112,6 +154,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <csr-id-679591e53ed65fa3f0d78f15b5054cd05085e8d9/>
 <csr-id-82f26428ea07326e82e0a0d88487f34af9582819/>
 <csr-id-c7858f6bc2f780f887b1aea96f5fec63a1a99ace/>
+<csr-id-0d55437399624692c6e5cfc8363a6a630ed13019/>
 
 ### Chore
 
@@ -7535,8 +7578,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-9b8ddfde0287e47b6f18a77a8e8847d80ee84bcd/> provide the SAP proof chain in JoinResponse::Retry msgs
    - Joining node now makes use of the NetworkPrefixMap to validate and
    accept new SAPs using the proof chain provided in JoinResponse::Retry.
-- Expected age of joining node for genesis section is now calculated
-     in a deterministic way using the peer's address.
 
 ### Chore (BREAKING)
 
@@ -8659,8 +8700,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-d6e601a3c18dc2b7f60c297f5c794883952e1d14/> prune parent whenever a child inserted
  - <csr-id-7a1065c46f5d72f6997a504c984a70493e197a5b/> impl throttled message sending
    - adds a new command that given sends messages in a throttled fashion
-- makes use of the new command to throttle replication messages to avoid message explosion
-- also refactors methods for writing data to disk
 
 ### Bug Fixes
 
@@ -8816,12 +8855,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-d8ad6a9b1d6a530b7f597bccf6a6bed6d8546ac0/> populate client sender success counter
  - <csr-id-8955fcf9d69e869725177340d1de6b6b1e7a203b/> read_from client API was incorrectly using provided length value as an end index
    - Minor refactoring in sn_api moving the SafeData struct into its own file.
-- Re-enabling the only two fetch API tests which are now passsing with this fix.
-- discard DKG session info for older sessions
-- skip DkgStart and DkgRetry messages for expired sessions
-- error instead of panicking if logger is already initialized
-- use unique socker addrs for nodes
-- print error returned from proptest
 
 ### Other
 
@@ -9653,7 +9686,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 <csr-unknown>
- add log markers for connection open/closeWe can detect connection open/close easily in the connection listenertasks, since these are started as soon as a connection is opened, andfinish when there are no more incoming connections (e.g. connection hasclosed). the JoinResponse::Retry message now provides the expected age for the joining node batch-up data for replication impl pull model data replication init data replicator module nodes retry link.send_with once blindly clients should retry message sending when Conn errors encountered add basic PeerLink cleanupprior to this client Peer Links were held forever. Now we triggera Cmd to clean them up if they’re not waiting on any other response fromthe network.We do this every X time republish data actively when deviant nodes are detected resolve nrs map container contentThe resolver can now return NrsMapContainer content, which can then be displayed by the CLI withthe cat and dog commands. This functionality was unintentionally broken at some point.The first change introduced an NrsEntry field in SafeData, and modified the NrsMapContainer toremove its resolve_into and public_name fields. The intention is for the resolver to returnNrsMapContainer data when a container XOR-URL is used, but when using an NRS URL, an NrsEntrywill be returned. The NrsMapContainer data will have the NRS map, whereas the NrsEntry will onlycontain the target link and subname version. It’s worth noting, the NrsEntry doesn’t have anXOR-URL because the entries are still stored in the map. An NRS URL still has an NrsMapContainercontent type and that content is retrieved during the resolution process.This brings us to the next change. The nrs_get API was modified to return an Option<SafeUrl>,where None will now be returned if the container XOR-URL is used. In this case, the resolver willknow to return NrsMapContainer data, otherwise, it will return the NrsEntry with the target URL.One exception is worth mentioning: if the NRS URL uses the registered topname and that topnamedoesn’t link to anything, NrsMapContainer data will also be returned. To make these extensions,small unit tests were added to the NrsMap and several tests were added to the resolver to coverthese scenarios.With these changes in place, the CLI could then be updated. The cat and dog commands weremodified to print the NRS map when NrsMapContainer data was returned. Previously, the map wasprinted as a table, but this isn’t really suitable for presentation because the table crate doesn’thave the ability to use multi-line cells and the target links are too large, so I changed it toprint a list. Test cases were added for both commands, which should hopefully prevent us breakingthe feature again.Finally, some usability changes were also made to nrs commands to give the user the XOR-URL of thecontainer. This can be useful to them if they want to list all the entries in a map. add flame arg to use cargo flamegraphuses the launcher option to enable flamegraph generation per node enable cmd retriesPreviously a command error would simply error out and fail.Now we use an exponential backoff to retry incase errorscan be overcome randomize elder contact on cmd.Priously we always took the first 3 from the SAP’s elders vec. This should spreadcommands out over all elders more fairly. counting ACK/Err cmd response together and notify error to upper layer timeout on waiting CmdAcks send CmdAck on client cmd randomize elder contact on cmd.Priously we always took the first 3 from the SAP’s elders vec. This should spreadcommands out over all elders more fairly. retry intial client contact if it failsPreviously we tried to connect to all known nodes, but if we reached the end of the list, we’d keep hitting the same nodes over and over.Now we fail after trying all candidates, and retry with a new xorname to get new candidates (if we know a prefixmap).We also mark the attempted connections as failed, so the client attempts to createfresh new connections instead of using possibly dead connections clients mark closed connections as suchAnd now check that the current connection is valid before trying to use it.Otherwise they reconnect verify blobs QueryResponse from adults and penalise if faulty Add jitter into client query request timingThis should help prevent nodes being hammered over the same period.This PR also increases the default client query time to 500s. locally track query listeners to avoid overwrite/removalPreviously each query for an op_id overwrote the listener.This could lead to odd behaviour for parallel requests in the same client.Now we only remove the listener for our msg_id even if it’s the sameoperation_id impl Ordering for NetworkPrefixMap based on it’s length substract space from used_space on register delete restore NotEnoughSpace checks and reunite reg and chunk storage tracking optimise disk space checks by doing them less often discard JoinResponse messages in dispatcherDispatcher is only created when we have joined the network already. Therefore we can safely ignore JoinResponses there.We now error out of the msg handling flow and so will log this unexpected message at the node. Move command limit to service msgs only.Require a permit or drop a service msg level command. This should hopefully stop mem leak due to waiting to handle messages coming in from clients Add hard limit to concurrent commandsIt may be that nodes can be overwhelmed when too many messages come in.Here there’s a naiive impl to drop commands (and msgs) from being handled when we’re overwhelmed reenable using constants for message priorityand wait on higher priority message completion before spawning newCommand tasksThis reverts commit 6d1cdc64078de06a43281d924f58d01b615e9268. make read and delete async remove unused kv store, cleanup chunk store disk chunk store use upload_and_verify by default in safe_client keeping Chunks wich were retrieved in a local client cache Use Peers to ensure connection reuse on initial contact put all known elders into the contact pool.Previously if we knew a sap, we only took 3 nodes make contact via register getWe previously use a chunk get, but this in itself will cause more network messaging than a simple register get which can be dealt with by elders only use backoff during make contact instead of standard_wait.This should help aleviate any pressure on already struggling nodes, especially if a low wait was set to make tests run faster eg (where ae may not always be needed limit the relocations at one time use Vec of DataCmd instead of wrapper struct upgrade batch to write ahead log with index aggregate joins per section keyPreviously we only did one aggregation. But errors could arise if we had to resend and scrap aggregation.This means we can aggregate any number of churning section keys. expose API for calculate Blob/Spot address without a network connection start a fresh round of joins when aggregation is erroring.Aggregation may error, perhaps due to section churn. If we half or more bad signaturs that would prevent aggregation. We clean the slate and start a fresh round of aggregation and join messaging. avoid broadcasting DKG messages revamp joins/rejoins to follow BRB deduce expected_prefix from expected_age adapt registers to hold vec u8 instead of Url in sn use AE to progress various intra-DKG phasessometimes a DKG session might receive DKG messages from a further phasethat it has not reached yet. eg. it might receive Proposal messageswhile in the Initialization phase. When this happens, the DKG canrespond with a DkgNotReady message to the message source which will senta list of ‘DKG Messages’ that can be applied to an existing DKG processso it can progress to the next phase.note that this does not solve the case where the DKG session has not yetstarted. that will need to be handled separately. they are currentlypushed to the backlog and handled later allow ELDER_COUNT to be overridden by env var SN_ELDER_COUNT retry client queires if elder conns fail verify and use SAP received in AE-Redirect to update client’s network knowledge verify and use SAP received in AE-Redirect to update our network knowledge support --json-logs in testnetThis makes it easier to enable JSON logs for local testnets. allow to change the default interval for testnet nodes add network health check script to easily wait until we’re ready+healthy cache prefix_map for clients add more prioritiy leves for different types of messages stepped fixed age during first section read prefix_map from disk if available use tokio::semaphore for limiting concurrent joins add AE backoff before resending messages to a node backoff during join request looping make subcommand optional, to get stats quickly enable pleasant span viewing for node logs avoid change name by mistake when Join complete the relocation flow order of target length in ElderConn error corrected keep trying even with connection error w/ always-joinable flag aovid overwrite pervious session by  accident multiple fixes for DKG-AE avoid network_knowledge loopup when sending DkgRetry or DkgSessionInfo avoid network_knowledge lookup when sending DKGNotReady or DkgSessionUnknown make has_split.sh detect SplitSuccess correctly reduce backoff time; avoid start DKG shrink elders don’t crash node on failed signature aggregation on join retry joins on section key mismatch.We could sometimes get a key sent from nodes with a newer section_pkthan we were expecting.We should then retry avoid use outdated keyshare status restore ServiceMsg authority checkThe AuthorityProof struct is designed to be a proof of validauthority, by ensuring all possible constructors either generate orvalidate a signature. This can only be guaranteed if the field remainsmodule-private. At some point it seems the field was made pub(crate),which meant we were missing an authority check for some ServiceMsgs, fix node joining age for genesis section Adults refactor join flows to use the new Peer type remove redundant send_node_approval multiples fixes for unit tests send DkgRetry for DkgError::MissingPart as well ensure client chunk count is 3 w/ 7 elders fix a compilation error introduced by merge joining node age to genesis section shall be less than or equal to suggested age use correct dst section key for AE-Update to siblings after split raise SectionSplit event whenever prefix changed during bootstrap, handling the case prefix_map was loaded avoid holding write lock on ae_backoff_cache during sleepThis could inadvertently be slowing down other joins if we’re holding the write lock on the cache while we backoff draining backlog before process DKG message less DKG progression interval; switch SAP on DKGcompletion when OurElder already received fix Eq for SectionPeersThis would have always returned true, since it was comparing withitself… refactor the Join process regarding used_recipients if attempting to send a msg fails, continue with the rest of cmd processing instead of bailing out client config test timeout/keepalive needed updating routing test tweaks make health check tolerante of possible demotions tesnet grep is_log_file check node tests after removing blocking cmd layer fix windows grep lock error: dont search non log files readd keep alive for client update logs during AEUpdate bring back elders len check during chain updates match on name make KvStore::store perform atomic immutable writesKvStore is the database abstraction we use to persist chunks. This isitself backed by sled. sled uses a log as one of the underlyingstorage primitives, which means that all inserts (even overwrites) willconsume additional space (until the log is compacted, which may happenirregularly).However, chunks themselves are write-once which means that we would onlyever need to write a value once. As such, we can use compare_and_swapto write the value only if it’s not currently set. Since chunks arecontent-addressable, we furthermore don’t need to do anything if thevalue did already exist and wasn’t written, since there is only onepossible value for a given key. fix test for GetChunk ‘data not found’ failures typo spot and blob management inconsistency add some comments replace prefixmap check to ensure last proof chainkey is present on provided sap elders update uses correct key for prefixmap updates updated routing untrusted ae test for new error provide valid proof chain to update prefix map during elders agreement handling keep section in sync on ae retry recevial at nodes ae blob tests dont have standard wait use client query in routing tests instead of bytes don’t bail out when handling ElderAgreement if prefix-map is not updated allow to set the genesis key for Core and Section structs of first node prevent deadlock by dropping write locks in relocation enough having enough elders before split attempt build sn_node from inside sn directorySince we moved to a workspace layout, the testnet binary has beenbuilding more than necessary since it runs cargo build from theworkspace root. Additionally, cargo’s feature resolution may behaveunexpectedly when executed from the workspace directory, so rather thanusing -p safe_network we rather run cargo build from the sndirectory. exit with error if sn_node build failsWe would previously ignore the result of trying to build the sn_nodebinary, which would lead to either using the incorrect binary if oneexisted, or a later error because the binary doesn’t exist. fix a possible panic when creating client improve join req handling for elders maintain lexicographical order write to correct source get more splits (at the cost of more join msgs) dont wait before first join request fix elders agreement routing tests using wrong command type missing post rebase async_trait dep only resend if we’ve had an update client config test resolution test except for the blob range tests<csr-unknown/>
+Expected age of joining node for genesis section is now calculatedin a deterministic way using the peer’s address.makes use of the new command to throttle replication messages to avoid message explosionalso refactors methods for writing data to diskRe-enabling the only two fetch API tests which are now passsing with this fix.discard DKG session info for older sessionsskip DkgStart and DkgRetry messages for expired sessionserror instead of panicking if logger is already initializeduse unique socker addrs for nodesprint error returned from proptest<csr-unknown/>
 
 ## v0.58.13 (2022-04-23)
 
