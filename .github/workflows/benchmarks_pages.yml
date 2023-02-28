@@ -15,7 +15,7 @@ permissions:
 env:
   CARGO_INCREMENTAL: '0'
   RUST_BACKTRACE: 1
-  NODE_COUNT: 15
+  NODE_COUNT: 14
 
 jobs:
   benchmark:
