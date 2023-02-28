@@ -355,7 +355,7 @@ impl MyNode {
         if node_state.is_relocated() {
             let peer = *node_state.peer();
             info!("Notify relocation to node {:?}", peer);
-            let msg = NodeMsg::Relocate(node_state);
+            let msg = NodeMsg::CompleteRelocation(node_state);
             Some(Cmd::send_msg(msg, Peers::Single(peer), self.context()))
         } else {
             None
