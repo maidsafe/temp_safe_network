@@ -5,15 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.77.2 (2023-02-28)
+## v0.77.3 (2023-02-28)
 
-### Bug Fixes
+### Chore
 
- - <csr-id-fe2f46bcb60185a2c2fd28c0dcc3befdeb9851c0/> ae updates and affects split into sap and member updates
-   We were only updating members if the SAP changed. We were attempting
-   to terminate DKG runs if members changed.
-   
-   Now those two flows are distinct
+ - <csr-id-5fd068e10cc96396fb800cf6acd92b377f4e21d9/> clarify relocation flow
 
 ### Commit Statistics
 
@@ -30,6 +26,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Clarify relocation flow ([`5fd068e`](https://github.com/maidsafe/safe_network/commit/5fd068e10cc96396fb800cf6acd92b377f4e21d9))
+</details>
+
+## v0.77.2 (2023-02-28)
+
+### Chore
+
+ - <csr-id-80bae9ffa64e274da520e752cab0df79d5cf419e/> sn_interface-0.19.2/sn_node-0.77.2
+
+### Bug Fixes
+
+ - <csr-id-fe2f46bcb60185a2c2fd28c0dcc3befdeb9851c0/> ae updates and affects split into sap and member updates
+   We were only updating members if the SAP changed. We were attempting
+   to terminate DKG runs if members changed.
+   
+   Now those two flows are distinct
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Sn_interface-0.19.2/sn_node-0.77.2 ([`80bae9f`](https://github.com/maidsafe/safe_network/commit/80bae9ffa64e274da520e752cab0df79d5cf419e))
     - Ae updates and affects split into sap and member updates ([`fe2f46b`](https://github.com/maidsafe/safe_network/commit/fe2f46bcb60185a2c2fd28c0dcc3befdeb9851c0))
 </details>
 
@@ -38,6 +67,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <csr-id-9a2f912effa46112c8481dd259c9f203ee775e2e/>
 <csr-id-5fcb6700fa26c0825191feb87c8d4a4653e50eef/>
 <csr-id-3fda80a40c508d16fbe097091252a98b01f8f339/>
+<csr-id-558061d5eea7bc1f0feac310afb91ef9ca7c681e/>
 
 ### Refactor
 
@@ -9684,9 +9714,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Update actions workflows for workspace refactor ([`d0134e8`](https://github.com/maidsafe/safe_network/commit/d0134e870bb097e095e1c8a33e607cf7994e6491))
     - Move safe_network code into sn directory ([`2254329`](https://github.com/maidsafe/safe_network/commit/225432908839359800d301d9e5aa8274e4652ee1))
 </details>
-
-<csr-unknown>
-Expected age of joining node for genesis section is now calculatedin a deterministic way using the peer’s address.makes use of the new command to throttle replication messages to avoid message explosionalso refactors methods for writing data to diskRe-enabling the only two fetch API tests which are now passsing with this fix.discard DKG session info for older sessionsskip DkgStart and DkgRetry messages for expired sessionserror instead of panicking if logger is already initializeduse unique socker addrs for nodesprint error returned from proptest<csr-unknown/>
 
 ## v0.58.13 (2022-04-23)
 
