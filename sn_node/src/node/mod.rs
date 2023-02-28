@@ -540,11 +540,8 @@ mod core {
             }
         }
 
-        /// Updates various state if elders changed.
-        pub(crate) async fn update_on_section_change(
-            &mut self,
-            old: &NodeContext,
-        ) -> Result<Vec<Cmd>> {
+        /// Updates various state if elders SAP changed.
+        pub(crate) async fn update_on_sap_change(&mut self, old: &NodeContext) -> Result<Vec<Cmd>> {
             let new = self.context();
             let new_section_key = new.network_knowledge.section_key();
             let new_prefix = new.network_knowledge.prefix();
