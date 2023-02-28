@@ -160,46 +160,34 @@ impl MyNode {
 
         // block off the write lock
         let updated = {
-            let should_update_knowledge = {
-                starting_context
-                    .clone()
-                    .network_knowledge
-                    .update_sap_knowledge_if_valid(
-                        section_tree_update.clone(),
-                        &starting_context.name,
-                    )?
-            };
+            let should_update = starting_context
+                .clone()
+                .network_knowledge
+                .update_knowledge_if_valid(
+                    section_tree_update.clone(),
+                    members.clone(),
+                    &starting_context.name,
+                )?;
 
-            let should_update_members = {
-                starting_context
-                    .clone()
-                    .network_knowledge
-                    .update_section_member_knowledge(members.clone())?
-            };
-
-            if should_update_knowledge || should_update_members {
+            if should_update {
                 let mut write_locked_node = node.write().await;
                 trace!("[NODE WRITE]: handling AE write gottt...");
-                let updated_knowledge = write_locked_node
+                let updated = write_locked_node
                     .network_knowledge
-                    .update_sap_knowledge_if_valid(section_tree_update, &starting_context.name)?;
-
-                let updated_members = write_locked_node
-                    .network_knowledge
-                    .update_section_member_knowledge(members)?;
-
-                if updated_knowledge {
-                    debug!("net knowledge updated");
-                    cmds.extend(
-                        write_locked_node
-                            .update_on_sap_change(&starting_context)
-                            .await?,
-                    );
-
-                    trace!("updated for section change");
-                }
-
-                updated_knowledge || updated_members
+                    .update_knowledge_if_valid(
+                        section_tree_update,
+                        members,
+                        &starting_context.name,
+                    )?;
+                debug!("net knowledge updated");
+                // always run this, only changes will trigger events
+                cmds.extend(
+                    write_locked_node
+                        .update_on_section_change(&starting_context)
+                        .await?,
+                );
+                trace!("updated for section change");
+                updated
             } else {
                 false
             }
@@ -541,9 +529,11 @@ mod tests {
         // now let's insert the other SAP to make it aware of the other prefix
         let section_tree_update =
             SectionTreeUpdate::new(other_sap.clone(), other_section.section_chain());
-        assert!(node
-            .network_knowledge
-            .update_sap_knowledge_if_valid(section_tree_update, &context.name,)?);
+        assert!(node.network_knowledge.update_knowledge_if_valid(
+            section_tree_update,
+            None,
+            &context.name,
+        )?);
 
         let new_context = node.context();
         // and it now shall give us an AE redirect msg

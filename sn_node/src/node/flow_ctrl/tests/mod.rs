@@ -614,7 +614,7 @@ async fn handle_elders_update() -> Result<()> {
         // Merging the section contained in the message with the original section succeeds.
         assert!(section0
             .clone()
-            .update_sap_knowledge_if_valid(section_tree_update, &info.name())
+            .update_knowledge_if_valid(section_tree_update, None, &info.name())
             .is_ok());
 
         update_actual_recipients.extend(recipients);

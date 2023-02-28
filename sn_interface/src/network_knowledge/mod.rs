@@ -234,9 +234,10 @@ impl NetworkKnowledge {
     }
 
     /// Update our network knowledge with the provided `SectionTreeUpdate`
-    pub fn update_sap_knowledge_if_valid(
+    pub fn update_knowledge_if_valid(
         &mut self,
         section_tree_update: SectionTreeUpdate,
+        updated_members: Option<SectionPeersMsg>,
         our_name: &XorName,
     ) -> Result<bool> {
         trace!("Attempting to update network knoweldge");
@@ -282,17 +283,6 @@ impl NetworkKnowledge {
                 return Err(err);
             }
         }
-
-        Ok(there_was_an_update)
-    }
-
-    /// Update our network knowledge with the provided `SectionTreeUpdate`
-    pub fn update_section_member_knowledge(
-        &mut self,
-        updated_members: Option<SectionPeersMsg>,
-    ) -> Result<bool> {
-        trace!("Attempting to update section member's knowledge");
-        let mut there_was_an_update = false;
 
         // Update members if changes were provided
         if let Some(members) = updated_members {
@@ -636,8 +626,11 @@ mod tests {
         let proof_chain = knowledge.section_chain();
         let section_tree_update =
             TestSectionTree::get_section_tree_update(&sap1, &proof_chain, &sk_gen.secret_key());
-        assert!(knowledge
-            .update_sap_knowledge_if_valid(section_tree_update, &our_node_name_prefix_1)?);
+        assert!(knowledge.update_knowledge_if_valid(
+            section_tree_update,
+            None,
+            &our_node_name_prefix_1
+        )?);
         assert_eq!(knowledge.signed_sap, sap1);
 
         // section with different prefix (0) and our node name doesn't match
@@ -646,8 +639,11 @@ mod tests {
         let section_tree_update =
             TestSectionTree::get_section_tree_update(&sap0, &proof_chain, &sk_gen.secret_key());
         // our node is still in prefix1
-        assert!(knowledge
-            .update_sap_knowledge_if_valid(section_tree_update, &our_node_name_prefix_1)?);
+        assert!(knowledge.update_knowledge_if_valid(
+            section_tree_update,
+            None,
+            &our_node_name_prefix_1
+        )?);
         // sap should not be updated
         assert_eq!(knowledge.signed_sap, sap1);
 

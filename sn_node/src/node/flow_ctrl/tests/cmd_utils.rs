@@ -167,7 +167,7 @@ impl<'a> ProcessAndInspectCmds<'a> {
     }
 
     pub(crate) async fn next(&mut self) -> crate::node::error::Result<Option<&Cmd>> {
-        let mut next_index = self.index_inspected.wrapping_add(1);
+        let mut next_index = self.index_inspected + 1;
         if next_index < self.pending_cmds.len() {
             let cmd = self.pending_cmds.get(next_index);
             assert!(cmd.is_some());

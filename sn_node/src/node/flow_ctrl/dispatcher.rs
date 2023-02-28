@@ -189,8 +189,9 @@ impl Dispatcher {
                     let mut node = node.write().await;
                     let name = node.name();
                     trace!("[NODE WRITE]: update client write got");
-                    node.network_knowledge.update_sap_knowledge_if_valid(
+                    node.network_knowledge.update_knowledge_if_valid(
                         SectionTreeUpdate::new(signed_sap, proof_chain),
+                        None,
                         &name,
                     )?
                 };

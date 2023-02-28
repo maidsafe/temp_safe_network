@@ -133,11 +133,11 @@ impl MyNode {
                         to update the node network knowledge before processing the spend."
                     );
                     let name = context.name;
-                    let there_was_an_update =
-                        context.network_knowledge.update_sap_knowledge_if_valid(
-                            SectionTreeUpdate::new(signed_sap.clone(), proof_chain.clone()),
-                            &name,
-                        )?;
+                    let there_was_an_update = context.network_knowledge.update_knowledge_if_valid(
+                        SectionTreeUpdate::new(signed_sap.clone(), proof_chain.clone()),
+                        None,
+                        &name,
+                    )?;
 
                     if there_was_an_update {
                         // To avoid a loop, recompose the message without the updated proof_chain.

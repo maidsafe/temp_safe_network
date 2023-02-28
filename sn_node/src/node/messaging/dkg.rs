@@ -821,7 +821,7 @@ impl MyNode {
         // it to sign any msg that needs section agreement.
         self.section_keys_provider.insert(key_share.clone());
 
-        let mut cmds = self.update_on_sap_change(&self.context()).await?;
+        let mut cmds = self.update_on_section_change(&self.context()).await?;
 
         if !self.network_knowledge.has_chain_key(&sap.section_key()) {
             // This request is sent to the current set of elders to be aggregated
