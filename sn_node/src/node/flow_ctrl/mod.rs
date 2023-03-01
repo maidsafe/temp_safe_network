@@ -228,7 +228,8 @@ impl FlowCtrl {
     }
 
     /// This is a never ending loop as long as the node is live.
-    /// This loop drives the periodic events internal to the node.
+    /// This loop processes cmds pushed via the CmdChannel and
+    /// runs the periodic events internal to the node.
     async fn process_cmds_and_periodic_checks(
         mut self,
         mut node: MyNode,
