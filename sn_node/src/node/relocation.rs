@@ -41,24 +41,24 @@ pub(super) fn find_nodes_to_relocate(
     // Find the peers that pass the relocation check and take only the oldest ones to avoid
     // relocating too many nodes at the same time.
     // Capped by criteria that cannot relocate too many node at once.
-    let section_size = network_knowledge.section_members().len();
+    let section_members = network_knowledge.section_members();
+    let section_size = section_members.len();
+    let recommended_section_size = recommended_section_size();
     info!(
-        "Finding relocation candidates, having {:?} members, recommended section_size {:?}",
-        section_size,
-        recommended_section_size(),
+        "Finding relocation candidates, having {section_size} members, \
+        recommended section_size {recommended_section_size}"
     );
 
     // no relocation if total section size is too small
-    if section_size < recommended_section_size() {
+    if section_size <= recommended_section_size {
         return vec![];
     }
 
     let max_reloctions = elder_count() / 2;
-    let allowed_relocations = min(section_size - recommended_section_size(), max_reloctions);
+    let allowed_relocations = min(section_size - recommended_section_size, max_reloctions);
 
     // Find the peers that pass the relocation check
-    let mut candidates: Vec<_> = network_knowledge
-        .section_members()
+    let mut candidates: Vec<_> = section_members
         .into_iter()
         .filter(|state| network_knowledge.is_adult(&state.name()))
         .filter(|info| check(info.age(), churn_id))
