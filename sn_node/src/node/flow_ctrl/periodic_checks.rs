@@ -80,8 +80,7 @@ impl FlowCtrl {
         let mut cmds = vec![];
 
         cmds.extend(self.enqueue_cmds_for_node_periodic_checks(&context, node));
-        if !context.is_elder {
-        } else {
+        if context.is_elder {
             cmds.extend(
                 self.enqueue_cmds_for_elder_periodic_checks(&context, node)
                     .await,

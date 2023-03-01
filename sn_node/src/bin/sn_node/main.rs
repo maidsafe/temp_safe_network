@@ -28,7 +28,7 @@
     clippy::unwrap_used
 )]
 
-use sn_node::node::{start_new_node, Config, Error as NodeError, RejoinReason};
+use sn_node::node::{new_node, Config, Error as NodeError, RejoinReason};
 use sn_updater::{update_binary, UpdateType};
 
 use clap::{CommandFactory, Parser};
@@ -149,7 +149,7 @@ fn create_runtime_and_node(config: &Config) -> Result<()> {
 
         let outcome = rt.block_on(async {
             info!("Initial node config: {config:?}");
-            Ok::<_, ErrReport>(start_new_node(config, join_timeout).await)
+            Ok::<_, ErrReport>(new_node(config, join_timeout).await)
         })?;
 
         match outcome {
