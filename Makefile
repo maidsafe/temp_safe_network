@@ -16,7 +16,8 @@ gha-build-x86_64-unknown-linux-musl:
 	sudo apt update -y && sudo apt install -y musl-tools
 	rustup target add x86_64-unknown-linux-musl
 	cargo build --release --target x86_64-unknown-linux-musl --bin sn_node --features otlp
-	cargo build --release --target x86_64-unknown-linux-musl --features limit-client-upload-size --bin safe
+	cargo build --release --target x86_64-unknown-linux-musl --bin safe \
+		--features limit-client-upload-size,data-network
 	find target/x86_64-unknown-linux-musl/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
 	rm -f artifacts/.cargo-lock
 
@@ -34,7 +35,8 @@ arm-unknown-linux-musleabi:
 	mkdir artifacts
 	cargo install cross
 	cross build --release --target arm-unknown-linux-musleabi --bin sn_node --features otlp
-	cross build --release --target arm-unknown-linux-musleabi --features limit-client-upload-size --bin safe
+	cross build --release --target arm-unknown-linux-musleabi --bin safe \
+		--features limit-client-upload-size,data-network
 	find target/arm-unknown-linux-musleabi/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
 
 .ONESHELL:
@@ -47,7 +49,8 @@ armv7-unknown-linux-musleabihf:
 	mkdir artifacts
 	cargo install cross
 	cross build --release --target armv7-unknown-linux-musleabihf --bin sn_node --features otlp
-	cross build --release --target armv7-unknown-linux-musleabihf --features limit-client-upload-size --bin safe
+	cross build --release --target armv7-unknown-linux-musleabihf --bin safe \
+		--features limit-client-upload-size,data-network
 	find target/armv7-unknown-linux-musleabihf/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
 
 .ONESHELL:
@@ -60,14 +63,15 @@ aarch64-unknown-linux-musl:
 	mkdir artifacts
 	cargo install cross
 	cross build --release --target aarch64-unknown-linux-musl --bin sn_node --features otlp
-	cross build --release --target aarch64-unknown-linux-musl --features limit-client-upload-size --bin safe
+	cross build --release --target aarch64-unknown-linux-musl --bin safe \
+		--features limit-client-upload-size,data-network
 	find target/aarch64-unknown-linux-musl/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
 
 release-build:
 	rm -rf artifacts
 	mkdir artifacts
 	cargo build --release --bin sn_node --features otlp
-	cargo build --release --features limit-client-upload-size --bin safe
+	cargo build --release --bin safe --features limit-client-upload-size,data-network
 	find target/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
 
 .ONESHELL:
