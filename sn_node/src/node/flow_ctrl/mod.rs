@@ -154,8 +154,8 @@ impl FlowCtrl {
         (cmd_sender_channel, rejoin_network_rx)
     }
 
-    /// This is a never ending loop as long as the node is live.
-    /// This loop drives the periodic events internal to the node.
+    /// This runs the join process until we detect we are a network node
+    /// At that point it returns our MyNode instance for further use.
     async fn join_processing(
         &self,
         mut node: MyNode,
