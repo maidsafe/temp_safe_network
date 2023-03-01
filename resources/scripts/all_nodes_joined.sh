@@ -16,8 +16,8 @@ echo
 echo "Checking nodes log files to verify all nodes have joined. Logs path: $log_dir"
 
 # -u needed here to search log dirs
-nodes=$(rg ".*connection info:.*" "$log_dir" -g "*.log*" -u | rg "(sn-node-.*).sn_node.log.*(.{6}\(\d{8}\)).*(127.0.0.1:\d{5})" -or '$2->$3 $1' --sort path)
-nodes_ips=$(rg "connection info:.*" "$log_dir" -g "*.log*" -u | rg "(.{6}\(\d{8}\)).*(127.0.0.1:\d{5})" -or '$1->$2' | sort)
+nodes=$(rg ".*connection info:.*" "$log_dir" -g "*.log*" -u | rg "(sn-node-.*).sn_node\.log.*(.{6}\(\d{8}\)).*(127\.0\.0\.1:\d{5})" -or '$2->$3 $1' --sort path)
+nodes_ips=$(rg "connection info:.*" "$log_dir" -g "*.log*" -u | rg "(.{6}\(\d{8}\)).*(127\.0\.0\.1:\d{5})" -or '$1->$2' | sort)
 nodes_ips_count=$(echo "$nodes_ips" | wc -l)
 
 echo
@@ -35,7 +35,7 @@ fi
 
 # We'll use the logs from the nodes that joined, to obtain the
 # list of members in the network knowledge they share with AE messages.
-members=$(rg ".* msg: AntiEntropy\(AntiEntropy \{.* kind: Update \{ members: \{(.*)\} \}\)" -or '$1' "$log_dir" -g "*.log*" | rg "(?:NodeState\((.{6}\(\d{8}\)).., (127.0.0.1:\d{5}), Joined)+" -or '$1->$2' | sort -u)
+members=$(rg ".* msg: AntiEntropy\(AntiEntropy \{.* kind: Update \{ members: \{(.*)\} \}\)" -or '$1' "$log_dir" -g "*.log*" | rg "(?:NodeState\((.{6}\(\d{8}\)).., (127\.0\.0\.1:\d{5}), Joined)+" -or '$1->$2' | sort -u)
 members_count=$(echo "$members" | wc -l)
 
 echo
