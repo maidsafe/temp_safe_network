@@ -17,7 +17,8 @@ on:
 
 env:
   CARGO_INCREMENTAL: 0 # bookkeeping for incremental builds has overhead, not useful in CI.
-  NODE_COUNT: 14
+  NODE_COUNT: 35
+  SN_ALLOW_RELOCATION: 0
 
 jobs:
 

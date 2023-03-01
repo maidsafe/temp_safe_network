@@ -19,6 +19,9 @@ use std::{
 };
 use xor_name::XorName;
 
+/// Should be 0 to disabled relocation or 1 to enable.
+/// Defaults to enabled
+const SN_ALLOW_RELOCATION_STRING: &str = "SN_ALLOW_RELOCATION";
 // Unique identifier for a churn event, which is used to select nodes to relocate.
 pub(crate) struct ChurnId(pub(crate) [u8; bls::SIG_SIZE]);
 
@@ -38,6 +41,34 @@ pub(super) fn find_nodes_to_relocate(
     churn_id: &ChurnId,
     excluded: BTreeSet<XorName>,
 ) -> Vec<(NodeState, XorName)> {
+    // if we have an env var for this, lets override
+    let relocations_enabled = match std::env::var(SN_ALLOW_RELOCATION_STRING) {
+        Ok(enabled) => match enabled.parse() {
+            Ok(enabled) => {
+                warn!(
+                    "ALLOW_RELOCATION set from env var {SN_ALLOW_RELOCATION_STRING}: {:?}",
+                    enabled
+                );
+                enabled
+            }
+            Err(error) => {
+                warn!("There was an error parsing {SN_ALLOW_RELOCATION_STRING} env var. Relocations are enabled {:?}", error);
+                true
+            }
+        },
+        Err(error) => {
+            warn!("There was an error reading the {SN_ALLOW_RELOCATION_STRING} env var. Relocations are enabled {:?}", error);
+            true
+        }
+    };
+
+    if !relocations_enabled {
+        debug!(
+            "Relocations are not enabled as the {SN_ALLOW_RELOCATION_STRING} env var has been set"
+        );
+        return vec![];
+    }
+
     // Find the peers that pass the relocation check and take only the oldest ones to avoid
     // relocating too many nodes at the same time.
     // Capped by criteria that cannot relocate too many node at once.
