@@ -44,36 +44,6 @@ impl Spentbook {
         }
     }
 
-    pub(crate) async fn get(&self, addr: &SpendAddress) -> Result<Spend> {
-        let file_path = self.addr_to_filepath(addr)?;
-        match fs::read(file_path).await {
-            Ok(bytes) => {
-                let spend: Spend = deserialize(&bytes)?;
-                if spend.dst_address() == *addr {
-                    trace!(
-                        "Got spend {:?} from disk.. tx hash is {:?}",
-                        spend.id(),
-                        spend.proof().content.transaction_hash
-                    );
-                    Ok(spend)
-                } else {
-                    warn!(
-                        "Unexpected address of spend: {:?}. Should be {addr:?}.",
-                        spend.dst_address()
-                    );
-                    // This can happen if the content read is empty, or incomplete,
-                    // possibly due to an issue with the OS synchronising to disk,
-                    // resulting in a mismatch with recreated address of the Chunk.
-                    Err(Error::SpendNotFound(*addr.name()))
-                }
-            }
-            Err(io_error @ io::Error { .. }) if io_error.kind() == ErrorKind::NotFound => {
-                Err(Error::SpendNotFound(*addr.name()))
-            }
-            Err(other) => Err(other.into()),
-        }
-    }
-
     /// Stores a share at an individual location for that share.
     pub(crate) async fn store(&self, spend: &SpendShare) -> Result<StorageLevel> {
         let id = spend.dbc_id_xorname();
@@ -183,6 +153,36 @@ impl Spentbook {
         Ok(())
     }
 
+    pub(crate) async fn get(&self, addr: &SpendAddress) -> Result<Spend> {
+        let file_path = self.addr_to_filepath(addr)?;
+        match fs::read(file_path).await {
+            Ok(bytes) => {
+                let spend: Spend = deserialize(&bytes)?;
+                if spend.dst_address() == *addr {
+                    trace!(
+                        "Got spend {:?} from disk.. tx hash is {:?}",
+                        spend.id(),
+                        spend.proof().content.transaction_hash
+                    );
+                    Ok(spend)
+                } else {
+                    warn!(
+                        "Unexpected address of spend: {:?}. Should be {addr:?}.",
+                        spend.dst_address()
+                    );
+                    // This can happen if the content read is empty, or incomplete,
+                    // possibly due to an issue with the OS synchronising to disk,
+                    // resulting in a mismatch with recreated address of the spend.
+                    Err(Error::SpendNotFound(*addr.name()))
+                }
+            }
+            Err(io_error @ io::Error { .. }) if io_error.kind() == ErrorKind::NotFound => {
+                Err(Error::SpendNotFound(*addr.name()))
+            }
+            Err(other) => Err(other.into()),
+        }
+    }
+
     // returns a spend if enough shares exist
     fn get_spend(&self, id: &XorName) -> Option<Spend> {
         self.pending_spends
@@ -190,7 +190,7 @@ impl Spentbook {
             .map(|r| r.value().clone())
             .and_then(|share_map| {
                 let (key, tx_hash) = share_map.values().last().map(|s| {
-                    let content = s.proof_share().content.clone();
+                    let content = &s.proof_share().content;
                     (content.public_key, content.transaction_hash)
                 })?;
                 let shares = share_map
