@@ -5,11 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.77.5 (2023-03-01)
+## v0.77.6 (2023-03-01)
 
 ### Chore
 
- - <csr-id-45016b3732bd9cf3a8bca2522c640265eed7b54b/> avoid unnecessary relocation candidates look up
+ - <csr-id-839a821faed652875671e633bef53bef37a16f12/> clarify spend flow
 
 ### Commit Statistics
 
@@ -26,12 +26,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Clarify spend flow ([`839a821`](https://github.com/maidsafe/safe_network/commit/839a821faed652875671e633bef53bef37a16f12))
+</details>
+
+## v0.77.5 (2023-03-01)
+
+<csr-id-45016b3732bd9cf3a8bca2522c640265eed7b54b/>
+
+### Chore
+
+ - <csr-id-45016b3732bd9cf3a8bca2522c640265eed7b54b/> avoid unnecessary relocation candidates look up
+
+### Chore
+
+ - <csr-id-6e1173bb84e83dcb5990b0340ccbb0ce05033a9b/> sn_node-0.77.5
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Sn_node-0.77.5 ([`6e1173b`](https://github.com/maidsafe/safe_network/commit/6e1173bb84e83dcb5990b0340ccbb0ce05033a9b))
     - Avoid unnecessary relocation candidates look up ([`45016b3`](https://github.com/maidsafe/safe_network/commit/45016b3732bd9cf3a8bca2522c640265eed7b54b))
 </details>
 
 ## v0.77.4 (2023-03-01)
 
 <csr-id-652af5fbe3468b82c26be9a2f88a7c824c6c0032/>
+<csr-id-f195979b7a13a710d1c217aae4a0a361476dec3e/>
 
 ### Chore
 
