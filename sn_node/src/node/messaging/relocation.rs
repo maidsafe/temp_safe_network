@@ -231,7 +231,8 @@ mod tests {
         },
         network_knowledge::{recommended_section_size, MyNodeInfo, NodeState, MIN_ADULT_AGE},
         test_utils::{
-            gen_node_id_in_prefix, prefix, try_create_relocation_trigger, TestKeys, TestSapBuilder,
+            gen_node_id_in_prefix, prefix, section_decision, try_create_relocation_trigger,
+            TestKeys, TestSapBuilder,
         },
     };
 
@@ -280,7 +281,7 @@ mod tests {
 
         let relocated_node = gen_node_id_in_prefix(MIN_ADULT_AGE - 1, prefix);
         let node_state = NodeState::joined(relocated_node, None);
-        let node_state = TestKeys::get_decision(&sk_set, 1, node_state)?;
+        let node_state = section_decision(&sk_set, 1, node_state)?;
         assert!(section.try_update_member(node_state)?);
         // update our node with the new network_knowledge
         node.network_knowledge = section.clone();

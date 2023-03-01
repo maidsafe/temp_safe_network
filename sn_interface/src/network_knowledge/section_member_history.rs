@@ -208,7 +208,9 @@ mod tests {
     use super::{SectionMemberHistory, SectionsDAG};
     use crate::{
         network_knowledge::{MembershipState, NodeState},
-        test_utils::{assert_lists, create_relocation_trigger, gen_addr, TestKeys},
+        test_utils::{
+            assert_lists, create_relocation_trigger, gen_addr, section_decision, TestKeys,
+        },
         types::NodeId,
     };
     use eyre::Result;
@@ -341,13 +343,13 @@ mod tests {
             .first_key_value()
             .unwrap_or_else(|| panic!("Proposal of Decision is empty"));
 
-        let _node_left_joins = TestKeys::get_decision(
+        let _node_left_joins = section_decision(
             &sk_set,
             3,
             NodeState::joined(*node_left_state.node_id(), None),
         );
 
-        let _node_relocated_joins = TestKeys::get_decision(
+        let _node_relocated_joins = section_decision(
             &sk_set,
             4,
             NodeState::joined(*node_relocated_state.node_id(), None),
@@ -392,9 +394,9 @@ mod tests {
             .unwrap_or_else(|| panic!("Proposal of Decision is empty"));
 
         let node_1 = NodeState::left(*node_state_1.node_id(), Some(node_state_1.name()));
-        let node_1 = TestKeys::get_decision(&sk_set, 3, node_1)?;
+        let node_1 = section_decision(&sk_set, 3, node_1)?;
         let node_2 = NodeState::left(*node_state_2.node_id(), Some(node_state_2.name()));
-        let node_2 = TestKeys::get_decision(&sk_set, 4, node_2)?;
+        let node_2 = section_decision(&sk_set, 4, node_2)?;
         assert!(section_members.update(node_1.clone())?);
         assert!(section_members.update(node_2.clone())?);
 
@@ -425,7 +427,7 @@ mod tests {
                     NodeState::relocated(node_id, None, trigger.clone())
                 }
             };
-            decisions.push(TestKeys::get_decision(secret_key_set, gen, node_state)?);
+            decisions.push(section_decision(secret_key_set, gen, node_state)?);
         }
         Ok(decisions)
     }
