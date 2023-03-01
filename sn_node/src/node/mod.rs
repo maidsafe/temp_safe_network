@@ -30,7 +30,7 @@ pub use self::{
     cfg::config_handler::Config,
     error::{Error, Result},
     flow_ctrl::RejoinReason,
-    node_starter::start_new_node,
+    node_starter::new_node,
 };
 use self::{core::MyNode, flow_ctrl::cmds::Cmd};
 pub use crate::storage::DataStorage;

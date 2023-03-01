@@ -51,17 +51,7 @@ pub(crate) struct NodeRef {
 }
 
 /// Start a new node.
-pub async fn start_new_node(
-    config: &Config,
-    join_retry_timeout: Duration,
-) -> Result<(CmdChannel, mpsc::Receiver<RejoinReason>)> {
-    let (cmd_channel, rejoin_network_rx) = new_node(config, join_retry_timeout).await?;
-
-    Ok((cmd_channel, rejoin_network_rx))
-}
-
-// Private helper to create a new node using the given config and bootstraps it to the network.
-async fn new_node(
+pub async fn new_node(
     config: &Config,
     join_retry_timeout: Duration,
 ) -> Result<(CmdChannel, mpsc::Receiver<RejoinReason>)> {
@@ -82,13 +72,13 @@ async fn new_node(
     let used_space = UsedSpace::new(config.min_capacity(), config.max_capacity());
 
     let (cmd_channel, rejoin_network_rx) =
-        bootstrap_node(config, used_space, root_dir, join_retry_timeout).await?;
+        start_node(config, used_space, root_dir, join_retry_timeout).await?;
 
     Ok((cmd_channel, rejoin_network_rx))
 }
 
 // Private helper to create a new node using the given config and bootstraps it to the network.
-async fn bootstrap_node(
+async fn start_node(
     config: &Config,
     used_space: UsedSpace,
     root_storage_dir: &Path,
@@ -108,7 +98,7 @@ async fn bootstrap_node(
         )
         .await?
     } else {
-        start_node(
+        start_normal_node(
             config,
             comm,
             used_space,
@@ -207,7 +197,7 @@ async fn start_genesis_node(
 }
 
 #[allow(clippy::too_many_arguments)]
-async fn start_node(
+async fn start_normal_node(
     config: &Config,
     comm: Comm,
     used_space: UsedSpace,
