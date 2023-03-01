@@ -288,8 +288,8 @@ mod tests {
             .map(|node| {
                 let prefix = node.network_knowledge().prefix();
                 let name = node.name();
-                let dispatcher = Arc::new(RwLock::new(TestNode::new(node, msg_tracker.clone())));
-                ((prefix, name), dispatcher)
+                let test_node = Arc::new(RwLock::new(TestNode::new(node, msg_tracker.clone())));
+                ((prefix, name), test_node)
             })
             .collect::<BTreeMap<(Prefix, XorName), Arc<RwLock<TestNode>>>>();
         let mut comm_receivers = BTreeMap::new();
@@ -418,17 +418,17 @@ mod tests {
         let relocation_node_old_name = env.get_peers(prefix0, 0, 1, None).remove(0).name();
 
         // Only the elders in prefix0 should propose the SectionStateVote
-        for dispatcher in node_instances
+        for test_node in node_instances
             .iter()
-            .filter_map(|((pre, name), dispatcher)| {
+            .filter_map(|((pre, name), test_node)| {
                 if name != &relocation_node_old_name && pre == &prefix0 {
-                    Some(dispatcher)
+                    Some(test_node)
                 } else {
                     None
                 }
             })
         {
-            initialize_relocation(dispatcher.clone(), relocation_node_old_name, prefix1).await?;
+            initialize_relocation(test_node.clone(), relocation_node_old_name, prefix1).await?;
         }
 
         relocation_loop(
@@ -447,9 +447,9 @@ mod tests {
             .await
             .node
             .name();
-        for ((pref, node_name), dispatcher) in node_instances.iter() {
-            let network_knowledge = dispatcher.read().await.node.network_knowledge().clone();
-            // the dispatcher for the relocation_node is still under the old name
+        for ((pref, node_name), test_node) in node_instances.iter() {
+            let network_knowledge = test_node.read().await.node.network_knowledge().clone();
+            // the test_node for the relocation_node is still under the old name
             if node_name == &relocation_node_old_name {
                 // the relocation node should be part of prefix1
                 assert_eq!(network_knowledge.prefix(), prefix1);
@@ -571,12 +571,12 @@ mod tests {
                             // The relocating node waits for the elders to allow it to join the
                             // section. It happens through a bidi stream and hence spawn it as a
                             // separate task.
-                            let dis = test_node.clone();
+                            let test_node = test_node.clone();
                             join_handle_for_relocating_node = Some((
                                 name,
-                                tokio::spawn(
-                                    async move { dis.write().await.process_cmd(cmd).await },
-                                ),
+                                tokio::spawn(async move {
+                                    test_node.write().await.process_cmd(cmd).await
+                                }),
                             ));
                         } else if let Cmd::HandleNodeOffAgreement { .. } = &cmd {
                             let mut send_cmd = node.process_cmd(cmd).await?;

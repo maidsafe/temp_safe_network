@@ -44,10 +44,8 @@ pub(crate) async fn handle_online_cmd(
     let node_state = NodeState::joined(*peer, None);
     let membership_decision = section_decision(sk_set, node_state);
 
-    let mut all_cmds = ProcessAndInspectCmds::new(
-        Cmd::HandleMembershipDecision(membership_decision),
-        // node,
-    );
+    let mut all_cmds =
+        ProcessAndInspectCmds::new(Cmd::HandleMembershipDecision(membership_decision));
 
     let mut approval_sent = JoinApprovalSent(false);
 
@@ -153,7 +151,6 @@ impl ProcessAndInspectCmds {
             })) => {
                 let cmds = MyNode::handle_msg(node, peer, wire_msg, Some(send_stream)).await?;
                 Ok(Self::from(cmds))
-                // Ok(Self::from(cmds, node.clone()))
             }
             _ => Err(crate::node::error::Error::NoClientResponseStream),
         }

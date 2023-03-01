@@ -13,6 +13,7 @@ use crate::{
     storage::{Error as StorageError, StorageLevel},
 };
 
+use qp2p::{SendStream, UsrMsgBytes};
 use sn_fault_detection::IssueType;
 use sn_interface::{
     messaging::{
@@ -23,10 +24,7 @@ use sn_interface::{
     network_knowledge::{MembershipState, NetworkKnowledge},
     types::{log_markers::LogMarker, Keypair, Peer, PublicKey, ReplicatedData},
 };
-
-use qp2p::{SendStream, UsrMsgBytes};
 use std::collections::BTreeSet;
-
 use xor_name::XorName;
 
 impl MyNode {

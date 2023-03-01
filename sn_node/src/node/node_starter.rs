@@ -64,11 +64,7 @@ pub async fn start_new_node(
 async fn new_node(
     config: &Config,
     join_retry_timeout: Duration,
-) -> Result<(
-    // MyNode,
-    CmdChannel,
-    mpsc::Receiver<RejoinReason>,
-)> {
+) -> Result<(CmdChannel, mpsc::Receiver<RejoinReason>)> {
     let root_dir_buf = config.root_dir()?;
     let root_dir = root_dir_buf.as_path();
     fs::create_dir_all(root_dir).await?;
