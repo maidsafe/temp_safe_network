@@ -26,7 +26,7 @@ use sn_interface::{
         fees::{FeeCiphers, RequiredFee},
         log_markers::LogMarker,
         register::User,
-        ClientId, ReplicatedData,
+        ClientId, ReplicatedData, SpendShare,
     },
 };
 
@@ -184,7 +184,7 @@ impl MyNode {
                 }
 
                 // First we validate it here at the Elder.
-                let (fee_paid, spent_share) = match MyNode::validate_spentbook_cmd(cmd, &context) {
+                let (fee_paid, spend_share) = match MyNode::validate_spend(cmd, &context) {
                     Ok((fee_paid, share)) => (fee_paid, share),
                     Err(e) => {
                         return MyNode::send_error(msg_id, data_cmd, e, send_stream, client_id)
@@ -195,7 +195,7 @@ impl MyNode {
                 #[cfg(not(feature = "data-network"))]
                 return Ok(vec![Cmd::EnqueueSpend {
                     fee_paid,
-                    spent_share,
+                    spend_share,
                     send_stream,
                     client_id,
                     correlation_id: msg_id,
@@ -203,10 +203,9 @@ impl MyNode {
 
                 // Else if data-network, then we forward it to data holders.
                 #[cfg(feature = "data-network")]
-                return MyNode::forward_spent_share(
+                return MyNode::forward_spend_share(
                     msg_id,
-                    spent_share,
-                    public_key,
+                    spend_share,
                     client_id,
                     send_stream,
                     context,
@@ -242,10 +241,7 @@ impl MyNode {
         Ok(vec![cmd])
     }
 
-    fn validate_spentbook_cmd(
-        cmd: SpentbookCmd,
-        context: &NodeContext,
-    ) -> Result<(Token, SpentProofShare)> {
+    fn validate_spend(cmd: SpentbookCmd, context: &NodeContext) -> Result<(Token, SpendShare)> {
         let SpentbookCmd::Spend {
             public_key,
             tx,
@@ -280,7 +276,7 @@ impl MyNode {
             context,
         )?;
 
-        Ok((fee_paid, spent_proof_share))
+        Ok((fee_paid, SpendShare::new(spent_proof_share)))
     }
 
     /// Generate a spent proof share from the information provided by the client.

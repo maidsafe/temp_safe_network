@@ -10,7 +10,7 @@ use sn_dbc::{
     Dbc, DbcTransaction, Owner, OwnerOnce, PublicKey, SpentProof, SpentProofShare, Token,
     TransactionBuilder,
 };
-use sn_interface::{messaging::data::RegisterCmd, types::ReplicatedData};
+use sn_interface::types::ReplicatedData;
 
 use eyre::{eyre, Result};
 use std::collections::BTreeSet;
@@ -21,17 +21,8 @@ pub(crate) fn get_spent_proof_share_from_replicated_data(
     replicated_data: ReplicatedData,
 ) -> Result<SpentProofShare> {
     match replicated_data {
-        ReplicatedData::SpentbookWrite(reg_cmd) => match reg_cmd {
-            RegisterCmd::Edit(signed_edit) => {
-                let entry = signed_edit.op.edit.crdt_op.value;
-                let spent_proof_share: SpentProofShare = rmp_serde::from_slice(&entry)?;
-                Ok(spent_proof_share)
-            }
-            _ => Err(eyre!("A RegisterCmd::Edit variant was expected")),
-        },
-        _ => Err(eyre!(
-            "A ReplicatedData::SpentbookWrite variant was expected"
-        )),
+        ReplicatedData::SpendShare(spend_share) => Ok(spend_share.proof_share().clone()),
+        _ => Err(eyre!("A `ReplicatedData::Spentbook` variant was expected")),
     }
 }
 

@@ -547,18 +547,9 @@ impl Session {
                         valid_response = Some(*response);
                     }
                 }
-                QueryResponse::GetSpentProofShares(Ok(ref spentproof_set)) => {
-                    debug!("okay _read_ spentproofs from {node_address:?}");
-                    // TODO: properly merge all registers
-                    if let Some(QueryResponse::GetSpentProofShares(Ok(prior_response))) =
-                        &valid_response
-                    {
-                        if spentproof_set.len() > prior_response.len() {
-                            debug!("longer spentproof response retrieved");
-                            // keep this new register
-                            valid_response = Some(*response);
-                        }
-                    } else {
+                QueryResponse::GetSpend(Ok(_)) => {
+                    debug!("okay _read_ spend from {node_address:?}");
+                    if valid_response.is_none() {
                         valid_response = Some(*response);
                     }
                 }

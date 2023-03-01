@@ -16,11 +16,11 @@ use crate::{
 };
 
 use sn_client::{api::ReissueOutputs, Client};
-use sn_dbc::{rng, Error as DbcError, Hash, Owner, OwnerOnce, PublicKey, SpentProof};
+use sn_dbc::{rng, Error as DbcError, Owner, OwnerOnce, PublicKey};
 use sn_interface::types::fees::SpendPriority;
 
 use bytes::Bytes;
-use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::collections::{BTreeMap, BTreeSet};
 use tracing::{debug, warn};
 
 /// Type tag to use for the Wallet stored on Register
@@ -138,37 +138,14 @@ impl Safe {
     /// Verify if the provided DBC's public_key has been already spent on the network.
     pub async fn is_dbc_spent(&self, public_key: PublicKey) -> Result<bool> {
         let client = self.get_safe_client()?;
-        let spent_proof_shares = client.spent_proof_shares(public_key).await?;
-
-        // We obtain a set of unique spent transactions hash the shares belong to
-        let spent_transactions: BTreeSet<Hash> = spent_proof_shares
-            .iter()
-            .map(|share| share.content.transaction_hash)
-            .collect();
-
-        let proof_key_verifier = SpentProofKeyVerifier { client };
-
-        // Among all different proof shares that could have been signed for different
-        // transactions, let's try to find one set of shares which can actually
-        // be aggregated onto a valid proof signature for the provided DBC's public_key,
-        // and which is signed by a known section key.
-        let is_spent = spent_transactions.into_iter().any(|tx_hash| {
-            let shares_for_current_tx = spent_proof_shares
-                .iter()
-                .cloned()
-                .filter(|share| share.content.transaction_hash == tx_hash)
-                .collect();
-
-            verify_spent_proof_shares_for_tx(
-                public_key,
-                tx_hash,
-                &shares_for_current_tx,
-                &proof_key_verifier,
-            )
-            .is_ok()
-        });
-
-        Ok(is_spent)
+        if let Ok(spend) = client.get_spend(public_key).await {
+            let proof_key_verifier = SpentProofKeyVerifier { client };
+            let tx_hash = spend.proof().transaction_hash();
+            let is_spent = spend.proof().verify(tx_hash, &proof_key_verifier).is_ok();
+            Ok(is_spent)
+        } else {
+            Ok(false)
+        }
     }
 
     /// Fetch a wallet from a Url performing all type of URL resolution required.
@@ -465,19 +442,6 @@ impl Safe {
 
         Ok(())
     }
-}
-
-// Private helper to verify if a set of spent proof shares are valid for a given public_key and TX
-fn verify_spent_proof_shares_for_tx(
-    public_key: PublicKey,
-    tx_hash: Hash,
-    proof_shares: &HashSet<sn_dbc::SpentProofShare>,
-    proof_key_verifier: &SpentProofKeyVerifier,
-) -> Result<()> {
-    SpentProof::try_from_proof_shares(public_key, tx_hash, proof_shares)
-        .and_then(|spent_proof| spent_proof.verify(tx_hash, proof_key_verifier))?;
-
-    Ok(())
 }
 
 #[cfg(test)]

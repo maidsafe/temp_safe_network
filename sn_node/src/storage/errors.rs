@@ -31,6 +31,9 @@ pub enum Error {
     /// Chunk not found.
     #[error("Chunk not found: {0:?}")]
     ChunkNotFound(XorName),
+    /// Spend not found.
+    #[error("Spend not found: {0:?}")]
+    SpendNotFound(XorName),
     /// Storage not supported for type of data address
     #[error("Storage not supported for type of data address: {0:?}")]
     UnsupportedDataType(DataAddress),

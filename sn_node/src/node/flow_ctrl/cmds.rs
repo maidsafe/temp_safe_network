@@ -8,9 +8,7 @@
 
 use crate::node::{messaging::Recipients, XorName};
 
-use qp2p::SendStream;
 use sn_consensus::Decision;
-use sn_dbc::SpentProofShare;
 use sn_fault_detection::IssueType;
 use sn_interface::{
     messaging::{
@@ -21,10 +19,11 @@ use sn_interface::{
     network_knowledge::{
         NodeState, SectionAuthorityProvider, SectionKeyShare, SectionTreeUpdate, SectionsDAG,
     },
-    types::{ClientId, DataAddress, NodeId, Participant},
+    types::{ClientId, DataAddress, NodeId, Participant, SpendShare},
 };
 
 use custom_debug::Debug;
+use qp2p::SendStream;
 use std::{collections::BTreeSet, fmt, time::SystemTime};
 
 /// A struct for the job of controlling the flow
@@ -208,7 +207,7 @@ pub enum Cmd {
     /// Enqueues a valid spend, with the valid paid fee, in the spend queue.
     EnqueueSpend {
         fee_paid: sn_dbc::Token,
-        spent_share: SpentProofShare,
+        spend_share: SpendShare,
         send_stream: SendStream,
         correlation_id: MsgId,
         client_id: ClientId,
@@ -346,13 +345,13 @@ impl fmt::Display for Cmd {
             }
             Cmd::EnqueueSpend {
                 fee_paid,
-                spent_share,
+                spend_share,
                 ..
             } => {
                 write!(
                     f,
-                    "EnqueueSpend {fee_paid:?}: {:?}",
-                    spent_share.public_key()
+                    "EnqueueSpend with dbc id: {:?}, and fee paid: {fee_paid:?}.",
+                    spend_share.dbc_id()
                 )
             }
         }

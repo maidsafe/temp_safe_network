@@ -12,8 +12,8 @@ use crate::Client;
 use crate::Result;
 
 use sn_dbc::{
-    rng, Dbc, DbcTransaction, Hash, Owner, OwnerOnce, RevealedAmount, SpentProof, SpentProofShare,
-    Token, TransactionBuilder,
+    rng, Dbc, DbcTransaction, Hash, Owner, OwnerOnce, RevealedAmount, SpentProof, Token,
+    TransactionBuilder,
 };
 use sn_interface::{
     dbcs::DbcReason,
@@ -23,7 +23,7 @@ use sn_interface::{
 };
 
 use bls::PublicKey;
-use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::collections::{BTreeMap, BTreeSet};
 use xor_name::XorName;
 
 pub use errors::Error;
@@ -384,34 +384,28 @@ async fn reissue_dbcs(
                 )
                 .await?;
 
-            let spent_proof_shares = client.spent_proof_shares(public_key).await?;
+            let spend = client.get_spend(public_key).await?;
 
-            // TODO: we temporarilly filter the spent proof shares which correspond to the TX we
-            // are spending now. This is because current implementation of Spentbook allows
-            // double spents, so we may be retrieving spent proof shares for others spent TXs.
-            let shares_for_current_tx: HashSet<SpentProofShare> = spent_proof_shares
-                .into_iter()
-                .filter(|proof_share| proof_share.content.transaction_hash == tx_hash)
-                .collect();
+            // // TODO: we temporarilly filter the spent proof shares which correspond to the TX we
+            // // are spending now. This is because current implementation of Spentbook allows
+            // // double spents, so we may be retrieving spent proof shares for others spent TXs.
+            // let shares_for_current_tx: HashSet<SpentProofShare> = spent_proof_shares
+            //     .into_iter()
+            //     .filter(|proof_share| proof_share.content.transaction_hash == tx_hash)
+            //     .collect();
 
-            match verify_spent_proof_shares_for_tx(
-                public_key,
-                tx_hash,
-                &shares_for_current_tx,
-                &proof_key_verifier,
-            ) {
+            match spend.proof().verify(tx_hash, &proof_key_verifier) {
                 Ok(()) => {
                     dbc_builder = dbc_builder
-                        .add_spent_proof_shares(shares_for_current_tx.into_iter())
+                        .add_spent_proof(spend.proof().clone())
                         .add_spent_transaction(tx);
                     break;
                 }
-                Err(err) if attempts == NUM_OF_DBC_REISSUE_ATTEMPTS => {
-                    return Err(Error::DbcReissueError(format!(
-                        "Failed to spend input, {} proof shares obtained from spentbook: {}",
-                        shares_for_current_tx.len(),
-                        err
-                    )))?;
+                Err(_) if attempts == NUM_OF_DBC_REISSUE_ATTEMPTS => {
+                    return Err(crate::Error::DbcSpendRetryAttemptsExceeded {
+                        attempts,
+                        public_key,
+                    });
                 }
                 Err(_) => {}
             }
@@ -472,19 +466,6 @@ fn fee_ciphers(
         );
     }
     Ok(input_fee_ciphers)
-}
-
-// Private helper to verify if a set of spent proof shares are valid for a given public_key and TX
-fn verify_spent_proof_shares_for_tx(
-    public_key: PublicKey,
-    tx_hash: Hash,
-    proof_shares: &HashSet<SpentProofShare>,
-    proof_key_verifier: &SpentProofKeyVerifier,
-) -> errors::Result<()> {
-    SpentProof::try_from_proof_shares(public_key, tx_hash, proof_shares)
-        .and_then(|spent_proof| spent_proof.verify(tx_hash, proof_key_verifier))?;
-
-    Ok(())
 }
 
 // Make sure total input amount gathered with input DBCs are enough for the output amount

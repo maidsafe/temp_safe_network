@@ -13,7 +13,7 @@ use crate::messaging::system::SectionSigned;
 use crate::network_knowledge::{SectionAuthorityProvider, SectionsDAG};
 use crate::types::{
     fees::{FeeCiphers, SpendPriority},
-    SpentbookAddress,
+    SpendAddress,
 };
 
 use sn_dbc::{DbcTransaction, PublicKey, SpentProof};
@@ -31,8 +31,8 @@ pub enum SpendQuery {
         dbc_id: PublicKey,
         priority: SpendPriority,
     },
-    /// Query for the set of spent proofs if the provided public key has already been spent with a Tx.
-    GetSpentProofShares(SpentbookAddress),
+    /// Query for the spentbook to see if the provided public key has already been spent with a Tx..
+    GetSpend(SpendAddress),
 }
 
 /// A Spentbook cmd.
@@ -66,6 +66,21 @@ pub enum SpentbookCmd {
 }
 
 impl SpentbookCmd {
+    /// Returns the name of the spend address.
+    /// This is not a unique identifier.
+    pub fn name(&self) -> XorName {
+        *self.dst_address().name()
+    }
+
+    /// Returns the dst address of the spend.
+    pub fn dst_address(&self) -> SpendAddress {
+        match self {
+            Self::Spend { public_key, .. } => {
+                SpendAddress::new(XorName::from_content(&public_key.to_bytes()))
+            }
+        }
+    }
+
     /// Creates a Response containing an error, with the Response variant corresponding to the
     /// Request variant.
     pub fn to_error_response(&self, error: Error) -> CmdResponse {
@@ -81,39 +96,22 @@ impl SpendQuery {
     pub fn to_error_response(&self, error: Error) -> QueryResponse {
         match self {
             Self::GetFees { .. } => QueryResponse::GetFees(Err(error)),
-            Self::GetSpentProofShares(_) => QueryResponse::GetSpentProofShares(Err(error)),
+            Self::GetSpend(_) => QueryResponse::GetSpend(Err(error)),
         }
     }
 
     /// Returns the dst address for the request.
-    pub fn dst_address(&self) -> SpentbookAddress {
+    pub fn dst_address(&self) -> SpendAddress {
         match self {
             Self::GetFees { dbc_id, .. } => {
-                SpentbookAddress::new(XorName::from_content(&dbc_id.to_bytes()))
+                SpendAddress::new(XorName::from_content(&dbc_id.to_bytes()))
             }
-            Self::GetSpentProofShares(address) => *address,
+            Self::GetSpend(address) => *address,
         }
     }
 
     /// Returns the xorname of the data for request.
     pub fn dst_name(&self) -> XorName {
         *self.dst_address().name()
-    }
-}
-
-impl SpentbookCmd {
-    /// Returns the name of the register.
-    /// This is not a unique identifier.
-    pub fn name(&self) -> XorName {
-        *self.dst_address().name()
-    }
-
-    /// Returns the dst address of the spentbook.
-    pub fn dst_address(&self) -> SpentbookAddress {
-        match self {
-            Self::Spend { public_key, .. } => {
-                SpentbookAddress::new(XorName::from_content(&public_key.to_bytes()))
-            }
-        }
     }
 }

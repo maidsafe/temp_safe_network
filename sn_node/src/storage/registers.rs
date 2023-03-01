@@ -12,30 +12,28 @@ use super::{
     Error, Result,
 };
 
+use crate::UsedSpace;
+
 use sn_interface::{
     messaging::{
         data::{
-            CreateRegister, EditRegister, RegisterCmd, RegisterQuery, SignedRegisterCreate,
-            SignedRegisterEdit,
+            EditRegister, RegisterCmd, RegisterQuery, SignedRegisterCreate, SignedRegisterEdit,
         },
         system::NodeQueryResponse,
-        ClientAuth, SectionSig, VerifyAuthority,
+        VerifyAuthority,
     },
     types::{
-        register::{Action, EntryHash, Permissions, Policy, Register, User},
-        Keypair, PublicKey, RegisterAddress, ReplicatedRegisterLog, SPENTBOOK_TYPE_TAG,
+        register::{Action, EntryHash, Register, User},
+        RegisterAddress, ReplicatedRegisterLog,
     },
 };
 
-use crate::UsedSpace;
 use bincode::serialize;
 use std::{
-    collections::BTreeMap,
     fmt::{self, Display, Formatter},
     path::Path,
 };
 use tracing::info;
-use xor_name::XorName;
 
 const REGISTER_STORE_DIR_NAME: &str = "register";
 
@@ -52,7 +50,7 @@ impl RegisterStorage {
         Self { file_store }
     }
 
-    pub(super) async fn remove_register(&self, address: &RegisterAddress) -> Result<()> {
+    pub(super) async fn remove(&self, address: &RegisterAddress) -> Result<()> {
         debug!("Removing register, {:?}", address);
         self.file_store.delete_data(address).await
     }
@@ -236,32 +234,6 @@ impl RegisterStorage {
     // =========================== Helpers ====================================
     // ========================================================================
 
-    // Temporary helper function which makes sure there exists a Register for the spentbook,
-    // this shouldn't be required once we have a Spentbook data type.
-    pub(super) async fn write_spentbook_register(
-        &self,
-        cmd: &RegisterCmd,
-        section_pk: PublicKey,
-        node_keypair: Keypair,
-    ) -> Result<StorageLevel> {
-        let address = cmd.dst_address();
-        debug!("Creating new spentbook register: {:?}", address);
-
-        let mut permissions = BTreeMap::new();
-        let _ = permissions.insert(User::Anyone, Permissions::new(true));
-        let owner = User::Key(section_pk);
-        let policy = Policy { owner, permissions };
-
-        let create_cmd =
-            create_reg_w_policy(*address.name(), SPENTBOOK_TYPE_TAG, policy, &node_keypair)?;
-
-        self.update(&ReplicatedRegisterLog {
-            address,
-            op_log: [create_cmd, cmd.clone()].to_vec(),
-        })
-        .await
-    }
-
     // Private helper which does all verification and tries to apply given cmd to given Register
     // state. It accumulates the cmd, if valid, into the log so further calls can be made with
     // the same state and log, as used by the `update` function.
@@ -374,53 +346,24 @@ impl Display for RegisterStorage {
     }
 }
 
-// Helper functions temporarily used for spentbook logic, but also used for tests.
-// This shouldn't be required outside of tests once we have a Spentbook data type.
-fn create_reg_w_policy(
-    name: XorName,
-    tag: u64,
-    policy: Policy,
-    node_keypair: &Keypair,
-) -> Result<RegisterCmd> {
-    let op = CreateRegister { name, tag, policy };
-    let signature = node_keypair.sign(&serialize(&op)?);
-
-    let auth = ClientAuth {
-        public_key: node_keypair.public_key(),
-        signature,
-    };
-
-    Ok(RegisterCmd::Create {
-        cmd: SignedRegisterCreate { op, auth },
-        section_sig: section_sig(),
-    })
-}
-
-fn section_sig() -> SectionSig {
-    let sk = bls::SecretKey::random();
-    let public_key = sk.public_key();
-    let data = "TODO-spentbook".to_string();
-    let signature = sk.sign(data);
-    SectionSig {
-        public_key,
-        signature,
-    }
-}
-
 #[cfg(test)]
 mod test {
     use crate::storage::StorageLevel;
 
-    use super::{create_reg_w_policy, RegisterStorage, UsedSpace};
+    use super::{RegisterStorage, UsedSpace};
+
     use sn_interface::{
         messaging::{
-            data::{EditRegister, RegisterCmd, RegisterQuery, SignedRegisterEdit},
+            data::{
+                CreateRegister, EditRegister, RegisterCmd, RegisterQuery, SignedRegisterCreate,
+                SignedRegisterEdit,
+            },
             system::NodeQueryResponse,
             ClientAuth,
         },
         types::{
             register::{EntryHash, Policy, Register, User},
-            Keypair,
+            Keypair, SectionSig,
         },
     };
 
@@ -813,6 +756,39 @@ mod test {
         let cmd = create_reg_w_policy(xorname, 0, policy.clone(), &keypair)?;
 
         Ok((cmd, authority, keypair, xorname, policy))
+    }
+
+    // Helper functions temporarily used for spentbook logic, but also used for tests.
+    // This shouldn't be required outside of tests once we have a Spentbook data type.
+    fn create_reg_w_policy(
+        name: XorName,
+        tag: u64,
+        policy: Policy,
+        node_keypair: &Keypair,
+    ) -> Result<RegisterCmd> {
+        let op = CreateRegister { name, tag, policy };
+        let signature = node_keypair.sign(&serialize(&op)?);
+
+        let auth = ClientAuth {
+            public_key: node_keypair.public_key(),
+            signature,
+        };
+
+        Ok(RegisterCmd::Create {
+            cmd: SignedRegisterCreate { op, auth },
+            section_sig: section_sig(),
+        })
+    }
+
+    fn section_sig() -> SectionSig {
+        let sk = bls::SecretKey::random();
+        let public_key = sk.public_key();
+        let data = "data".to_string();
+        let signature = sk.sign(data);
+        SectionSig {
+            public_key,
+            signature,
+        }
     }
 
     fn edit_register(register: &mut Register, keypair: &Keypair) -> Result<RegisterCmd> {

@@ -10,7 +10,7 @@ mod register;
 mod spentbook;
 
 pub use register::RegisterAddress;
-pub use spentbook::SpentbookAddress;
+pub use spentbook::SpendAddress;
 
 use serde::{Deserialize, Serialize};
 use xor_name::XorName;
@@ -25,7 +25,7 @@ pub enum DataAddress {
     ///
     Register(RegisterAddress),
     ///
-    Spentbook(SpentbookAddress),
+    Spentbook(SpendAddress),
 }
 
 impl DataAddress {
@@ -55,6 +55,11 @@ impl DataAddress {
 pub struct ChunkAddress(pub XorName);
 
 impl ChunkAddress {
+    /// Constructs a new `ChunkAddress` given `name`.
+    pub fn new(name: XorName) -> Self {
+        Self(name)
+    }
+
     /// Returns the name.
     pub fn name(&self) -> &XorName {
         &self.0

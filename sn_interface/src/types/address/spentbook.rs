@@ -10,12 +10,12 @@ use serde::{Deserialize, Serialize};
 use std::hash::Hash;
 use xor_name::XorName;
 
-/// Address of a Spentbook.
+/// Address of a spent dbc.
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Debug)]
-pub struct SpentbookAddress(XorName);
+pub struct SpendAddress(XorName);
 
-impl SpentbookAddress {
-    /// Constructs a new `SpentbookAddress` given `name`.
+impl SpendAddress {
+    /// Constructs a new `SpendAddress` given `name`.
     pub fn new(name: XorName) -> Self {
         Self(name)
     }

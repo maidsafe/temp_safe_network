@@ -60,7 +60,10 @@ use sn_interface::{
         SectionAuthorityProvider, SectionKeyShare, SectionKeysProvider, SectionTree, SectionsDAG,
         GENESIS_DBC_SK,
     },
-    types::{fees::SpendQ, keys::ed25519::Digest256, log_markers::LogMarker, DataAddress, NodeId},
+    types::{
+        fees::SpendQ, keys::ed25519::Digest256, log_markers::LogMarker, DataAddress, NodeId,
+        SpendShare,
+    },
 };
 
 use bls::PublicKey;
@@ -96,7 +99,7 @@ pub(crate) struct MyNode {
     pub(crate) data_storage: DataStorage, // Adult only before cache
     pub(crate) keypair: Arc<Keypair>,
     pub(crate) reward_secret_key: Arc<bls::SecretKey>,
-    pub(crate) spend_q: SpendQ<sn_dbc::SpentProofShare>,
+    pub(crate) spend_q: SpendQ<SpendShare>,
     // Network resources
     pub(crate) section_keys_provider: SectionKeysProvider,
     pub(crate) network_knowledge: NetworkKnowledge,

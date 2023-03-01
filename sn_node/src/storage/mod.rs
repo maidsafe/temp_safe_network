@@ -10,6 +10,7 @@ mod chunks;
 mod errors;
 mod register_store;
 mod registers;
+mod spentbook;
 mod used_space;
 
 pub use used_space::UsedSpace;
@@ -18,17 +19,17 @@ pub(crate) use errors::{Error, Result};
 pub(crate) use used_space::StorageLevel;
 
 use chunks::ChunkStorage;
+use hex::FromHex;
 use registers::RegisterStorage;
+use spentbook::Spentbook;
 
-use sn_dbc::SpentProofShare;
 use sn_interface::{
     messaging::{
-        data::{DataQuery, Error as MessagingError, RegisterQuery, SpendQuery},
+        data::{DataQuery, SpendQuery},
         system::NodeQueryResponse,
     },
     types::{
-        register::User, DataAddress, Keypair, PublicKey, RegisterAddress, ReplicatedData,
-        SPENTBOOK_TYPE_TAG,
+        log_markers::LogMarker, register::User, DataAddress, Keypair, PublicKey, ReplicatedData,
     },
 };
 
@@ -46,6 +47,7 @@ const BIT_TREE_DEPTH: usize = 20;
 pub struct DataStorage {
     chunks: ChunkStorage,
     registers: RegisterStorage,
+    spentbook: Spentbook,
     used_space: UsedSpace,
 }
 
@@ -55,6 +57,7 @@ impl DataStorage {
         Self {
             chunks: ChunkStorage::new(path, used_space.clone()),
             registers: RegisterStorage::new(path, used_space.clone()),
+            spentbook: Spentbook::new(path, used_space.clone()),
             used_space,
         }
     }
@@ -86,12 +89,12 @@ impl DataStorage {
 
             let chunks = self.chunks.clone();
             let _handle = tokio::task::spawn(async move {
-                let chunk_addr_to_remove = chunks
+                let addr_to_remove = chunks
                     .addrs()
                     .into_iter()
                     .filter(|addr| !prefix.matches(addr.name()));
-                for addr in chunk_addr_to_remove {
-                    if let Err(err) = chunks.remove_chunk(&addr).await {
+                for addr in addr_to_remove {
+                    if let Err(err) = chunks.remove(&addr).await {
                         warn!("Could not remove chunk {addr:?} due to {err}.");
                     }
                 }
@@ -99,13 +102,26 @@ impl DataStorage {
 
             let registers = self.registers.clone();
             let _handle = tokio::task::spawn(async move {
-                let reg_addr_to_remove = registers
+                let addr_to_remove = registers
                     .addrs()
                     .await
                     .into_iter()
                     .filter(|addr| !prefix.matches(addr.name()));
-                for addr in reg_addr_to_remove {
-                    if let Err(err) = registers.remove_register(&addr).await {
+                for addr in addr_to_remove {
+                    if let Err(err) = registers.remove(&addr).await {
+                        warn!("Could not remove register {addr:?} due to {err}.");
+                    }
+                }
+            });
+
+            let spentbook = self.spentbook.clone();
+            let _handle = tokio::task::spawn(async move {
+                let addr_to_remove = spentbook
+                    .addrs()
+                    .into_iter()
+                    .filter(|addr| !prefix.matches(addr.name()));
+                for addr in addr_to_remove {
+                    if let Err(err) = spentbook.remove(&addr).await {
                         warn!("Could not remove register {addr:?} due to {err}.");
                     }
                 }
@@ -129,62 +145,29 @@ impl DataStorage {
                 self.registers.update(data).await
             }
             ReplicatedData::RegisterWrite(cmd) => self.registers.write(cmd).await,
-            ReplicatedData::SpentbookWrite(cmd) => {
-                // FIMXE: this is temporary logic to have spentbooks as Registers.
-                // Spentbooks shall always exist, and the section nodes shall create them by default.
-                self.registers
-                    .write_spentbook_register(cmd, section_pk, node_keypair)
-                    .await
-            }
-            ReplicatedData::SpentbookLog(data) => self.registers.update(data).await,
+            ReplicatedData::SpendShare(share) => self.spentbook.store(share).await,
+            ReplicatedData::Spend(spend) => self.spentbook.write_to_disk(spend).await,
         }
     }
 
     // Query the local store and return NodeQueryResponse
     pub(crate) async fn query(&self, query: &DataQuery, requester: User) -> NodeQueryResponse {
         match query {
-            DataQuery::GetChunk(addr) => self.chunks.get(addr).await,
+            DataQuery::GetChunk(addr) => {
+                trace!("{:?} {addr:?}", LogMarker::ChunkQueryReceviedAtStoringNode);
+                NodeQueryResponse::GetChunk(
+                    self.chunks
+                        .get_chunk(addr)
+                        .await
+                        .map_err(|error| error.into()),
+                )
+            }
             DataQuery::Register(read) => self.registers.read(read, requester).await,
-            DataQuery::Spentbook(SpendQuery::GetSpentProofShares(addr)) => {
-                // TODO: this is temporary till spentbook native data type is implemented,
-                // we read from the Register where we store the spentbook data
-                let reg_addr = RegisterAddress::new(*addr.name(), SPENTBOOK_TYPE_TAG);
-
-                match self
-                    .registers
-                    .read(&RegisterQuery::Get(reg_addr), requester)
-                    .await
-                {
-                    NodeQueryResponse::GetRegister(Err(MessagingError::DataNotFound(_))) => {
-                        NodeQueryResponse::GetSpentProofShares(Ok(Vec::new()))
-                    }
-                    NodeQueryResponse::GetRegister(result) => {
-                        let proof_shares_result = result.map(|reg| {
-                            let mut proof_shares = Vec::new();
-                            let entries = reg.read();
-                            for (_, entry) in entries {
-                                // Deserialise spent proof share from the entry
-                                let spent_proof_share: SpentProofShare = match rmp_serde::from_slice(&entry) {
-                                    Ok(proof) => proof,
-                                    Err(err) => {
-                                        warn!("Ignoring entry found in Spentbook since it cannot be deserialised as a valid SpentProofShare: {:?}", err);
-                                        continue;
-                                    }
-                                };
-
-                                proof_shares.push(spent_proof_share);
-                            }
-                            proof_shares
-                        });
-
-                        NodeQueryResponse::GetSpentProofShares(proof_shares_result)
-                    }
-                    other => {
-                        // TODO: this is temporary till spentbook native data type is implemented,
-                        // for now we just return the response even that it's a Register query response.
-                        other
-                    }
-                }
+            DataQuery::Spentbook(SpendQuery::GetSpend(addr)) => {
+                trace!("{:?} {addr:?}", LogMarker::SpendQueryReceviedAtStoringNode);
+                NodeQueryResponse::GetSpend(
+                    self.spentbook.get(addr).await.map_err(|error| error.into()),
+                )
             }
             // this should be unreachable
             DataQuery::Spentbook(SpendQuery::GetFees { dbc_id, priority }) => {
@@ -218,11 +201,7 @@ impl DataStorage {
                 .await
                 .map(ReplicatedData::RegisterLog),
             DataAddress::Spentbook(addr) => {
-                let reg_addr = RegisterAddress::new(*addr.name(), SPENTBOOK_TYPE_TAG);
-                self.registers
-                    .get_register_replica(&reg_addr)
-                    .await
-                    .map(ReplicatedData::SpentbookLog)
+                self.spentbook.get(addr).await.map(ReplicatedData::Spend)
             }
             other => Err(Error::UnsupportedDataType(*other)),
         }
@@ -231,12 +210,9 @@ impl DataStorage {
     #[allow(dead_code)]
     pub(crate) async fn remove(&mut self, address: &DataAddress) -> Result<()> {
         match address {
-            DataAddress::Bytes(addr) => self.chunks.remove_chunk(addr).await,
-            DataAddress::Register(addr) => self.registers.remove_register(addr).await,
-            DataAddress::Spentbook(addr) => {
-                let reg_addr = RegisterAddress::new(*addr.name(), SPENTBOOK_TYPE_TAG);
-                self.registers.remove_register(&reg_addr).await
-            }
+            DataAddress::Bytes(addr) => self.chunks.remove(addr).await,
+            DataAddress::Register(addr) => self.registers.remove(addr).await,
+            DataAddress::Spentbook(addr) => self.spentbook.remove(addr).await,
             other => Err(Error::UnsupportedDataType(*other)),
         }
     }
@@ -287,6 +263,15 @@ fn list_files_in(path: &Path) -> Vec<PathBuf> {
         .filter(|entry| entry.file_type().is_file())
         .map(|entry| entry.path().to_path_buf())
         .collect()
+}
+
+fn filepath_to_name(path: &Path) -> Result<XorName> {
+    let filename = path
+        .file_name()
+        .ok_or_else(|| Error::NoFilename(path.to_path_buf()))?
+        .to_str()
+        .ok_or_else(|| Error::InvalidFilename(path.to_path_buf()))?;
+    Ok(XorName(<[u8; 32]>::from_hex(filename)?))
 }
 
 #[cfg(test)]

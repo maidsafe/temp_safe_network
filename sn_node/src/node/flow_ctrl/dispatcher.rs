@@ -123,13 +123,13 @@ impl MyNode {
             }
             Cmd::EnqueueSpend {
                 fee_paid,
-                spent_share,
+                spend_share,
                 send_stream,
                 correlation_id,
                 client_id,
             } => {
                 // Push the spend onto the pool, it will be prioritised by fee.
-                node.spend_q.push(spent_share, fee_paid.as_nano());
+                node.spend_q.push(spend_share, fee_paid.as_nano());
 
                 // Then ack back to Client.
                 let mut cmds = vec![Cmd::send_data_response(
@@ -148,8 +148,8 @@ impl MyNode {
                 // which keeps the n latest fees paid, as to have a reasonable price also if/when the
                 // queue is empty.
                 if node.spend_q.elapsed() {
-                    if let Some((spent_share, _)) = node.spend_q.pop() {
-                        cmds.extend(MyNode::send_spent_share(spent_share, context)?);
+                    if let Some((spend_share, _)) = node.spend_q.pop() {
+                        cmds.extend(MyNode::send_spend_share(spend_share, context)?);
                     }
                 }
 

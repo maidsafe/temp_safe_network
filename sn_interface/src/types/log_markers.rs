@@ -45,6 +45,11 @@ pub enum LogMarker {
     MembershipSendingAeUpdateRequest,
     MembershipAeRequestReceived,
     GossippingMembershipVotes,
+    // Spentbook
+    RecordedSpendShare,
+    StoringSpend,
+    StoredSpend,
+    SpendQueryReceviedAtStoringNode,
     // Chunks
     StoringChunk,
     StoredNewChunk,

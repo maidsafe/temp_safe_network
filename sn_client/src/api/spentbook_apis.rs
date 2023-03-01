@@ -10,13 +10,16 @@ use super::Client;
 
 use crate::{Error, Result};
 
-use sn_dbc::{DbcTransaction, PublicKey, SpentProof, SpentProofShare};
+use sn_dbc::{DbcTransaction, PublicKey, SpentProof};
 use sn_interface::{
     dbcs::DbcReason,
     messaging::data::{
         DataCmd, DataQuery, Error as NetworkDataError, QueryResponse, SpendQuery, SpentbookCmd,
     },
-    types::{fees::FeeCiphers, SpentbookAddress},
+    types::{
+        Spend,
+        {fees::FeeCiphers, SpendAddress},
+    },
 };
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -109,16 +112,13 @@ impl Client {
     // Spend related reads
     //---------------------
 
-    /// Return the set of spent proof shares if the provided DBC's public key is spent
+    /// Return the `Spend` if the provided DBC's public key is spent.
     #[instrument(skip(self), level = "debug")]
-    pub async fn spent_proof_shares(&self, public_key: PublicKey) -> Result<Vec<SpentProofShare>> {
-        let address = SpentbookAddress::new(XorName::from_content(&public_key.to_bytes()));
-        let query = DataQuery::Spentbook(SpendQuery::GetSpentProofShares(address));
-        let response = self.send_query(query.clone()).await?;
-        match response {
-            QueryResponse::GetSpentProofShares(res) => {
-                res.map_err(|err| Error::ErrorMsg { source: err })
-            }
+    pub async fn get_spend(&self, public_key: PublicKey) -> Result<Spend> {
+        let address = SpendAddress::new(XorName::from_content(&public_key.to_bytes()));
+        let query = DataQuery::Spentbook(SpendQuery::GetSpend(address));
+        match self.send_query(query.clone()).await? {
+            QueryResponse::GetSpend(res) => res.map_err(|err| Error::ErrorMsg { source: err }),
             other => Err(Error::UnexpectedQueryResponse {
                 query,
                 response: other,

@@ -757,8 +757,8 @@ async fn spentbook_spend_client_message_should_replicate_to_adults_and_send_ack(
     while let Some(cmd) = cmds.next(&mut node).await? {
         match cmd {
             #[cfg(not(feature = "data-network"))]
-            Cmd::EnqueueSpend { spent_share, .. } => {
-                assert_eq!(spent_share.public_key(), &public_key);
+            Cmd::EnqueueSpend { spend_share, .. } => {
+                assert_eq!(spend_share.dbc_id(), &public_key);
                 return Ok(());
             }
             #[cfg(feature = "data-network")]

@@ -28,12 +28,11 @@ pub use self::{
 use crate::types::{
     fees::RequiredFee,
     register::{Entry, EntryHash, Permissions, Policy, Register, User},
-    Chunk,
+    Chunk, Spend,
 };
 use crate::{messaging::MsgId, types::ReplicatedData};
 
 use serde::{Deserialize, Serialize};
-use sn_dbc::SpentProofShare;
 use std::{
     collections::BTreeSet,
     convert::TryFrom,
@@ -142,8 +141,8 @@ pub enum QueryResponse {
     //
     // ===== Spentbook Data =====
     //
-    /// Response to [`SpendQuery::GetSpentProofShares`].
-    GetSpentProofShares(Result<Vec<SpentProofShare>>),
+    /// Response to [`SpendQuery::GetSpend`].
+    GetSpend(Result<Spend>),
     //
     /// Response to [`SpendQuery::GetFees`].
     GetFees(Result<RequiredFee>),
@@ -161,7 +160,7 @@ impl QueryResponse {
             ReadRegister(r) => r.is_err(),
             GetRegisterPolicy(r) => r.is_err(),
             GetRegisterUserPermissions(r) => r.is_err(),
-            GetSpentProofShares(r) => r.is_err(),
+            GetSpend(r) => r.is_err(),
             GetFees(r) => r.is_err(),
         }
     }
@@ -182,7 +181,7 @@ impl QueryResponse {
                 | GetRegisterPolicy(Err(Error::NoSuchUser(_)))
                 | GetRegisterUserPermissions(Err(Error::DataNotFound(_)))
                 | GetRegisterUserPermissions(Err(Error::NoSuchUser(_)))
-                | GetSpentProofShares(Err(Error::DataNotFound(_)))
+                | GetSpend(Err(Error::DataNotFound(_)))
         )
     }
 }
@@ -220,9 +219,9 @@ impl CmdResponse {
             ReplicatedData::RegisterWrite(RegisterCmd::Edit { .. }) => {
                 CmdResponse::EditRegister(Ok(()))
             }
-            ReplicatedData::SpentbookWrite(_) => CmdResponse::SpendKey(Ok(())),
+            ReplicatedData::SpendShare(_) => CmdResponse::SpendKey(Ok(())),
+            ReplicatedData::Spend(_) => return Err(Error::NoCorrespondingCmdError), // this should be unreachable, since `Spend` is not resulting from a cmd.
             ReplicatedData::RegisterLog(_) => return Err(Error::NoCorrespondingCmdError), // this should be unreachable, since `RegisterLog` is not resulting from a cmd.
-            ReplicatedData::SpentbookLog(_) => return Err(Error::NoCorrespondingCmdError), // this should be unreachable, since `SpentbookLog` is not resulting from a cmd.
         };
         Ok(res)
     }
@@ -237,9 +236,9 @@ impl CmdResponse {
             ReplicatedData::RegisterWrite(RegisterCmd::Edit { .. }) => {
                 CmdResponse::EditRegister(Err(err))
             }
-            ReplicatedData::SpentbookWrite(_) => CmdResponse::SpendKey(Err(err)),
+            ReplicatedData::SpendShare(_) => CmdResponse::SpendKey(Err(err)),
+            ReplicatedData::Spend(_) => return Err(Error::NoCorrespondingCmdError), // this should be unreachable, since `Spend` is not resulting from a cmd.
             ReplicatedData::RegisterLog(_) => return Err(Error::NoCorrespondingCmdError), // this should be unreachable, since `RegisterLog` is not resulting from a cmd.
-            ReplicatedData::SpentbookLog(_) => return Err(Error::NoCorrespondingCmdError), // this should be unreachable, since `SpentbookLog` is not resulting from a cmd.
         };
         Ok(res)
     }

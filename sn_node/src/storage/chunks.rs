@@ -6,15 +6,14 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{list_files_in, prefix_tree_path, used_space::StorageLevel, Error, Result, UsedSpace};
-
-use sn_interface::{
-    messaging::system::NodeQueryResponse,
-    types::{log_markers::LogMarker, Chunk, ChunkAddress},
+use super::{
+    filepath_to_name, list_files_in, prefix_tree_path, used_space::StorageLevel, Error, Result,
+    UsedSpace,
 };
 
+use sn_interface::types::{log_markers::LogMarker, Chunk, ChunkAddress};
+
 use bytes::Bytes;
-use hex::FromHex;
 use std::{
     fmt::{self, Display, Formatter},
     io::{self, ErrorKind},
@@ -25,7 +24,6 @@ use tokio::{
     io::AsyncWriteExt,
 };
 use tracing::info;
-use xor_name::XorName;
 
 const CHUNKS_STORE_DIR_NAME: &str = "chunks";
 
@@ -52,19 +50,9 @@ impl ChunkStorage {
     pub(super) fn addrs(&self) -> Vec<ChunkAddress> {
         list_files_in(&self.file_store_path)
             .iter()
-            .filter_map(|filepath| Self::chunk_filepath_to_address(filepath).ok())
+            .filter_map(|filepath| filepath_to_name(filepath).ok())
+            .map(ChunkAddress::new)
             .collect()
-    }
-
-    fn chunk_filepath_to_address(path: &Path) -> Result<ChunkAddress> {
-        let filename = path
-            .file_name()
-            .ok_or_else(|| Error::NoFilename(path.to_path_buf()))?
-            .to_str()
-            .ok_or_else(|| Error::InvalidFilename(path.to_path_buf()))?;
-
-        let xorname = XorName(<[u8; 32]>::from_hex(filename)?);
-        Ok(ChunkAddress(xorname))
     }
 
     fn chunk_addr_to_filepath(&self, addr: &ChunkAddress) -> Result<PathBuf> {
@@ -74,7 +62,7 @@ impl ChunkStorage {
         Ok(path.join(filename))
     }
 
-    pub(super) async fn remove_chunk(&self, address: &ChunkAddress) -> Result<()> {
+    pub(super) async fn remove(&self, address: &ChunkAddress) -> Result<()> {
         debug!("Removing chunk, {:?}", address);
         let filepath = self.chunk_addr_to_filepath(address)?;
         let meta = metadata(filepath.clone()).await?;
@@ -104,15 +92,6 @@ impl ChunkStorage {
             }
             Err(other) => Err(other.into()),
         }
-    }
-
-    // Read chunk from local store and return NodeQueryResponse
-    pub(super) async fn get(&self, address: &ChunkAddress) -> NodeQueryResponse {
-        trace!(
-            "{:?} {address:?}",
-            LogMarker::ChunkQueryReceviedAtStoringNode
-        );
-        NodeQueryResponse::GetChunk(self.get_chunk(address).await.map_err(|error| error.into()))
     }
 
     /// Store a chunk in the local disk store unless it is already there
