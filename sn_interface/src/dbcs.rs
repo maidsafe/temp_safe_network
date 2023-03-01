@@ -75,6 +75,7 @@ pub fn gen_genesis_dbc(
     let content = SpentProofContent {
         public_key,
         transaction_hash: Hash::from(tx.hash()),
+        reason: Hash::default(),
         public_commitment: revealed_commitment.commit(&PedersenGens::default()),
     };
 

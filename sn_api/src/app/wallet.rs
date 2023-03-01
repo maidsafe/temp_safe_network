@@ -162,12 +162,14 @@ impl Safe {
         let is_spent = spent_transactions.into_iter().any(|tx_hash| {
             let shares_for_current_tx = spent_proof_shares
                 .iter()
-                .filter(|share| share.content.transaction_hash == tx_hash);
+                .cloned()
+                .filter(|share| share.content.transaction_hash == tx_hash)
+                .collect();
 
             verify_spent_proof_shares_for_tx(
                 public_key,
                 tx_hash,
-                shares_for_current_tx,
+                &shares_for_current_tx,
                 &proof_key_verifier,
             )
             .is_ok()
@@ -278,6 +280,7 @@ impl Safe {
         wallet_url: &str,
         amount: &str,
         owner_public_key: Option<bls::PublicKey>,
+        reason: Option<Hash>,
     ) -> Result<Dbc> {
         debug!(
             "Reissuing DBC from wallet at {} for an amount of {} tokens",
@@ -289,6 +292,7 @@ impl Safe {
                 [(amount.to_string(), owner_public_key)]
                     .into_iter()
                     .collect(),
+                reason,
             )
             .await?;
 
@@ -309,6 +313,7 @@ impl Safe {
         &self,
         wallet_url: &str,
         outputs: Vec<(String, Option<bls::PublicKey>)>,
+        reason: Option<Hash>,
     ) -> Result<Vec<Dbc>> {
         let mut total_output_amount = Token::zero();
         let mut outputs_owners = Vec::<(Token, OwnerOnce)>::new();
@@ -389,7 +394,7 @@ impl Safe {
 
         // We can now reissue the output DBCs
         let (output_dbcs, change_dbc) = self
-            .reissue_dbcs(input_dbcs_to_spend, outputs_owners, change_amount)
+            .reissue_dbcs(input_dbcs_to_spend, outputs_owners, reason, change_amount)
             .await?;
 
         if output_dbcs.is_empty() {
@@ -451,9 +456,9 @@ impl Safe {
         &self,
         input_dbcs: Vec<Dbc>,
         outputs: Vec<(Token, OwnerOnce)>,
+        reason: Option<Hash>,
         change_amount: Token,
     ) -> Result<(Vec<(Dbc, OwnerOnce, AmountSecrets)>, Option<Dbc>)> {
-        // TODO: enable the use of decoys
         let mut tx_builder = TransactionBuilder::default()
             .add_inputs_dbc_bearer(input_dbcs.iter())?
             .add_outputs_by_amount(outputs.into_iter().map(|(token, owner)| (token, owner)));
@@ -491,6 +496,7 @@ impl Safe {
                     .spend_dbc(
                         public_key,
                         tx.clone(),
+                        reason,
                         spent_proofs.clone(),
                         spent_transactions.clone(),
                     )
@@ -509,7 +515,7 @@ impl Safe {
                 match verify_spent_proof_shares_for_tx(
                     public_key,
                     tx_hash,
-                    shares_for_current_tx.iter(),
+                    &shares_for_current_tx,
                     &proof_key_verifier,
                 ) {
                     Ok(()) => {
@@ -550,10 +556,10 @@ impl Safe {
 }
 
 // Private helper to verify if a set of spent proof shares are valid for a given public_key and TX
-fn verify_spent_proof_shares_for_tx<'a>(
+fn verify_spent_proof_shares_for_tx(
     public_key: PublicKey,
     tx_hash: Hash,
-    proof_shares: impl Iterator<Item = &'a SpentProofShare>,
+    proof_shares: &HashSet<sn_dbc::SpentProofShare>,
     proof_key_verifier: &SpentProofKeyVerifier,
 ) -> Result<()> {
     SpentProof::try_from_proof_shares(public_key, tx_hash, proof_shares)
@@ -643,7 +649,7 @@ mod tests {
         safe.wallet_deposit(&wallet_xorurl, Some("my-dbc"), &dbc, None)
             .await?;
         let owned_dbc = safe
-            .wallet_reissue(&wallet_xorurl, "2.35", Some(sk.public_key()))
+            .wallet_reissue(&wallet_xorurl, "2.35", Some(sk.public_key()), None)
             .await?;
         safe.wallet_deposit(
             &wallet_xorurl,
@@ -672,7 +678,7 @@ mod tests {
         safe.wallet_deposit(&wallet_xorurl, Some("my-dbc"), &dbc, None)
             .await?;
         let owned_dbc = safe
-            .wallet_reissue(&wallet_xorurl, "2.35", Some(pk))
+            .wallet_reissue(&wallet_xorurl, "2.35", Some(pk), None)
             .await?;
         let result = safe
             .wallet_deposit(&wallet_xorurl, Some("owned-dbc"), &owned_dbc, None)
@@ -700,7 +706,7 @@ mod tests {
         safe.wallet_deposit(&wallet_xorurl, Some("my-dbc"), &dbc, None)
             .await?;
         let owned_dbc = safe
-            .wallet_reissue(&wallet_xorurl, "2.35", Some(pk))
+            .wallet_reissue(&wallet_xorurl, "2.35", Some(pk), None)
             .await?;
         let result = safe
             .wallet_deposit(&wallet_xorurl, Some("owned-dbc"), &owned_dbc, Some(sk2))
@@ -750,7 +756,7 @@ mod tests {
         safe.wallet_deposit(&wallet_xorurl, Some("my-dbc"), &dbc, None)
             .await?;
         let owned_dbc = safe
-            .wallet_reissue(&wallet_xorurl, "2.35", Some(sk.public_key()))
+            .wallet_reissue(&wallet_xorurl, "2.35", Some(sk.public_key()), None)
             .await?;
         // Deposit the owned DBC in another wallet because it's easier to ensure this owned DBC
         // will be used as an input in the next reissue rather than having to be precise about
@@ -763,7 +769,7 @@ mod tests {
         )
         .await?;
 
-        let result = safe.wallet_reissue(&wallet2_xorurl, "2", None).await;
+        let result = safe.wallet_reissue(&wallet2_xorurl, "2", None, None).await;
         match result {
             Ok(_) => {
                 // For this case, we just want to make sure the reissue went through without an
@@ -931,7 +937,7 @@ mod tests {
         let amount_to_reissue =
             Token::from_nano(dbc1_balance.as_nano() + dbc2_balance.as_nano() - 100);
         let output_dbc = safe
-            .wallet_reissue(&wallet_xorurl, &amount_to_reissue.to_string(), None)
+            .wallet_reissue(&wallet_xorurl, &amount_to_reissue.to_string(), None, None)
             .await?;
 
         let output_balance = output_dbc
@@ -966,7 +972,7 @@ mod tests {
         safe.wallet_deposit(&wallet_xorurl, Some("deposited-dbc-1"), &dbc, None)
             .await?;
 
-        let output_dbc = safe.wallet_reissue(&wallet_xorurl, "1", None).await?;
+        let output_dbc = safe.wallet_reissue(&wallet_xorurl, "1", None, None).await?;
 
         let output_balance = output_dbc
             .amount_secrets_bearer()
@@ -1005,7 +1011,7 @@ mod tests {
         safe.wallet_deposit(&wallet_xorurl, Some("deposited-dbc-1"), &dbc, None)
             .await?;
 
-        let _ = safe.wallet_reissue(&wallet_xorurl, "1", None).await?;
+        let _ = safe.wallet_reissue(&wallet_xorurl, "1", None, None).await?;
         let wallet_balances = safe.wallet_get(&wallet_xorurl).await?;
 
         let (_, (change_dbc_read, _)) = wallet_balances
@@ -1027,11 +1033,32 @@ mod tests {
 
         let pk = bls::SecretKey::random().public_key();
         let owner = Owner::from(pk);
-        let output_dbc = safe.wallet_reissue(&wallet_xorurl, "1", Some(pk)).await?;
+        let output_dbc = safe
+            .wallet_reissue(&wallet_xorurl, "1", Some(pk), None)
+            .await?;
 
         // We have verified transaction details in other tests. In this test, we're just concerned
         // with the owner being assigned correctly.
         assert_eq!(owner, *output_dbc.owner_base());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_wallet_reissue_with_reason() -> Result<()> {
+        let (safe, dbc, _) = new_safe_instance_with_dbc().await?;
+        let wallet_xorurl = safe.wallet_create().await?;
+
+        safe.wallet_deposit(&wallet_xorurl, Some("deposited-dbc-1"), &dbc, None)
+            .await?;
+
+        let pk = bls::SecretKey::random().public_key();
+        let any_reason = Some(Hash::hash(&[1, 2, 3, 4]));
+        let output_dbc = safe
+            .wallet_reissue(&wallet_xorurl, "1", Some(pk), any_reason)
+            .await?;
+
+        assert_eq!(any_reason, output_dbc.reason());
 
         Ok(())
     }
@@ -1048,6 +1075,7 @@ mod tests {
             .wallet_reissue(
                 &wallet_xorurl,
                 &Token::from_nano(dbc_balance.as_nano() + 1).to_string(),
+                None,
                 None,
             )
             .await
@@ -1066,7 +1094,7 @@ mod tests {
         let safe = new_safe_instance().await?;
         let wallet_xorurl = safe.wallet_create().await?;
 
-        match safe.wallet_reissue(&wallet_xorurl, "0", None).await {
+        match safe.wallet_reissue(&wallet_xorurl, "0", None, None).await {
             Err(Error::InvalidAmount(msg)) => {
                 assert_eq!(
                     msg,
@@ -1095,7 +1123,9 @@ mod tests {
             .await?;
 
         // Now check we can still reissue from the wallet and the corrupted entry is ignored
-        let _ = safe.wallet_reissue(&wallet_xorurl, "0.4", None).await?;
+        let _ = safe
+            .wallet_reissue(&wallet_xorurl, "0.4", None, None)
+            .await?;
         let current_balance = safe.wallet_balance(&wallet_xorurl).await?;
         assert_eq!(
             current_balance,
@@ -1116,7 +1146,7 @@ mod tests {
         // Now check that after reissuing with the total balance,
         // there is no change deposited in the wallet, i.e. wallet is empty with 0 balance
         let _ = safe
-            .wallet_reissue(&wallet_xorurl, &dbc_balance.to_string(), None)
+            .wallet_reissue(&wallet_xorurl, &dbc_balance.to_string(), None, None)
             .await?;
 
         let current_balance = safe.wallet_balance(&wallet_xorurl).await?;
@@ -1137,7 +1167,9 @@ mod tests {
         safe.wallet_deposit(&wallet1_xorurl, Some("deposited-dbc"), &dbc, None)
             .await?;
 
-        let output_dbc = safe.wallet_reissue(&wallet1_xorurl, "0.25", None).await?;
+        let output_dbc = safe
+            .wallet_reissue(&wallet1_xorurl, "0.25", None, None)
+            .await?;
 
         safe.wallet_deposit(&wallet2_xorurl, Some("reissued-dbc"), &output_dbc, None)
             .await?;
@@ -1200,7 +1232,7 @@ mod tests {
         .await?;
 
         // It shall detect no spent proofs for this TX, thus fail to reissue
-        match safe.wallet_reissue(&wallet_xorurl, "0.1", None).await {
+        match safe.wallet_reissue(&wallet_xorurl, "0.1", None, None).await {
             Err(Error::ClientError(ClientError::CmdError {
                 source: ErrorMsg::InvalidOperation(msg),
                 ..
@@ -1272,7 +1304,7 @@ mod tests {
             .collect();
 
         let output_dbcs = safe
-            .wallet_reissue_many(&wallet_xorurl, outputs_owners)
+            .wallet_reissue_many(&wallet_xorurl, outputs_owners, None)
             .await?;
 
         assert_eq!(output_dbcs.len(), output_amounts.len());

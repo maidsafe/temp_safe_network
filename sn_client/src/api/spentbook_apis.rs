@@ -10,7 +10,7 @@ use super::Client;
 
 use crate::{Error, Result};
 
-use sn_dbc::{DbcTransaction, PublicKey, SpentProof, SpentProofShare};
+use sn_dbc::{DbcTransaction, Hash, PublicKey, SpentProof, SpentProofShare};
 use sn_interface::{
     messaging::data::{
         DataCmd, DataQuery, Error as NetworkDataError, QueryResponse, SpentbookCmd, SpentbookQuery,
@@ -44,6 +44,7 @@ impl Client {
         &self,
         public_key: PublicKey,
         tx: DbcTransaction,
+        reason: Option<Hash>,
         spent_proofs: BTreeSet<SpentProof>,
         spent_transactions: BTreeSet<DbcTransaction>,
     ) -> Result<()> {
@@ -58,6 +59,7 @@ impl Client {
             let cmd = SpentbookCmd::Spend {
                 public_key,
                 tx: tx.clone(),
+                reason,
                 spent_proofs: spent_proofs.clone(),
                 spent_transactions: spent_transactions.clone(),
                 network_knowledge,
@@ -200,6 +202,7 @@ mod tests {
             .spend_dbc(
                 public_key,
                 tx.clone(),
+                None,
                 genesis_dbc.spent_proofs,
                 genesis_dbc.spent_transactions,
             )
@@ -242,6 +245,7 @@ mod tests {
             .spend_dbc(
                 public_key,
                 tx.clone(),
+                None,
                 invalid_spent_proofs,
                 genesis_dbc.spent_transactions,
             )
@@ -287,6 +291,7 @@ mod tests {
             .spend_dbc(
                 public_key,
                 tx.clone(),
+                None,
                 genesis_dbc.spent_proofs,
                 genesis_dbc.spent_transactions,
             )
@@ -362,6 +367,7 @@ mod tests {
             .spend_dbc(
                 output_owneronce_2.as_owner().public_key(),
                 output_dbc_2.transaction.clone(),
+                None,
                 genesis_dbc.spent_proofs.clone(),
                 genesis_dbc.spent_transactions,
             )
@@ -408,6 +414,7 @@ mod tests {
             .spend_dbc(
                 random_public_key,
                 tx.clone(),
+                None,
                 genesis_dbc.spent_proofs.clone(),
                 genesis_dbc.spent_transactions,
             )
@@ -487,7 +494,6 @@ mod tests {
         Vec<(sn_dbc::Dbc, OwnerOnce, sn_dbc::AmountSecrets)>,
         Option<sn_dbc::Dbc>,
     )> {
-        // TODO: enable the use of decoys
         let mut tx_builder = TransactionBuilder::default()
             .add_inputs_dbc_bearer(input_dbcs.iter())?
             .add_outputs_by_amount(outputs.into_iter().map(|(token, owner)| (token, owner)));
@@ -524,6 +530,7 @@ mod tests {
                     .spend_dbc(
                         public_key,
                         tx.clone(),
+                        None,
                         spent_proofs.clone(),
                         spent_transactions.clone(),
                     )
@@ -542,7 +549,7 @@ mod tests {
                 match verify_spent_proof_shares_for_tx(
                     public_key,
                     tx_hash,
-                    shares_for_current_tx.iter(),
+                    &shares_for_current_tx,
                     &proof_key_verifier,
                 ) {
                     Ok(()) => {
@@ -586,10 +593,10 @@ mod tests {
     }
 
     // Private helper to verify if a set of spent proof shares are valid for a given public_key and TX
-    fn verify_spent_proof_shares_for_tx<'a>(
+    fn verify_spent_proof_shares_for_tx(
         public_key: sn_dbc::PublicKey,
         tx_hash: Hash,
-        proof_shares: impl Iterator<Item = &'a sn_dbc::SpentProofShare>,
+        proof_shares: &HashSet<sn_dbc::SpentProofShare>,
         proof_key_verifier: &SpentProofKeyVerifier,
     ) -> Result<()> {
         sn_dbc::SpentProof::try_from_proof_shares(public_key, tx_hash, proof_shares)

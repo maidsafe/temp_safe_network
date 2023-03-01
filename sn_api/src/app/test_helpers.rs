@@ -113,6 +113,7 @@ async fn reissue_bearer_dbcs() -> Result<Vec<(Dbc, Token)>> {
         .reissue_dbcs(
             vec![GENESIS_DBC.clone()],
             output_amounts,
+            None,
             Token::from_nano(change_amount),
         )
         .await?;
