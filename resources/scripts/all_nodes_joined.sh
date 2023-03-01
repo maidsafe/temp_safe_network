@@ -45,7 +45,7 @@ fi
 # We'll use the logs from the nodes that joined, to obtain the
 # list of members in the network knowledge they share with AE messages.
 members=$(\
-  rg ".* msg: AntiEntropy\(AntiEntropy \{.* kind: Update \{ members: \{(.*)\} \}\)" \
+  rg ".* msg: AntiEntropy\(AntiEntropy \{.* kind: Update \{ section_decisions: \{(.*)\} \}\)" \
     -or '$1' "$log_dir" -g "*.log*" | \
   rg "(?:NodeState\((.{6}\(\d{8}\)).., ((127\.0\.0\.1|0\.0\.0\.0):\d{5}), Joined)+" -or '$1->$2' | \
   sort -u)
