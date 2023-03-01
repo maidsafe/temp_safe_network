@@ -16,9 +16,9 @@ impl MyNode {
         context: NodeContext,
         relocation: Option<RelocationProof>,
     ) -> Option<Cmd> {
-        debug!("tyring to join...");
+        debug!("trying to join...");
         if context.network_knowledge.is_section_member(&context.name) {
-            debug!("tyring to join...WE JOINED?!");
+            info!("We joined the network");
             None
         } else {
             Some(MyNode::send_to_elders_await_responses(
