@@ -309,15 +309,14 @@ impl MyNode {
         Ok(())
     }
 
-    /// get joined members at gen
-    fn get_members_at_gen(&self, gen: Generation) -> Result<BTreeMap<XorName, NodeState>> {
-        let members = self.network_knowledge.members_at_gen(gen);
-        if members.is_empty() {
-            error!("Failed to fetch members at generation {gen:?}");
-            Err(Error::InvalidMembershipGeneration)
-        } else {
-            Ok(members)
-        }
+    /// get current joined members
+    fn get_current_members(&self) -> Result<BTreeMap<XorName, NodeState>> {
+        Ok(self
+            .network_knowledge
+            .section_members()
+            .iter()
+            .map(|n| (n.name(), n.clone()))
+            .collect())
     }
 
     fn get_sap_for_prefix(&self, prefix: Prefix) -> Result<SectionAuthorityProvider> {
@@ -330,7 +329,9 @@ impl MyNode {
     fn check_elder_handover_candidates(&self, sap: &SectionAuthorityProvider) -> Result<()> {
         // in regular handover the previous SAP's prefix is the same
         let previous_gen_sap = self.get_sap_for_prefix(sap.prefix())?;
-        let members = self.get_members_at_gen(sap.membership_gen())?;
+
+        // use the current members
+        let members = self.get_current_members()?;
         let received_candidates: BTreeSet<NodeId> = sap.elders().copied().collect();
 
         let expected_candidates: BTreeSet<NodeId> =
@@ -356,7 +357,7 @@ impl MyNode {
         // and the same ancestor prefix
         let prev_prefix = sap1.prefix().popped();
         let previous_gen_sap = self.get_sap_for_prefix(prev_prefix)?;
-        let members = self.get_members_at_gen(sap1.membership_gen())?;
+        let members = self.get_current_members()?;
         let dummy_chain_len = 0;
         let dummy_gen = 0;
 

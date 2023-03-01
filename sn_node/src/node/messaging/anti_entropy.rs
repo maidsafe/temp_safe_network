@@ -158,12 +158,17 @@ impl MyNode {
 
         // block off the write lock
         let updated = {
+            let already_updated = node.network_knowledge.section_key() == sap.section_key();
+
             let updated_knowledge = node
                 .network_knowledge
                 .update_sap_knowledge_if_valid(section_tree_update, &starting_context.name)?;
-            let updated_members = node
-                .network_knowledge
-                .update_section_member_knowledge(section_decisions)?;
+            let updated_members = if updated_knowledge || already_updated {
+                node.network_knowledge
+                    .update_section_member_knowledge(section_decisions)?
+            } else {
+                false
+            };
 
             if updated_members {
                 node.remove_dkg_sessions_with_missing_members();
@@ -180,7 +185,7 @@ impl MyNode {
         };
 
         // mut here to update comms
-        let latest_context = node.context();
+        let mut latest_context = node.context();
 
         // Only trigger reorganize data when there is a membership change happens.
         if updated {
@@ -197,26 +202,34 @@ impl MyNode {
             let prefix = sap.prefix();
             info!("SectionTree written to disk with update for prefix {prefix:?}");
 
-            // check if we've been kicked out of the section
-            if starting_context
-                .network_knowledge
-                .members()
-                .iter()
-                .map(|m| m.name())
-                .contains(&node.name())
-                && !node
+            match (
+                starting_context
                     .network_knowledge
                     .members()
                     .iter()
                     .map(|m| m.name())
-                    .contains(&node.name())
-            {
-                error!("We've been removed from the section");
-                return Err(Error::RejoinRequired(RejoinReason::RemovedFromSection));
+                    .contains(&node.name),
+                latest_context
+                    .network_knowledge
+                    .members()
+                    .iter()
+                    .map(|m| m.name())
+                    .contains(&latest_context.name),
+            ) {
+                (true, true) | (false, true) => {
+                    // we're in the section, only now we start asking others for data
+                    cmds.push(
+                        MyNode::ask_for_any_new_data_from_whole_section(&latest_context).await,
+                    );
+                }
+                (true, false) => {
+                    error!("We've been removed from the section");
+                    return Err(Error::RejoinRequired(RejoinReason::RemovedFromSection));
+                }
+                (false, false) => {
+                    error!("We are not in the section");
+                }
             }
-
-            // we're still in the section, only now we start asking others for data
-            cmds.push(MyNode::ask_for_any_new_data_from_whole_section(&latest_context).await);
         } else {
             debug!("No update to network knowledge");
         }
@@ -336,6 +349,7 @@ impl MyNode {
     // If entropy is found, determine the `SectionTreeUpdate` and kind of AE response
     // to send in order to bring the sender's knowledge about us up to date.
     pub(crate) fn check_for_entropy(
+        is_self_elder: bool,
         wire_msg: &WireMsg,
         network_knowledge: &NetworkKnowledge,
         sender: &Participant,
@@ -348,6 +362,14 @@ impl MyNode {
         let our_prefix = network_knowledge.prefix();
         // Let's try to find a section closer to the destination, if it's not for us.
         if !our_prefix.matches(&dst.name) {
+            if !is_self_elder {
+                // In case we are an adult, we don't update the non-self-section-sender to update.
+                // This situation happens when we are a relocated adult,
+                // AND received notification from prev-section AFTER we joined the target section.
+                // Sending Redirect back causes the msg stalled within msg_tracker for the tests
+                // like `relocate_adults_to_different_section`. Due to the testing infrastructure.
+                return Ok(None);
+            }
             trace!(
                 "AE: {msg_id:?} prefix not matching. We are: {our_prefix:?}, they sent to: {:?}",
                 dst.name
@@ -465,7 +487,7 @@ mod tests {
         let context = node.context();
         let sender = Participant::from_node(node.info().id());
 
-        let ae_msg = MyNode::check_for_entropy(&msg, &context.network_knowledge, &sender)?;
+        let ae_msg = MyNode::check_for_entropy(true, &msg, &context.network_knowledge, &sender)?;
 
         assert!(ae_msg.is_none());
         Ok(())
@@ -504,7 +526,7 @@ mod tests {
         let sender = Participant::from_node(node.info().id());
 
         let (section_tree_update, _kind) =
-            MyNode::check_for_entropy(&wire_msg, &context.network_knowledge, &sender)?
+            MyNode::check_for_entropy(true, &wire_msg, &context.network_knowledge, &sender)?
                 .context("no entropy found")?;
 
         assert_eq!(
@@ -523,7 +545,7 @@ mod tests {
         // and it now shall give us an AE redirect msg
         // with the SAP we inserted for other prefix
         let (section_tree_update, _kind) =
-            MyNode::check_for_entropy(&wire_msg, &new_context.network_knowledge, &sender)?
+            MyNode::check_for_entropy(true, &wire_msg, &new_context.network_knowledge, &sender)?
                 .context("no entropy found")?;
 
         assert_eq!(section_tree_update.signed_sap, other_sap);
@@ -553,7 +575,7 @@ mod tests {
 
         let sender = Participant::from_node(node.info().id());
         let (section_tree_update, _kind) =
-            MyNode::check_for_entropy(&msg, network_knowledge, &sender)?
+            MyNode::check_for_entropy(true, &msg, network_knowledge, &sender)?
                 .context("no entropy found")?;
 
         assert_eq!(
@@ -589,7 +611,7 @@ mod tests {
         let sender = Participant::from_node(node.info().id());
 
         let (section_tree_update, _kind) =
-            MyNode::check_for_entropy(&msg, &context.network_knowledge, &sender)?
+            MyNode::check_for_entropy(true, &msg, &context.network_knowledge, &sender)?
                 .context("no entropy found")?;
 
         assert_eq!(
