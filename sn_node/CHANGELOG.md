@@ -5,18 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.77.3 (2023-02-28)
+## v0.77.4 (2023-03-01)
 
 ### Chore
 
- - <csr-id-5fd068e10cc96396fb800cf6acd92b377f4e21d9/> clarify relocation flow
+ - <csr-id-652af5fbe3468b82c26be9a2f88a7c824c6c0032/> relocation + age changes/ logs
+
+### New Features
+
+ - <csr-id-5177d154b5f1c524004d688552da5008f83c7522/> add ae probe msg to section elders
+   this should ensure we are up to date with members
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 1 commit contributed to the release.
- - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -26,10 +31,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Add ae probe msg to section elders ([`5177d15`](https://github.com/maidsafe/safe_network/commit/5177d154b5f1c524004d688552da5008f83c7522))
+    - Relocation + age changes/ logs ([`652af5f`](https://github.com/maidsafe/safe_network/commit/652af5fbe3468b82c26be9a2f88a7c824c6c0032))
+</details>
+
+## v0.77.3 (2023-02-28)
+
+<csr-id-5fd068e10cc96396fb800cf6acd92b377f4e21d9/>
+
+### Chore
+
+ - <csr-id-5fd068e10cc96396fb800cf6acd92b377f4e21d9/> clarify relocation flow
+
+### Chore
+
+ - <csr-id-039e1cc0fa8a7e7ae1c97a0c89328117a43d4796/> sn_interface-0.19.3/sn_node-0.77.3
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Sn_interface-0.19.3/sn_node-0.77.3 ([`039e1cc`](https://github.com/maidsafe/safe_network/commit/039e1cc0fa8a7e7ae1c97a0c89328117a43d4796))
     - Clarify relocation flow ([`5fd068e`](https://github.com/maidsafe/safe_network/commit/5fd068e10cc96396fb800cf6acd92b377f4e21d9))
 </details>
 
 ## v0.77.2 (2023-02-28)
+
+<csr-id-80bae9ffa64e274da520e752cab0df79d5cf419e/>
 
 ### Chore
 
