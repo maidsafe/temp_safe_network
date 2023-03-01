@@ -72,7 +72,6 @@ impl RejoinReason {
 /// Listens for incoming msgs and forms Cmds for each,
 /// Periodically triggers other Cmd Processes (eg health checks, fault detection etc)
 pub(crate) struct FlowCtrl {
-    // node: Arc<RwLock<MyNode>>,
     cmd_sender_channel: Sender<(Cmd, Vec<usize>)>,
     fault_channels: FaultChannels,
     timestamps: PeriodicChecksTimestamps,
@@ -116,11 +115,7 @@ impl FlowCtrl {
             }
         };
 
-        // let node_arc_for_processing = node.clone();
-        // let node_arc_for_periodics = node.clone();
-
         let flow_ctrl = Self {
-            // node,
             cmd_sender_channel: cmd_sender_channel.clone(),
             fault_channels,
             timestamps: PeriodicChecksTimestamps::now(),
@@ -132,7 +127,6 @@ impl FlowCtrl {
         Self::listen_for_comm_events(incoming_msg_events, cmd_channel_for_msgs);
 
         // second do this until join
-        // let _handle = tokio::task::spawn(
         let node = flow_ctrl
             .join_processing(
                 node,
@@ -142,7 +136,6 @@ impl FlowCtrl {
                 &rejoin_network_tx,
             )
             .await;
-        // /);
 
         let _handle = tokio::task::spawn(flow_ctrl.process_cmds_and_periodic_checks(
             node,
@@ -150,30 +143,6 @@ impl FlowCtrl {
             incoming_cmds_from_apis,
             rejoin_network_tx,
         ));
-
-        // let _cmd_channel = cmd_sender_channel.clone();
-
-        // // start a new thread to kick off incoming cmds
-        // let _handle = tokio::task::spawn(async move {
-        //     // Get a stable identifier for statemap naming. This is NOT the node's current name.
-        //     // It's the initial name... but will not change for the entire statemap
-        //     let the_node = node_arc_for_processing.clone();
-        //     let latest_context = node_context.clone();
-        //     while let Some((cmd, cmd_id)) = incoming_cmds_from_apis.recv().await {
-        //         trace!("Taking cmd off stack: {cmd:?}");
-        //         cmd_ctrl
-        //             .process_cmd_job(
-        //                 the_node.clone(),
-        //                 node_context,
-        //                 cmd,
-        //                 cmd_id,
-        //                 node_identifier,
-        //                 cmd_channel.clone(),
-        //                 rejoin_network_tx.clone(),
-        //             )
-        //             .await
-        //     }
-        // });
 
         Self::send_out_data_for_replication(
             node_context.data_storage,
