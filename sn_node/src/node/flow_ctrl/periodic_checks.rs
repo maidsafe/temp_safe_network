@@ -81,7 +81,6 @@ impl FlowCtrl {
 
         cmds.extend(self.enqueue_cmds_for_node_periodic_checks(&context, node));
         if !context.is_elder {
-            // self.enqueue_cmds_for_adult_periodic_checks(&context).await;
         } else {
             cmds.extend(
                 self.enqueue_cmds_for_elder_periodic_checks(&context, node)
