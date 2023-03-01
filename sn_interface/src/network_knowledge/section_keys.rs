@@ -107,6 +107,7 @@ impl SectionKeysProvider {
 pub fn build_spent_proof_share(
     public_key: &bls::PublicKey,
     tx: &DbcTransaction,
+    reason: Option<Hash>,
     sap: &SectionAuthorityProvider,
     skp: &SectionKeysProvider,
     public_commitment: Commitment,
@@ -114,6 +115,7 @@ pub fn build_spent_proof_share(
     let content = SpentProofContent {
         public_key: *public_key,
         transaction_hash: Hash::from(tx.hash()),
+        reason: reason.unwrap_or_default(),
         public_commitment,
     };
     let (index, sig_share) = skp.sign_with(content.hash().as_ref(), &sap.section_key())?;

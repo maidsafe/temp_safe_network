@@ -15,7 +15,7 @@ use bls::{PublicKey, SecretKey};
 use clap::Subcommand;
 use color_eyre::{eyre::eyre, eyre::Error, Help, Result};
 use sn_api::{Error as ApiError, Safe};
-use sn_dbc::{Dbc, Error as DbcError};
+use sn_dbc::{Dbc, Error as DbcError, Hash};
 use std::path::{Path, PathBuf};
 use tokio::fs;
 
@@ -74,6 +74,10 @@ pub enum WalletSubCommands {
         /// A file path to store the content of the reissued DBC.
         #[clap(long = "save")]
         save: Option<PathBuf>,
+        /// The reason why this DBC is spent
+        /// (Used for data payments: currently not yet implemented)
+        #[clap(long = "reason")]
+        reason: Option<Hash>,
     },
 }
 
@@ -203,6 +207,7 @@ pub async fn wallet_commander(
             save,
             to,
             owned,
+            reason,
         } => {
             if owned && to.is_some() {
                 return Err(eyre!(
@@ -227,7 +232,7 @@ pub async fn wallet_commander(
             } else {
                 None
             };
-            let dbc = safe.wallet_reissue(&from, &amount, pk).await?;
+            let dbc = safe.wallet_reissue(&from, &amount, pk, reason).await?;
             let dbc_hex = dbc.to_hex()?;
 
             // Write the DBC to a file if the user requested it, but fall

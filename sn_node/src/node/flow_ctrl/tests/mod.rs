@@ -700,6 +700,7 @@ async fn spentbook_spend_client_message_should_replicate_to_adults_and_send_ack(
         ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
             public_key,
             tx: tx.clone(),
+            reason: None,
             spent_proofs,
             spent_transactions,
             network_knowledge: None,
@@ -776,6 +777,7 @@ async fn spentbook_spend_transaction_with_no_inputs_should_return_spentbook_erro
         ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
             public_key: new_dbc2_sk.public_key(),
             tx: new_dbc2.transaction,
+            reason: None,
             spent_proofs: new_dbc.spent_proofs.clone(),
             spent_transactions: new_dbc.spent_transactions,
             network_knowledge: None,
@@ -878,6 +880,7 @@ async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node()
         ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
             public_key,
             tx,
+            reason: None,
             spent_proofs: new_dbc2.spent_proofs,
             spent_transactions: new_dbc2.spent_transactions,
             network_knowledge: Some((proof_chain, sap)),

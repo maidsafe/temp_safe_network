@@ -9,8 +9,8 @@
 use crate::node::{core::NodeContext, flow_ctrl::cmds::Cmd, Error, MyNode, Result};
 
 use sn_dbc::{
-    get_public_commitments_from_transaction, Commitment, DbcTransaction, PublicKey, SpentProof,
-    SpentProofShare,
+    get_public_commitments_from_transaction, Commitment, DbcTransaction, Hash, PublicKey,
+    SpentProof, SpentProofShare,
 };
 use sn_interface::{
     messaging::{
@@ -110,6 +110,7 @@ impl MyNode {
                     network_knowledge,
                     public_key,
                     tx,
+                    reason,
                     spent_proofs,
                     spent_transactions,
                 } = cmd.clone();
@@ -131,6 +132,7 @@ impl MyNode {
                             ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
                                 public_key,
                                 tx,
+                                reason,
                                 spent_proofs,
                                 spent_transactions,
                                 network_knowledge: None,
@@ -200,6 +202,7 @@ impl MyNode {
         let SpentbookCmd::Spend {
             public_key,
             tx,
+            reason,
             spent_proofs,
             spent_transactions,
             ..
@@ -210,6 +213,7 @@ impl MyNode {
         let spent_proof_share = MyNode::gen_spent_proof_share(
             &public_key,
             &tx,
+            reason,
             &spent_proofs,
             &spent_transactions,
             context,
@@ -222,6 +226,7 @@ impl MyNode {
     fn gen_spent_proof_share(
         public_key: &PublicKey,
         tx: &DbcTransaction,
+        reason: Option<Hash>,
         spent_proofs: &BTreeSet<SpentProof>,
         spent_transactions: &BTreeSet<DbcTransaction>,
         context: &NodeContext,
@@ -262,6 +267,7 @@ impl MyNode {
         let spent_proof_share = build_spent_proof_share(
             public_key,
             tx,
+            reason,
             &context.network_knowledge.section_auth(),
             &context.section_keys_provider,
             public_commitment,

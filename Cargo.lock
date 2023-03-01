@@ -3843,7 +3843,7 @@ dependencies = [
  "serde_json",
  "sha3",
  "sn_client",
- "sn_dbc",
+ "sn_dbc 8.4.0",
  "sn_interface",
  "thiserror",
  "time 0.3.17",
@@ -3899,7 +3899,7 @@ dependencies = [
  "serde_yaml",
  "sn_api",
  "sn_cmd_test_utilities",
- "sn_dbc",
+ "sn_dbc 8.4.0",
  "sn_launch_tool",
  "sn_updater",
  "tempfile",
@@ -3948,7 +3948,7 @@ dependencies = [
  "serde_bytes",
  "serde_json",
  "signature",
- "sn_dbc",
+ "sn_dbc 9.0.0",
  "sn_interface",
  "sn_launch_tool",
  "strum",
@@ -4021,9 +4021,25 @@ dependencies = [
 
 [[package]]
 name = "sn_dbc"
-version = "8.3.1"
+version = "8.4.0"
+dependencies = [
+ "bincode",
+ "blsttc",
+ "bulletproofs",
+ "curve25519-dalek-ng",
+ "custom_debug",
+ "hex",
+ "merlin",
+ "serde",
+ "thiserror",
+ "tiny-keccak",
+]
+
+[[package]]
+name = "sn_dbc"
+version = "9.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "127f6d0acb060879e9abace4ccda0a413e4f878f71d68c75e7515199b241067d"
+checksum = "6a6e51feee9b73de5ea9220b95c40493f83e90fdfc9572e10f84b91f2dc7654a"
 dependencies = [
  "bincode",
  "blsttc",
@@ -4085,7 +4101,7 @@ dependencies = [
  "serde_json",
  "signature",
  "sn_consensus",
- "sn_dbc",
+ "sn_dbc 8.4.0",
  "sn_sdkg",
  "strum",
  "strum_macros",
@@ -4162,7 +4178,7 @@ dependencies = [
  "signature",
  "sn_comms",
  "sn_consensus",
- "sn_dbc",
+ "sn_dbc 9.0.0",
  "sn_fault_detection",
  "sn_interface",
  "sn_sdkg",

@@ -205,6 +205,7 @@ pub fn reissue_dbc(
         let spent_proof_share = build_spent_proof_share(
             &public_key,
             &tx,
+            None,
             sap,
             section_keys_provider,
             public_commitment,
