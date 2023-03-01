@@ -169,7 +169,7 @@ impl FlowCtrl {
 
         // Fire cmd to join the network
         let mut last_join_attempt = Instant::now();
-        self.send_join_network_cmd();
+        self.send_join_network_cmd().await;
 
         loop {
             // first do any pending processing
@@ -196,7 +196,7 @@ impl FlowCtrl {
             if last_join_attempt.elapsed() > join_retry_timeout {
                 last_join_attempt = Instant::now();
                 debug!("we're not joined so firing off cmd");
-                self.send_join_network_cmd();
+                self.send_join_network_cmd().await;
             }
 
             // cheeck if we are a member
@@ -211,21 +211,19 @@ impl FlowCtrl {
     }
 
     // Helper to send the TryJoinNetwork cmd
-    fn send_join_network_cmd(&self) {
+    async fn send_join_network_cmd(&self) {
         let cmd_channel_clone = self.cmd_sender_channel.clone();
-        let _handle = tokio::spawn(async move {
-            // send the join message...
-            if let Err(error) = cmd_channel_clone
-                .send((Cmd::TryJoinNetwork, vec![]))
-                .await
-                .map_err(|e| {
-                    error!("Failed join: {:?}", e);
-                    Error::JoinTimeout
-                })
-            {
-                error!("Could not join the network: {error:?}");
-            }
-        });
+        // send the join message...
+        if let Err(error) = cmd_channel_clone
+            .send((Cmd::TryJoinNetwork, vec![]))
+            .await
+            .map_err(|e| {
+                error!("Failed join: {:?}", e);
+                Error::JoinTimeout
+            })
+        {
+            error!("Could not join the network: {error:?}");
+        }
         debug!("Sent TryJoinNetwork command");
     }
 
