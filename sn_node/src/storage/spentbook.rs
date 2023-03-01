@@ -50,6 +50,11 @@ impl Spentbook {
             Ok(bytes) => {
                 let spend: Spend = deserialize(&bytes)?;
                 if spend.dst_address() == *addr {
+                    trace!(
+                        "Got spend {:?} from disk.. tx hash is {:?}",
+                        spend.id(),
+                        spend.proof().content.transaction_hash
+                    );
                     Ok(spend)
                 } else {
                     warn!(
@@ -83,6 +88,10 @@ impl Spentbook {
         trace!(
             "Storing tx share {tx_share_id:?} of spend {id:?}.. (there are {} pending spends)",
             self.pending_spends.len()
+        );
+        trace!(
+            "Storing tx share {tx_share_id:?}, tx hash is: {:?}",
+            spend.proof_share().content.transaction_hash
         );
 
         match self.pending_spends.entry(id) {
@@ -135,6 +144,11 @@ impl Spentbook {
 
         // Store the spend on disk
         trace!("{:?} {addr:?}", LogMarker::StoringSpend);
+        trace!(
+            "Writing spend {:?} to disk.. tx hash is: {:?}",
+            spend.id(),
+            spend.proof().content.transaction_hash
+        );
         if let Some(dirs) = filepath.parent() {
             create_dir_all(dirs).await?;
         }

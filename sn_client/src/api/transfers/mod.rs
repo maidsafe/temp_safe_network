@@ -345,6 +345,9 @@ async fn reissue_dbcs(
         .build(rng::thread_rng())
         .map_err(Error::DbcError)?;
 
+    let inputs = dbc_builder.inputs();
+    trace!("Wallet reissue: {} inputs", inputs.len());
+
     // Get fee outputs to generate the fee ciphers.
     #[cfg(not(feature = "data-network"))]
     let outputs = dbc_builder
@@ -357,7 +360,7 @@ async fn reissue_dbcs(
     let spent_dbcs = inputs.iter().map(|(key, _)| key).cloned().collect();
 
     // Spend all the input DBCs, collecting the spent proof shares for each of them
-    for (public_key, tx) in inputs {
+    for (index, (public_key, tx)) in inputs.into_iter().enumerate() {
         // Generate the fee ciphers.
         #[cfg(not(feature = "data-network"))]
         let input_fee_ciphers = {
@@ -368,6 +371,8 @@ async fn reissue_dbcs(
         };
 
         let tx_hash = Hash::from(tx.hash());
+        trace!("Input #{index} tx_hash: {tx_hash:?}");
+
         // TODO: spend DBCs concurrently spawning tasks
         let mut attempts = 0;
         loop {
@@ -385,6 +390,10 @@ async fn reissue_dbcs(
                 .await?;
 
             let spend = client.get_spend(public_key).await?;
+            trace!(
+                "Spend #{index} tx_hash: {:?}",
+                spend.proof().content.transaction_hash
+            );
 
             // // TODO: we temporarilly filter the spent proof shares which correspond to the TX we
             // // are spending now. This is because current implementation of Spentbook allows
