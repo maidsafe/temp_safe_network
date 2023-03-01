@@ -1,68 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1677674166451,
+  "lastUpdate": 1677691557713,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
-      {
-        "commit": {
-          "author": {
-            "email": "26634292+bors[bot]@users.noreply.github.com",
-            "name": "bors[bot]",
-            "username": "bors[bot]"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": false,
-          "id": "9c6914e2688f70a25ad5dfe74307572cb8e8fcc2",
-          "message": "Merge #1301\n\n1301: feat(node): perform signature verifications on input DBC SpentProof before signing new spent proof share r=bochaco a=bochaco\n\nThis is a follow up PR (6th PR) to PR https://github.com/maidsafe/safe_network/pull/1274, PR https://github.com/maidsafe/safe_network/pull/1235, PR https://github.com/maidsafe/safe_network/pull/1097, PR https://github.com/maidsafe/safe_network/pull/1105, and PR https://github.com/maidsafe/safe_network/pull/1143.\r\n\r\n- This implements `SpentProof`s signature verification by nodes before signing for a spent proof share, as well as checking that each `SpentProof` has been signed by a known section key (by checking the sections chains).\r\n- The input key for the genesis DBC TX is changed to be the same as the genesis key and owner of the genesis DBC. This makes the genesis spent-proof TX to be signed by the genesis key, and it allows nodes to realise when the genesis DBC is the one being spent when doing the `SpentProof` public key verification described above.\r\n- Adapt client_api spentbook test to read genesis DBC from first node in testnet, by default from `~/.safe/node/local-test-network/sn-node-genesis/genesis_dbc`, unless a path is provided on `TEST_ENV_GENESIS_DBC_PATH` env var.\r\n- We temporarily allow double spents in this sn_client test. Once we have the SpentBook implementation which prevents double spents, we'll need to adapt this sn_client test to verify there is no double spent of the genesis DBC.\n\nCo-authored-by: bochaco <gabrielviganotti@gmail.com>",
-          "timestamp": "2022-07-08T14:00:21Z",
-          "tree_id": "30dcb65a6b5622f48ea399f4240a8d01f6c51666",
-          "url": "https://github.com/maidsafe/safe_network/commit/9c6914e2688f70a25ad5dfe74307572cb8e8fcc2"
-        },
-        "date": 1657294111326,
-        "tool": "cargo",
-        "benches": [
-          {
-            "name": "upload-sampling/upload and read 3072b",
-            "value": 513582979,
-            "range": "± 13842798",
-            "unit": "ns/iter"
-          },
-          {
-            "name": "upload-sampling/upload and read 1mb",
-            "value": 540335560,
-            "range": "± 29011079",
-            "unit": "ns/iter"
-          },
-          {
-            "name": "upload-sampling/upload and read 10mb",
-            "value": 813136159,
-            "range": "± 1352708466",
-            "unit": "ns/iter"
-          },
-          {
-            "name": "upload-sampling/upload 3072b",
-            "value": 279763839,
-            "range": "± 41979825",
-            "unit": "ns/iter"
-          },
-          {
-            "name": "upload-sampling/upload 1mb",
-            "value": 396938676,
-            "range": "± 18851096",
-            "unit": "ns/iter"
-          },
-          {
-            "name": "upload-sampling/upload 10mb",
-            "value": 1088885537,
-            "range": "± 27614829",
-            "unit": "ns/iter"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -68932,6 +68872,150 @@ window.BENCHMARK_DATA = {
             "name": "read-sampling/chunk keys/4000",
             "value": 391450866,
             "range": "± 8724711",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "gabrielviganotti@gmail.com",
+            "name": "bochaco",
+            "username": "bochaco"
+          },
+          "committer": {
+            "email": "joshuef@gmail.com",
+            "name": "joshuef",
+            "username": "joshuef"
+          },
+          "distinct": false,
+          "id": "45016b3732bd9cf3a8bca2522c640265eed7b54b",
+          "message": "chore(node): avoid unnecessary relocation candidates look up",
+          "timestamp": "2023-03-01T15:31:33Z",
+          "tree_id": "64c0d68b2c3229bbbc3f80894155432aa939f2f2",
+          "url": "https://github.com/maidsafe/safe_network/commit/45016b3732bd9cf3a8bca2522c640265eed7b54b"
+        },
+        "date": 1677691554132,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "serialize/serialize for sending",
+            "value": 2370019,
+            "range": "± 38361",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 86268636,
+            "range": "± 549833",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 102059940,
+            "range": "± 3896551",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 618826764,
+            "range": "± 7179575",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 72231201,
+            "range": "± 283357",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 87487788,
+            "range": "± 747584",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 539831350,
+            "range": "± 3261039",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "register-edit-sampling/register_edits/1000",
+            "value": 23714090898,
+            "range": "± 240436307",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/100",
+            "value": 56592843,
+            "range": "± 24268642",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/1000",
+            "value": 2961569057,
+            "range": "± 503231050",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/4000",
+            "value": 7038981144,
+            "range": "± 1941249886",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/100",
+            "value": 177618764,
+            "range": "± 6737795",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/1000",
+            "value": 1761819704,
+            "range": "± 55597356",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/4000",
+            "value": 6650359479,
+            "range": "± 418723339",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/100",
+            "value": 46049568,
+            "range": "± 940368",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/1000",
+            "value": 442959901,
+            "range": "± 4882511",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/4000",
+            "value": 1708787444,
+            "range": "± 15082891",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/100",
+            "value": 11361200,
+            "range": "± 395967",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/1000",
+            "value": 96559739,
+            "range": "± 3660441",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/4000",
+            "value": 331270490,
+            "range": "± 3913142",
             "unit": "ns/iter"
           }
         ]
