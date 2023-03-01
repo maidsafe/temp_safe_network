@@ -24,8 +24,7 @@ pub use self::{
     errors::{Error, Result},
     node_info::MyNodeInfo,
     node_state::{
-        MembershipState, NodeState, RelocationDst, RelocationInfo, RelocationProof,
-        RelocationState, RelocationTrigger,
+        MembershipState, NodeState, RelocationDst, RelocationInfo, RelocationProof, RelocationState,
     },
     section_authority_provider::{SapCandidate, SectionAuthUtils, SectionAuthorityProvider},
     section_keys::{SectionKeyShare, SectionKeysProvider},

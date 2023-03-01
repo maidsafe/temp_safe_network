@@ -8,9 +8,7 @@
 
 mod relocation;
 
-pub use relocation::{
-    RelocationDst, RelocationInfo, RelocationProof, RelocationState, RelocationTrigger,
-};
+pub use relocation::{RelocationDst, RelocationInfo, RelocationProof, RelocationState};
 
 use crate::network_knowledge::{section_has_room_for_node, Error, Result};
 use crate::types::Peer;

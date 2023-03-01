@@ -334,9 +334,7 @@ mod tests {
             let node_state = match membership_state {
                 MembershipState::Joined => NodeState::joined(peer, None),
                 MembershipState::Left => NodeState::left(peer, None),
-                MembershipState::Relocated(ref dst) => {
-                    NodeState::relocated(peer, None, (*dst).clone())
-                }
+                MembershipState::Relocated(ref dst) => NodeState::relocated(peer, None, *dst),
             };
             let sectioin_signed_node_state = TestKeys::get_section_signed(secret_key, node_state);
             decisions.push(section_signed_to_decision(sectioin_signed_node_state));

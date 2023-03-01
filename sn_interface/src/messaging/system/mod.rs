@@ -12,7 +12,7 @@ mod node_msgs;
 mod section_sig;
 
 use crate::messaging::AuthorityProof;
-use crate::network_knowledge::{NodeState, RelocationProof, RelocationTrigger, SapCandidate};
+use crate::network_knowledge::{NodeState, RelocationDst, RelocationProof, SapCandidate};
 use crate::SectionAuthorityProvider;
 
 pub use dkg::DkgSessionId;
@@ -39,16 +39,20 @@ pub type SectionPeers = BTreeSet<Decision<NodeState>>;
 #[allow(clippy::large_enum_variant, clippy::derive_partial_eq_without_eq)]
 /// Message sent over the among nodes
 pub enum NodeMsg {
-    /// Sent to the relocating node to begin the relocation process. The `RelocationTrigger` is used
-    /// by the relocating nodes to request the Section for the relocation membership change.
-    BeginRelocating(RelocationTrigger),
-    /// Sent by the relocating node to the Section to start the relocation membership change process.
-    RelocationRequest {
-        relocation_node: XorName,
-        relocation_trigger: RelocationTrigger,
-    },
-    /// Sent from a section to the node to be immediately relocated.
-    Relocate(SectionSigned<NodeState>),
+    /// Sent to a node to begin the relocation process of it. This is so that the node can keep
+    /// polling the elders to ask them to run the relocation request through consensus.
+    /// The node will continue to poll until it receives the AE Update showing that the Elders
+    /// successfully decided for it to be relocated, at which point the node can start the join
+    /// process at the target section, including the necessary proof from src section for it to
+    /// be handled as a relocation.
+    PrepareToRelocate(RelocationDst),
+    /// Sent by the relocating node to its section to proceed the relocation process by initiating a
+    /// membership change, where the node is considered `Relocated`.
+    ProceedRelocation(RelocationDst),
+    /// Sent from the section of a node that is undergoing the relocation process, containing the
+    /// signed membership change. This is used by the node to complete the relocation by including
+    /// it in a `proof` when joining the new section.
+    CompleteRelocation(SectionSigned<NodeState>),
     /// Membership Votes, in order they should be processed in.
     MembershipVotes(Vec<SignedVote<NodeState>>),
     /// Membership Anti-Entropy request
@@ -137,9 +141,9 @@ impl NodeMsg {
 impl Display for NodeMsg {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Relocate { .. } => write!(f, "NodeMsg::Relocate"),
-            Self::BeginRelocating { .. } => write!(f, "NodeMsg::BeginRelocating"),
-            Self::RelocationRequest { .. } => write!(f, "NodeMsg::RequestRelocation"),
+            Self::PrepareToRelocate { .. } => write!(f, "NodeMsg::PrepareToRelocate"),
+            Self::ProceedRelocation { .. } => write!(f, "NodeMsg::ProceedRelocation"),
+            Self::CompleteRelocation { .. } => write!(f, "NodeMsg::CompleteRelocation"),
             Self::MembershipVotes { .. } => write!(f, "NodeMsg::MembershipVotes"),
             Self::MembershipAE { .. } => write!(f, "NodeMsg::MembershipAE"),
             Self::TryJoin(_) => write!(f, "NodeMsg::TryJoin"),

@@ -22,7 +22,7 @@ concurrency:
 
 env:
   CARGO_INCREMENTAL: 0 # bookkeeping for incremental builds has overhead, not useful in CI.
-  NODE_COUNT: 15
+  NODE_COUNT: 14
 
 jobs:
   cargo-udeps:
@@ -162,7 +162,7 @@ jobs:
         timeout-minutes: 50
 
       - name: Run sn_fault_detection tests
-        timeout-minutes: 15
+        timeout-minutes: 14
         env:
           RUST_LOG: sn_fault_detection
         run: cd sn_fault_detection && cargo test --release
@@ -542,7 +542,7 @@ jobs:
   #   name: E2E tests w/ full network
   #   runs-on: self-hosted-ubuntu
   #   env:
-  #     NODE_COUNT: 15
+  #     NODE_COUNT: 14
   #   steps:
   #     - uses: actions/checkout@v2
 
@@ -602,7 +602,7 @@ jobs:
   #     #     sleep 10
   #     #     rm -rf ~/.safe
 
-  #     # # This starts a NODE_COUNT node network, and then adds 15 _more_ nodes
+  #     # # This starts a NODE_COUNT node network, and then adds 14 _more_ nodes
   #     # - name: Run network split data integrity test
   #     #   timeout-minutes: 35 # made 35 for now due to client slowdown. TODO: fix that!
   #     #   shell: bash

@@ -165,26 +165,23 @@ impl MyNode {
                     .await
                     .map(|c| c.into_iter().collect())
             }
-            NodeMsg::BeginRelocating(relocation_trigger) => {
+            NodeMsg::PrepareToRelocate(relocation_trigger) => {
                 let mut node = node.write().await;
-                trace!("[NODE WRITE]: BeginRelocating write gottt...");
-                trace!("Handling BeginRelocating msg from {sender}: {msg_id:?}");
-                Ok(node.handle_begin_relocating(relocation_trigger))
+                trace!("[NODE WRITE]: PrepareToRelocate write gottt...");
+                trace!("Handling PrepareToRelocate msg from {sender}: {msg_id:?}");
+                Ok(node.prepare_to_relocate(relocation_trigger))
             }
-            NodeMsg::RelocationRequest {
-                relocation_node,
-                relocation_trigger,
-            } => {
+            NodeMsg::ProceedRelocation(dst) => {
                 let mut node = node.write().await;
-                trace!("[NODE WRITE]: RelocationRequest write gottt...");
-                trace!("Handling RelocationRequest msg from {sender}: {msg_id:?}");
-                Ok(node.handle_relocation_request(relocation_node, relocation_trigger)?)
+                trace!("[NODE WRITE]: ProceedRelocation write gottt...");
+                trace!("Handling ProceedRelocation msg from {sender}: {msg_id:?}");
+                Ok(node.proceed_relocation(sender.name(), dst)?)
             }
 
-            NodeMsg::Relocate(signed_relocation) => {
+            NodeMsg::CompleteRelocation(signed_relocation) => {
                 let mut node = node.write().await;
-                trace!("[NODE WRITE]: Relocated write gottt...");
-                trace!("Handling Relocate msg from {sender}: {msg_id:?}");
+                trace!("[NODE WRITE]: CompleteRelocation write gottt...");
+                trace!("Handling CompleteRelocation msg from {sender}: {msg_id:?}");
                 Ok(node.relocate(signed_relocation)?.into_iter().collect())
             }
             // The approval or rejection of a join (approval both for new network joiner as well as
