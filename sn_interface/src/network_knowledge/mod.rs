@@ -165,9 +165,14 @@ impl NetworkKnowledge {
             .get_signed(&prefix)
             .cloned()
             .ok_or(Error::NoMatchingSection)?;
+
+        let initial_members = BTreeSet::from_iter(signed_sap.value.members().cloned());
+        let mut section_members = SectionMemberHistory::default();
+        section_members.reset_initial_members(initial_members);
+
         Ok(Self {
             signed_sap,
-            section_members: SectionMemberHistory::default(),
+            section_members,
             section_tree,
         })
     }
@@ -214,6 +219,10 @@ impl NetworkKnowledge {
         if self.section_tree().get(&dst_sap.prefix()).is_none() {
             return Err(Error::NoMatchingSection);
         }
+
+        let initial_members = BTreeSet::from_iter(dst_sap.value.members().cloned());
+        self.reset_initial_members(initial_members);
+
         self.signed_sap = dst_sap;
         Ok(())
     }
@@ -238,12 +247,15 @@ impl NetworkKnowledge {
         {
             Ok(true) => {
                 there_was_an_update = true;
-                info!("Updated network section tree with SAP for {:?}", sap_prefix);
+                info!(
+                    "Updated network section tree with SAP {:?}",
+                    signed_sap.value
+                );
                 // update the signed_sap only if the prefix matches
                 if sap_prefix.matches(our_name) {
                     // Our section SAP is changed, reset the bootstrap members
-                    let bootstrap_members: BTreeSet<_> = signed_sap.members().cloned().collect();
-                    self.reset_initial_members(bootstrap_members);
+                    let initial_members: BTreeSet<_> = signed_sap.members().cloned().collect();
+                    self.reset_initial_members(initial_members);
 
                     let our_prev_prefix = self.prefix();
                     // Remove any node which doesn't belong to our new section's prefix
@@ -267,7 +279,7 @@ impl NetworkKnowledge {
                 warn!("Anti-Entropy: discarded SAP for {sap_prefix:?} since it's the same as the one in our records: {:?}", signed_sap.value);
             }
             Err(err) => {
-                warn!("Anti-Entropy: discarded SAP for {sap_prefix:?} since we failed to update section tree with: {err:?}");
+                warn!("Anti-Entropy: discarded SAP for {sap_prefix:?} since we failed to update section tree with: {:?} - {err:?}", signed_sap.value);
                 return Err(err);
             }
         }
@@ -434,17 +446,17 @@ impl NetworkKnowledge {
     /// Try to merge this `NetworkKnowledge` members with `peers`.
     /// Checks if we're already up to date before attempting to verify and merge members
     pub fn update_members(&mut self, peers: SectionDecisions) -> Result<bool> {
-        for decision in peers.iter() {
-            // The update will be terminated on any of failed validation.
-            decision.validate(&self.signed_sap.public_key_set())?;
-        }
+        // for decision in peers.iter() {
+        //     // The update will be terminated on any of failed validation.
+        //     decision.validate(&self.signed_sap.public_key_set())?;
+        // }
 
         Ok(self.section_members.update_peers(peers))
     }
 
     /// Try update one member with the incoming decision. Returns whether it actually updated.
     pub fn try_update_member(&mut self, decision: Decision<NodeState>) -> Result<bool> {
-        decision.validate(&self.signed_sap.public_key_set())?;
+        // decision.validate(&self.signed_sap.public_key_set())?;
         self.section_members.update(decision)
     }
 

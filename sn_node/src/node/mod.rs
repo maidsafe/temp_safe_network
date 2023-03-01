@@ -360,23 +360,8 @@ impl MyNode {
             }
         }
 
-<<<<<<< HEAD
         let probe = context.network_knowledge.anti_entropy_probe();
         info!("ProbeMsg targets {:?}: {probe:?}", recipients);
-=======
-        /// Generates section infos for the best elder candidate among the members at the given generation
-        /// Returns a set of candidate `DkgSessionId`'s.
-        pub(crate) fn best_elder_candidates_at_gen(
-            &self,
-            membership_gen: u64,
-        ) -> Vec<DkgSessionId> {
-            let sap = self.network_knowledge.section_auth();
-            let chain_len = self.network_knowledge.section_chain_len();
-
-            // get members for membership gen
-            // TODO: shall we just always using the current members?
-            let members = self.network_knowledge.members_at_gen(membership_gen);
->>>>>>> e49d87d33... chore(sn_node): refactor SectionPeers to using Decision
 
         Ok(Cmd::send_network_msg(
             probe,
@@ -492,24 +477,11 @@ impl MyNode {
         }
     }
 
-<<<<<<< HEAD
     /// Generates section infos for the current best elder candidate among the current members
     /// Returns a set of candidate `DkgSessionId`'s.
     pub(crate) fn best_elder_candidates(&self) -> Vec<DkgSessionId> {
-        match self.membership.as_ref() {
-            Some(m) => self.best_elder_candidates_at_gen(m.generation()),
-            None => {
-                error!("Attempted to find best elder candidates when we don't have a membership instance");
-                vec![]
-            }
-=======
-        /// Generates section infos for the current best elder candidate among the current members
-        /// Returns a set of candidate `DkgSessionId`'s.
-        pub(crate) fn best_elder_candidates(&self) -> Vec<DkgSessionId> {
-            let gen = self.network_knowledge.section_decisions().len() as u64;
-            self.best_elder_candidates_at_gen(gen)
->>>>>>> e49d87d33... chore(sn_node): refactor SectionPeers to using Decision
-        }
+        let gen = self.network_knowledge.section_decisions().len() as u64;
+        self.best_elder_candidates_at_gen(gen)
     }
 
     fn initialize_membership(&mut self, key: SectionKeyShare) -> bool {
@@ -777,7 +749,6 @@ impl MyNode {
         });
     }
 
-<<<<<<< HEAD
     /// Sends `FaultsCmd::UntrackIssue` cmd
     /// Spawns a process to send this incase the channel may be full, we don't hold up
     /// processing around this (as this can be called during dkg eg)
@@ -805,31 +776,11 @@ impl MyNode {
     }
 
     pub(crate) fn log_section_stats(&self) {
-        if let Some(m) = self.membership.as_ref() {
-            let adults = self.network_knowledge.adults().len();
+        let adults = self.network_knowledge.adults().len();
+        let elders = self.network_knowledge.section_auth().elder_count();
+        let prefix = self.network_knowledge.prefix();
 
-            let elders = self.network_knowledge.section_auth().elder_count();
-=======
-        pub(crate) fn log_section_stats(&self) {
-            if let Some(_m) = self.membership.as_ref() {
-                let adults = self.network_knowledge.adults().len();
-                let elders = self.network_knowledge.section_auth().elder_count();
-                let prefix = self.network_knowledge.prefix();
-
-                info!("{prefix:?}: {elders} Elders, {adults} Adults.");
-            } else {
-                debug!("log_section_stats: No membership instance");
-            };
-        }
->>>>>>> e49d87d33... chore(sn_node): refactor SectionPeers to using Decision
-
-            let membership_adults = m.current_section_members().len() - elders;
-            let prefix = self.network_knowledge.prefix();
-
-            info!("{prefix:?}: {elders} Elders, {adults}~{membership_adults} Adults.");
-        } else {
-            debug!("log_section_stats: No membership instance");
-        };
+        info!("{prefix:?}: {elders} Elders, {adults} Adults.");
     }
 
     pub(crate) fn write_section_tree(section_tree: SectionTree, root_storage_dir: &Path) {

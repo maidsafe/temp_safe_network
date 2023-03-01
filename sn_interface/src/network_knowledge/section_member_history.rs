@@ -55,6 +55,10 @@ impl SectionMemberHistory {
     /// Returns joined members at the specific generation.
     pub(crate) fn members_at_gen(&self, gen: u64) -> BTreeMap<XorName, NodeState> {
         if gen as usize > self.decisions.len() {
+            warn!(
+                "Cann't get members at genereation {gen:?} as we only have {:?}",
+                self.decisions.len()
+            );
             return BTreeMap::new();
         }
 
@@ -134,6 +138,18 @@ impl SectionMemberHistory {
             "incoming_generation {incoming_generation:?} self.decisions.len() {:?}",
             self.decisions.len()
         );
+
+        // Reject Decision when contains a Joined entry of any initial members
+        for (node, _) in new_decision
+            .proposals
+            .iter()
+            .filter(|(n, _)| matches!(n.state(), MembershipState::Joined))
+        {
+            if self.initial_members.contains(node) {
+                warn!("The incoming Joined decision of {node:?} existing as initial members");
+                return Ok(false);
+            }
+        }
 
         if incoming_generation == self.decisions.len() + 1 {
             self.decisions.push(new_decision.clone());
