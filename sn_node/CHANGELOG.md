@@ -5,11 +5,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.77.5 (2023-03-01)
+
+### Chore
+
+ - <csr-id-45016b3732bd9cf3a8bca2522c640265eed7b54b/> avoid unnecessary relocation candidates look up
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 1 commit contributed to the release.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Avoid unnecessary relocation candidates look up ([`45016b3`](https://github.com/maidsafe/safe_network/commit/45016b3732bd9cf3a8bca2522c640265eed7b54b))
+</details>
+
 ## v0.77.4 (2023-03-01)
+
+<csr-id-652af5fbe3468b82c26be9a2f88a7c824c6c0032/>
 
 ### Chore
 
  - <csr-id-652af5fbe3468b82c26be9a2f88a7c824c6c0032/> relocation + age changes/ logs
+
+### Chore
+
+ - <csr-id-f195979b7a13a710d1c217aae4a0a361476dec3e/> sn_node-0.77.4
 
 ### New Features
 
@@ -20,8 +50,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
- - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 3 commits contributed to the release.
+ - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -31,6 +61,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Sn_node-0.77.4 ([`f195979`](https://github.com/maidsafe/safe_network/commit/f195979b7a13a710d1c217aae4a0a361476dec3e))
     - Add ae probe msg to section elders ([`5177d15`](https://github.com/maidsafe/safe_network/commit/5177d154b5f1c524004d688552da5008f83c7522))
     - Relocation + age changes/ logs ([`652af5f`](https://github.com/maidsafe/safe_network/commit/652af5fbe3468b82c26be9a2f88a7c824c6c0032))
 </details>
@@ -38,6 +69,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## v0.77.3 (2023-02-28)
 
 <csr-id-5fd068e10cc96396fb800cf6acd92b377f4e21d9/>
+<csr-id-039e1cc0fa8a7e7ae1c97a0c89328117a43d4796/>
 
 ### Chore
 
