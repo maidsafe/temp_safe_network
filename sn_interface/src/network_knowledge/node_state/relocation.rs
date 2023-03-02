@@ -157,8 +157,12 @@ impl RelocationProof {
         self.info.signed_relocation.age()
     }
 
+    pub fn signed_relocation(&self) -> &SectionSigned<NodeState> {
+        &self.info.signed_relocation
+    }
+
     // ed25519_dalek::Signature has overly verbose debug output, so we provide our own
-    pub fn fmt_ed25519(sig: &Signature, f: &mut Formatter<'_>) -> fmt::Result {
+    fn fmt_ed25519(sig: &Signature, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "Signature({:0.10})", HexFmt(sig))
     }
 
@@ -172,6 +176,8 @@ impl RelocationProof {
 #[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug)]
 pub enum RelocationState {
+    /// The node is not peforming a relocation
+    NoRelocation,
     /// A relocation dst is sent from a section to one of its members, based upon
     /// the node matching the trigger.
     /// This is the elders asking the node to start polling
@@ -179,4 +185,13 @@ pub enum RelocationState {
     PreparingToRelocate(RelocationTrigger),
     /// When the node has a `RelocationProof` it can join the dst section with the provided proof.
     ReadyToJoinNewSection(RelocationProof),
+}
+
+impl RelocationState {
+    pub fn proof(&self) -> Option<&RelocationProof> {
+        match self {
+            Self::ReadyToJoinNewSection(proof) => Some(proof),
+            _ => None,
+        }
+    }
 }
