@@ -5,18 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.77.6 (2023-03-01)
+## v0.77.7 (2023-03-02)
 
-### Chore
+### New Features
 
- - <csr-id-839a821faed652875671e633bef53bef37a16f12/> clarify spend flow
+ - <csr-id-8d22e3da6dfb6c32a5eb56cb91005703b1b43f0e/> remove DKG sessions with absent members on membership update
+
+### Bug Fixes
+
+ - <csr-id-22ab2945479fbd7d5187153a69fa762969061007/> dramatic removal of all DKG sessions except what we want to remove
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 1 commit contributed to the release.
- - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -26,12 +30,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Dramatic removal of all DKG sessions except what we want to remove ([`22ab294`](https://github.com/maidsafe/safe_network/commit/22ab2945479fbd7d5187153a69fa762969061007))
+    - Remove DKG sessions with absent members on membership update ([`8d22e3d`](https://github.com/maidsafe/safe_network/commit/8d22e3da6dfb6c32a5eb56cb91005703b1b43f0e))
+</details>
+
+## v0.77.6 (2023-03-01)
+
+<csr-id-839a821faed652875671e633bef53bef37a16f12/>
+
+### Chore
+
+ - <csr-id-839a821faed652875671e633bef53bef37a16f12/> clarify spend flow
+
+### Chore
+
+ - <csr-id-e084b00fd54bb13382b2535d2cc70b480ed099c0/> sn_node-0.77.6
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Sn_node-0.77.6 ([`e084b00`](https://github.com/maidsafe/safe_network/commit/e084b00fd54bb13382b2535d2cc70b480ed099c0))
     - Clarify spend flow ([`839a821`](https://github.com/maidsafe/safe_network/commit/839a821faed652875671e633bef53bef37a16f12))
 </details>
 
 ## v0.77.5 (2023-03-01)
 
 <csr-id-45016b3732bd9cf3a8bca2522c640265eed7b54b/>
+<csr-id-6e1173bb84e83dcb5990b0340ccbb0ce05033a9b/>
 
 ### Chore
 
