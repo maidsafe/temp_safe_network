@@ -551,7 +551,7 @@ mod core {
             let missing_members_hashes = Vec::from_iter(
                 self.dkg_sessions_info
                     .iter()
-                    .filter(|(_, info)| info.session_id.elders.keys().all(is_member))
+                    .filter(|(_, info)| !info.session_id.elders.keys().all(is_member))
                     .map(|(hash, _)| *hash),
             );
             for hash in missing_members_hashes {
