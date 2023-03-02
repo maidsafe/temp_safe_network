@@ -180,6 +180,8 @@ jobs:
         run: cd sn_node && cargo test --release
 
       - name: Build sn_cli tests before running
+        env:
+            RUST_LOG: "sn_api=trace"
         run: cd sn_cli && cargo test --no-run --release --features data-network
         timeout-minutes: 50
 
@@ -949,6 +951,8 @@ jobs:
         timeout-minutes: 50
 
       - name: Run CLI tests
+        env:
+            RUST_LOG: "sn_api=trace"
         run: cd sn_cli && cargo test --release --features check-replicas,data-network,node-ctrl -- --test-threads=1
         timeout-minutes: 7
 
