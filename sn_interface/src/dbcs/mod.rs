@@ -7,12 +7,17 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use sn_dbc::{
-    rng, Dbc, Hash, IndexedSignatureShare, Owner, OwnerOnce, PedersenGens, RevealedCommitment,
-    RevealedInput, SpentProofContent, SpentProofShare, Token, TransactionBuilder,
+    rng, Dbc, Error as DbcError, Hash, IndexedSignatureShare, Owner, OwnerOnce, PedersenGens,
+    RevealedCommitment, RevealedInput, SpentProofContent, SpentProofShare, Token,
+    TransactionBuilder,
 };
 
 use std::{fmt::Debug, result};
 use thiserror::Error;
+
+mod reasons;
+
+pub use reasons::DbcReason;
 
 /// Amount of tokens to be owned by the Genesis DBC.
 /// At the inception of the Network a total supply of 4,525,524,120 whole tokens will be created.
@@ -30,6 +35,9 @@ pub enum Error {
     /// Error occurred when minting the Genesis DBC.
     #[error("Genesis DBC error:: {0}")]
     GenesisDbcError(String),
+    /// FailedToParseReason
+    #[error("Failed to parse reason: {0}")]
+    FailedToParseReason(#[from] DbcError),
 }
 
 /// Generate the genesis DBC.

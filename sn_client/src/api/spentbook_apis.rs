@@ -10,8 +10,9 @@ use super::Client;
 
 use crate::{Error, Result};
 
-use sn_dbc::{DbcTransaction, Hash, PublicKey, SpentProof, SpentProofShare};
+use sn_dbc::{DbcTransaction, PublicKey, SpentProof, SpentProofShare};
 use sn_interface::{
+    dbcs::DbcReason,
     messaging::data::{
         DataCmd, DataQuery, Error as NetworkDataError, QueryResponse, SpentbookCmd, SpentbookQuery,
     },
@@ -44,7 +45,7 @@ impl Client {
         &self,
         public_key: PublicKey,
         tx: DbcTransaction,
-        reason: Option<Hash>,
+        reason: DbcReason,
         spent_proofs: BTreeSet<SpentProof>,
         spent_transactions: BTreeSet<DbcTransaction>,
     ) -> Result<()> {
@@ -131,6 +132,7 @@ mod tests {
     use crate::Client;
 
     use sn_dbc::{rng, DbcTransaction, Hash, OwnerOnce, TransactionBuilder};
+    use sn_interface::dbcs::DbcReason;
     use sn_interface::messaging::data::Error as ErrorMsg;
 
     use eyre::{bail, Result};
@@ -202,7 +204,7 @@ mod tests {
             .spend_dbc(
                 public_key,
                 tx.clone(),
-                None,
+                DbcReason::none(),
                 genesis_dbc.spent_proofs,
                 genesis_dbc.spent_transactions,
             )
@@ -245,7 +247,7 @@ mod tests {
             .spend_dbc(
                 public_key,
                 tx.clone(),
-                None,
+                DbcReason::none(),
                 invalid_spent_proofs,
                 genesis_dbc.spent_transactions,
             )
@@ -291,7 +293,7 @@ mod tests {
             .spend_dbc(
                 public_key,
                 tx.clone(),
-                None,
+                DbcReason::none(),
                 genesis_dbc.spent_proofs,
                 genesis_dbc.spent_transactions,
             )
@@ -367,7 +369,7 @@ mod tests {
             .spend_dbc(
                 output_owneronce_2.as_owner().public_key(),
                 output_dbc_2.transaction.clone(),
-                None,
+                DbcReason::none(),
                 genesis_dbc.spent_proofs.clone(),
                 genesis_dbc.spent_transactions,
             )
@@ -414,7 +416,7 @@ mod tests {
             .spend_dbc(
                 random_public_key,
                 tx.clone(),
-                None,
+                DbcReason::none(),
                 genesis_dbc.spent_proofs.clone(),
                 genesis_dbc.spent_transactions,
             )
@@ -530,7 +532,7 @@ mod tests {
                     .spend_dbc(
                         public_key,
                         tx.clone(),
-                        None,
+                        DbcReason::none(),
                         spent_proofs.clone(),
                         spent_transactions.clone(),
                     )

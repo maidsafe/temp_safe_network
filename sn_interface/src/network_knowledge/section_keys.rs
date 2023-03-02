@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::dbcs::DbcReason;
 use crate::network_knowledge::{Error, Result, SectionAuthorityProvider};
 use crate::types::log_markers::LogMarker;
 
@@ -107,7 +108,7 @@ impl SectionKeysProvider {
 pub fn build_spent_proof_share(
     public_key: &bls::PublicKey,
     tx: &DbcTransaction,
-    reason: Option<Hash>,
+    reason: DbcReason,
     sap: &SectionAuthorityProvider,
     skp: &SectionKeysProvider,
     public_commitment: Commitment,
@@ -115,7 +116,7 @@ pub fn build_spent_proof_share(
     let content = SpentProofContent {
         public_key: *public_key,
         transaction_hash: Hash::from(tx.hash()),
-        reason: reason.unwrap_or_default(),
+        reason: reason.into(),
         public_commitment,
     };
     let (index, sig_share) = skp.sign_with(content.hash().as_ref(), &sap.section_key())?;
