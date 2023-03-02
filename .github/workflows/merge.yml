@@ -25,6 +25,22 @@ env:
   NODE_COUNT: 14
 
 jobs:
+
+  pre_job:
+    # continue-on-error: true # Uncomment once integration is finished
+    runs-on: ubuntu-latest
+    # Map a step output to a job output
+    outputs:
+      should_skip: ${{ steps.skip_check.outputs.should_skip }}
+    steps:
+      - id: skip_check
+        uses: fkirc/skip-duplicate-actions@v5
+        with:
+          # All of these options are optional, so you can remove them if you are happy with the defaults
+          concurrent_skipping: 'never'
+          skip_after_successful_duplicate: 'true'
+          do_not_skip: '["pull_request", "workflow_dispatch", "schedule"]'
+
   cargo-udeps:
     if: "!startsWith(github.event.head_commit.message, 'chore(release):')"
     name: Unused dependency check
@@ -97,6 +113,8 @@ jobs:
         run: RUSTDOCFLAGS="--deny=warnings" cargo doc --no-deps
 
   build-arm:
+    needs: pre_job
+    if: needs.pre_job.outputs.should_skip != 'true'
     name: build arm
     runs-on: ${{ matrix.os }}
     strategy:
@@ -126,7 +144,8 @@ jobs:
             !artifacts/.cargo-lock
 
   unit:
-    if: "!startsWith(github.event.head_commit.message, 'chore(release):')"
+    needs: pre_job
+    if: "!startsWith(github.event.head_commit.message, 'chore(release):') && needs.pre_job.outputs.should_skip != 'true'"
     name: Unit Tests
     runs-on: ${{ matrix.os }}
     strategy:
@@ -188,7 +207,8 @@ jobs:
         run: cd sn_cli && cargo test --release --bin safe --features data-network
 
   e2e:
-    if: "!startsWith(github.event.head_commit.message, 'chore(release):')"
+    needs: pre_job
+    if: "!startsWith(github.event.head_commit.message, 'chore(release):') && needs.pre_job.outputs.should_skip != 'true'"
     name: E2E tests
     runs-on: ${{ matrix.os }}
     strategy:
@@ -325,7 +345,8 @@ jobs:
         continue-on-error: true
 
   e2e-msg-happy-path:
-    if: "!startsWith(github.event.head_commit.message, 'chore(release):')"
+    needs: pre_job
+    if: "!startsWith(github.event.head_commit.message, 'chore(release):') && needs.pre_job.outputs.should_skip != 'true'"
     name: E2E tests (msg happy path)
     runs-on: ${{ matrix.os }}
     strategy:
@@ -462,7 +483,8 @@ jobs:
         continue-on-error: true
 
   e2e-churn:
-    if: "!startsWith(github.event.head_commit.message, 'chore(release):')"
+    needs: pre_job
+    if: "!startsWith(github.event.head_commit.message, 'chore(release):') && needs.pre_job.outputs.should_skip != 'true'"
     name: E2E Churn test
     runs-on: ubuntu-latest
     env:
@@ -710,7 +732,8 @@ jobs:
   #         rm -rf ~/.safe
 
   api:
-    if: "!startsWith(github.event.head_commit.message, 'chore(release):')"
+    needs: pre_job
+    if: "!startsWith(github.event.head_commit.message, 'chore(release):') && needs.pre_job.outputs.should_skip != 'true'"
     name: Run API tests
     runs-on: ${{ matrix.os }}
     strategy:
@@ -827,7 +850,8 @@ jobs:
         continue-on-error: true
 
   cli:
-    if: "!startsWith(github.event.head_commit.message, 'chore(release):')"
+    needs: pre_job
+    if: "!startsWith(github.event.head_commit.message, 'chore(release):') && needs.pre_job.outputs.should_skip != 'true'"
     name: Run CLI tests
     runs-on: ${{ matrix.os }}
     strategy:
