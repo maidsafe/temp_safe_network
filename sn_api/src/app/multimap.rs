@@ -13,9 +13,9 @@ use crate::{Error, Result, Safe};
 
 use sn_interface::types::DataAddress;
 
-use log::debug;
 use rand::Rng;
 use std::collections::BTreeSet;
+use tracing::debug;
 use xor_name::XorName;
 
 pub type MultimapKey = Vec<u8>;

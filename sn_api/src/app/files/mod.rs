@@ -11,28 +11,6 @@ mod files_map;
 mod metadata;
 mod realpath;
 
-use sn_client::QueriedDataReplicas;
-
-use crate::{
-    app::consts::*, app::nrs::VersionHash, resolver::Range, ContentType, DataType, Error, Result,
-    Safe, SafeUrl, XorUrl,
-};
-use bytes::{Buf, Bytes};
-use file_system::{
-    file_system_dir_walk, file_system_single_file, normalise_path_separator, upload_file_to_net,
-};
-use files_map::add_or_update_file_item;
-use log::{debug, info, warn};
-use relative_path::RelativePath;
-use sn_client::Client;
-use std::{
-    collections::{BTreeMap, HashSet},
-    iter::FromIterator,
-    path::{Path, PathBuf},
-    str,
-};
-use xor_name::XorName;
-
 pub(crate) use files_map::{file_map_for_path, get_file_link_and_metadata};
 pub(crate) use metadata::FileMeta;
 pub(crate) use realpath::RealPath;
@@ -45,6 +23,28 @@ pub type ProcessedFiles = BTreeMap<PathBuf, FilesMapChange>;
 const ERROR_MSG_NO_FILES_CONTAINER_FOUND: &str = "No FilesContainer found at this address";
 // Type tag to use for the FilesContainer stored on Register
 pub(crate) const FILES_CONTAINER_TYPE_TAG: u64 = 1_100;
+
+use crate::{
+    app::consts::*, app::nrs::VersionHash, resolver::Range, ContentType, DataType, Error, Result,
+    Safe, SafeUrl, XorUrl,
+};
+
+use sn_client::{Client, QueriedDataReplicas};
+
+use bytes::{Buf, Bytes};
+use file_system::{
+    file_system_dir_walk, file_system_single_file, normalise_path_separator, upload_file_to_net,
+};
+use files_map::add_or_update_file_item;
+use relative_path::RelativePath;
+use std::{
+    collections::{BTreeMap, HashSet},
+    iter::FromIterator,
+    path::{Path, PathBuf},
+    str,
+};
+use tracing::{debug, info, warn};
+use xor_name::XorName;
 
 impl Safe {
     /// # Create an empty `FilesContainer`.

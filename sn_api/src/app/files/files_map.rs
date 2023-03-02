@@ -11,10 +11,12 @@ use super::{
     metadata::FileMeta,
     ProcessedFiles, RealPath,
 };
+
 use crate::{app::consts::*, Error, Result, Safe, XorUrl};
-use log::{debug, info};
+
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, fs, path::Path};
+use tracing::{debug, info};
 
 // To use for mapping files names (with path in a flattened hierarchy) to FileInfos
 pub type FilesMap = BTreeMap<String, FileInfo>;

@@ -7,14 +7,17 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{metadata::get_metadata, FilesMapChange, ProcessedFiles};
+
 use crate::{Error, Result, Safe, XorUrl};
-use bytes::Bytes;
-use log::info;
+
 use sn_client::Error as ClientError;
+
+use bytes::Bytes;
 use std::{
     fs,
     path::{Path, PathBuf},
 };
+use tracing::info;
 use walkdir::{DirEntry, WalkDir};
 
 const MAX_RECURSIVE_DEPTH: usize = 10_000;
