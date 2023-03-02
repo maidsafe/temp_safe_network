@@ -770,7 +770,7 @@ jobs:
 
       - name: Run API tests
         env:
-          RUST_LOG: "sn_client=trace"
+          RUST_LOG: "sn_api=trace,sn_client=trace"
         run: cd sn_api && cargo test --release --features check-replicas
         timeout-minutes: 7
 
