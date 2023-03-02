@@ -5,7 +5,68 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.77.8 (2023-03-02)
+
+### Chore
+
+ - <csr-id-bc3b2fb766531e42f4771b81775d6ccc5355238c/> simplify + flatten node_starter
+ - <csr-id-0d8cadd1bdfad43311e13ec32c3e0c96973d6259/> update docs for process_cmds_and_periodics
+ - <csr-id-5248262e087b0c46a34b956c78f6e47bd423b3ea/> test tidying and commented code removal
+ - <csr-id-93483636ad4256ea8c5592b34ec4084a27730075/> update join processing docs
+ - <csr-id-d994346be71e13de7d8e60574013d2f10753a33d/> remove unnecessary spawn call during join
+ - <csr-id-aedb4e081f3611a6570ea668eac052ed4e0f0783/> tidy away commented code
+ - <csr-id-4b2b47ff79e449e445cf7bd4e789594d88f300c2/> remove Duration::checked_sub
+ - <csr-id-067ce87d783e2966f6b0b70ab1577a74fcaa5023/> fixes post-rebase
+ - <csr-id-d9790dbca657ee4d596b4130aadcae877ed6ec1b/> refactor away Dispatcher as a concept
+ - <csr-id-dadfe57d91c8621d72952e8fab72fdc10cef6121/> pass down context from dispatcher
+
+### New Features
+
+ - <csr-id-82ae4089db5e6e9e8975d3cf205ed5da4b5e8326/> remove RwLock around MyNode
+ - <csr-id-20202065bff96af62ad1f5276750824ef5a6a7c7/> add Cmds for Node/Ae,Client processing
+   This should allow for better targetting of threading down the line
+
+### Bug Fixes
+
+ - <csr-id-45d37d8c22d50e3448afe6ae075e7c5395114d4b/> ignore error while processing cmds
+ - <csr-id-b3443505a630b6673e234d01095a559edda46328/> make tests work without dispatcher
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 14 commits contributed to the release.
+ - 14 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Ignore error while processing cmds ([`45d37d8`](https://github.com/maidsafe/safe_network/commit/45d37d8c22d50e3448afe6ae075e7c5395114d4b))
+    - Simplify + flatten node_starter ([`bc3b2fb`](https://github.com/maidsafe/safe_network/commit/bc3b2fb766531e42f4771b81775d6ccc5355238c))
+    - Update docs for process_cmds_and_periodics ([`0d8cadd`](https://github.com/maidsafe/safe_network/commit/0d8cadd1bdfad43311e13ec32c3e0c96973d6259))
+    - Test tidying and commented code removal ([`5248262`](https://github.com/maidsafe/safe_network/commit/5248262e087b0c46a34b956c78f6e47bd423b3ea))
+    - Update join processing docs ([`9348363`](https://github.com/maidsafe/safe_network/commit/93483636ad4256ea8c5592b34ec4084a27730075))
+    - Remove unnecessary spawn call during join ([`d994346`](https://github.com/maidsafe/safe_network/commit/d994346be71e13de7d8e60574013d2f10753a33d))
+    - Tidy away commented code ([`aedb4e0`](https://github.com/maidsafe/safe_network/commit/aedb4e081f3611a6570ea668eac052ed4e0f0783))
+    - Remove Duration::checked_sub ([`4b2b47f`](https://github.com/maidsafe/safe_network/commit/4b2b47ff79e449e445cf7bd4e789594d88f300c2))
+    - Fixes post-rebase ([`067ce87`](https://github.com/maidsafe/safe_network/commit/067ce87d783e2966f6b0b70ab1577a74fcaa5023))
+    - Make tests work without dispatcher ([`b344350`](https://github.com/maidsafe/safe_network/commit/b3443505a630b6673e234d01095a559edda46328))
+    - Refactor away Dispatcher as a concept ([`d9790db`](https://github.com/maidsafe/safe_network/commit/d9790dbca657ee4d596b4130aadcae877ed6ec1b))
+    - Remove RwLock around MyNode ([`82ae408`](https://github.com/maidsafe/safe_network/commit/82ae4089db5e6e9e8975d3cf205ed5da4b5e8326))
+    - Pass down context from dispatcher ([`dadfe57`](https://github.com/maidsafe/safe_network/commit/dadfe57d91c8621d72952e8fab72fdc10cef6121))
+    - Add Cmds for Node/Ae,Client processing ([`2020206`](https://github.com/maidsafe/safe_network/commit/20202065bff96af62ad1f5276750824ef5a6a7c7))
+</details>
+
 ## v0.77.7 (2023-03-02)
+
+### Chore
+
+ - <csr-id-12822dea56f8b16574a3a3a81239985a36f976e2/> sn_node-0.77.7
 
 ### New Features
 
@@ -19,8 +80,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
- - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 3 commits contributed to the release.
+ - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -30,6 +91,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Sn_node-0.77.7 ([`12822de`](https://github.com/maidsafe/safe_network/commit/12822dea56f8b16574a3a3a81239985a36f976e2))
     - Dramatic removal of all DKG sessions except what we want to remove ([`22ab294`](https://github.com/maidsafe/safe_network/commit/22ab2945479fbd7d5187153a69fa762969061007))
     - Remove DKG sessions with absent members on membership update ([`8d22e3d`](https://github.com/maidsafe/safe_network/commit/8d22e3da6dfb6c32a5eb56cb91005703b1b43f0e))
 </details>
@@ -37,6 +99,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## v0.77.6 (2023-03-01)
 
 <csr-id-839a821faed652875671e633bef53bef37a16f12/>
+<csr-id-e084b00fd54bb13382b2535d2cc70b480ed099c0/>
 
 ### Chore
 
