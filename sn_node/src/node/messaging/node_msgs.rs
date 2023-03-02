@@ -162,7 +162,7 @@ impl MyNode {
             }
             NodeMsg::PrepareToRelocate(relocation_trigger) => {
                 trace!("Handling PrepareToRelocate msg from {sender}: {msg_id:?}");
-                Ok(node.prepare_to_relocate(relocation_trigger))
+                Ok(node.prepare_to_relocate(relocation_trigger, context.name))
             }
             NodeMsg::ProceedRelocation(dst) => {
                 trace!("Handling ProceedRelocation msg from {sender}: {msg_id:?}");
@@ -179,7 +179,7 @@ impl MyNode {
                 if context.network_knowledge.is_section_member(&context.name) {
                     // we can ignore this reponse msg
                     trace!("Join response received when we're already a member. Ignoring.");
-                    return Ok(vec![])
+                    return Ok(vec![]);
                 }
 
                 match join_response {
