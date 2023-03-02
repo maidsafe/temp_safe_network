@@ -25,7 +25,7 @@ pub mod test_utils {
         network_knowledge::{SectionAuthUtils, SectionKeyShare},
     };
     use bls::{blstrs::Scalar, poly::Poly, SecretKey, SecretKeySet, Signature};
-    use eyre::eyre;
+    use eyre::{eyre, Context, Result};
     use serde::Serialize;
     use std::collections::{BTreeMap, BTreeSet};
 
@@ -34,9 +34,9 @@ pub mod test_utils {
 
     impl TestKeys {
         /// Create `bls::Signature` for the given payload using the provided `bls::SecretKey`
-        pub fn sign<T: Serialize>(secret_key: &SecretKey, payload: &T) -> Signature {
-            let bytes = bincode::serialize(payload).expect("Failed to serialize payload");
-            Self::sign_bytes(secret_key, &bytes)
+        pub fn sign<T: Serialize>(secret_key: &SecretKey, payload: &T) -> Result<Signature> {
+            let bytes = bincode::serialize(payload).wrap_err("Failed to serialize payload")?;
+            Ok(Self::sign_bytes(secret_key, &bytes))
         }
 
         /// Create `bls::Signature` for the given bytes using the provided `bls::SecretKey`
@@ -53,9 +53,12 @@ pub mod test_utils {
         }
 
         /// Create `SectionSig` for the given payload using the provided `bls::SecretKey`
-        pub fn get_section_sig<T: Serialize>(secret_key: &SecretKey, payload: &T) -> SectionSig {
-            let bytes = bincode::serialize(payload).expect("Failed to serialize payload");
-            Self::get_section_sig_bytes(secret_key, &bytes)
+        pub fn get_section_sig<T: Serialize>(
+            secret_key: &SecretKey,
+            payload: &T,
+        ) -> Result<SectionSig> {
+            let bytes = bincode::serialize(payload).wrap_err("Failed to serialize payload")?;
+            Ok(Self::get_section_sig_bytes(secret_key, &bytes))
         }
 
         /// Create signature for the given payload using the provided `bls::SecretKey` and
@@ -63,9 +66,9 @@ pub mod test_utils {
         pub fn get_section_signed<T: Serialize>(
             secret_key: &SecretKey,
             payload: T,
-        ) -> SectionSigned<T> {
-            let sig = Self::get_section_sig(secret_key, &payload);
-            SectionSigned::new(payload, sig)
+        ) -> Result<SectionSigned<T>> {
+            let sig = Self::get_section_sig(secret_key, &payload)?;
+            Ok(SectionSigned::new(payload, sig))
         }
 
         /// Generate a `SectionKeyShare` from the `bls::SecretKeySet` and given index
@@ -81,7 +84,7 @@ pub mod test_utils {
         /// we provide n shares, where n > threshold + 1.
         pub fn get_sk_set_from_shares(
             section_key_shares: &[SectionKeyShare],
-        ) -> eyre::Result<SecretKeySet> {
+        ) -> Result<SecretKeySet> {
             // need to first get the pub_key_set to calulcate the threshold
             let pub_key_set = section_key_shares
                 .iter()
@@ -130,7 +133,7 @@ pub mod test_utils {
     }
 
     #[test]
-    fn obtain_sk_set_from_shares() -> eyre::Result<()> {
+    fn obtain_sk_set_from_shares() -> Result<()> {
         let sks = SecretKeySet::random(3, &mut bls::rand::thread_rng());
 
         // > threshold shares are needed to get the sk_set

@@ -630,20 +630,20 @@ mod tests {
 
         // section 1
         let (sap1, sk_1, ..) = TestSapBuilder::new(prefix("1")).elder_count(0).build();
-        let sap1 = TestKeys::get_section_signed(&sk_1.secret_key(), sap1);
+        let sap1 = TestKeys::get_section_signed(&sk_1.secret_key(), sap1)?;
         let our_node_name_prefix_1 = sap1.prefix().name();
         let proof_chain = knowledge.section_chain();
         let section_tree_update =
-            TestSectionTree::get_section_tree_update(&sap1, &proof_chain, &sk_gen.secret_key());
+            TestSectionTree::get_section_tree_update(&sap1, &proof_chain, &sk_gen.secret_key())?;
         assert!(knowledge
             .update_sap_knowledge_if_valid(section_tree_update, &our_node_name_prefix_1)?);
         assert_eq!(knowledge.signed_sap, sap1);
 
         // section with different prefix (0) and our node name doesn't match
         let (sap0, sk_0, ..) = TestSapBuilder::new(prefix("0")).elder_count(0).build();
-        let sap0 = TestKeys::get_section_signed(&sk_0.secret_key(), sap0);
+        let sap0 = TestKeys::get_section_signed(&sk_0.secret_key(), sap0)?;
         let section_tree_update =
-            TestSectionTree::get_section_tree_update(&sap0, &proof_chain, &sk_gen.secret_key());
+            TestSectionTree::get_section_tree_update(&sap0, &proof_chain, &sk_gen.secret_key())?;
         // our node is still in prefix1
         assert!(knowledge
             .update_sap_knowledge_if_valid(section_tree_update, &our_node_name_prefix_1)?);

@@ -709,7 +709,7 @@ pub mod test_utils {
         let mut dummy_network_contacts: Vec<SectionTree> = Vec::new();
 
         for _ in 0..n_network_contacts {
-            let (network_contacts, _) = TestSectionTree::random_tree();
+            let (network_contacts, _) = TestSectionTree::random_tree()?;
             let filename = format!("{:?}", network_contacts.genesis_key());
 
             network_contacts

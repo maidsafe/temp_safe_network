@@ -479,10 +479,10 @@ mod tests {
         let prefix = Prefix::default();
         let env = TestNetworkBuilder::new(thread_rng())
             .sap(prefix, 7, 0, None, None)
-            .build();
+            .build()?;
 
         let mut membership = env
-            .get_nodes(prefix, 1, 0, None)
+            .get_nodes(prefix, 1, 0, None)?
             .remove(0)
             .membership
             .expect("Membership for the elder should've been initialized");

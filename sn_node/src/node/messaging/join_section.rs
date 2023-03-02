@@ -75,9 +75,9 @@ mod tests {
         let msg_tracker = Arc::new(RwLock::new(TestMsgTracker::default()));
         let mut env = TestNetworkBuilder::new(thread_rng())
             .sap(prefix, elder_count, adult_count, None, None)
-            .build();
+            .build()?;
         let mut node_instances = env
-            .get_nodes(prefix, elder_count, adult_count, None)
+            .get_nodes(prefix, elder_count, adult_count, None)?
             .into_iter()
             .map(|node| {
                 let name = node.name();
@@ -91,7 +91,7 @@ mod tests {
             let comm = env.take_comm_rx(pk);
             let _ = comm_receivers.insert(*name, comm);
         }
-        let network_knowledge = env.get_network_knowledge(prefix, None);
+        let network_knowledge = env.get_network_knowledge(prefix, None)?;
 
         let (joining_node_name, mut joining_node_handle) = initialize_join(
             prefix,
@@ -128,9 +128,9 @@ mod tests {
         let prefix = Prefix::default();
         let env = TestNetworkBuilder::new(thread_rng())
             .sap(prefix, 1, 0, None, None)
-            .build();
+            .build()?;
 
-        let network_knowledge = env.get_network_knowledge(prefix, None);
+        let network_knowledge = env.get_network_knowledge(prefix, None)?;
 
         let joining_node = {
             let (info, comm, _incoming_msg_receiver) =
@@ -138,7 +138,7 @@ mod tests {
             TestNetwork::build_a_node_instance(&info, &comm, &network_knowledge)
         };
 
-        let mut nodes = env.get_nodes(prefix, 1, 0, None);
+        let mut nodes = env.get_nodes(prefix, 1, 0, None)?;
         let mut elder = nodes.pop().expect("One elder should exist.");
         let elder_peer = elder.info().peer();
 
@@ -195,9 +195,9 @@ mod tests {
         let prefix = Prefix::default();
         let env = TestNetworkBuilder::new(thread_rng())
             .sap(prefix, 1, 1, None, None)
-            .build();
+            .build()?;
 
-        let network_knowledge = env.get_network_knowledge(prefix, None);
+        let network_knowledge = env.get_network_knowledge(prefix, None)?;
 
         let joining_node = {
             let (info, comm, _incoming_msg_receiver) =
@@ -205,7 +205,7 @@ mod tests {
             TestNetwork::build_a_node_instance(&info, &comm, &network_knowledge)
         };
 
-        let mut nodes = env.get_nodes(prefix, 0, 1, None);
+        let mut nodes = env.get_nodes(prefix, 0, 1, None)?;
         let mut adult = nodes.pop().expect("One adult should exist.");
 
         assert!(adult.is_not_elder());
@@ -239,9 +239,9 @@ mod tests {
 
         let env = TestNetworkBuilder::new(thread_rng())
             .sap(section_prefix, 1, 0, None, None)
-            .build();
+            .build()?;
 
-        let network_knowledge = env.get_network_knowledge(section_prefix, None);
+        let network_knowledge = env.get_network_knowledge(section_prefix, None)?;
 
         let joining_node = {
             let (info, comm, _incoming_msg_receiver) =
@@ -249,7 +249,7 @@ mod tests {
             TestNetwork::build_a_node_instance(&info, &comm, &network_knowledge)
         };
 
-        let mut nodes = env.get_nodes(section_prefix, 1, 0, None);
+        let mut nodes = env.get_nodes(section_prefix, 1, 0, None)?;
         let mut elder = nodes.pop().expect("One elder should exist.");
 
         let elder_context = elder.context();
@@ -279,9 +279,9 @@ mod tests {
 
         let env = TestNetworkBuilder::new(thread_rng())
             .sap(section_prefix, 1, 0, None, None)
-            .build();
+            .build()?;
 
-        let network_knowledge = env.get_network_knowledge(section_prefix, None);
+        let network_knowledge = env.get_network_knowledge(section_prefix, None)?;
 
         let joining_node = {
             let (info, comm, _incoming_msg_receiver) =
@@ -289,7 +289,7 @@ mod tests {
             TestNetwork::build_a_node_instance(&info, &comm, &network_knowledge)
         };
 
-        let mut nodes = env.get_nodes(section_prefix, 1, 0, None);
+        let mut nodes = env.get_nodes(section_prefix, 1, 0, None)?;
         let mut elder = nodes.pop().expect("One elder should exist.");
 
         let elder_context = elder.context();
@@ -319,9 +319,9 @@ mod tests {
 
         let env = TestNetworkBuilder::new(thread_rng())
             .sap(section_prefix, 1, 0, None, None)
-            .build();
+            .build()?;
 
-        let network_knowledge = env.get_network_knowledge(section_prefix, None);
+        let network_knowledge = env.get_network_knowledge(section_prefix, None)?;
 
         let joining_node = {
             let (info, comm, _incoming_msg_receiver) =
@@ -329,7 +329,7 @@ mod tests {
             TestNetwork::build_a_node_instance(&info, &comm, &network_knowledge)
         };
 
-        let mut nodes = env.get_nodes(section_prefix, 1, 0, None);
+        let mut nodes = env.get_nodes(section_prefix, 1, 0, None)?;
         let mut elder = nodes.pop().expect("One elder should exist.");
 
         // disallow joins
@@ -379,9 +379,9 @@ mod tests {
         let msg_tracker = Arc::new(RwLock::new(TestMsgTracker::default()));
         let mut env = TestNetworkBuilder::new(thread_rng())
             .sap(prefix, elder_count, adult_count, None, None)
-            .build();
+            .build()?;
         let mut node_instances = env
-            .get_nodes(prefix, elder_count, adult_count, None)
+            .get_nodes(prefix, elder_count, adult_count, None)?
             .into_iter()
             .map(|node| {
                 let name = node.name();
@@ -395,7 +395,7 @@ mod tests {
             let comm = env.take_comm_rx(pk);
             let _ = comm_receivers.insert(*name, comm);
         }
-        let network_knowledge = env.get_network_knowledge(prefix, None);
+        let network_knowledge = env.get_network_knowledge(prefix, None)?;
 
         // elder joins the network
         let (joining_node_name, mut joining_node_handle) = initialize_join(
@@ -510,7 +510,7 @@ mod tests {
                 tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
 
                 while let Some(msg) = get_next_msg(comm_rx).await {
-                    let mut cmds = node.test_handle_msg_from_peer(msg, None).await;
+                    let mut cmds = node.test_handle_msg_from_peer(msg, None).await?;
                     while !cmds.is_empty() {
                         match node.process_cmd(cmds.remove(0)).await {
                             Ok(new_cmds) => cmds.extend(new_cmds),
