@@ -18,9 +18,9 @@ use crate::{
 
 use sn_interface::types::Keypair;
 
-use log::{debug, info};
 use serde_json::json;
 use std::path::{Path, PathBuf};
+use tracing::{debug, info};
 
 // Method for requesting application's authorisation
 const SN_AUTHD_METHOD_AUTHORISE: &str = "authorise";

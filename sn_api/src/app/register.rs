@@ -20,10 +20,9 @@ use sn_interface::{
     },
 };
 
-use log::debug;
 use rand::Rng;
 use std::collections::{BTreeMap, BTreeSet};
-use tracing::info;
+use tracing::{debug, info};
 use xor_name::XorName;
 
 impl Safe {

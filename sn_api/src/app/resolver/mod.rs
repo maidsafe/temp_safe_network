@@ -9,13 +9,13 @@
 mod handlers;
 mod safe_data;
 
-use sn_client::QueriedDataReplicas;
+pub use super::{ContentType, DataType, SafeUrl, VersionHash, XorUrlBase};
+pub use safe_data::SafeData;
 
 use super::{files::FileInfo, Safe};
-pub use super::{ContentType, DataType, SafeUrl, VersionHash, XorUrlBase};
 use crate::{Error, Result};
-use log::{debug, info};
-pub use safe_data::SafeData;
+use sn_client::QueriedDataReplicas;
+use tracing::{debug, info};
 
 pub type Range = Option<(Option<u64>, Option<u64>)>;
 

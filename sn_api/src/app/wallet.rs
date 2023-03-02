@@ -6,22 +6,23 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use dbc::DbcTransaction;
-pub use sn_dbc::{self as dbc, Dbc, Token};
+pub use sn_dbc::{self as dbc, Dbc, DbcTransaction, Token};
 
 use super::{helpers::parse_tokens_amount, register::EntryHash};
 use crate::{
     safeurl::{ContentType, SafeUrl, XorUrl},
     Error, Result, Safe,
 };
-use bytes::Bytes;
-use log::{debug, warn};
+
 use sn_client::Client;
 use sn_dbc::{
     rng, AmountSecrets, Error as DbcError, Hash, Owner, OwnerOnce, PublicKey, SpentProof,
     SpentProofShare, TransactionBuilder,
 };
+
+use bytes::Bytes;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
+use tracing::{debug, warn};
 
 /// Type tag to use for the Wallet stored on Register
 pub const WALLET_TYPE_TAG: u64 = 1_000;

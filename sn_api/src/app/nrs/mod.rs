@@ -14,9 +14,9 @@ pub use nrs_map::NrsMap;
 
 use crate::{app::Safe, register::EntryHash, Error, Result, SafeUrl};
 
-use log::{debug, info};
 use std::collections::{BTreeMap, BTreeSet};
 use std::str;
+use tracing::{debug, info};
 
 /// Type tag to use for the NrsMapContainer stored on Register
 pub const NRS_MAP_TYPE_TAG: u64 = 1_500;

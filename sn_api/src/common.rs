@@ -7,11 +7,12 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{constants::SN_AUTHD_CONNECTION_IDLE_TIMEOUT, Error, Result};
-use log::info;
+
 use qjsonrpc::ClientEndpoint;
 use serde::de::DeserializeOwned;
 use std::path::Path;
 use tokio::runtime;
+use tracing::info;
 
 pub mod auth_types {
     use crate::ipc::req::IpcReq;

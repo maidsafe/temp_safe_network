@@ -11,11 +11,11 @@ use super::{
     constants::{SN_AUTHD_ENDPOINT_HOST, SN_AUTHD_ENDPOINT_PORT},
     notifs_endpoint::jsonrpc_listen,
 };
+
 use crate::{AuthReq, AuthedAppsList, Error, Result, SafeAuthReqId};
-use log::{debug, error, info, trace};
+
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-
 use std::{
     io::{self, Write},
     path::{Path, PathBuf},
@@ -25,6 +25,7 @@ use tokio::{
     sync::{mpsc, oneshot},
     task,
 };
+use tracing::{debug, error, info, trace};
 
 #[cfg(not(target_os = "windows"))]
 const SN_AUTHD_EXECUTABLE: &str = "sn_authd";

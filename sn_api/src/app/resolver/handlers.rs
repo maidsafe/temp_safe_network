@@ -7,15 +7,17 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{Range, SafeData};
+
 use crate::app::{
     files::{self, FileInfo, FilesMap},
     multimap::Multimap,
     DataType, Safe, SafeUrl,
 };
 use crate::{Error, Result};
+
 use bytes::Bytes;
-use log::{debug, warn};
 use std::collections::BTreeSet;
+use tracing::{debug, warn};
 
 impl Safe {
     pub(crate) async fn resolve_nrs_map_container(&self, input_url: SafeUrl) -> Result<SafeData> {

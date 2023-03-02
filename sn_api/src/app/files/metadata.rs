@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::files_map::FileInfo;
+
 use crate::{
     app::{
         consts::*,
@@ -14,8 +15,9 @@ use crate::{
     },
     Error, Result,
 };
-use log::debug;
+
 use std::{fs, path::Path};
+use tracing::debug;
 
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;

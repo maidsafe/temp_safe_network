@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::AuthReq;
-use log::{debug, error, info};
+
 use qjsonrpc::{
     IncomingJsonRpcRequest, JsonRpcRequest, JsonRpcResponse, JsonRpcResponseStream, ServerEndpoint,
 };
@@ -17,6 +17,7 @@ use tokio::{
     runtime,
     sync::{mpsc, oneshot},
 };
+use tracing::{debug, error, info};
 use url::Url;
 
 const JSONRPC_NOTIF_ERROR: isize = -1;
