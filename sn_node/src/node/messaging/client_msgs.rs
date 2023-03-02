@@ -9,10 +9,11 @@
 use crate::node::{core::NodeContext, flow_ctrl::cmds::Cmd, Error, MyNode, Result};
 
 use sn_dbc::{
-    get_public_commitments_from_transaction, Commitment, DbcTransaction, Hash, PublicKey,
-    SpentProof, SpentProofShare,
+    get_public_commitments_from_transaction, Commitment, DbcTransaction, PublicKey, SpentProof,
+    SpentProofShare,
 };
 use sn_interface::{
+    dbcs::DbcReason,
     messaging::{
         data::{ClientMsg, DataCmd, DataQuery, DataResponse, SpentbookCmd},
         AuthorityProof, ClientAuth, MsgId,
@@ -226,7 +227,7 @@ impl MyNode {
     fn gen_spent_proof_share(
         public_key: &PublicKey,
         tx: &DbcTransaction,
-        reason: Option<Hash>,
+        reason: DbcReason,
         spent_proofs: &BTreeSet<SpentProof>,
         spent_transactions: &BTreeSet<DbcTransaction>,
         context: &NodeContext,

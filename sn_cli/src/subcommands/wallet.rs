@@ -14,8 +14,8 @@ use crate::operations::config::Config;
 use bls::{PublicKey, SecretKey};
 use clap::Subcommand;
 use color_eyre::{eyre::eyre, eyre::Error, Help, Result};
-use sn_api::{Error as ApiError, Safe};
-use sn_dbc::{Dbc, Error as DbcError, Hash};
+use sn_api::{wallet::DbcReason, Error as ApiError, Safe};
+use sn_dbc::{Dbc, Error as DbcError};
 use std::path::{Path, PathBuf};
 use tokio::fs;
 
@@ -77,7 +77,7 @@ pub enum WalletSubCommands {
         /// The reason why this DBC is spent
         /// (Used for data payments: currently not yet implemented)
         #[clap(long = "reason")]
-        reason: Option<Hash>,
+        reason: DbcReason,
     },
 }
 

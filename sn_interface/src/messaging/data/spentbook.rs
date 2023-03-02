@@ -8,12 +8,13 @@
 
 use super::{CmdResponse, Error, QueryResponse};
 
+use crate::dbcs::DbcReason;
 use crate::messaging::system::SectionSigned;
 use crate::network_knowledge::{SectionAuthorityProvider, SectionsDAG};
 use crate::types::SpentbookAddress;
 
 use serde::{Deserialize, Serialize};
-use sn_dbc::{DbcTransaction, Hash, PublicKey, SpentProof};
+use sn_dbc::{DbcTransaction, PublicKey, SpentProof};
 use std::collections::BTreeSet;
 use xor_name::XorName;
 
@@ -39,7 +40,7 @@ pub enum SpentbookCmd {
         #[debug(skip)]
         tx: DbcTransaction,
         /// Reason for spending a DBC, used for data payments
-        reason: Option<Hash>,
+        reason: DbcReason,
         #[debug(skip)]
         spent_proofs: BTreeSet<SpentProof>,
         #[debug(skip)]

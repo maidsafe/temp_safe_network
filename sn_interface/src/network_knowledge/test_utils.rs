@@ -1,5 +1,6 @@
 use super::SectionKeysProvider;
 use crate::{
+    dbcs::DbcReason,
     network_knowledge::{section_keys::build_spent_proof_share, Error, MyNodeInfo, MIN_ADULT_AGE},
     types::{keys::ed25519, NodeId},
     SectionAuthorityProvider,
@@ -205,7 +206,7 @@ pub fn reissue_dbc(
         let spent_proof_share = build_spent_proof_share(
             &public_key,
             &tx,
-            None,
+            DbcReason::none(),
             sap,
             section_keys_provider,
             public_commitment,
