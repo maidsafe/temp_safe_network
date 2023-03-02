@@ -4,17 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
-## v0.72.1 (2023-02-28)
+## v0.72.2 (2023-03-02)
 
-### Refactor
+### Chore
 
- - <csr-id-5fcb6700fa26c0825191feb87c8d4a4653e50eef/> fix clippy lints; fmt
+ - <csr-id-4b84cd72c25f7074d966771928685174a76d6ef7/> remove panics for easier debugging
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
  - 1 commit contributed to the release.
+ - 2 days passed between releases.
  - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
@@ -25,10 +26,43 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Remove panics for easier debugging ([`4b84cd7`](https://github.com/maidsafe/safe_network/commit/4b84cd72c25f7074d966771928685174a76d6ef7))
+</details>
+
+## v0.72.1 (2023-02-28)
+
+<csr-id-5fcb6700fa26c0825191feb87c8d4a4653e50eef/>
+
+### Refactor
+
+ - <csr-id-5fcb6700fa26c0825191feb87c8d4a4653e50eef/> fix clippy lints; fmt
+
+### Chore
+
+ - <csr-id-558061d5eea7bc1f0feac310afb91ef9ca7c681e/> sn_interface-0.19.1/sn_fault_detection-0.15.5/sn_node-0.77.1/sn_cli-0.72.1
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Sn_interface-0.19.1/sn_fault_detection-0.15.5/sn_node-0.77.1/sn_cli-0.72.1 ([`558061d`](https://github.com/maidsafe/safe_network/commit/558061d5eea7bc1f0feac310afb91ef9ca7c681e))
     - Fix clippy lints; fmt ([`5fcb670`](https://github.com/maidsafe/safe_network/commit/5fcb6700fa26c0825191feb87c8d4a4653e50eef))
 </details>
 
 ## v0.72.0 (2023-02-27)
+
+<csr-id-7b046d3bf9c2de4d7aea170197ba4f3e2392fe89/>
 
 ### Chore
 

@@ -1113,7 +1113,36 @@ needed, as they keypair itself contains the Arcs we need.
     - Self authentication Example
     - Example to demonstrate Storage API
 
+## v0.81.2 (2023-03-02)
+
+### Chore
+
+ - <csr-id-4b84cd72c25f7074d966771928685174a76d6ef7/> remove panics for easier debugging
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 1 commit contributed to the release.
+ - 2 days passed between releases.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Remove panics for easier debugging ([`4b84cd7`](https://github.com/maidsafe/safe_network/commit/4b84cd72c25f7074d966771928685174a76d6ef7))
+</details>
+
 ## v0.81.1 (2023-02-27)
+
+### Chore
+
+ - <csr-id-08a24be66114afcb8c9878336bb45cb896525778/> sn_client-0.81.1
 
 ### Bug Fixes
 
@@ -1126,8 +1155,8 @@ needed, as they keypair itself contains the Arcs we need.
 
 <csr-read-only-do-not-edit/>
 
- - 1 commit contributed to the release.
- - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -1137,10 +1166,13 @@ needed, as they keypair itself contains the Arcs we need.
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Sn_client-0.81.1 ([`08a24be`](https://github.com/maidsafe/safe_network/commit/08a24be66114afcb8c9878336bb45cb896525778))
     - Use max_backoff_interval when retrying checking replicas ([`87a5634`](https://github.com/maidsafe/safe_network/commit/87a5634612282c189f68293940d85830e8d65400))
 </details>
 
 ## v0.81.0 (2023-02-27)
+
+<csr-id-7b046d3bf9c2de4d7aea170197ba4f3e2392fe89/>
 
 ### Chore
 

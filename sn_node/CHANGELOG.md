@@ -5,22 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.77.9 (2023-03-02)
+## v0.77.10 (2023-03-02)
 
 ### Chore
 
- - <csr-id-07a803bd6e4cd71b21f3702d93640631d7b8e3d1/> membership validation logic allows relocations even when joined...
-
-### Bug Fixes
-
- - <csr-id-b3bbca2630e2d7c65d661a90d52c50b619e8b86f/> only get joined members when we want that
+ - <csr-id-4b84cd72c25f7074d966771928685174a76d6ef7/> remove panics for easier debugging
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
- - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 1 commit contributed to the release.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -30,6 +26,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Remove panics for easier debugging ([`4b84cd7`](https://github.com/maidsafe/safe_network/commit/4b84cd72c25f7074d966771928685174a76d6ef7))
+</details>
+
+## v0.77.9 (2023-03-02)
+
+<csr-id-07a803bd6e4cd71b21f3702d93640631d7b8e3d1/>
+
+### Chore
+
+ - <csr-id-07a803bd6e4cd71b21f3702d93640631d7b8e3d1/> membership validation logic allows relocations even when joined...
+
+### Chore
+
+ - <csr-id-3ea30cbdbf18a6f3e7429d4ed0ea58227ffbb62d/> sn_interface-0.19.4/sn_node-0.77.9
+
+### Bug Fixes
+
+ - <csr-id-b3bbca2630e2d7c65d661a90d52c50b619e8b86f/> only get joined members when we want that
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Sn_interface-0.19.4/sn_node-0.77.9 ([`3ea30cb`](https://github.com/maidsafe/safe_network/commit/3ea30cbdbf18a6f3e7429d4ed0ea58227ffbb62d))
     - Only get joined members when we want that ([`b3bbca2`](https://github.com/maidsafe/safe_network/commit/b3bbca2630e2d7c65d661a90d52c50b619e8b86f))
     - Membership validation logic allows relocations even when joined... ([`07a803b`](https://github.com/maidsafe/safe_network/commit/07a803bd6e4cd71b21f3702d93640631d7b8e3d1))
 </details>
@@ -46,6 +77,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <csr-id-067ce87d783e2966f6b0b70ab1577a74fcaa5023/>
 <csr-id-d9790dbca657ee4d596b4130aadcae877ed6ec1b/>
 <csr-id-dadfe57d91c8621d72952e8fab72fdc10cef6121/>
+<csr-id-fb4764ec4b26227f8ed3ced970a88c7318fba625/>
 
 ### Chore
 
