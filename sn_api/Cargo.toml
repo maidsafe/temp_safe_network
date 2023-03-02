@@ -1,6 +1,6 @@
 [package]
 name = "sn_api"
-version = "0.79.0"
+version = "0.79.1"
 description = "Safe API"
 authors = [
   "bochaco <gabrielviganotti@gmail.com>",
