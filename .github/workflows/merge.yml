@@ -15,11 +15,6 @@ on:
     branches: ["*"]
 
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
-
-
 env:
   CARGO_INCREMENTAL: 0 # bookkeeping for incremental builds has overhead, not useful in CI.
   NODE_COUNT: 14
