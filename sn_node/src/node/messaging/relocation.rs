@@ -8,7 +8,7 @@
 
 use crate::node::{
     flow_ctrl::cmds::Cmd, messaging::Recipients, relocation::find_nodes_to_relocate, MyNode,
-    NodeEvent, Result,
+    NodeContext, NodeEvent, Result,
 };
 
 use sn_interface::{
@@ -65,14 +65,14 @@ impl MyNode {
     /// request the section to do the relocation membership change.
     pub(crate) fn prepare_to_relocate(&mut self, trigger: RelocationTrigger) -> Vec<Cmd> {
         // store the `RelocationDst` to start polling the elders
-        if self.relocation_state.is_none() {
+        if let RelocationState::NoRelocation = self.relocation_state {
             debug!(
                 "Started trying to relocate our node. (on churn of {})",
                 trigger.churn_id(),
             );
 
             // store the `RelocationState` locally to periodically request the elders
-            self.relocation_state = Some(RelocationState::PreparingToRelocate(trigger.clone()));
+            self.relocation_state = RelocationState::PreparingToRelocate(trigger.clone());
         } else {
             warn!(
                 "Already trying to init relocation, so ignoring new relocation msg to trigger: {trigger:?}"
@@ -175,9 +175,37 @@ impl MyNode {
 
         let proof = RelocationProof::new(info, node_sig, original_info.keypair.public);
         // we cache the proof so that we can retry if the join times out
-        self.relocation_state = Some(RelocationState::ReadyToJoinNewSection(proof.clone()));
+        self.relocation_state = RelocationState::ReadyToJoinNewSection(proof.clone());
 
         Ok(MyNode::try_join_section(self.context(), Some(proof)))
+    }
+
+    /// Finalise an ongoing relocation process, by updating the node's state,
+    /// if we confirm we've already joined the new section.
+    pub(crate) fn finalise_relocation(
+        &mut self,
+        context: &NodeContext,
+        node_state: SectionSigned<NodeState>,
+    ) {
+        info!(
+            "{} for node: {:?}: Age is: {:?}",
+            LogMarker::RelocateEnd,
+            context.name,
+            context.info.age()
+        );
+
+        info!("We've joined a section, dropping the relocation proof.");
+        self.relocation_state = RelocationState::NoRelocation;
+
+        // Update our members list making sure we don't exist in it with our old name.
+        let new_state = node_state.value.clone();
+        if self.network_knowledge.update_member(node_state) {
+            trace!(
+                "Section members list updated due to relocation: {new_state:?}. \
+                New members list: {:?}",
+                self.network_knowledge.members()
+            );
+        }
     }
 }
 

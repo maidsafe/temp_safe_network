@@ -40,7 +40,7 @@ pub struct NodeContext {
     pub(crate) joins_allowed_until_split: bool,
     #[debug(skip)]
     pub(crate) fault_cmds_sender: Sender<FaultsCmd>,
-    pub(crate) relocation_state: Option<RelocationState>,
+    pub(crate) relocation_state: RelocationState,
 }
 
 impl NodeContext {

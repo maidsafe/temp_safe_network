@@ -117,7 +117,7 @@ impl FlowCtrl {
         // check if we can request for relocation
         // The relocation_state will be changed into `JoinAsRelocated` once the request has been
         // approved by the section
-        if let Some(RelocationState::PreparingToRelocate(trigger)) = &context.relocation_state {
+        if let RelocationState::PreparingToRelocate(trigger) = &context.relocation_state {
             if self.timestamps.request_to_relocate_check.elapsed() > REQUEST_TO_RELOCATE_TIMEOUT_SEC
             {
                 info!(
@@ -134,7 +134,7 @@ impl FlowCtrl {
         }
 
         // check if we can join the dst section
-        if let Some(RelocationState::ReadyToJoinNewSection(proof)) = &context.relocation_state {
+        if let RelocationState::ReadyToJoinNewSection(proof) = &context.relocation_state {
             let prev_name = proof.previous_name();
             let new_name = proof.new_name();
             if self.timestamps.join_as_relocated_check.elapsed() > JOIN_AS_RELOCATED_TIMEOUT_SEC {
@@ -159,7 +159,7 @@ impl FlowCtrl {
                         context.info.age()
                     );
                     info!("We've joined a section, dropping the relocation proof.");
-                    node.relocation_state = None;
+                    node.relocation_state = RelocationState::NoRelocation;
                 }
             }
         }

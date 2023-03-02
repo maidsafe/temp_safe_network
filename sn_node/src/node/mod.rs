@@ -105,7 +105,7 @@ pub(crate) struct MyNode {
     pub(crate) elder_promotion_aggregator: SignatureAggregator,
     pub(crate) pending_split_sections:
         BTreeMap<Generation, BTreeSet<SectionSigned<SectionAuthorityProvider>>>,
-    pub(crate) relocation_state: Option<RelocationState>,
+    pub(crate) relocation_state: RelocationState,
     // ======================== Elder only ========================
     pub(crate) membership: Option<Membership>,
     // Section handover consensus state (Some for Elders, None for others)
@@ -206,7 +206,7 @@ impl MyNode {
             section_keys_provider,
             dkg_sessions_info: HashMap::default(),
             pending_split_sections: Default::default(),
-            relocation_state: None,
+            relocation_state: RelocationState::NoRelocation,
             dkg_start_aggregator: SignatureAggregator::default(),
             dkg_voter: DkgVoter::default(),
             handover_voting: handover,

@@ -172,7 +172,6 @@ impl MyNode {
                 trace!("Handling ProceedRelocation msg from {node_id}: {msg_id:?}");
                 Ok(node.proceed_relocation(node_id.name(), dst)?)
             }
-
             NodeMsg::CompleteRelocation(signed_relocation) => {
                 trace!("Handling CompleteRelocation msg from {node_id}: {msg_id:?}");
                 Ok(node.relocate(signed_relocation)?.into_iter().collect())
@@ -214,6 +213,11 @@ impl MyNode {
                             "=========>> This node ({:?} @ {:?}) has been approved to join the section at {:?}!", context.name, context.info.addr,
                             target_sap.prefix(),
                         );
+
+                        // If we were relocating finalise it
+                        if let Some(proof) = context.relocation_state.proof() {
+                            node.finalise_relocation(&context, proof.signed_relocation().clone());
+                        }
 
                         Ok(vec![])
                     }
