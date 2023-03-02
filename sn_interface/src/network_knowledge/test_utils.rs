@@ -4,7 +4,7 @@ use crate::{
     types::{keys::ed25519, Peer},
     SectionAuthorityProvider,
 };
-use eyre::{eyre, Result};
+use eyre::{eyre, Context, ContextCompat, Result};
 use itertools::Itertools;
 use sn_consensus::{Ballot, Consensus, Decision, Proposition, Vote, VoteResponse};
 use sn_dbc::{
@@ -99,7 +99,7 @@ pub fn gen_sorted_nodes(
 pub fn section_decision<P: Proposition>(
     secret_key_set: &bls::SecretKeySet,
     proposal: P,
-) -> Decision<P> {
+) -> Result<Decision<P>> {
     let n = secret_key_set.threshold() + 1;
     let mut nodes = Vec::from_iter((1..=n).into_iter().map(|idx| {
         let secret = (idx as u8, secret_key_set.secret_key_share(idx));
@@ -112,15 +112,17 @@ pub fn section_decision<P: Proposition>(
             ballot: Ballot::Propose(proposal),
             faults: Default::default(),
         })
-        .expect("Failed to sign first vote");
+        .wrap_err("Failed to sign first vote")?;
 
-    let mut votes = vec![nodes[0].cast_vote(first_vote).expect("Failed to cast vote")];
+    let mut votes = vec![nodes[0]
+        .cast_vote(first_vote)
+        .wrap_err("Failed to cast vote")?];
 
     while let Some(vote) = votes.pop() {
         for node in &mut nodes {
             match node
                 .handle_signed_vote(vote.clone())
-                .expect("Failed to handle vote")
+                .wrap_err("Failed to handle vote")?
             {
                 VoteResponse::WaitingForMoreVotes => (),
                 VoteResponse::Broadcast(vote) => votes.push(vote),
@@ -144,7 +146,7 @@ pub fn section_decision<P: Proposition>(
     nodes[0]
         .decision
         .clone()
-        .expect("We should have seen a decision, this is a bug")
+        .wrap_err("We should have seen a decision, this is a bug")
 }
 
 struct FakeProofKeyVerifier {}
@@ -198,7 +200,7 @@ pub fn reissue_dbc(
             .into_iter()
             .find(|(k, _c)| k == &public_key)
             .map(|(_k, c)| c)
-            .expect("Found no commitment for Tx input with pubkey: {public_key:?}");
+            .ok_or_else(|| eyre!("Found no commitment for Tx input with pubkey: {public_key:?}"))?;
 
         let spent_proof_share = build_spent_proof_share(
             &public_key,

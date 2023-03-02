@@ -173,13 +173,13 @@ mod tests {
             sk_set.public_keys(),
             0,
         );
-        let sap = TestKeys::get_section_signed(&sk, sap);
+        let sap = TestKeys::get_section_signed(&sk, sap)?;
         let tree = SectionTree::new(sap)?;
         let mut network_knowledge = NetworkKnowledge::new(Prefix::default(), tree)?;
 
         for peer in &peers {
             let info = NodeState::joined(*peer, None);
-            let info = TestKeys::get_section_signed(&sk, info);
+            let info = TestKeys::get_section_signed(&sk, info)?;
             assert!(network_knowledge.update_member(info));
         }
 

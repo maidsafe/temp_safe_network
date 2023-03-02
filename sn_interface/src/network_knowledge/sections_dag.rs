@@ -1124,7 +1124,7 @@ pub(crate) mod tests {
 
     fn gen_signed_keypair(parent_sk: &bls::SecretKey) -> (bls::SecretKey, SectionInfo) {
         let (sk, pk) = gen_keypair();
-        let sig = TestKeys::sign(parent_sk, &pk);
+        let sig = TestKeys::sign(parent_sk, &pk).expect("Failed to sign parent_sk");
         let info = SectionInfo { key: pk, sig };
         (sk, info)
     }
@@ -1227,7 +1227,7 @@ pub(crate) mod tests {
             .elder_count(0)
             .build_rng(&mut rng);
         let sk_gen = sk_gen.secret_key();
-        let sap_gen = TestKeys::get_section_signed(&sk_gen, sap_gen);
+        let sap_gen = TestKeys::get_section_signed(&sk_gen, sap_gen)?;
         let pk_gen = sap_gen.public_key_set().public_key();
 
         let mut dag = SectionsDAG::new(pk_gen);
@@ -1254,9 +1254,9 @@ pub(crate) mod tests {
             dag: &mut SectionsDAG,
         ) -> Result<()> {
             let (sap, sk_set, ..) = TestSapBuilder::new(prefix).elder_count(0).build_rng(rng);
-            let sap = TestKeys::get_section_signed(&sk_set.secret_key(), sap);
+            let sap = TestKeys::get_section_signed(&sk_set.secret_key(), sap)?;
             let key = sap.public_key_set().public_key();
-            let sig = TestKeys::sign(parent_sk, &key);
+            let sig = TestKeys::sign(parent_sk, &key)?;
             dag.verify_and_insert(&parent_sk.public_key(), sap.section_key(), sig)?;
             sections_map.insert(sap.section_key(), (sk_set.secret_key(), sap));
             Ok(())

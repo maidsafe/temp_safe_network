@@ -212,16 +212,19 @@ mod tests {
     /// NOTE: recommended to call this with low `age` (4 or 5), otherwise it might take very long time
     /// to complete because it needs to generate a signature with the number of trailing zeroes equal
     /// to (or greater that) `age`.
-    fn create_relocation_trigger(sk_set: &bls::SecretKeySet, age: u8) -> Decision<NodeState> {
+    fn create_relocation_trigger(
+        sk_set: &bls::SecretKeySet,
+        age: u8,
+    ) -> Result<Decision<NodeState>> {
         loop {
             let node_state = NodeState::joined(gen_peer(MIN_ADULT_AGE), None);
-            let decision = section_decision(sk_set, node_state.clone());
+            let decision = section_decision(sk_set, node_state.clone())?;
 
             let sig: bls::Signature = decision.proposals[&node_state].clone();
             let churn_id = ChurnId(sig.to_bytes());
 
             if relocation_check(age, &churn_id) && !relocation_check(age + 1, &churn_id) {
-                return decision;
+                return Ok(decision);
             }
         }
     }
@@ -234,19 +237,19 @@ mod tests {
         let adults = recommended_section_size() - elder_count();
         let env = TestNetworkBuilder::new(rand::thread_rng())
             .sap(prefix, elder_count(), adults, None, None)
-            .build();
-        let mut node = env.get_nodes(prefix, 1, 0, None).remove(0);
-        let mut section = env.get_network_knowledge(prefix, None);
-        let sk_set = env.get_secret_key_set(prefix, None);
+            .build()?;
+        let mut node = env.get_nodes(prefix, 1, 0, None)?.remove(0);
+        let mut section = env.get_network_knowledge(prefix, None)?;
+        let sk_set = env.get_secret_key_set(prefix, None)?;
 
         let relocated_peer = gen_peer_in_prefix(MIN_ADULT_AGE - 1, prefix);
         let node_state = NodeState::joined(relocated_peer, None);
-        let node_state = TestKeys::get_section_signed(&sk_set.secret_key(), node_state);
+        let node_state = TestKeys::get_section_signed(&sk_set.secret_key(), node_state)?;
         assert!(section.update_member(node_state));
         // update our node with the new network_knowledge
         node.network_knowledge = section.clone();
 
-        let membership_decision = create_relocation_trigger(&sk_set, relocated_peer.age());
+        let membership_decision = create_relocation_trigger(&sk_set, relocated_peer.age())?;
 
         let mut cmds =
             ProcessAndInspectCmds::new(Cmd::HandleMembershipDecision(membership_decision));
@@ -281,9 +284,9 @@ mod tests {
         let msg_tracker = Arc::new(RwLock::new(TestMsgTracker::default()));
         let mut env = TestNetworkBuilder::new(rand::thread_rng())
             .sap(Prefix::default(), elder_count, adult_count, None, None)
-            .build();
+            .build()?;
         let node_instances = env
-            .get_nodes(Prefix::default(), elder_count, adult_count, None)
+            .get_nodes(Prefix::default(), elder_count, adult_count, None)?
             .into_iter()
             .map(|node| {
                 let prefix = node.network_knowledge().prefix();
@@ -303,7 +306,7 @@ mod tests {
 
         // Initialize relocation manually without using ChurnIds
         let relocation_node_old_name = env
-            .get_peers(Prefix::default(), 0, 1, None)
+            .get_peers(Prefix::default(), 0, 1, None)?
             .remove(0)
             .name();
         for node in node_instances.iter().filter_map(|((_, name), node)| {
@@ -368,18 +371,18 @@ mod tests {
         let mut env = TestNetworkBuilder::new(rand::thread_rng())
             .sap(prefix0, elder_count_0, adult_count_0, None, None)
             .sap(prefix1, elder_count_1, adult_count_1, None, None)
-            .build();
-        let network_knowledge_0 = env.get_network_knowledge(prefix0, None);
+            .build()?;
+        let network_knowledge_0 = env.get_network_knowledge(prefix0, None)?;
         let st_update_0 = network_knowledge_0
             .section_tree()
             .generate_section_tree_update(&prefix0)?;
-        let network_knowledge_1 = env.get_network_knowledge(prefix1, None);
+        let network_knowledge_1 = env.get_network_knowledge(prefix1, None)?;
         let st_update_1 = network_knowledge_1
             .section_tree()
             .generate_section_tree_update(&prefix1)?;
 
-        let mut node_instances = env.get_nodes(prefix0, elder_count_0, adult_count_0, None);
-        node_instances.extend(env.get_nodes(prefix1, elder_count_1, adult_count_1, None));
+        let mut node_instances = env.get_nodes(prefix0, elder_count_0, adult_count_0, None)?;
+        node_instances.extend(env.get_nodes(prefix1, elder_count_1, adult_count_1, None)?);
         let node_instances = node_instances
             .into_iter()
             .map(|mut node| {
@@ -415,7 +418,7 @@ mod tests {
 
         // Initialize relocation manually without using ChurnIds. Here, the adult from prefix0 is
         // to be relocated to prefix1
-        let relocation_node_old_name = env.get_peers(prefix0, 0, 1, None).remove(0).name();
+        let relocation_node_old_name = env.get_peers(prefix0, 0, 1, None)?.remove(0).name();
 
         // Only the elders in prefix0 should propose the SectionStateVote
         for test_node in node_instances
@@ -562,8 +565,7 @@ mod tests {
                 tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
 
                 while let Some(msg) = get_next_msg(comm_rx).await {
-                    let cmds = node.test_handle_msg_from_peer(msg, Some(name)).await;
-                    for cmd in cmds {
+                    for cmd in node.test_handle_msg_from_peer(msg, Some(name)).await? {
                         info!("Got cmd {}", cmd);
                         if let Cmd::SendMsg { .. } = &cmd {
                             assert!(node.process_cmd(cmd).await?.is_empty());

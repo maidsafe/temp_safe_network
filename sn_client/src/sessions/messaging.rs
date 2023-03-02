@@ -661,7 +661,8 @@ mod tests {
 
         let genesis_sk = genesis_sk_set.secret_key();
         let genesis_pk = genesis_sk.public_key();
-        let genesis_sap = TestKeys::get_section_signed(&genesis_sk, genesis_sap);
+        let genesis_sap = TestKeys::get_section_signed(&genesis_sk, genesis_sap)
+            .expect("Failed to sign genesis_key");
         let tree = SectionTree::new(genesis_sap).expect("SAP belongs to the genesis prefix");
 
         (tree, genesis_sk, genesis_pk)
@@ -673,7 +674,7 @@ mod tests {
 
         let prefix = prefix("0");
         let (sap, secret_key_set, ..) = TestSapBuilder::new(prefix).elder_count(elders_len).build();
-        let sap0 = TestKeys::get_section_signed(&secret_key_set.secret_key(), sap);
+        let sap0 = TestKeys::get_section_signed(&secret_key_set.secret_key(), sap)?;
         let (mut network_contacts, _genesis_sk, _) = new_network_network_contacts();
         assert!(network_contacts.insert_without_chain(sap0));
 

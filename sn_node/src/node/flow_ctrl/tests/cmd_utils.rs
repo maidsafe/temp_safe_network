@@ -21,7 +21,7 @@ use sn_interface::{
 
 use assert_matches::assert_matches;
 use bytes::Bytes;
-use eyre::{Context, Result};
+use eyre::{eyre, Context, Result};
 use qp2p::Endpoint;
 use std::{
     collections::{btree_map::Entry, BTreeMap, BTreeSet, VecDeque},
@@ -42,7 +42,7 @@ pub(crate) async fn handle_online_cmd(
     node: &mut MyNode,
 ) -> Result<JoinApprovalSent> {
     let node_state = NodeState::joined(*peer, None);
-    let membership_decision = section_decision(sk_set, node_state);
+    let membership_decision = section_decision(sk_set, node_state)?;
 
     let mut all_cmds =
         ProcessAndInspectCmds::new(Cmd::HandleMembershipDecision(membership_decision));
@@ -245,7 +245,7 @@ impl TestNode {
         &mut self,
         msg: MsgFromPeer,
         relocation_old_name: Option<XorName>,
-    ) -> Vec<Cmd> {
+    ) -> Result<Vec<Cmd>> {
         let msg_id = msg.wire_msg.msg_id();
 
         // check if we have successfully untracked the msg
@@ -255,7 +255,13 @@ impl TestNode {
         }
         let our_name = self.node.name();
         untracked = untracked || self.msg_tracker.write().await.untrack(msg_id, &our_name);
-        assert!(untracked);
+        if !untracked {
+            return Err(eyre!(
+                "Trying to untrack {msg_id:?} at node {our_name:?}
+                \nThe msg was not tracked for this node.
+                \nPlease check Cmd::SendMsg* to debug the issue"
+            ));
+        }
 
         let handle_node_msg_cmd = Cmd::HandleMsg {
             origin: msg.sender,
@@ -266,7 +272,7 @@ impl TestNode {
         let msg_cmds = self
             .process_cmd(handle_node_msg_cmd)
             .await
-            .expect("Error while handling node msg");
+            .wrap_err("Error while handling node msg")?;
         let mut cmds = Vec::new();
         for cmd in msg_cmds {
             match self.process_cmd(cmd).await {
@@ -274,7 +280,7 @@ impl TestNode {
                 Err(err) => error!("Error while handling node_msgs {err:?}"),
             }
         }
-        cmds
+        Ok(cmds)
     }
 }
 
@@ -330,7 +336,6 @@ impl TestMsgTracker {
                 let _ = entry.remove();
             }
         } else {
-            // panic!("msg_id {msg_id:?} is not found")
             removed = false;
         }
         removed
@@ -348,7 +353,7 @@ impl TestMsgTracker {
 /// testing context.
 impl Cmd {
     // Filters the list of recipients in a `SendCmd`
-    pub(crate) fn filter_recipients(&mut self, filter_list: BTreeSet<XorName>) {
+    pub(crate) fn filter_recipients(&mut self, filter_list: BTreeSet<XorName>) -> Result<()> {
         if let Cmd::SendMsg {
             ref mut recipients, ..
         } = self
@@ -372,8 +377,9 @@ impl Cmd {
             };
             *recipients = new_recipients;
         } else {
-            panic!("A Cmd::SendMsg variant was expected")
+            return Err(eyre!("Expected a Cmd::SendMsg* to filter the recipients"));
         };
+        Ok(())
     }
 }
 

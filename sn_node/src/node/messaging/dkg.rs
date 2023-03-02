@@ -869,7 +869,7 @@ mod tests {
 
     use assert_matches::assert_matches;
     use bls::SecretKeySet;
-    use eyre::{eyre, Result};
+    use eyre::{eyre, Context, Result};
     use rand::{Rng, RngCore};
     use std::{
         collections::{BTreeMap, BTreeSet},
@@ -887,7 +887,7 @@ mod tests {
         let node_count = 7;
         let msg_tracker = Arc::new(RwLock::new(TestMsgTracker::default()));
         let (mut node_instances, mut comm_receivers, _) =
-            create_elders(node_count, msg_tracker.clone(), &mut rng);
+            create_elders(node_count, msg_tracker.clone(), &mut rng)?;
 
         // let the current set of elders start the dkg round
         let _ = start_dkg(&mut node_instances).await?;
@@ -904,7 +904,7 @@ mod tests {
                 info!("\n\n NODE: {name}");
 
                 while let Some(msg) = get_next_msg(comm_rx).await {
-                    let cmds = test_node.test_handle_msg_from_peer(msg, None).await;
+                    let cmds = test_node.test_handle_msg_from_peer(msg, None).await?;
                     for cmd in cmds {
                         info!("Got cmd {}", cmd);
                         if let Cmd::SendMsg { .. } = &cmd {
@@ -942,7 +942,7 @@ mod tests {
         let node_count = 7;
         let msg_tracker = Arc::new(RwLock::new(TestMsgTracker::default()));
         let (mut node_instances, mut comm_receivers, _) =
-            create_elders(node_count, msg_tracker.clone(), &mut rng);
+            create_elders(node_count, msg_tracker.clone(), &mut rng)?;
 
         // let current set of elders start the dkg round
         let _ = start_dkg(&mut node_instances).await?;
@@ -963,11 +963,10 @@ mod tests {
                 info!("\n\n NODE: {name}");
 
                 while let Some(msg) = get_next_msg(comm_rx).await {
-                    let cmds = test_node.test_handle_msg_from_peer(msg, None).await;
-                    for mut cmd in cmds {
+                    for mut cmd in test_node.test_handle_msg_from_peer(msg, None).await? {
                         info!("Got cmd {}", cmd);
                         if let Cmd::SendMsg { .. } = cmd {
-                            cmd.filter_recipients(BTreeSet::from([dead_node]));
+                            cmd.filter_recipients(BTreeSet::from([dead_node]))?;
                             assert!(test_node.process_cmd(cmd).await?.is_empty());
                         } else {
                             panic!("got a different cmd {cmd:?}");
@@ -994,7 +993,7 @@ mod tests {
         let node_count = 7;
         let msg_tracker = Arc::new(RwLock::new(TestMsgTracker::default()));
         let (mut node_instances, mut comm_receivers, _) =
-            create_elders(node_count, msg_tracker.clone(), &mut rng);
+            create_elders(node_count, msg_tracker.clone(), &mut rng)?;
 
         // let current set of elders start the dkg round
         let dkg_session_id = start_dkg(&mut node_instances).await?;
@@ -1015,8 +1014,7 @@ mod tests {
                 tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
 
                 while let Some(msg) = get_next_msg(comm_rx).await {
-                    let cmds = test_node.test_handle_msg_from_peer(msg, None).await;
-                    for mut cmd in cmds {
+                    for mut cmd in test_node.test_handle_msg_from_peer(msg, None).await? {
                         info!("Got cmd {}", cmd);
                         if let Cmd::SendMsg { ref recipients, .. } = cmd {
                             // (1/node_count) chance to drop a msg
@@ -1028,7 +1026,7 @@ mod tests {
                                     .map(|p| p.name())
                                     .nth(rng.gen::<usize>() % recp_count)
                                     .ok_or_else(|| eyre!("Contains node_count peers"))?;
-                                cmd.filter_recipients(BTreeSet::from([drop_recp]));
+                                cmd.filter_recipients(BTreeSet::from([drop_recp]))?;
                             };
                             assert!(test_node.process_cmd(cmd).await?.is_empty());
                         } else if let Cmd::HandleDkgOutcome {
@@ -1089,21 +1087,23 @@ mod tests {
     // Test helpers
 
     /// Generate a set of `MyNode` instances
+    #[allow(clippy::type_complexity)]
     fn create_elders(
         elder_count: usize,
         msg_tracker: Arc<RwLock<TestMsgTracker>>,
         rng: impl RngCore,
-    ) -> (
+    ) -> Result<(
         BTreeMap<XorName, TestNode>,
         BTreeMap<XorName, mpsc::Receiver<CommEvent>>,
         SecretKeySet,
-    ) {
+    )> {
         let mut env = TestNetworkBuilder::new(rng)
             .sap(Prefix::default(), elder_count, 0, None, None)
-            .build();
-        let sk_set = env.get_secret_key_set(Prefix::default(), None);
+            .build()
+            .wrap_err("Failed to build TestEnv")?;
+        let sk_set = env.get_secret_key_set(Prefix::default(), None)?;
         let node_instances = env
-            .get_nodes(Prefix::default(), elder_count, 0, None)
+            .get_nodes(Prefix::default(), elder_count, 0, None)?
             .into_iter()
             .map(|node| {
                 let name = node.name();
@@ -1117,7 +1117,7 @@ mod tests {
             let comm = env.take_comm_rx(pk);
             let _ = comm_receivers.insert(*name, comm);
         }
-        (node_instances, comm_receivers, sk_set)
+        Ok((node_instances, comm_receivers, sk_set))
     }
 
     // Each node sends out DKG start msg to the other nodes
