@@ -45,9 +45,6 @@ pub const DEFAULT_NETWORK_CONTACTS_FILE_NAME: &str = "default";
 // Each Chunk is maximum types::MAX_CHUNK_SIZE_IN_BYTES, i.e. ~1MB
 const CHUNK_CACHE_SIZE: usize = 50;
 
-// Number of times to try network probe on client startup
-const NETWORK_PROBE_MAX_ATTEMPTS: usize = 3;
-
 // LRU cache to keep the Chunks we retrieve.
 type ChunksCache = LRUCache<Chunk, CHUNK_CACHE_SIZE>;
 
@@ -85,37 +82,25 @@ impl Client {
         }));
         debug!("Making initial contact with network. Probe msg: {query:?}");
 
-        let mut attempts = 1;
-        loop {
-            // Send the dummy message to probe the network for it's infrastructure details.
-            match self.send_query_without_retry(query.clone()).await {
-                Ok(response) if response.is_data_not_found() => {
-                    // A data-not-found response means it comes from the right set of Elders,
-                    // any AE retries should have taken place as well.
-                    let network_knowledge = self.session.network.read().await;
-                    let sections_count = network_knowledge.known_sections_count();
-                    let known_sap = network_knowledge.closest(&query.dst_name(), None);
-                    debug!(
-                        "Client has some network knowledge. Current sections \
-                        known: {sections_count}. SAP for our startup-query: {known_sap:?}"
-                    );
-                    break Ok(());
-                }
-                result => {
-                    if attempts == NETWORK_PROBE_MAX_ATTEMPTS {
-                        // we've failed
-                        break Err(Error::NetworkContacts(format!(
-                            "failed to make initial contact with network to bootstrap to \
-                            after {attempts} attempts, result in last attempt: {result:?}"
-                        )));
-                    }
-
-                    attempts += 1;
-                    warn!(
-                        "Initial probe msg to network failed. Trying again (attempt #{}): {:?}",
-                        attempts, result
-                    );
-                }
+        // Send the dummy message to probe the network for it's infrastructure details.
+        match self.send_query_without_retry(query.clone()).await {
+            Ok(response) if response.is_data_not_found() => {
+                // A data-not-found response means it comes from the right set of Elders,
+                // any AE retries should have taken place as well.
+                let network_knowledge = self.session.network.read().await;
+                let sections_count = network_knowledge.known_sections_count();
+                let known_sap = network_knowledge.closest(&query.dst_name(), None);
+                debug!(
+                    "Client has some network knowledge. Current sections \
+                    known: {sections_count}. SAP for our startup-query: {known_sap:?}"
+                );
+                Ok(())
+            }
+            result => {
+                // we've failed
+                Err(Error::NetworkContacts(format!(
+                    "failed to make initial contact with network, resulted in: {result:?}"
+                )))
             }
         }
     }
