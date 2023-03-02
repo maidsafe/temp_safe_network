@@ -5,7 +5,47 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.77.9 (2023-03-02)
+
+### Chore
+
+ - <csr-id-07a803bd6e4cd71b21f3702d93640631d7b8e3d1/> membership validation logic allows relocations even when joined...
+
+### Bug Fixes
+
+ - <csr-id-b3bbca2630e2d7c65d661a90d52c50b619e8b86f/> only get joined members when we want that
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Only get joined members when we want that ([`b3bbca2`](https://github.com/maidsafe/safe_network/commit/b3bbca2630e2d7c65d661a90d52c50b619e8b86f))
+    - Membership validation logic allows relocations even when joined... ([`07a803b`](https://github.com/maidsafe/safe_network/commit/07a803bd6e4cd71b21f3702d93640631d7b8e3d1))
+</details>
+
 ## v0.77.8 (2023-03-02)
+
+<csr-id-bc3b2fb766531e42f4771b81775d6ccc5355238c/>
+<csr-id-0d8cadd1bdfad43311e13ec32c3e0c96973d6259/>
+<csr-id-5248262e087b0c46a34b956c78f6e47bd423b3ea/>
+<csr-id-93483636ad4256ea8c5592b34ec4084a27730075/>
+<csr-id-d994346be71e13de7d8e60574013d2f10753a33d/>
+<csr-id-aedb4e081f3611a6570ea668eac052ed4e0f0783/>
+<csr-id-4b2b47ff79e449e445cf7bd4e789594d88f300c2/>
+<csr-id-067ce87d783e2966f6b0b70ab1577a74fcaa5023/>
+<csr-id-d9790dbca657ee4d596b4130aadcae877ed6ec1b/>
+<csr-id-dadfe57d91c8621d72952e8fab72fdc10cef6121/>
 
 ### Chore
 
@@ -19,6 +59,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-067ce87d783e2966f6b0b70ab1577a74fcaa5023/> fixes post-rebase
  - <csr-id-d9790dbca657ee4d596b4130aadcae877ed6ec1b/> refactor away Dispatcher as a concept
  - <csr-id-dadfe57d91c8621d72952e8fab72fdc10cef6121/> pass down context from dispatcher
+
+### Chore
+
+ - <csr-id-fb4764ec4b26227f8ed3ced970a88c7318fba625/> sn_node-0.77.8
 
 ### New Features
 
@@ -35,8 +79,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 14 commits contributed to the release.
- - 14 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 15 commits contributed to the release.
+ - 15 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -46,6 +90,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Sn_node-0.77.8 ([`fb4764e`](https://github.com/maidsafe/safe_network/commit/fb4764ec4b26227f8ed3ced970a88c7318fba625))
     - Ignore error while processing cmds ([`45d37d8`](https://github.com/maidsafe/safe_network/commit/45d37d8c22d50e3448afe6ae075e7c5395114d4b))
     - Simplify + flatten node_starter ([`bc3b2fb`](https://github.com/maidsafe/safe_network/commit/bc3b2fb766531e42f4771b81775d6ccc5355238c))
     - Update docs for process_cmds_and_periodics ([`0d8cadd`](https://github.com/maidsafe/safe_network/commit/0d8cadd1bdfad43311e13ec32c3e0c96973d6259))
@@ -63,6 +108,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.77.7 (2023-03-02)
+
+<csr-id-12822dea56f8b16574a3a3a81239985a36f976e2/>
 
 ### Chore
 

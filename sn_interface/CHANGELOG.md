@@ -6,18 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## v0.19.3 (2023-02-28)
+## v0.19.4 (2023-03-02)
 
 ### Chore
 
- - <csr-id-5fd068e10cc96396fb800cf6acd92b377f4e21d9/> clarify relocation flow
+ - <csr-id-07a803bd6e4cd71b21f3702d93640631d7b8e3d1/> membership validation logic allows relocations even when joined...
+
+### Bug Fixes
+
+ - <csr-id-b3bbca2630e2d7c65d661a90d52c50b619e8b86f/> only get joined members when we want that
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 1 commit contributed to the release.
- - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits contributed to the release.
+ - 1 day passed between releases.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -27,10 +32,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Only get joined members when we want that ([`b3bbca2`](https://github.com/maidsafe/safe_network/commit/b3bbca2630e2d7c65d661a90d52c50b619e8b86f))
+    - Membership validation logic allows relocations even when joined... ([`07a803b`](https://github.com/maidsafe/safe_network/commit/07a803bd6e4cd71b21f3702d93640631d7b8e3d1))
+</details>
+
+## v0.19.3 (2023-02-28)
+
+<csr-id-5fd068e10cc96396fb800cf6acd92b377f4e21d9/>
+
+### Chore
+
+ - <csr-id-5fd068e10cc96396fb800cf6acd92b377f4e21d9/> clarify relocation flow
+
+### Chore
+
+ - <csr-id-039e1cc0fa8a7e7ae1c97a0c89328117a43d4796/> sn_interface-0.19.3/sn_node-0.77.3
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Sn_interface-0.19.3/sn_node-0.77.3 ([`039e1cc`](https://github.com/maidsafe/safe_network/commit/039e1cc0fa8a7e7ae1c97a0c89328117a43d4796))
     - Clarify relocation flow ([`5fd068e`](https://github.com/maidsafe/safe_network/commit/5fd068e10cc96396fb800cf6acd92b377f4e21d9))
 </details>
 
 ## v0.19.2 (2023-02-28)
+
+<csr-id-80bae9ffa64e274da520e752cab0df79d5cf419e/>
 
 ### Chore
 
