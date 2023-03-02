@@ -211,7 +211,22 @@ pub async fn run_split() -> Result<()> {
 }
 
 async fn upload_data() -> Result<(XorName, [u8; 32])> {
-    let client = Client::builder().build().await?;
+    // Retry connecting up to 5 times, with 1.5s in between.
+    let mut retries = 5;
+    let client = loop {
+        match Client::builder().build().await {
+            Ok(client) => break client,
+            Err(sn_client::Error::NetworkContacts(e)) => {
+                retries -= 1;
+                if retries == 0 {
+                    return Err(sn_client::Error::NetworkContacts(e).into());
+                }
+                println!("Client connection failed, retrying in 1.5s");
+                tokio::time::sleep(Duration::from_millis(1500)).await;
+            }
+            Err(e) => return Err(e.into()),
+        }
+    };
 
     let bytes = random_bytes(FILE_SIZE_LENGTH);
 
