@@ -77,7 +77,7 @@ pub enum WalletSubCommands {
         /// The reason why this DBC is spent
         /// (Used for data payments: currently not yet implemented)
         #[clap(long = "reason")]
-        reason: DbcReason,
+        reason: Option<DbcReason>,
     },
 }
 
@@ -232,7 +232,9 @@ pub async fn wallet_commander(
             } else {
                 None
             };
-            let dbc = safe.wallet_reissue(&from, &amount, pk, reason).await?;
+            let dbc = safe
+                .wallet_reissue(&from, &amount, pk, reason.unwrap_or_default())
+                .await?;
             let dbc_hex = dbc.to_hex()?;
 
             // Write the DBC to a file if the user requested it, but fall
