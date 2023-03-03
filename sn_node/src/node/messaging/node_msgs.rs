@@ -176,6 +176,12 @@ impl MyNode {
             // The approval or rejection of a join (approval both for new network joiner as well as
             // existing node relocated to the section) will be received here.
             NodeMsg::JoinResponse(join_response) => {
+                if context.network_knowledge.is_section_member(&context.name) {
+                    // we can ignore this reponse msg
+                    trace!("Join response received when we're already a member. Ignoring.");
+                    return Ok(vec![])
+                }
+
                 match join_response {
                     JoinResponse::Rejected(reason) => Err(super::Error::RejoinRequired(
                         RejoinReason::from_reject_reason(reason),
