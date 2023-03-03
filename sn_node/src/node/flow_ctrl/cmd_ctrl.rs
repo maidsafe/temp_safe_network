@@ -58,13 +58,21 @@ impl CmdCtrl {
 
         trace!("Processing for {cmd:?}, id: {id:?}");
 
-        // TODO: move this somewhere neater
-        if node.data_replication_sender.is_none() {
-            node.data_replication_sender = Some(self.data_replication_sender.clone());
-        }
-
         #[cfg(feature = "statemap")]
         sn_interface::statemap::log_state(node_identifier.to_string(), cmd.statemap_state());
+
+        if cmd.should_go_off_thread() {
+            MyNode::process_cmd_off_thread(
+                cmd,
+                node.context(),
+                id,
+                cmd_process_api,
+                rejoin_network_sender,
+                // self.data_replication_sender.clone()
+            );
+            // early return
+            return;
+        }
 
         match MyNode::process_cmd(cmd, node).await {
             Ok(cmds) => {
@@ -100,4 +108,6 @@ impl CmdCtrl {
             sn_interface::statemap::State::Idle,
         );
     }
+
+    // async fn dispatch_cmd(cmd: Cmd)
 }
