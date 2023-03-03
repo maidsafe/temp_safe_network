@@ -579,6 +579,7 @@ mod tests {
     use anyhow::{anyhow, Result};
     use sn_client::{Error as ClientError, ErrorMsg};
     use sn_dbc::{Error as DbcError, Owner};
+    use xor_name::XorName;
 
     #[tokio::test]
     async fn test_wallet_create() -> Result<()> {
@@ -1075,7 +1076,8 @@ mod tests {
             .await?;
 
         let pk = bls::SecretKey::random().public_key();
-        let any_reason = DbcReason::from(Hash::hash(&[1, 2, 3, 4]));
+        let just_any_xorname = XorName::from_content(&[1, 2, 3, 4]);
+        let any_reason = DbcReason::from(just_any_xorname);
         let output_dbc = safe
             .wallet_reissue(&wallet_xorurl, "1", Some(pk), any_reason)
             .await?;
