@@ -272,12 +272,13 @@ impl TestNode {
         let msg_cmds = self
             .process_cmd(handle_node_msg_cmd)
             .await
-            .wrap_err("Error while handling node msg")?;
+            .wrap_err("Error while handling node_msg, Cmd::HandleMsg")?;
         let mut cmds = Vec::new();
         for cmd in msg_cmds {
+            let cmd_string = cmd.to_string();
             match self.process_cmd(cmd).await {
                 Ok(new_cmds) => cmds.extend(new_cmds),
-                Err(err) => error!("Error while handling node_msgs {err:?}"),
+                Err(err) => warn!("Error while handling node_msg, {cmd_string:?}: {err:?}"),
             }
         }
         Ok(cmds)
