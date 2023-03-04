@@ -29,7 +29,7 @@ use sn_interface::{
             ClientMsg, CmdResponse, DataCmd, DataResponse, Error as MessagingDataError,
             SpentbookCmd,
         },
-        system::{NodeDataCmd, NodeMsg},
+        system::{JoinDetails, NodeDataCmd, NodeMsg},
         AntiEntropyKind, AntiEntropyMsg, Dst, NetworkMsg, WireMsg,
     },
     network_knowledge::{
@@ -38,7 +38,7 @@ use sn_interface::{
         MIN_ADULT_AGE,
     },
     test_utils::*,
-    types::{keys::ed25519, Participant, PublicKey},
+    types::{keys::ed25519, Participant, PublicKey, RewardPeer},
 };
 
 use assert_matches::assert_matches;
@@ -68,13 +68,13 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
     let old_name = old_info.name();
     let old_keypair = old_info.keypair.clone();
 
-    let new_info = MyNodeInfo::new(
-        ed25519::gen_keypair(&prefix.range_inclusive(), old_info.age() + 1),
-        gen_addr(),
-    );
+    let new_keypair = ed25519::gen_keypair(&prefix.range_inclusive(), old_info.age() + 1);
+    let reward_peer = RewardPeer::random_w_key(new_keypair.public);
+    let new_info = MyNodeInfo::new(new_keypair, reward_peer);
 
     let relocation_dst = RelocationDst::new(xor_name::rand::random());
-    let relocated_state = NodeState::relocated(old_info.id(), Some(old_name), relocation_dst);
+    let relocated_state =
+        NodeState::relocated(old_info.reward_id(), Some(old_name), relocation_dst);
     let section_signed_state = TestKeys::get_section_signed(&sk_set.secret_key(), relocated_state)?;
 
     let info = RelocationInfo::new(section_signed_state, new_info.name());
@@ -89,7 +89,7 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
             name: XorName::from(PublicKey::Bls(section_key)),
             section_key,
         },
-        NodeMsg::TryJoin(Some(proof)),
+        NodeMsg::TryJoin(JoinDetails::Relocation(proof)),
     )?;
 
     let mut elder_node = env.get_nodes(prefix, 1, 0, None)?.remove(0);
@@ -118,7 +118,7 @@ async fn handle_agreement_on_online() -> Result<()> {
         .build()?;
     let mut node = env.get_nodes(prefix, 1, 0, None)?.remove(0);
     let sk_set = env.get_secret_key_set(prefix, None)?;
-    let new_node = gen_node_id(MIN_ADULT_AGE);
+    let new_node = gen_reward_node_id(MIN_ADULT_AGE);
     let join_approval_sent = handle_online_cmd(&new_node, &sk_set, &mut node).await?;
     assert!(join_approval_sent.0);
 
@@ -146,15 +146,15 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
     let section = env.get_network_knowledge(prefix, None)?;
     let sk_set = env.get_secret_key_set(prefix, None)?;
 
-    let mut expected_new_elders = section
+    let mut expected_new_elders: BTreeSet<_> = section
         .elders()
         .into_iter()
         .filter(|node_id| node_id.age() == MIN_ADULT_AGE + 1)
-        .collect::<BTreeSet<_>>();
+        .collect();
 
     // Handle agreement on Online of a node that is older than the youngest
     // current elder - that means this node is going to be promoted.
-    let new_node = gen_node_id(MIN_ADULT_AGE + 1);
+    let new_node = gen_reward_node_id(MIN_ADULT_AGE + 1);
     let node_state = NodeState::joined(new_node, None);
 
     let membership_decision = section_decision(&sk_set, node_state.clone())?;
@@ -169,7 +169,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
 
     // Verify we sent a `DkgStart` message with the expected participants.
     let mut dkg_start_sent = false;
-    let _changed = expected_new_elders.insert(new_node);
+    let _changed = expected_new_elders.insert(new_node.node_id());
 
     while let Some(cmd) = cmds.next(&mut node).await? {
         let (msg, recipients) = match cmd {
@@ -181,15 +181,12 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
             _ => continue,
         };
 
-        let actual_elder_candidates = match msg {
-            NodeMsg::DkgStart(session, _) => session.elders.clone(),
+        let actual_elder_candidates: BTreeSet<_> = match msg {
+            NodeMsg::DkgStart(session, _) => session.elders.iter().map(|e| e.node_id()).collect(),
             _ => continue,
         };
 
-        itertools::assert_equal(
-            actual_elder_candidates,
-            expected_new_elders.iter().map(|p| (p.name(), p.addr())),
-        );
+        itertools::assert_equal(&actual_elder_candidates, &expected_new_elders);
 
         let expected_dkg_start_recipients: BTreeSet<_> = expected_new_elders
             .iter()
@@ -218,7 +215,7 @@ async fn handle_join_request_of_rejoined_node() -> Result<()> {
     let mut node = env.get_nodes(prefix, 1, 0, None)?.remove(0);
 
     // Make a left node.
-    let node_id = gen_node_id_in_prefix(MIN_ADULT_AGE, prefix);
+    let node_id = gen_reward_node_id_in_prefix(MIN_ADULT_AGE, prefix);
     node.membership
         .as_mut()
         .ok_or_else(|| eyre!("Membership for the node must be set"))?
@@ -249,7 +246,11 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
     let sk_set = env.get_secret_key_set(prefix, None)?;
 
     // get the node state of the non_elder node
-    let node_state = env.get_nodes(prefix, 0, 1, None)?.remove(0).info().id();
+    let node_state = env
+        .get_nodes(prefix, 0, 1, None)?
+        .remove(0)
+        .info()
+        .reward_id();
     let node_state = NodeState::left(node_state, None);
 
     let proposal = node_state.clone();
@@ -277,7 +278,7 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
     let sk_set = env.get_secret_key_set(prefix, None)?;
 
     let elder = elders.remove(0);
-    let elder_id = elder.info().id();
+    let elder_id = elder.info().reward_id();
     let offline_elder = NodeState::left(elder_id, None);
 
     // Handle agreement on the Offline proposal
@@ -458,7 +459,7 @@ async fn msg_to_self() -> Result<()> {
     assert!(cmds.is_empty());
 
     let msg_type = assert_matches!(comm_rx.recv().await, Some(CommEvent::Msg(MsgReceived { sender, wire_msg, .. })) => {
-        assert_eq!(sender.addr(), info.addr);
+        assert_eq!(sender.addr(), info.addr());
         assert_matches!(wire_msg.into_msg(), Ok(msg_type) => msg_type)
     });
 

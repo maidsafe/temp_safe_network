@@ -10,27 +10,34 @@ use crate::node::{
     core::NodeContext, flow_ctrl::cmds::Cmd, messaging::Recipients, Error, MyNode, Result,
 };
 
-use qp2p::SendStream;
 use sn_interface::{
     messaging::{
-        system::{JoinRejectReason, JoinResponse, NodeMsg},
+        system::{JoinDetails, JoinRejectReason, JoinResponse, NodeMsg},
         MsgId,
     },
     network_knowledge::{NodeState, RelocationProof, MIN_ADULT_AGE},
-    types::{log_markers::LogMarker, NodeId, Participant},
+    types::{log_markers::LogMarker, NodeId, Participant, RewardPeer},
 };
+
+use qp2p::SendStream;
 
 // Message handling
 impl MyNode {
     pub(crate) fn handle_join(
+        node_id: NodeId,
+        details: JoinDetails,
+        correlation_id: MsgId,
+        send_stream: Option<SendStream>,
         node: &mut MyNode,
         context: &NodeContext,
-        node_id: NodeId,
-        correlation_id: MsgId,
-        relocation: Option<RelocationProof>,
-        send_stream: Option<SendStream>,
     ) -> Result<Vec<Cmd>> {
-        trace!("Handling join from {node_id:?}");
+        let (reward_node_id, relocation) = match details {
+            JoinDetails::New(reward_key) => (RewardPeer::new(node_id, reward_key), None),
+            JoinDetails::Relocation(proof) => {
+                (RewardPeer::new(node_id, proof.reward_key()), Some(proof))
+            }
+        };
+        trace!("Handling join from {reward_node_id:?}");
 
         // Ignore a join request if we are not elder.
         if !context.is_elder {
@@ -115,7 +122,7 @@ impl MyNode {
         }
 
         // We propose membership
-        let node_state = NodeState::joined(node_id, previous_name);
+        let node_state = NodeState::joined(reward_node_id, previous_name);
 
         if let Some(cmd) = node.propose_membership_change(node_state) {
             cmds.push(cmd);

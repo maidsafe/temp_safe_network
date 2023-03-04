@@ -606,8 +606,7 @@ mod tests {
         let (recv_endpoint, mut incoming_connections) =
             Endpoint::builder().addr(local_addr()).server()?;
         let recv_addr = recv_endpoint.local_addr();
-        let name = xor_name::rand::random();
-        let node_id = NodeId::new(name, recv_addr);
+        let node_id = NodeId::random_w_addr(recv_addr);
         let msg0 = new_test_msg(dst(node_id))?;
 
         // add node as a known member
@@ -653,7 +652,7 @@ mod tests {
 
         let (comm1, _rx1) = Comm::new(local_addr(), None)?;
 
-        let node_id = NodeId::new(xor_name::rand::random(), addr0);
+        let node_id = NodeId::random_w_addr(addr0);
         let msg = new_test_msg(dst(node_id))?;
 
         // add node as a known member
@@ -718,7 +717,7 @@ mod tests {
             }
         });
 
-        Ok((NodeId::new(xor_name::rand::random(), addr), rx))
+        Ok((NodeId::random_w_addr(addr), rx))
     }
 
     async fn get_invalid_node() -> Result<NodeId> {
@@ -733,7 +732,7 @@ mod tests {
             let _ = socket;
         });
 
-        Ok(NodeId::new(xor_name::rand::random(), addr))
+        Ok(NodeId::random_w_addr(addr))
     }
 
     fn local_addr() -> SocketAddr {

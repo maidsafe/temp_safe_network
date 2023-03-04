@@ -53,8 +53,7 @@ impl MyNode {
             .network_knowledge
             .section_auth()
             .elders()
-            .filter(|node_id| !names.contains(&node_id.name()))
-            .cloned()
+            .filter_map(|p| (!names.contains(&p.name())).then_some(p.node_id()))
             .collect();
         let mut result: Vec<Cmd> = Vec::new();
         for name in names.iter() {

@@ -12,11 +12,11 @@ mod node_msgs;
 mod section_sig;
 
 use crate::messaging::AuthorityProof;
-use crate::network_knowledge::{NodeState, RelocationDst, RelocationProof, SapCandidate};
+use crate::network_knowledge::{NodeState, RelocationDst, SapCandidate};
 use crate::SectionAuthorityProvider;
 
 pub use dkg::DkgSessionId;
-pub use join::{JoinRejectReason, JoinRequest, JoinResponse};
+pub use join::{JoinDetails, JoinRejectReason, JoinResponse};
 pub use node_msgs::{NodeDataCmd, NodeEvent, NodeQueryResponse};
 pub use section_sig::{SectionSig, SectionSigShare, SectionSigned};
 
@@ -58,7 +58,7 @@ pub enum NodeMsg {
     /// Membership Anti-Entropy request
     MembershipAE(Generation),
     /// Try to join a section in the network.
-    TryJoin(Option<RelocationProof>),
+    TryJoin(JoinDetails),
     /// Response to a join request.
     JoinResponse(JoinResponse),
     /// Sent to the new elder candidates to start the DKG process, along with a sig of the DkgSessionId

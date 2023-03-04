@@ -167,7 +167,7 @@ impl FlowCtrl {
 
         // Fire cmd to join the network
         let mut last_join_attempt = Instant::now();
-        self.send_join_network_cmd().await;
+        self.send_join_network_cmd(node.reward_key()).await;
 
         loop {
             // first do any pending processing
@@ -194,13 +194,12 @@ impl FlowCtrl {
             if last_join_attempt.elapsed() > join_retry_timeout {
                 last_join_attempt = Instant::now();
                 debug!("we're not joined so firing off cmd");
-                self.send_join_network_cmd().await;
+                self.send_join_network_cmd(node.reward_key()).await;
             }
 
-            // cheeck if we are a member
+            // check if we are a member
             // await for join retry time
-            let our_name = node.info().name();
-            is_member = node.network_knowledge.is_section_member(&our_name);
+            is_member = node.network_knowledge.is_section_member(&node.name());
 
             tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
         }
@@ -209,11 +208,11 @@ impl FlowCtrl {
     }
 
     // Helper to send the TryJoinNetwork cmd
-    async fn send_join_network_cmd(&self) {
+    async fn send_join_network_cmd(&self, reward_key: bls::PublicKey) {
         let cmd_channel_clone = self.cmd_sender_channel.clone();
         // send the join message...
         if let Err(error) = cmd_channel_clone
-            .send((Cmd::TryJoinNetwork, vec![]))
+            .send((Cmd::TryJoinNetwork(reward_key), vec![]))
             .await
             .map_err(|e| {
                 error!("Failed join: {:?}", e);

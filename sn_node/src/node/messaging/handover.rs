@@ -331,13 +331,12 @@ impl MyNode {
         // in regular handover the previous SAP's prefix is the same
         let previous_gen_sap = self.get_sap_for_prefix(sap.prefix())?;
         let members = self.get_members_at_gen(sap.membership_gen())?;
-        let received_candidates: BTreeSet<NodeId> = sap.elders().copied().collect();
+        let received_candidates: BTreeSet<NodeId> = sap.elder_ids().collect();
 
         let expected_candidates: BTreeSet<NodeId> =
             elder_candidates(members.values().cloned(), &previous_gen_sap)
                 .iter()
                 .map(|node| node.node_id())
-                .copied()
                 .collect();
         if received_candidates != expected_candidates {
             trace!("InvalidElderCandidates: received SAP at gen {} with candidates {:#?}, expected candidates {:#?}", sap.membership_gen(), received_candidates, expected_candidates);
@@ -360,24 +359,16 @@ impl MyNode {
         let dummy_chain_len = 0;
         let dummy_gen = 0;
 
-        let received_candidates1: BTreeSet<&NodeId> = sap1.elders().collect();
-        let received_candidates2: BTreeSet<&NodeId> = sap2.elders().collect();
+        let received_candidates1: BTreeSet<NodeId> = sap1.elder_ids().collect();
+        let received_candidates2: BTreeSet<NodeId> = sap2.elder_ids().collect();
 
         if let Some((dkg1, dkg2)) =
             try_split_dkg(&members, &previous_gen_sap, dummy_chain_len, dummy_gen)
         {
-            let expected_nodes1: BTreeSet<NodeId> = dkg1
-                .elders
-                .iter()
-                .map(|(n, a)| NodeId::new(*n, *a))
-                .collect();
-            let expected_nodes2: BTreeSet<NodeId> = dkg2
-                .elders
-                .iter()
-                .map(|(n, a)| NodeId::new(*n, *a))
-                .collect();
-            let expected_candidates1: BTreeSet<&NodeId> = expected_nodes1.iter().collect();
-            let expected_candidates2: BTreeSet<&NodeId> = expected_nodes2.iter().collect();
+            let expected_candidates1: BTreeSet<NodeId> =
+                dkg1.elders.iter().map(|e| e.node_id()).collect();
+            let expected_candidates2: BTreeSet<NodeId> =
+                dkg2.elders.iter().map(|e| e.node_id()).collect();
 
             // the order of these SAPs is not absolute, so we try both comparisons
             if (received_candidates1 != expected_candidates1

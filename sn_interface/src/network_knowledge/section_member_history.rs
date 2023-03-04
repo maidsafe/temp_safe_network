@@ -151,8 +151,8 @@ mod tests {
     use super::{SectionMemberHistory, SectionsDAG};
     use crate::{
         network_knowledge::{MembershipState, NodeState, RelocationDst, SectionSigned},
-        test_utils::{assert_lists, gen_addr, TestKeys},
-        types::NodeId,
+        test_utils::{assert_lists, TestKeys},
+        types::RewardPeer,
     };
     use eyre::Result;
     use rand::thread_rng;
@@ -266,13 +266,15 @@ mod tests {
             .first_key_value()
             .unwrap_or_else(|| panic!("Proposal of Decision is empty"));
 
-        let node_left_joins =
-            TestKeys::get_section_signed(&sk, NodeState::joined(*node_left_state.node_id(), None))?;
+        let node_left_joins = TestKeys::get_section_signed(
+            &sk,
+            NodeState::joined(*node_left_state.reward_id(), None),
+        )?;
         let node_left_joins = section_signed_to_decision(node_left_joins);
 
         let node_relocated_joins = TestKeys::get_section_signed(
             &sk,
-            NodeState::joined(*node_relocated_state.node_id(), None),
+            NodeState::joined(*node_relocated_state.reward_id(), None),
         )?;
         let node_relocated_joins = section_signed_to_decision(node_relocated_joins);
 
@@ -310,10 +312,10 @@ mod tests {
             .first_key_value()
             .unwrap_or_else(|| panic!("Proposal of Decision is empty"));
 
-        let node_1 = NodeState::left(*node_state_1.node_id(), Some(node_state_1.name()));
+        let node_1 = NodeState::left(*node_state_1.reward_id(), Some(node_state_1.name()));
         let node_1 = TestKeys::get_section_signed(&sk, node_1)?;
         let node_1 = section_signed_to_decision(node_1);
-        let node_2 = NodeState::left(*node_state_2.node_id(), Some(node_state_2.name()));
+        let node_2 = NodeState::left(*node_state_2.reward_id(), Some(node_state_2.name()));
         let node_2 = TestKeys::get_section_signed(&sk, node_2)?;
         let node_2 = section_signed_to_decision(node_2);
         assert!(section_members.update(node_1.clone()));
@@ -332,12 +334,9 @@ mod tests {
         membership_state: MembershipState,
         secret_key: &bls::SecretKey,
     ) -> Result<Vec<Decision<NodeState>>> {
-        let mut rng = thread_rng();
         let mut decisions = Vec::new();
         for _ in 0..num_nodes {
-            let addr = gen_addr();
-            let name = XorName::random(&mut rng);
-            let node_id = NodeId::new(name, addr);
+            let node_id = RewardPeer::random();
             let node_state = match membership_state {
                 MembershipState::Joined => NodeState::joined(node_id, None),
                 MembershipState::Left => NodeState::left(node_id, None),

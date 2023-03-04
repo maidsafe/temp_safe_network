@@ -21,7 +21,7 @@ use sn_interface::{
         MIN_ADULT_AGE,
     },
     test_utils::*,
-    types::{keys::ed25519::gen_keypair, NodeId, PublicKey},
+    types::{keys::ed25519::gen_keypair, NodeId, PublicKey, RewardPeer},
 };
 
 use bls::SecretKeySet;
@@ -148,7 +148,10 @@ impl<R: RngCore> TestNetworkBuilder<R> {
             let socket_addr: SocketAddr = (Ipv4Addr::LOCALHOST, 0).into();
             let (comm, rx) = Comm::new(socket_addr, None).expect("failed to create Comm");
             let mut node = node.clone();
-            node.addr = comm.socket_addr();
+            node.node_id = RewardPeer::new(
+                NodeId::new(node.name(), comm.socket_addr()),
+                node.reward_id().reward_key(),
+            );
 
             // insert the commRx
             let _ = self.receivers.insert(node.public_key(), Some(rx));
@@ -192,10 +195,10 @@ impl<R: RngCore> TestNetworkBuilder<R> {
         );
 
         let elder_count = elders.len();
-        let elders_iter = elders.iter().map(|(node, _)| node.id());
+        let elders_iter = elders.iter().map(|(node, _)| node.reward_id());
         let members_iter = members
             .iter()
-            .map(|(node, _)| NodeState::joined(node.id(), None));
+            .map(|(node, _)| NodeState::joined(node.reward_id(), None));
         let sk_set = gen_sk_set(&mut self.rng, elder_count, None);
         let sap = SectionAuthorityProvider::new(
             elders_iter,
@@ -457,10 +460,10 @@ impl<R: RngCore> TestNetworkBuilder<R> {
     ) {
         let (elders, adults, comm_rx) =
             TestNetwork::gen_node_infos(&prefix, elder_count, adult_count, elder_age_pattern);
-        let elders_for_sap = elders.iter().map(|(node, _)| node.id());
+        let elders_for_sap = elders.iter().map(|(node, _)| node.reward_id());
         let members = adults
             .iter()
-            .map(|(node, _)| node.id())
+            .map(|(node, _)| node.reward_id())
             .chain(elders_for_sap.clone())
             .map(|node_id| NodeState::joined(node_id, None));
         let sk_set = gen_sk_set(&mut self.rng, elder_count, sk_threshold_size);
@@ -781,10 +784,10 @@ impl TestNetwork {
         let _ = handle.enter();
         let socket_addr: SocketAddr = (Ipv4Addr::LOCALHOST, 0).into();
         let (comm, rx) = Comm::new(socket_addr, None).expect("failed  to create comm");
-        let info = MyNodeInfo::new(
-            gen_keypair(&prefix.unwrap_or_default().range_inclusive(), age),
-            comm.socket_addr(),
-        );
+        let keypair = gen_keypair(&prefix.unwrap_or_default().range_inclusive(), age);
+        let node_id =
+            RewardPeer::random_w_node_id(NodeId::from_key(comm.socket_addr(), keypair.public));
+        let info = MyNodeInfo::new(keypair, node_id);
         (info, comm, rx)
     }
 
@@ -802,6 +805,7 @@ impl TestNetwork {
             create_test_capacity_and_root_storage().expect("Failed to create root storage");
 
         MyNode::new(
+            info.reward_id(),
             comm.clone(),
             info.keypair.clone(),
             network_knowledge.clone(),
@@ -830,6 +834,7 @@ impl TestNetwork {
         let (min_capacity, max_capacity, root_storage_dir) =
             create_test_capacity_and_root_storage().wrap_err("Failed to create root storage")?;
         let mut my_node = MyNode::new(
+            info.reward_id(),
             comm.clone(),
             info.keypair.clone(),
             network_knowledge.clone(),

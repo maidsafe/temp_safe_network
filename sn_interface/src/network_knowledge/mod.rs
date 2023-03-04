@@ -37,7 +37,7 @@ use crate::{
         system::{SectionMembers, SectionSig, SectionSigned},
         AntiEntropyMsg, Dst, NetworkMsg,
     },
-    types::NodeId,
+    types::{NodeId, RewardPeer},
 };
 
 use bls::PublicKey as BlsPublicKey;
@@ -185,7 +185,7 @@ impl NetworkKnowledge {
 
     /// Creates `NetworkKnowledge` for the first node in the network
     pub fn first_node(
-        node_id: NodeId,
+        node_id: RewardPeer,
         genesis_sk_set: bls::SecretKeySet,
     ) -> Result<(Self, SectionKeyShare)> {
         let public_key_set = genesis_sk_set.public_keys();
@@ -495,7 +495,7 @@ impl NetworkKnowledge {
         let mut live_adults = BTreeSet::new();
         for node_state in self.section_members.members() {
             if !self.is_elder(&node_state.name()) {
-                let _ = live_adults.insert(*node_state.node_id());
+                let _ = live_adults.insert(node_state.node_id());
             }
         }
         live_adults
@@ -555,7 +555,7 @@ impl NetworkKnowledge {
 fn create_first_section_authority_provider(
     pk_set: &bls::PublicKeySet,
     sk_share: &bls::SecretKeyShare,
-    node_id: NodeId,
+    node_id: RewardPeer,
 ) -> Result<SectionSigned<SectionAuthorityProvider>> {
     let section_auth = SectionAuthorityProvider::new(
         iter::once(node_id),
@@ -589,15 +589,14 @@ fn create_first_sig<T: Serialize>(
 mod tests {
     use super::{supermajority, NetworkKnowledge};
     use crate::{
-        test_utils::{gen_addr, prefix, TestKeys, TestSapBuilder, TestSectionTree},
-        types::NodeId,
+        test_utils::{prefix, TestKeys, TestSapBuilder, TestSectionTree},
+        types::RewardPeer,
     };
 
     use bls::SecretKeySet;
     use eyre::Result;
     use proptest::prelude::*;
     use rand::thread_rng;
-    use xor_name::XorName;
 
     #[test]
     fn supermajority_of_small_group() {
@@ -628,7 +627,7 @@ mod tests {
     {
         let mut rng = thread_rng();
         let sk_gen = SecretKeySet::random(0, &mut rng);
-        let node_id = NodeId::new(XorName::random(&mut rng), gen_addr());
+        let node_id = RewardPeer::random();
         let (mut knowledge, _) = NetworkKnowledge::first_node(node_id, sk_gen.clone())?;
 
         // section 1

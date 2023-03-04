@@ -16,7 +16,7 @@ use sn_interface::{
         AuthorityProof, ClientAuth, Dst, MsgId, MsgKind, NetworkMsg,
     },
     network_knowledge::{test_utils::*, NodeState},
-    types::{Keypair, NodeId},
+    types::{Keypair, RewardPeer},
 };
 
 use assert_matches::assert_matches;
@@ -37,7 +37,7 @@ use xor_name::XorName;
 pub(crate) struct JoinApprovalSent(pub(crate) bool);
 
 pub(crate) async fn handle_online_cmd(
-    node_id: &NodeId,
+    node_id: &RewardPeer,
     sk_set: &bls::SecretKeySet,
     node: &mut MyNode,
 ) -> Result<JoinApprovalSent> {
@@ -62,7 +62,7 @@ pub(crate) async fn handle_online_cmd(
         match msg {
             NodeMsg::JoinResponse(JoinResponse::Approved { .. }) => {
                 assert_matches!(recipients, Recipients::Multiple(nodes) => {
-                    assert_eq!(nodes, &BTreeSet::from([*node_id]));
+                    assert_eq!(nodes, &BTreeSet::from([node_id.node_id()]));
                 });
                 approval_sent.0 = true;
             }

@@ -19,7 +19,7 @@ use sn_interface::{
     dbcs::gen_genesis_dbc,
     messaging::system::SectionSigned,
     network_knowledge::{NetworkKnowledge, SectionsDAG, GENESIS_DBC_SK},
-    types::{log_markers::LogMarker, NodeId},
+    types::{log_markers::LogMarker, NodeId, RewardPeer},
     SectionAuthorityProvider,
 };
 
@@ -30,6 +30,7 @@ use tokio::sync::mpsc;
 
 impl MyNode {
     pub(crate) fn first_node(
+        node_id: RewardPeer,
         comm: Comm,
         keypair: Keypair,
         used_space: UsedSpace,
@@ -37,7 +38,6 @@ impl MyNode {
         genesis_sk_set: bls::SecretKeySet,
         fault_cmds_sender: mpsc::Sender<FaultsCmd>,
     ) -> Result<(Self, Dbc)> {
-        let node_id = NodeId::from_key(comm.socket_addr(), keypair.public);
         let genesis_dbc =
             gen_genesis_dbc(&genesis_sk_set, &bls::SecretKey::from_hex(GENESIS_DBC_SK)?)?;
 
@@ -45,6 +45,7 @@ impl MyNode {
             NetworkKnowledge::first_node(node_id, genesis_sk_set)?;
 
         let node = Self::new(
+            node_id,
             comm,
             Arc::new(keypair),
             network_knowledge,
@@ -64,6 +65,8 @@ impl MyNode {
     ) -> Result<()> {
         // try to relocate to the section that matches our current name
         self.network_knowledge.switch_section(dst_sap)?;
+        let new_id = NodeId::from_key(self.node_id.addr(), new_keypair.public);
+        self.node_id = RewardPeer::new(new_id, self.node_id.reward_key());
         self.keypair = Arc::new(new_keypair);
         Ok(())
     }

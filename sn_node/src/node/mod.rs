@@ -69,15 +69,15 @@ mod core {
             supermajority, MyNodeInfo, NetworkKnowledge, NodeState, RelocationState,
             SectionAuthorityProvider, SectionKeyShare, SectionKeysProvider,
         },
-        types::{keys::ed25519::Digest256, log_markers::LogMarker},
-        types::{DataAddress, NodeId},
+        types::{
+            keys::ed25519::Digest256, log_markers::LogMarker, DataAddress, NodeId, RewardPeer,
+        },
     };
     use tokio::sync::mpsc::Sender;
 
     use ed25519_dalek::Keypair;
     use std::{
         collections::{BTreeMap, BTreeSet, HashMap},
-        net::SocketAddr,
         path::PathBuf,
         sync::Arc,
     };
@@ -93,11 +93,11 @@ mod core {
     }
 
     pub(crate) struct MyNode {
+        pub(crate) node_id: RewardPeer,
         pub(crate) comm: Comm,
-        pub(crate) addr: SocketAddr, // does this change? if so... when? only at node start atm?
+        pub(crate) keypair: Arc<Keypair>,
         root_storage_dir: PathBuf,
         pub(crate) data_storage: DataStorage, // Adult only before cache
-        pub(crate) keypair: Arc<Keypair>,
         // Network resources
         pub(crate) section_keys_provider: SectionKeysProvider,
         pub(crate) network_knowledge: NetworkKnowledge,
@@ -198,7 +198,9 @@ mod core {
             }
         }
 
+        #[allow(clippy::too_many_arguments)]
         pub(crate) fn new(
+            node_id: RewardPeer,
             comm: Comm,
             keypair: Arc<Keypair>, //todo: Keypair, only test design blocks this
             network_knowledge: NetworkKnowledge,
@@ -207,7 +209,6 @@ mod core {
             root_storage_dir: PathBuf,
             fault_cmds_sender: Sender<FaultsCmd>,
         ) -> Result<Self> {
-            let addr = comm.socket_addr();
             comm.set_comm_targets(network_knowledge.members());
 
             let membership = if let Some(key) = section_key_share.clone() {
@@ -244,7 +245,7 @@ mod core {
 
             let node = Self {
                 comm,
-                addr,
+                node_id,
                 keypair,
                 network_knowledge,
                 section_keys_provider,
@@ -275,13 +276,18 @@ mod core {
         }
 
         pub(crate) fn info(&self) -> MyNodeInfo {
-            let keypair = self.keypair.clone();
-            let addr = self.addr;
-            MyNodeInfo { keypair, addr }
+            MyNodeInfo {
+                node_id: self.node_id,
+                keypair: self.keypair.clone(),
+            }
         }
 
         pub(crate) fn name(&self) -> XorName {
-            self.info().name()
+            self.node_id.name()
+        }
+
+        pub(crate) fn reward_key(&self) -> PublicKey {
+            self.node_id.reward_key()
         }
 
         ////////////////////////////////////////////////////////////////////////////
@@ -315,7 +321,7 @@ mod core {
                 // some times the call fails for what ever reason.)
                 let mut elders: Vec<_> = matching_section
                     .elders()
-                    .filter(|p| p.name() != context.name)
+                    .filter_map(|p| (p.name() != context.name).then_some(p.node_id()))
                     .collect();
                 elders.shuffle(&mut OsRng);
 
@@ -323,7 +329,7 @@ mod core {
                 // hopefully we'll eventually get updated on this section from somewhere else.
                 for elder in elders.iter() {
                     if elder.name() != context.name {
-                        let _ = recipients.insert(**elder);
+                        let _ = recipients.insert(*elder);
                         break;
                     }
                 }
@@ -381,13 +387,13 @@ mod core {
                 // Lets track ongoing DKG sessions.
                 // However we won't receive DKG messages from the other after-split section.
                 // So, shall only track the side that we are in as well.
-                if zero_dkg_id.elders.contains_key(&self.info().name()) {
-                    for candidate in zero_dkg_id.elders.keys() {
-                        self.track_node_issue(*candidate, IssueType::Dkg);
+                if zero_dkg_id.elders.iter().any(|e| e.name() == self.name()) {
+                    for candidate in zero_dkg_id.elders.iter().map(|e| e.name()) {
+                        self.track_node_issue(candidate, IssueType::Dkg);
                     }
-                } else if one_dkg_id.elders.contains_key(&self.info().name()) {
-                    for candidate in one_dkg_id.elders.keys() {
-                        self.track_node_issue(*candidate, IssueType::Dkg);
+                } else if one_dkg_id.elders.iter().any(|e| e.name() == self.name()) {
+                    for candidate in one_dkg_id.elders.iter().map(|e| e.name()) {
+                        self.track_node_issue(candidate, IssueType::Dkg);
                     }
                 }
 
@@ -409,7 +415,7 @@ mod core {
 
             if elder_candidates
                 .iter()
-                .map(|s| s.node_id())
+                .map(|s| s.reward_id())
                 .eq(current_elders.iter())
             {
                 vec![]
@@ -429,18 +435,14 @@ mod core {
                 let chain_len = self.network_knowledge.section_chain_len();
                 let session_id = DkgSessionId {
                     prefix: sap.prefix(),
-                    elders: BTreeMap::from_iter(
-                        elder_candidates
-                            .into_iter()
-                            .map(|node| (node.name(), node.addr())),
-                    ),
+                    elders: elder_candidates.iter().map(|c| *c.reward_id()).collect(),
                     section_chain_len: chain_len,
                     bootstrap_members: BTreeSet::from_iter(members.into_values()),
                     membership_gen,
                 };
                 // track init of DKG
-                for candidate in session_id.elders.keys() {
-                    self.track_node_issue(*candidate, IssueType::Dkg);
+                for candidate in &session_id.elders {
+                    self.track_node_issue(candidate.name(), IssueType::Dkg);
                 }
 
                 vec![session_id]
@@ -555,11 +557,11 @@ mod core {
                 .iter()
                 .map(|m| m.name())
                 .collect();
-            let is_member = |m: &XorName| current_section_members.contains(m);
+            let is_member = |p: &RewardPeer| current_section_members.contains(&p.name());
             let missing_members_hashes = Vec::from_iter(
                 self.dkg_sessions_info
                     .iter()
-                    .filter(|(_, info)| !info.session_id.elders.keys().all(is_member))
+                    .filter(|(_, info)| !info.session_id.elders.iter().all(is_member))
                     .map(|(hash, _)| *hash),
             );
             for hash in missing_members_hashes {
@@ -792,15 +794,8 @@ mod core {
             let relocated_members = context
                 .network_knowledge
                 .archived_members()
-                .into_iter()
-                .filter_map(|state| {
-                    // TODO: figure out how to retain the section sign key info within Decsion
-                    if state.is_relocated() {
-                        Some(*state.node_id())
-                    } else {
-                        None
-                    }
-                });
+                .into_iter() // TODO: figure out hot to retain the section sign key info within Decsion
+                .filter_map(|state| state.is_relocated().then_some(state.node_id()));
             let mut members = context.network_knowledge.members();
             members.extend(relocated_members);
             context.comm.set_comm_targets(members);

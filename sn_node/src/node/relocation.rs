@@ -120,7 +120,7 @@ mod tests {
         elder_count,
         network_knowledge::{NodeState, SectionAuthorityProvider, SectionTree, MIN_ADULT_AGE},
         test_utils::TestKeys,
-        types::NodeId,
+        types::{NodeId, RewardPeer},
     };
 
     use eyre::Result;
@@ -155,7 +155,7 @@ mod tests {
         }
     }
 
-    fn proptest_actions_impl(nodes: Vec<NodeId>, signature_trailing_zeros: u8) -> Result<()> {
+    fn proptest_actions_impl(nodes: Vec<RewardPeer>, signature_trailing_zeros: u8) -> Result<()> {
         let sk_set = bls::SecretKeySet::random(0, &mut thread_rng());
         let sk = sk_set.secret_key();
 
@@ -199,8 +199,8 @@ mod tests {
         // Only the oldest matching nodes should be relocated.
         let expected_relocated_age = nodes
             .iter()
-            .filter(|node| network_knowledge.is_adult(&node.name()))
-            .map(NodeId::age)
+            .filter(|peer| network_knowledge.is_adult(&peer.name()))
+            .map(|p| p.age())
             .filter(|age| *age <= signature_trailing_zeros)
             .max();
 
@@ -269,7 +269,7 @@ mod tests {
     fn arbitrary_unique_nodes(
         count: impl Into<SizeRange>,
         age: impl Strategy<Value = u8>,
-    ) -> impl Strategy<Value = Vec<NodeId>> {
+    ) -> impl Strategy<Value = Vec<RewardPeer>> {
         proptest::collection::btree_map(arbitrary_bytes(), (any::<SocketAddr>(), age), count)
             .prop_map(|nodes| {
                 nodes
@@ -277,7 +277,7 @@ mod tests {
                     .map(|(mut bytes, (addr, age))| {
                         bytes[XOR_NAME_LEN - 1] = age;
                         let name = XorName(bytes);
-                        NodeId::new(name, addr)
+                        RewardPeer::random_w_node_id(NodeId::new(name, addr))
                     })
                     .collect()
             })

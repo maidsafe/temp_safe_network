@@ -84,7 +84,7 @@ pub(crate) fn check_ephemeral_dkg_key(
     key_sig: Signature,
 ) -> Result<()> {
     // check key owner is in dkg session
-    if !session_id.elders.contains_key(&key_owner) {
+    if !session_id.elders.iter().any(|e| e.name() == key_owner) {
         return Err(Error::NodeNotInDkgSession(key_owner));
     }
 
@@ -258,8 +258,12 @@ impl DkgVoter {
             .pub_keys
             .insert(key_owner, (key, key_sig))
             .is_some();
-        let what_we_have = our_keys.pub_keys.keys().collect::<BTreeSet<_>>();
-        let what_we_need = session_id.elders.keys().collect::<BTreeSet<_>>();
+        let what_we_have = our_keys.pub_keys.keys().copied().collect::<BTreeSet<_>>();
+        let what_we_need = session_id
+            .elders
+            .iter()
+            .map(|e| e.name())
+            .collect::<BTreeSet<_>>();
         let just_completed = what_we_have == what_we_need;
         trace!(
             "Dkg keys s{}: ours: {:?}, in session_id: {:?}",

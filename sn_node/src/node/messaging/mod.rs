@@ -82,7 +82,7 @@ impl MyNode {
 
         // we've forwaded it to ourselves as we're the holder. This prevents a loop.
         // TODO: cut that wee loop down
-        let is_from_us = sender.addr() == context.info.addr;
+        let is_from_us = sender.addr() == context.info.addr();
         let is_for_us =
             is_from_us || wire_msg.dst().name == context.name || msg_kind.is_client_spend();
 

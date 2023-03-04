@@ -125,6 +125,11 @@ impl RelocationProof {
         self.info.signed_relocation.age()
     }
 
+    /// Reward key of the relocating node.
+    pub fn reward_key(&self) -> bls::PublicKey {
+        self.info.signed_relocation.reward_id().reward_key()
+    }
+
     // ed25519_dalek::Signature has overly verbose debug output, so we provide our own
     pub fn fmt_ed25519(sig: &Signature, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "Signature({:0.10})", HexFmt(sig))

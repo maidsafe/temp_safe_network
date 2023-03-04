@@ -1,7 +1,7 @@
 use super::SectionKeysProvider;
 use crate::{
     network_knowledge::{section_keys::build_spent_proof_share, Error, MyNodeInfo, MIN_ADULT_AGE},
-    types::{keys::ed25519, NodeId},
+    types::{keys::ed25519, NodeId, RewardPeer},
     SectionAuthorityProvider,
 };
 use eyre::{eyre, Context, ContextCompat, Result};
@@ -19,12 +19,12 @@ use std::{
 };
 use xor_name::Prefix;
 
-// Parse `Prefix` from string
+/// Parse `Prefix` from string
 pub fn prefix(s: &str) -> Prefix {
     s.parse().expect("Failed to parse prefix")
 }
 
-// Generate unique SocketAddr for testing purposes
+/// Generate unique SocketAddr for testing purposes
 pub fn gen_addr() -> SocketAddr {
     thread_local! {
         static NEXT_PORT: Cell<u16> = Cell::new(1000);
@@ -34,24 +34,35 @@ pub fn gen_addr() -> SocketAddr {
     ([192, 0, 2, 0], port).into()
 }
 
-// Generate a NodeId with the given age
+/// Generate a NodeId with the given age
 pub fn gen_node_id(age: u8) -> NodeId {
     let name = ed25519::gen_name_with_age(age);
-    NodeId::new(name, gen_addr())
+    NodeId::random_w_name(name)
 }
 
-// Generate a NodeId with the given age and prefix
+/// Generate a NodeId with the given age and prefix
 pub fn gen_node_id_in_prefix(age: u8, prefix: Prefix) -> NodeId {
     let name = ed25519::gen_name_with_age(age);
-    NodeId::new(prefix.substituted_in(name), gen_addr())
+    NodeId::random_w_name(prefix.substituted_in(name))
 }
 
-// Generate `MyNodeInfo` with the given age and prefix
+/// Generate a RewardPeer with the given age
+pub fn gen_reward_node_id(age: u8) -> RewardPeer {
+    let name = ed25519::gen_name_with_age(age);
+    RewardPeer::random_w_name(name)
+}
+
+/// Generate a RewardPeer with the given age and prefix
+pub fn gen_reward_node_id_in_prefix(age: u8, prefix: Prefix) -> RewardPeer {
+    let name = ed25519::gen_name_with_age(age);
+    RewardPeer::random_w_name(prefix.substituted_in(name))
+}
+
+/// Generate `MyNodeInfo` with the given age and prefix
 pub fn gen_info(age: u8, prefix: Option<Prefix>) -> MyNodeInfo {
-    MyNodeInfo::new(
-        ed25519::gen_keypair(&prefix.unwrap_or_default().range_inclusive(), age),
-        gen_addr(),
-    )
+    let keypair = ed25519::gen_keypair(&prefix.unwrap_or_default().range_inclusive(), age);
+    let peer = RewardPeer::random_w_key(keypair.public);
+    MyNodeInfo::new(keypair, peer)
 }
 
 /// Create `elder+adult` Nodes sorted by their names.

@@ -7,15 +7,21 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::NodeState;
-use serde::{Deserialize, Serialize};
+use crate::network_knowledge::RelocationProof;
+
 use sn_consensus::Decision;
+
+use serde::{Deserialize, Serialize};
 use std::{fmt, net::SocketAddr};
 
-/// Response to a request to join a section
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct JoinRequest {
-    /// The public key of the section to join.
-    pub section_key: bls::PublicKey,
+/// Details of a joining node, included when joining a section.
+#[allow(clippy::large_enum_variant)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum JoinDetails {
+    /// New node with its reward key.
+    New(bls::PublicKey),
+    /// Relocating node with the proof that it came from another section.
+    Relocation(RelocationProof),
 }
 
 /// Response to a request to join a section

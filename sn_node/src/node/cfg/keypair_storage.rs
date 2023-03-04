@@ -7,7 +7,10 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{Error, Result};
-use ed25519_dalek::{Keypair, PublicKey, KEYPAIR_LENGTH};
+
+use sn_interface::types::bls_from_hex;
+
+use ed25519_dalek::{Keypair, KEYPAIR_LENGTH};
 use hex::{decode, encode};
 use std::path::Path;
 use tokio::fs;
@@ -59,38 +62,26 @@ pub(crate) async fn get_network_keypair(root_dir: &Path) -> Result<Option<Keypai
 }
 
 /// Writes the public and secret key (hex-encoded) to different locations at disk.
-pub(crate) async fn store_new_reward_keypair(root_dir: &Path, keypair: &Keypair) -> Result<()> {
+pub(crate) async fn store_new_reward_keypair(
+    root_dir: &Path,
+    secret_key: &bls::SecretKey,
+) -> Result<()> {
     let secret_key_path = root_dir.join(REWARD_SECRET_KEY_FILENAME);
     let public_key_path = root_dir.join(REWARD_PUBLIC_KEY_FILENAME);
-    fs::write(secret_key_path, encode(keypair.secret.to_bytes())).await?;
-    fs::write(public_key_path, encode(keypair.public.to_bytes())).await?;
-
+    fs::write(secret_key_path, encode(secret_key.to_bytes())).await?;
+    fs::write(public_key_path, encode(secret_key.public_key().to_bytes())).await?;
     Ok(())
 }
 
-/// Returns Some(PublicKey) or None if file doesn't exist. It assumes it's hex-encoded.
-pub(crate) async fn get_reward_pk(root_dir: &Path) -> Result<Option<PublicKey>> {
+/// Returns Some(bls::PublicKey) or None if file doesn't exist. It assumes it's hex-encoded.
+pub(crate) async fn get_reward_pk(root_dir: &Path) -> Result<Option<bls::PublicKey>> {
     let path = root_dir.join(REWARD_PUBLIC_KEY_FILENAME);
     if !path.is_file() {
         return Ok(None);
     }
 
     let pk_hex_bytes = fs::read(&path).await?;
-    let pk_bytes = decode(pk_hex_bytes).map_err(|err| {
-        Error::Configuration(format!(
-            "couldn't hex-decode rewards Ed25519 public key bytes from {}: {}",
-            path.display(),
-            err
-        ))
-    })?;
-
-    let pk = PublicKey::from_bytes(&pk_bytes).map_err(|err| {
-        Error::Configuration(format!(
-            "invalid rewards Ed25519 public key bytes read from {}: {}",
-            path.display(),
-            err
-        ))
-    })?;
+    let pk = bls_from_hex(pk_hex_bytes)?;
 
     Ok(Some(pk))
 }
@@ -105,21 +96,18 @@ mod test {
     use tempfile::{tempdir, TempDir};
 
     #[tokio::test]
-    async fn pubkey_to_and_from_file() -> Result<()> {
-        let mut rng = OsRng;
-        let keypair = ed25519_dalek::Keypair::generate(&mut rng);
-
+    async fn reward_key_to_and_from_file() -> Result<()> {
+        let secret_key = bls::SecretKey::random();
         let root = create_temp_root()?;
         let root_dir = root.path();
-        store_new_reward_keypair(root_dir, &keypair).await?;
+        store_new_reward_keypair(root_dir, &secret_key).await?;
         let pk_result = get_reward_pk(root_dir).await?;
-
-        assert_eq!(pk_result, Some(keypair.public));
+        assert_eq!(pk_result, Some(secret_key.public_key()));
         Ok(())
     }
 
     #[tokio::test]
-    async fn keypair_to_and_from_file() -> Result<()> {
+    async fn network_keypair_to_and_from_file() -> Result<()> {
         let mut rng = OsRng;
         let keypair = ed25519_dalek::Keypair::generate(&mut rng);
 

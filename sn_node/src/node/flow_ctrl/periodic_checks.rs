@@ -14,7 +14,9 @@ use crate::node::{
 };
 
 use sn_interface::{
-    messaging::system::NodeMsg, network_knowledge::RelocationState, types::log_markers::LogMarker,
+    messaging::system::{JoinDetails, NodeMsg},
+    network_knowledge::RelocationState,
+    types::log_markers::LogMarker,
 };
 
 use std::{collections::BTreeSet, time::Duration};
@@ -146,7 +148,7 @@ impl FlowCtrl {
                     );
                     cmds.push(MyNode::send_to_elders_await_responses(
                         context.clone(),
-                        NodeMsg::TryJoin(Some(proof.clone())),
+                        NodeMsg::TryJoin(JoinDetails::Relocation(proof.clone())),
                     ));
                 } else {
                     info!(

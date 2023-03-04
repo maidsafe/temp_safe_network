@@ -54,6 +54,34 @@ impl NodeId {
             name: XorName::from(PublicKey::from(public_key)),
         }
     }
+
+    #[cfg(any(test, feature = "test-utils"))]
+    pub fn random() -> Self {
+        Self {
+            addr: crate::test_utils::gen_addr(),
+            name: xor_name::rand::random(),
+        }
+    }
+
+    #[cfg(any(test, feature = "test-utils"))]
+    pub fn random_w_key(public_key: ed25519_dalek::PublicKey) -> Self {
+        Self::from_key(crate::test_utils::gen_addr(), public_key)
+    }
+
+    #[cfg(any(test, feature = "test-utils"))]
+    pub fn random_w_name(name: XorName) -> Self {
+        Self {
+            addr: crate::test_utils::gen_addr(),
+            name,
+        }
+    }
+
+    pub fn random_w_addr(addr: SocketAddr) -> Self {
+        Self {
+            addr,
+            name: xor_name::rand::random(),
+        }
+    }
 }
 
 impl Display for NodeId {

@@ -864,7 +864,6 @@ mod tests {
             NetworkMsg, SectionSigShare,
         },
         network_knowledge::{supermajority, NodeState, SectionKeyShare},
-        types::NodeId,
     };
 
     use assert_matches::assert_matches;
@@ -1122,13 +1121,13 @@ mod tests {
 
     // Each node sends out DKG start msg to the other nodes
     async fn start_dkg(nodes: &mut BTreeMap<XorName, TestNode>) -> Result<DkgSessionId> {
-        let mut elders = BTreeMap::new();
-        for (name, node) in nodes.iter() {
-            let _ = elders.insert(*name, node.node.addr);
+        let mut elders = BTreeSet::new();
+        for (_, node) in nodes.iter() {
+            let _ = elders.insert(node.node.info().reward_id());
         }
         let bootstrap_members = elders
             .iter()
-            .map(|(name, addr)| NodeState::joined(NodeId::new(*name, *addr), None))
+            .map(|peer| NodeState::joined(*peer, None))
             .collect::<BTreeSet<_>>();
         // A DKG session which just creates a new key for the same set of elders
         let session_id = DkgSessionId {

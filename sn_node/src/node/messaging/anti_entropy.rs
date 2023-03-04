@@ -36,7 +36,7 @@ impl MyNode {
             .section_members()
             .into_iter()
             .filter(|info| info.name() != our_name)
-            .map(|info| *info.node_id())
+            .map(|info| info.node_id())
             .collect();
 
         if recipients.is_empty() {
@@ -92,9 +92,8 @@ impl MyNode {
             .get_signed(&sibling_prefix)
         {
             let promoted_sibling_elders: BTreeSet<_> = sibling_sap
-                .elders()
+                .elder_ids()
                 .filter(|elder| !prev_context.network_knowledge.elders().contains(elder))
-                .cloned()
                 .collect();
 
             if promoted_sibling_elders.is_empty() {
@@ -237,10 +236,10 @@ impl MyNode {
                 let target_name = XorName::from(PublicKey::Bls(sap.section_key()));
 
                 let chosen_dst_elder = if let Some(dst) = sap
-                    .elders()
+                    .elder_ids()
                     .max_by(|lhs, rhs| target_name.cmp_distance(&lhs.name(), &rhs.name()))
                 {
-                    *dst
+                    dst
                 } else {
                     error!("Failed to find closest Elder to resend msg upon AE-Redirect response.");
                     return Ok(cmds);
@@ -430,8 +429,8 @@ mod tests {
         elder_count,
         messaging::{AntiEntropyMsg, Dst, MsgId, MsgKind},
         network_knowledge::MyNodeInfo,
-        test_utils::{gen_addr, prefix},
-        types::keys::ed25519,
+        test_utils::prefix,
+        types::{keys::ed25519, RewardPeer},
     };
 
     use bls::SecretKey;
@@ -599,10 +598,9 @@ mod tests {
     }
 
     fn create_msg(src_section_prefix: &Prefix, src_section_pk: BlsPublicKey) -> Result<WireMsg> {
-        let sender = MyNodeInfo::new(
-            ed25519::gen_keypair(&src_section_prefix.range_inclusive(), MIN_ADULT_AGE),
-            gen_addr(),
-        );
+        let keypair = ed25519::gen_keypair(&src_section_prefix.range_inclusive(), MIN_ADULT_AGE);
+        let peer = RewardPeer::random_w_key(keypair.public);
+        let sender = MyNodeInfo::new(keypair, peer);
 
         // just some message we can construct easily
         let payload_msg = AntiEntropyMsg::Probe(src_section_pk);

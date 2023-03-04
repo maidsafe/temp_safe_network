@@ -7,18 +7,13 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::NodeState;
-
-use crate::types::keys::ed25519::Digest256;
-use crate::types::NodeId;
+use crate::types::{keys::ed25519::Digest256, NodeId, RewardPeer};
 
 use sn_consensus::Generation;
 
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    net::SocketAddr,
-};
+use std::collections::BTreeSet;
 use tiny_keccak::{Hasher, Sha3};
 use xor_name::{Prefix, XorName};
 
@@ -28,7 +23,7 @@ pub struct DkgSessionId {
     /// Prefix of the session we are elder candidates for
     pub prefix: Prefix,
     /// Other Elders in this dkg session
-    pub elders: BTreeMap<XorName, SocketAddr>,
+    pub elders: BTreeSet<RewardPeer>,
     /// The length of the section chain main branch.
     pub section_chain_len: u64,
     /// The bootstrap members for the next Membership instance.
@@ -66,13 +61,15 @@ impl DkgSessionId {
     }
 
     pub fn elder_names(&self) -> impl Iterator<Item = XorName> + '_ {
-        self.elders.keys().copied()
+        self.elders.iter().map(|p| p.name())
     }
 
     pub fn elder_ids(&self) -> impl Iterator<Item = NodeId> + '_ {
-        self.elders
-            .iter()
-            .map(|(name, addr)| NodeId::new(*name, *addr))
+        self.elders.iter().map(|e| e.node_id())
+    }
+
+    pub fn elders(&self) -> impl Iterator<Item = RewardPeer> + '_ {
+        self.elders.iter().cloned()
     }
 
     pub fn elder_index(&self, elder: XorName) -> Option<usize> {

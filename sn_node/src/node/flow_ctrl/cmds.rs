@@ -50,7 +50,8 @@ pub(crate) struct CmdJob {
 /// In other words, it enables enhanced flow control.
 #[derive(Debug)]
 pub enum Cmd {
-    TryJoinNetwork,
+    /// Try join, supplying the reward key to which rewards will be paid.
+    TryJoinNetwork(bls::PublicKey),
     /// Validate `wire_msg` from `sender`.
     /// Holding the WireMsg that has been received from the network,
     HandleMsg {
@@ -85,10 +86,7 @@ pub enum Cmd {
     /// Allows joining of new nodes until the section splits.
     SetJoinsAllowedUntilSplit(bool),
     /// Add an issue to the tracking of a node's faults
-    TrackNodeIssue {
-        name: XorName,
-        issue: IssueType,
-    },
+    TrackNodeIssue { name: XorName, issue: IssueType },
     UpdateNetworkAndHandleValidClientMsg {
         proof_chain: SectionsDAG,
         signed_sap: SectionSigned<SectionAuthorityProvider>,
@@ -280,7 +278,7 @@ impl Cmd {
             Cmd::EnqueueDataForReplication { .. } => State::Replication,
             Cmd::SetJoinsAllowed { .. } => State::Data,
             Cmd::SetJoinsAllowedUntilSplit { .. } => State::Data,
-            Cmd::TryJoinNetwork => State::Join,
+            Cmd::TryJoinNetwork(_) => State::Join,
         }
     }
 }
@@ -327,7 +325,7 @@ impl fmt::Display for Cmd {
             Cmd::ProposeVoteNodesOffline(_) => write!(f, "ProposeOffline"),
             Cmd::SetJoinsAllowed { .. } => write!(f, "SetJoinsAllowed"),
             Cmd::SetJoinsAllowedUntilSplit { .. } => write!(f, "SetJoinsAllowedUntilSplit"),
-            Cmd::TryJoinNetwork => write!(f, "TryJoinNetwork"),
+            Cmd::TryJoinNetwork(_) => write!(f, "TryJoinNetwork"),
             Cmd::UpdateCaller { caller, kind, .. } => {
                 write!(f, "UpdateCaller {caller:?}: {kind:?}")
             }

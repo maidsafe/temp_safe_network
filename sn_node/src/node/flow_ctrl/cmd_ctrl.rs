@@ -50,7 +50,7 @@ impl CmdCtrl {
         cmd_process_api: Sender<(Cmd, Vec<usize>)>,
         rejoin_network_sender: Sender<RejoinReason>,
     ) {
-        let node_identifier = node.info().name();
+        let node_identifier = node.name();
 
         if id.is_empty() {
             id.push(self.id_counter.fetch_add(1, Ordering::SeqCst));

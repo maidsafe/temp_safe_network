@@ -77,14 +77,14 @@ pub(crate) fn try_split_dkg(
     // create the DKG session IDs
     let zero_id = DkgSessionId {
         prefix: zero_prefix,
-        elders: BTreeMap::from_iter(zero_elders.iter().map(|node| (node.name(), node.addr()))),
+        elders: BTreeSet::from_iter(zero_elders.iter().map(|node| *node.reward_id())),
         section_chain_len,
         bootstrap_members: zero,
         membership_gen,
     };
     let one_id = DkgSessionId {
         prefix: one_prefix,
-        elders: BTreeMap::from_iter(one_elders.iter().map(|node| (node.name(), node.addr()))),
+        elders: BTreeSet::from_iter(one_elders.iter().map(|node| *node.reward_id())),
         section_chain_len,
         bootstrap_members: one,
         membership_gen,
@@ -311,7 +311,7 @@ impl Membership {
             &self.consensus.processed_votes_cache,
         ) {
             error!(
-                "Attempted proposal {node_state:?} at genereation {:?} invalidated with error {e:?}",
+                "Attempted proposal {node_state:?} at generation {:?} invalidated with error {e:?}",
                 self.gen + 1
             );
             return Err(Error::InvalidProposal);
@@ -468,7 +468,8 @@ impl Membership {
 mod tests {
     use super::Error;
     use crate::node::flow_ctrl::tests::network_builder::TestNetworkBuilder;
-    use sn_interface::{network_knowledge::NodeState, test_utils::gen_node_id};
+
+    use sn_interface::{network_knowledge::NodeState, test_utils::gen_reward_node_id};
 
     use assert_matches::assert_matches;
     use eyre::Result;
@@ -488,8 +489,8 @@ mod tests {
             .membership
             .expect("Membership for the elder should've been initialized");
 
-        let state1 = NodeState::joined(gen_node_id(5), None);
-        let state2 = NodeState::joined(gen_node_id(5), None);
+        let state1 = NodeState::joined(gen_reward_node_id(5), None);
+        let state2 = NodeState::joined(gen_reward_node_id(5), None);
 
         let _ = membership.propose(state1, &prefix)?;
         assert_matches!(

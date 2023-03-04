@@ -8,14 +8,11 @@
 
 use crate::node::{core::NodeContext, flow_ctrl::cmds::Cmd, MyNode};
 
-use sn_interface::{messaging::system::NodeMsg, network_knowledge::node_state::RelocationProof};
+use sn_interface::messaging::system::{JoinDetails, NodeMsg};
 
 impl MyNode {
     /// Join a section.
-    pub(crate) fn try_join_section(
-        context: NodeContext,
-        relocation: Option<RelocationProof>,
-    ) -> Option<Cmd> {
+    pub(crate) fn try_join_section(context: NodeContext, details: JoinDetails) -> Option<Cmd> {
         debug!("trying to join...");
         if context.network_knowledge.is_section_member(&context.name) {
             info!("We joined the network");
@@ -23,7 +20,7 @@ impl MyNode {
         } else {
             Some(MyNode::send_to_elders_await_responses(
                 context,
-                NodeMsg::TryJoin(relocation),
+                NodeMsg::TryJoin(details),
             ))
         }
     }
@@ -142,14 +139,15 @@ mod tests {
 
         let elder_context = elder.context();
 
-        let joiner_node_id = joining_node.info().id();
+        let info = joining_node.info();
+        let joiner_node_id = info.id();
         let some_cmd = MyNode::handle_join(
-            &mut elder,
-            &elder_context,
             joiner_node_id,
+            JoinDetails::New(info.reward_id().reward_key()),
             MsgId::new(),
             None,
-            None,
+            &mut elder,
+            &elder_context,
         )
         .expect("An error was not expected.");
 
@@ -210,18 +208,19 @@ mod tests {
 
         let adult_context = adult.context();
 
-        let joiner_node_id = joining_node.info().id();
-        let cmd = MyNode::handle_join(
-            &mut adult,
-            &adult_context,
+        let info = joining_node.info();
+        let joiner_node_id = info.id();
+        let cmds = MyNode::handle_join(
             joiner_node_id,
+            JoinDetails::New(info.reward_id().reward_key()),
             MsgId::new(),
             None,
-            None,
+            &mut adult,
+            &adult_context,
         )
         .expect("An error was not expected.");
 
-        let cmd = cmd.iter().find(|cmd| matches!(cmd, Cmd::SendMsg { .. }));
+        let cmd = cmds.iter().find(|cmd| matches!(cmd, Cmd::SendMsg { .. }));
         assert_matches!(cmd, None);
 
         Ok(())
@@ -252,18 +251,19 @@ mod tests {
 
         let elder_context = elder.context();
 
-        let joiner_node_id = joining_node.info().id();
-        let cmd = MyNode::handle_join(
-            &mut elder,
-            &elder_context,
+        let info = joining_node.info();
+        let joiner_node_id = info.id();
+        let cmds = MyNode::handle_join(
             joiner_node_id,
+            JoinDetails::New(info.reward_id().reward_key()),
             MsgId::new(),
             None,
-            None,
+            &mut elder,
+            &elder_context,
         )
         .expect("An error was not expected.");
 
-        let cmd = cmd.iter().find(|cmd| matches!(cmd, Cmd::SendMsg { .. }));
+        let cmd = cmds.iter().find(|cmd| matches!(cmd, Cmd::SendMsg { .. }));
         assert_matches!(cmd, None);
 
         Ok(())
@@ -292,18 +292,19 @@ mod tests {
 
         let elder_context = elder.context();
 
-        let joiner_node_id = joining_node.info().id();
-        let cmd = MyNode::handle_join(
-            &mut elder,
-            &elder_context,
+        let info = joining_node.info();
+        let joiner_node_id = info.id();
+        let cmds = MyNode::handle_join(
             joiner_node_id,
+            JoinDetails::New(info.reward_id().reward_key()),
             MsgId::new(),
             None,
-            None,
+            &mut elder,
+            &elder_context,
         )
         .expect("An error was not expected.");
 
-        let cmd = cmd.iter().find(|cmd| matches!(cmd, Cmd::SendMsg { .. }));
+        let cmd = cmds.iter().find(|cmd| matches!(cmd, Cmd::SendMsg { .. }));
         assert_matches!(cmd, None);
 
         Ok(())
@@ -335,20 +336,19 @@ mod tests {
 
         let elder_context = elder.context();
 
-        let joiner_node_id = joining_node.info().id();
-        let some_cmd = MyNode::handle_join(
-            &mut elder,
-            &elder_context,
+        let info = joining_node.info();
+        let joiner_node_id = info.id();
+        let cmds = MyNode::handle_join(
             joiner_node_id,
+            JoinDetails::New(info.reward_id().reward_key()),
             MsgId::new(),
             None,
-            None,
+            &mut elder,
+            &elder_context,
         )
         .expect("An error was not expected.");
 
-        let some_cmd = some_cmd
-            .iter()
-            .find(|cmd| matches!(cmd, Cmd::SendMsg { .. }));
+        let some_cmd = cmds.iter().find(|cmd| matches!(cmd, Cmd::SendMsg { .. }));
 
         assert_matches!(some_cmd, Some(Cmd::SendMsg {
             msg: NetworkMsg::Node(msg),
@@ -459,12 +459,17 @@ mod tests {
         let (info, comm, incoming_msg_receiver) =
             TestNetwork::gen_info(MIN_ADULT_AGE, Some(prefix));
         let node = TestNetwork::build_a_node_instance(&info, &comm, network_knowledge);
-        let name = node.info().name();
+        let name = node.name();
+        let reward_key = node.reward_key();
         let node = Arc::new(RwLock::new(TestNode::new(node, msg_tracker.clone())));
 
         // spawn a separate task for the joining node as it awaits for responses from the other
         // nodes
-        let mut send_cmd = node.write().await.process_cmd(Cmd::TryJoinNetwork).await?;
+        let mut send_cmd = node
+            .write()
+            .await
+            .process_cmd(Cmd::TryJoinNetwork(reward_key))
+            .await?;
         assert_eq!(send_cmd.len(), 1);
         let send_cmd = send_cmd.remove(0);
         assert_matches!(&send_cmd, Cmd::SendMsgEnqueueAnyResponse { .. });

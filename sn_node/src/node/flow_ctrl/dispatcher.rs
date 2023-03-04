@@ -9,7 +9,7 @@
 use crate::node::{messaging::Recipients, Cmd, Error, MyNode, Result};
 
 use sn_interface::{
-    messaging::{AntiEntropyMsg, NetworkMsg},
+    messaging::{system::JoinDetails, AntiEntropyMsg, NetworkMsg},
     network_knowledge::SectionTreeUpdate,
     types::{NodeId, Participant},
 };
@@ -23,9 +23,12 @@ impl MyNode {
         let start = Instant::now();
         let cmd_string = format!("{cmd}");
         let result = match cmd {
-            Cmd::TryJoinNetwork => Ok(MyNode::try_join_section(context, None)
-                .into_iter()
-                .collect()),
+            Cmd::TryJoinNetwork(reward_key) => Ok(MyNode::try_join_section(
+                context,
+                JoinDetails::New(reward_key),
+            )
+            .into_iter()
+            .collect()),
             Cmd::UpdateCaller {
                 caller,
                 correlation_id,

@@ -10,8 +10,9 @@ use super::NodeState;
 use crate::{
     messaging::system::{DkgSessionId, SectionSig, SectionSigned},
     network_knowledge::SectionsDAG,
-    types::NodeId,
+    types::{NodeId, RewardPeer},
 };
+
 use bls::{PublicKey, PublicKeySet};
 use serde::{Deserialize, Serialize};
 use sn_consensus::Generation;
@@ -62,7 +63,7 @@ pub struct SectionAuthorityProvider {
     /// Public key set of the section.
     public_key_set: PublicKeySet,
     /// The section's complete set of elders.
-    elders: BTreeSet<NodeId>,
+    elders: BTreeSet<RewardPeer>,
     /// The section members at the time of this elder churn.
     members: BTreeSet<NodeState>,
     /// The membership generation this SAP was instantiated on
@@ -149,7 +150,7 @@ impl SectionAuthorityProvider {
         membership_gen: Generation,
     ) -> Self
     where
-        E: IntoIterator<Item = NodeId>,
+        E: IntoIterator<Item = RewardPeer>,
         M: IntoIterator<Item = NodeState>,
     {
         Self {
@@ -163,7 +164,7 @@ impl SectionAuthorityProvider {
 
     pub fn from_dkg_session(session_id: &DkgSessionId, pk_set: PublicKeySet) -> Self {
         Self::new(
-            session_id.elder_ids(),
+            session_id.elders(),
             session_id.prefix,
             session_id.bootstrap_members.clone(),
             pk_set,
@@ -175,9 +176,14 @@ impl SectionAuthorityProvider {
         self.prefix
     }
 
-    // TODO: this should return &BTreeSet<NodeId>, let the caller turn it into an iter
-    pub fn elders(&self) -> impl Iterator<Item = &NodeId> + '_ {
+    // TODO: this should return &BTreeSet<RewardPeer>, let the caller turn it into an iter
+    pub fn elders(&self) -> impl Iterator<Item = &RewardPeer> + '_ {
         self.elders.iter()
+    }
+
+    // TODO: this should return &BTreeSet<NodeId>, let the caller turn it into an iter
+    pub fn elder_ids(&self) -> impl Iterator<Item = NodeId> + '_ {
+        self.elders.iter().map(|e| e.node_id())
     }
 
     pub fn members(&self) -> impl Iterator<Item = &NodeState> + '_ {
@@ -190,12 +196,12 @@ impl SectionAuthorityProvider {
 
     /// A convenience function since we often use SAP elders as recipients.
     pub fn elders_vec(&self) -> Vec<NodeId> {
-        self.elders.iter().cloned().collect()
+        self.elders.iter().map(|e| e.node_id()).collect()
     }
 
     /// A convenience function since we often use SAP elders as recipients.
     pub fn elders_set(&self) -> BTreeSet<NodeId> {
-        self.elders.iter().cloned().collect()
+        self.elders.iter().map(|e| e.node_id()).collect()
     }
 
     // Returns a copy of the public key set
@@ -214,17 +220,20 @@ impl SectionAuthorityProvider {
     }
 
     /// Returns the elder `NodeId` with the given `name`.
-    pub fn get_elder(&self, name: &XorName) -> Option<&NodeId> {
-        self.elders.iter().find(|elder| elder.name() == *name)
+    pub fn get_elder(&self, name: &XorName) -> Option<NodeId> {
+        self.elders
+            .iter()
+            .find(|elder| elder.name() == *name)
+            .map(|e| e.node_id())
     }
 
     /// Returns the set of elder names.
     pub fn names(&self) -> BTreeSet<XorName> {
-        self.elders.iter().map(NodeId::name).collect()
+        self.elders.iter().map(|e| e.name()).collect()
     }
 
     pub fn addresses(&self) -> Vec<SocketAddr> {
-        self.elders.iter().map(NodeId::addr).collect()
+        self.elders.iter().map(|e| e.addr()).collect()
     }
 
     /// Key of the section.
@@ -385,7 +394,7 @@ pub mod test_utils {
             let members = elder_nodes
                 .iter()
                 .chain(adult_nodes.iter())
-                .map(|i| NodeState::joined(i.id(), None));
+                .map(|i| NodeState::joined(i.reward_id(), None));
 
             let sk_set = if let Some(sk) = self.sk_set {
                 sk
@@ -394,7 +403,7 @@ pub mod test_utils {
             };
 
             let sap = SectionAuthorityProvider::new(
-                elder_nodes.iter().map(|i| i.id()),
+                elder_nodes.iter().map(|i| i.reward_id()),
                 self.prefix,
                 members,
                 sk_set.public_keys(),

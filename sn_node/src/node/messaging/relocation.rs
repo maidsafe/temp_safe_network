@@ -15,7 +15,7 @@ use crate::node::{
 
 use sn_interface::{
     elder_count,
-    messaging::system::{NodeMsg, SectionSigned},
+    messaging::system::{JoinDetails, NodeMsg, SectionSigned},
     network_knowledge::{
         node_state::{RelocationDst, RelocationInfo},
         Error, MembershipState, NodeState, RelocationProof, RelocationState,
@@ -56,7 +56,7 @@ impl MyNode {
 
             let cmd = Cmd::send_msg(
                 NodeMsg::PrepareToRelocate(RelocationDst::new(relocation_dst)),
-                Recipients::Single(Participant::from_node(*node_state.node_id())),
+                Recipients::Single(Participant::from_node(node_state.node_id())),
             );
             cmds.push(cmd);
         }
@@ -175,7 +175,10 @@ impl MyNode {
         // we cache the proof so that we can retry if the join times out
         self.relocation_state = Some(RelocationState::ReadyToJoinNewSection(proof.clone()));
 
-        Ok(MyNode::try_join_section(self.context(), Some(proof)))
+        Ok(MyNode::try_join_section(
+            self.context(),
+            JoinDetails::Relocation(proof),
+        ))
     }
 }
 
@@ -200,7 +203,9 @@ mod tests {
             AntiEntropyKind, AntiEntropyMsg, NetworkMsg,
         },
         network_knowledge::{recommended_section_size, NodeState, RelocationDst, MIN_ADULT_AGE},
-        test_utils::{gen_node_id, gen_node_id_in_prefix, prefix, section_decision, TestKeys},
+        test_utils::{
+            gen_reward_node_id, gen_reward_node_id_in_prefix, prefix, section_decision, TestKeys,
+        },
     };
 
     use assert_matches::assert_matches;
@@ -226,7 +231,7 @@ mod tests {
         age: u8,
     ) -> Result<Decision<NodeState>> {
         loop {
-            let node_state = NodeState::joined(gen_node_id(MIN_ADULT_AGE), None);
+            let node_state = NodeState::joined(gen_reward_node_id(MIN_ADULT_AGE), None);
             let decision = section_decision(sk_set, node_state.clone())?;
 
             let sig: bls::Signature = decision.proposals[&node_state].clone();
@@ -251,7 +256,7 @@ mod tests {
         let mut section = env.get_network_knowledge(prefix, None)?;
         let sk_set = env.get_secret_key_set(prefix, None)?;
 
-        let relocated_node = gen_node_id_in_prefix(MIN_ADULT_AGE - 1, prefix);
+        let relocated_node = gen_reward_node_id_in_prefix(MIN_ADULT_AGE - 1, prefix);
         let node_state = NodeState::joined(relocated_node, None);
         let node_state = TestKeys::get_section_signed(&sk_set.secret_key(), node_state)?;
         assert!(section.update_member(node_state));
@@ -432,8 +437,8 @@ mod tests {
         // Only the elders in prefix0 should propose the SectionStateVote
         for test_node in node_instances
             .iter()
-            .filter_map(|((pre, name), test_node)| {
-                if name != &relocation_node_old_name && pre == &prefix0 {
+            .filter_map(|((pfx, name), test_node)| {
+                if name != &relocation_node_old_name && pfx == &prefix0 {
                     Some(test_node)
                 } else {
                     None

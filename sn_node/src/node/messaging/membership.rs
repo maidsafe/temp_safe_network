@@ -314,7 +314,7 @@ impl MyNode {
             .proposals
             .keys()
             .filter(|n| n.state() == MembershipState::Joined)
-            .map(|n| *n.node_id())
+            .map(|n| n.node_id())
             .collect();
         let prefix = self.network_knowledge.prefix();
         info!("Section {prefix:?} has approved new nodes {nodes:?}.");
@@ -352,7 +352,7 @@ impl MyNode {
         // we then need to send the Relocate msg to the node attaching the signed NodeState
         // containing the relocation details.
         if node_state.is_relocated() {
-            let node_id = *node_state.node_id();
+            let node_id = node_state.node_id();
             info!("Notify relocation to node {node_id:?}");
             let msg = NodeMsg::CompleteRelocation(node_state);
             Some(Cmd::send_msg(

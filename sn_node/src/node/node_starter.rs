@@ -17,10 +17,9 @@ use crate::UsedSpace;
 use sn_comms::Comm;
 use sn_interface::{
     network_knowledge::{NetworkKnowledge, SectionTree, MIN_ADULT_AGE},
-    types::{keys::ed25519, log_markers::LogMarker, PublicKey as TypesPublicKey},
+    types::{keys::ed25519, log_markers::LogMarker, NodeId, RewardPeer},
 };
 
-use rand_07::rngs::OsRng;
 use std::{path::Path, sync::Arc, time::Duration};
 use tokio::{
     fs,
@@ -59,20 +58,20 @@ pub async fn new_node(
     let root_dir = root_dir_buf.as_path();
     fs::create_dir_all(root_dir).await?;
 
-    let _reward_key = match get_reward_pk(root_dir).await? {
-        Some(public_key) => TypesPublicKey::Ed25519(public_key),
+    let reward_key = match get_reward_pk(root_dir).await? {
+        Some(public_key) => public_key,
         None => {
-            let mut rng = OsRng;
-            let keypair = ed25519_dalek::Keypair::generate(&mut rng);
-            store_new_reward_keypair(root_dir, &keypair).await?;
-            TypesPublicKey::Ed25519(keypair.public)
+            let secret_key = bls::SecretKey::random();
+            let public_key = secret_key.public_key();
+            store_new_reward_keypair(root_dir, &secret_key).await?;
+            public_key
         }
     };
 
     let used_space = UsedSpace::new(config.min_capacity(), config.max_capacity());
 
     let (cmd_channel, rejoin_network_rx) =
-        start_node(config, used_space, root_dir, join_retry_timeout).await?;
+        start_node(config, used_space, root_dir, reward_key, join_retry_timeout).await?;
 
     Ok((cmd_channel, rejoin_network_rx))
 }
@@ -82,6 +81,7 @@ async fn start_node(
     config: &Config,
     used_space: UsedSpace,
     root_storage_dir: &Path,
+    reward_key: bls::PublicKey,
     join_retry_timeout: Duration,
 ) -> Result<(CmdChannel, mpsc::Receiver<RejoinReason>)> {
     let (fault_cmds_sender, fault_cmds_receiver) =
@@ -94,6 +94,7 @@ async fn start_node(
             comm,
             used_space,
             root_storage_dir,
+            reward_key,
             fault_cmds_sender.clone(),
         )
         .await?
@@ -103,6 +104,7 @@ async fn start_node(
             comm,
             used_space,
             root_storage_dir,
+            reward_key,
             fault_cmds_sender.clone(),
         )
         .await?
@@ -134,7 +136,7 @@ async fn start_node(
     let node_prefix = context.network_knowledge.prefix();
     let node_name = context.name;
     let node_age = context.info.age();
-    let our_conn_info = context.info.addr;
+    let our_conn_info = context.info.addr();
     let our_conn_info_json = serde_json::to_string(&our_conn_info)
         .unwrap_or_else(|_| "Failed to serialize connection info".into());
     println!(
@@ -155,11 +157,13 @@ async fn start_genesis_node(
     comm: Comm,
     used_space: UsedSpace,
     root_storage_dir: &Path,
+    reward_key: bls::PublicKey,
     fault_cmds_sender: mpsc::Sender<FaultsCmd>,
 ) -> Result<MyNode> {
     // Genesis node having a fix age of 255.
     let keypair = ed25519::gen_keypair(&Prefix::default().range_inclusive(), 255);
     let node_name = ed25519::name(&keypair.public);
+    let peer = RewardPeer::new(NodeId::new(node_name, comm.socket_addr()), reward_key);
 
     info!(
         "{} Starting a new network as the genesis node (PID: {}).",
@@ -171,6 +175,7 @@ async fn start_genesis_node(
     // as well as the owner of the genesis DBC minted by this first node of the network.
     let genesis_sk_set = bls::SecretKeySet::random(0, &mut rand::thread_rng());
     let (node, genesis_dbc) = MyNode::first_node(
+        peer,
         comm,
         keypair,
         used_space.clone(),
@@ -202,10 +207,13 @@ async fn start_normal_node(
     comm: Comm,
     used_space: UsedSpace,
     root_storage_dir: &Path,
+    reward_key: bls::PublicKey,
     fault_cmds_sender: mpsc::Sender<FaultsCmd>,
 ) -> Result<MyNode> {
     let keypair = ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE);
     let node_name = ed25519::name(&keypair.public);
+    let peer = RewardPeer::new(NodeId::new(node_name, comm.socket_addr()), reward_key);
+
     info!("{} Bootstrapping as a new node.", node_name);
     let section_tree_path = config.network_contacts_file().ok_or_else(|| {
         Error::Configuration("Could not obtain network contacts file path".to_string())
@@ -223,6 +231,7 @@ async fn start_normal_node(
     );
 
     let node = MyNode::new(
+        peer,
         comm,
         Arc::new(keypair),
         network_knowledge,
@@ -232,7 +241,7 @@ async fn start_normal_node(
         fault_cmds_sender,
     )?;
 
-    info!("Node {} started.", node.info().name());
+    info!("Node {} started.", node.name());
 
     Ok(node)
 }

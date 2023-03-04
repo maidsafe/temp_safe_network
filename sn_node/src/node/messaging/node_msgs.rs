@@ -160,9 +160,9 @@ impl MyNode {
         debug!("{:?}: {msg_id:?}", LogMarker::NodeMsgToBeHandled);
 
         match msg {
-            NodeMsg::TryJoin(relocation) => {
-                trace!("Handling msg {:?}: TryJoin from {}", msg_id, node_id);
-                MyNode::handle_join(node, &context, node_id, msg_id, relocation, send_stream)
+            NodeMsg::TryJoin(details) => {
+                trace!("Handling msg {msg_id:?}: TryJoin from {node_id}");
+                MyNode::handle_join(node_id, details, msg_id, send_stream, node, &context)
                     .map(|c| c.into_iter().collect())
             }
             NodeMsg::PrepareToRelocate(relocation_trigger) => {
@@ -212,7 +212,7 @@ impl MyNode {
                         }
 
                         info!(
-                            "=========>> This node ({:?} @ {:?}) has been approved to join the section at {:?}!", context.name, context.info.addr,
+                            "=========>> This node ({:?} @ {:?}) has been approved to join the section at {:?}!", context.name, context.info.addr(),
                             target_sap.prefix(),
                         );
 
