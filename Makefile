@@ -1,6 +1,6 @@
 SHELL := bash
-SN_NODE_VERSION := $(shell grep "^version" < sn_node/Cargo.toml | head -n 1 | awk '{ print $$3 }' | sed 's/\"//g')
-SN_CLI_VERSION := $(shell grep "^version" < sn_cli/Cargo.toml | head -n 1 | awk '{ print $$3 }' | sed 's/\"//g')
+SAFENODE_VERSION := $(shell grep "^version" < sn_node/Cargo.toml | head -n 1 | awk '{ print $$3 }' | sed 's/\"//g')
+SAFE_VERSION := $(shell grep "^version" < sn_cli/Cargo.toml | head -n 1 | awk '{ print $$3 }' | sed 's/\"//g')
 UNAME_S := $(shell uname -s)
 DEPLOY_PATH := deploy
 DEPLOY_PROD_PATH := ${DEPLOY_PATH}/prod
@@ -15,7 +15,7 @@ gha-build-x86_64-unknown-linux-musl:
 	mkdir artifacts
 	sudo apt update -y && sudo apt install -y musl-tools
 	rustup target add x86_64-unknown-linux-musl
-	cargo build --release --target x86_64-unknown-linux-musl --bin sn_node --features otlp
+	cargo build --release --target x86_64-unknown-linux-musl --bin safenode --features otlp
 	cargo build --release --target x86_64-unknown-linux-musl --bin safe \
 		--features limit-client-upload-size,data-network
 	find target/x86_64-unknown-linux-musl/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
@@ -34,7 +34,7 @@ arm-unknown-linux-musleabi:
 	rm -rf artifacts
 	mkdir artifacts
 	cargo install cross
-	cross build --release --target arm-unknown-linux-musleabi --bin sn_node --features otlp
+	cross build --release --target arm-unknown-linux-musleabi --bin safenode --features otlp
 	cross build --release --target arm-unknown-linux-musleabi --bin safe \
 		--features limit-client-upload-size,data-network
 	find target/arm-unknown-linux-musleabi/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
@@ -48,7 +48,7 @@ armv7-unknown-linux-musleabihf:
 	rm -rf artifacts
 	mkdir artifacts
 	cargo install cross
-	cross build --release --target armv7-unknown-linux-musleabihf --bin sn_node --features otlp
+	cross build --release --target armv7-unknown-linux-musleabihf --bin safenode --features otlp
 	cross build --release --target armv7-unknown-linux-musleabihf --bin safe \
 		--features limit-client-upload-size,data-network
 	find target/armv7-unknown-linux-musleabihf/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
@@ -62,7 +62,7 @@ aarch64-unknown-linux-musl:
 	rm -rf artifacts
 	mkdir artifacts
 	cargo install cross
-	cross build --release --target aarch64-unknown-linux-musl --bin sn_node --features otlp
+	cross build --release --target aarch64-unknown-linux-musl --bin safenode --features otlp
 	cross build --release --target aarch64-unknown-linux-musl --bin safe \
 		--features limit-client-upload-size,data-network
 	find target/aarch64-unknown-linux-musl/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
@@ -70,7 +70,7 @@ aarch64-unknown-linux-musl:
 release-build:
 	rm -rf artifacts
 	mkdir artifacts
-	cargo build --release --bin sn_node --features otlp
+	cargo build --release --bin safenode --features otlp
 	cargo build --release --bin safe --features limit-client-upload-size,data-network
 	find target/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
 
@@ -95,14 +95,14 @@ safe_network-build-artifacts-for-deploy:
 
 prepare-deploy:
 	find artifacts/ -name safe -exec chmod +x '{}' \;
-	find artifacts/ -name sn_node -exec chmod +x '{}' \;
+	find artifacts/ -name safenode -exec chmod +x '{}' \;
 	rm -f *.zip *.tar.gz
 	rm -rf ${DEPLOY_PATH}
 	mkdir -p ${DEPLOY_PROD_PATH}/safe
-	mkdir -p ${DEPLOY_PROD_PATH}/sn_node
+	mkdir -p ${DEPLOY_PROD_PATH}/safenode
 
 .ONESHELL:
-safe_network-package-version-artifacts-for-release:
+safenode-package-version-artifacts-for-release:
 	declare -a architectures=( \
 		"x86_64-unknown-linux-musl" \
 		"x86_64-pc-windows-msvc" \
@@ -112,16 +112,16 @@ safe_network-package-version-artifacts-for-release:
 		"aarch64-unknown-linux-musl")
 
 	for arch in "$${architectures[@]}" ; do \
-		if [[ $$arch == *"windows"* ]]; then bin_name="sn_node.exe"; else bin_name="sn_node"; fi; \
-		zip -j sn_node-${SN_NODE_VERSION}-$$arch.zip artifacts/prod/$$arch/release/$$bin_name; \
-		tar -C artifacts/prod/$$arch/release -zcvf sn_node-${SN_NODE_VERSION}-$$arch.tar.gz $$bin_name; \
+		if [[ $$arch == *"windows"* ]]; then bin_name="safenode.exe"; else bin_name="safenode"; fi; \
+		zip -j safenode-${SAFENODE_VERSION}-$$arch.zip artifacts/prod/$$arch/release/$$bin_name; \
+		tar -C artifacts/prod/$$arch/release -zcvf safenode-${SAFENODE_VERSION}-$$arch.tar.gz $$bin_name; \
 	done
 
-	mv *.tar.gz ${DEPLOY_PROD_PATH}/sn_node
-	mv *.zip ${DEPLOY_PROD_PATH}/sn_node
+	mv *.tar.gz ${DEPLOY_PROD_PATH}/safenode
+	mv *.zip ${DEPLOY_PROD_PATH}/safenode
 
 .ONESHELL:
-sn_cli-package-version-artifacts-for-release:
+safe-package-version-artifacts-for-release:
 	declare -a architectures=( \
 		"x86_64-unknown-linux-musl" \
 		"x86_64-pc-windows-msvc" \
@@ -132,53 +132,53 @@ sn_cli-package-version-artifacts-for-release:
 
 	for arch in "$${architectures[@]}" ; do \
 		if [[ $$arch == *"windows"* ]]; then bin_name="safe.exe"; else bin_name="safe"; fi; \
-		zip -j sn_cli-${SN_CLI_VERSION}-$$arch.zip artifacts/prod/$$arch/release/$$bin_name; \
-		tar -C artifacts/prod/$$arch/release -zcvf sn_cli-${SN_CLI_VERSION}-$$arch.tar.gz $$bin_name; \
+		zip -j sn_cli-${SAFE_VERSION}-$$arch.zip artifacts/prod/$$arch/release/$$bin_name; \
+		tar -C artifacts/prod/$$arch/release -zcvf sn_cli-${SAFE_VERSION}-$$arch.tar.gz $$bin_name; \
 	done
 
 	mv *.tar.gz ${DEPLOY_PROD_PATH}/safe
 	mv *.zip ${DEPLOY_PROD_PATH}/safe
 
 .ONESHELL:
-upload-sn_node-musl-to-s3:
+upload-safenode-musl-to-s3:
 	# This target can be used for quickly uploading a build to S3 to be used with the testnet tool.
 	# The testnet tool will download this 'latest' version as the default.
 	rm -rf target
 	rm -rf deploy
 	mkdir -p deploy
 	rustup target add x86_64-unknown-linux-musl
-	cargo build --release --target x86_64-unknown-linux-musl --bin sn_node
+	cargo build --release --target x86_64-unknown-linux-musl --bin safenode
 	(
 		cd deploy;
 		tar -C ../target/x86_64-unknown-linux-musl/release \
-			-zcvf sn_node-latest-x86_64-unknown-linux-musl.tar.gz sn_node;
-		aws s3 cp sn_node-latest-x86_64-unknown-linux-musl.tar.gz s3://sn-node --acl public-read;
+			-zcvf safenode-latest-x86_64-unknown-linux-musl.tar.gz safenode;
+		aws s3 cp safenode-latest-x86_64-unknown-linux-musl.tar.gz s3://sn-node --acl public-read;
 	)
 
 .ONESHELL:
 run-baby-fleming-clean-build:
-	pgrep sn_node | xargs kill -9
+	pgrep safenode | xargs kill -9
 	rm -rf ~/.safe
 	mkdir -p ~/.safe/node
 	cargo clean
-	cargo build --bin sn_node
-	cp target/debug/sn_node ~/.safe/node
-	RUST_LOG=sn_node=trace,sn_interface=trace cargo run node run-baby-fleming
+	cargo build --bin safenode
+	cp target/debug/safenode ~/.safe/node
+	RUST_LOG=safenode=trace,sn_interface=trace cargo run node run-baby-fleming
 
 .ONESHELL:
 run-baby-fleming:
-	pgrep sn_node | xargs kill -9
+	pgrep safenode | xargs kill -9
 	rm -rf ~/.safe
 	mkdir -p ~/.safe/node
-	cargo build --bin sn_node
-	cp target/debug/sn_node ~/.safe/node
-	RUST_LOG=sn_node=trace,sn_interface=trace cargo run node run-baby-fleming
+	cargo build --bin safenode
+	cp target/debug/safenode ~/.safe/node
+	RUST_LOG=safenode=trace,sn_interface=trace cargo run node run-baby-fleming
 
 ci-unit-tests:
-	cargo test --no-run --release --package sn_interface --package sn_fault_detection --package sn_node
+	cargo test --no-run --release --package sn_interface --package sn_fault_detection --package safenode
 	cargo nextest run --profile ci --release --package sn_interface messaging section_tree types
 	cargo nextest run --profile ci --release --package sn_fault_detection
-	cargo nextest run --profile ci --release --package sn_node dbs node routing
+	cargo nextest run --profile ci --release --package safenode dbs node routing
 	cargo nextest run --profile ci --release --package sn_cli --bin safe
 
 ci-client-upload-limit-test:

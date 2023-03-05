@@ -250,7 +250,7 @@ jobs:
         run: ./target/release/testnet --interval 30000
         id: section-startup
         env:
-          RUST_LOG: "sn_node,sn_comms,sn_consensus,sn_fault_detection,sn_interface=trace"
+          RUST_LOG: "safenode,sn_comms,sn_consensus,sn_fault_detection,sn_interface=trace"
 
       - name: Wait for all nodes to join
         shell: bash
@@ -299,7 +299,7 @@ jobs:
         if: failure() && matrix.os != 'windows-latest'
         continue-on-error: true
         run: |
-          echo "$(pgrep sn_node | wc -l) nodes still running"
+          echo "$(pgrep safenode | wc -l) nodes still running"
           ls $HOME/.safe/node/local-test-network
 
       - name: Kill all nodes
@@ -308,8 +308,8 @@ jobs:
         if: failure()
         continue-on-error: true
         run: |
-          pkill sn_node
-          echo "$(pgrep sn_node | wc -l) nodes still running"
+          pkill safenode
+          echo "$(pgrep safenode | wc -l) nodes still running"
 
       # - name: Generate StateMap
       #   shell: bash
@@ -388,7 +388,7 @@ jobs:
         run: ./target/release/testnet --interval 30000
         id: section-startup
         env:
-          RUST_LOG: "sn_node,sn_comms,sn_consensus,sn_dysfunction,sn_interface=trace"
+          RUST_LOG: "safenode,sn_comms,sn_consensus,sn_dysfunction,sn_interface=trace"
 
       - name: Wait for all nodes to join
         shell: bash
@@ -437,7 +437,7 @@ jobs:
         if: failure() && matrix.os != 'windows-latest'
         continue-on-error: true
         run: |
-          echo "$(pgrep sn_node | wc -l) nodes still running"
+          echo "$(pgrep safenode | wc -l) nodes still running"
           ls $HOME/.safe/node/local-test-network
 
       - name: Kill all nodes
@@ -446,8 +446,8 @@ jobs:
         if: failure()
         continue-on-error: true
         run: |
-          pkill sn_node
-          echo "$(pgrep sn_node | wc -l) nodes still running"
+          pkill safenode
+          echo "$(pgrep safenode | wc -l) nodes still running"
 
       # - name: Generate StateMap
       #   shell: bash
@@ -483,7 +483,7 @@ jobs:
     name: E2E Churn test
     runs-on: ubuntu-latest
     env:
-      RUST_LOG: sn_node,sn_fault_detection,sn_comms,sn_interface
+      RUST_LOG: safenode,sn_fault_detection,sn_comms,sn_interface
     steps:
       - uses: actions/checkout@v2
 
@@ -514,7 +514,7 @@ jobs:
         timeout-minutes: 1
         continue-on-error: true
         run: |
-          echo "$(pgrep sn_node | wc -l) nodes still running"
+          echo "$(pgrep safenode | wc -l) nodes still running"
           ls $HOME/.safe/node/local-test-network
 
       - name: Kill all nodes
@@ -523,8 +523,8 @@ jobs:
         if: failure()
         continue-on-error: true
         run: |
-          pkill sn_node
-          echo "$(pgrep sn_node | wc -l) nodes still running"
+          pkill safenode
+          echo "$(pgrep safenode | wc -l) nodes still running"
 
       # - name: Generate StateMap
       #   shell: bash
@@ -611,7 +611,7 @@ jobs:
   #       shell: bash
   #       run: cargo run --release --example churn
   #       env:
-  #         RUST_LOG: "sn_node,sn_client,sn_comms,sn_consensus,sn_fault_detection=trace,sn_interface=trace"
+  #         RUST_LOG: "safenode,sn_client,sn_comms,sn_consensus,sn_fault_detection=trace,sn_interface=trace"
 
   #     # - name: Print Network Stats after churn test
   #     #   shell: bash
@@ -619,7 +619,7 @@ jobs:
 
   #     # - name: Cleanup churn test
   #     #   run: |
-  #     #     killall -9 sn_node
+  #     #     killall -9 safenode
   #     #     sleep 10
   #     #     rm -rf ~/.safe
 
@@ -629,7 +629,7 @@ jobs:
   #     #   shell: bash
   #     #   run: cargo run --release --example network_split
   #     #   env:
-  #     #     RUST_LOG: "sn_node,sn_client,sn_comms,sn_consensus,sn_fault_detection=trace"
+  #     #     RUST_LOG: "safenode,sn_client,sn_comms,sn_consensus,sn_fault_detection=trace"
 
   #     # - name: Print Network Log Stats at start
   #     #   shell: bash
@@ -677,7 +677,7 @@ jobs:
   #       timeout-minutes: 1
   #       continue-on-error: true
   #       run: |
-  #         echo "$(pgrep sn_node | wc -l) nodes still running"
+  #         echo "$(pgrep safenode | wc -l) nodes still running"
   #         ls $HOME/.safe/node/local-test-network
 
   #      - name: Kill all nodes
@@ -686,8 +686,8 @@ jobs:
   #        if: failure()
   #        continue-on-error: true
   #        run: |
-  #          pkill sn_node
-  #          echo "$(pgrep sn_node | wc -l) nodes still running"
+  #          pkill safenode
+  #          echo "$(pgrep safenode | wc -l) nodes still running"
 
   #     # - name: Print Network Log Stats
   #     #   shell: bash
@@ -726,7 +726,7 @@ jobs:
   #     - name: Cleanup self-hosted runner
   #       if: always()
   #       run: |
-  #         killall -9 sn_node
+  #         killall -9 safenode
   #         sleep 10
   #         rm -rf ~/.safe
 
@@ -779,7 +779,7 @@ jobs:
         run: ./target/release/testnet --interval 30000
         id: section-startup
         env:
-          RUST_LOG: "sn_node,sn_comms,sn_consensus,sn_fault_detection=trace,sn_interface=trace"
+          RUST_LOG: "safenode,sn_comms,sn_consensus,sn_fault_detection=trace,sn_interface=trace"
 
       - name: Wait for all nodes to join
         shell: bash
@@ -801,7 +801,7 @@ jobs:
         timeout-minutes: 1
         if: failure() && matrix.os
         run: |
-          echo "$(pgrep sn_node | wc -l) nodes still running"
+          echo "$(pgrep safenode | wc -l) nodes still running"
           ls $HOME/.safe/node/local-test-network
 
       - name: Kill all nodes
@@ -810,8 +810,8 @@ jobs:
         if: failure()
         continue-on-error: true
         run: |
-          pkill sn_node
-          echo "$(pgrep sn_node | wc -l) nodes still running"
+          pkill safenode
+          echo "$(pgrep safenode | wc -l) nodes still running"
 
       - name: Ensure no nodes have left during test runs
         timeout-minutes: 1
@@ -897,7 +897,7 @@ jobs:
         run: ./target/release/testnet --interval 30000
         id: section-startup
         env:
-          RUST_LOG: "sn_node,sn_comms,sn_consensus,sn_fault_detection=trace,sn_interface=trace"
+          RUST_LOG: "safenode,sn_comms,sn_consensus,sn_fault_detection=trace,sn_interface=trace"
 
       - name: Wait for all nodes to join
         shell: bash
@@ -920,7 +920,7 @@ jobs:
         timeout-minutes: 1
         if: failure() && matrix.os
         run: |
-          echo "$(pgrep sn_node | wc -l) nodes still running"
+          echo "$(pgrep safenode | wc -l) nodes still running"
           ls $HOME/.safe/node/local-test-network
 
       - name: Kill all nodes
@@ -929,8 +929,8 @@ jobs:
         if: failure()
         continue-on-error: true
         run: |
-          pkill sn_node
-          echo "$(pgrep sn_node | wc -l) nodes still running"
+          pkill safenode
+          echo "$(pgrep safenode | wc -l) nodes still running"
 
       - name: Ensure no nodes have left during test runs
         timeout-minutes: 1
