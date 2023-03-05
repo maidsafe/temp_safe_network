@@ -10,6 +10,10 @@ readme = "README.md"
 repository = "https://github.com/maidsafe/safe_network"
 version = "0.78.5"
 
+[[bin]]
+name = "safenode"
+path = "src/bin/sn_node/main.rs"
+
 [[bench]]
 name = "data_storage"
 harness = false

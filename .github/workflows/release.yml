@@ -94,8 +94,8 @@ jobs:
         name: package artifacts for release
         run: |
           make prepare-deploy
-          make safe_network-package-version-artifacts-for-release
-          make sn_cli-package-version-artifacts-for-release
+          make safenode-package-version-artifacts-for-release
+          make safe-package-version-artifacts-for-release
 
       - shell: bash
         id: versioning
@@ -135,7 +135,7 @@ jobs:
         shell: bash
         run: |
           (
-            cd deploy/prod/sn_node
+            cd deploy/prod/safenode
             ls | xargs gh release upload ${{ steps.versioning.outputs.gh_release_tag_name }}
           )
           (
@@ -149,7 +149,7 @@ jobs:
           aws_key_id: ${{ secrets.S3_DEPLOY_AWS_ACCESS_KEY_ID }}
           aws_secret_access_key: ${{ secrets.S3_DEPLOY_AWS_SECRET_ACCESS_KEY }}
           aws_bucket: sn-node
-          source_dir: deploy/prod/sn_node
+          source_dir: deploy/prod/safenode
           destination_dir: ""
 
       - uses: shallwefootball/s3-upload-action@master
@@ -166,9 +166,9 @@ jobs:
         name: package artifacts for release
         run: |
           make prepare-deploy
-          make safe_network-package-version-artifacts-for-release \
-            SN_NODE_VERSION=latest DEPLOY_PATH=deploy
-          make sn_cli-package-version-artifacts-for-release SN_CLI_VERSION=latest DEPLOY_PATH=deploy
+          make safenode-package-version-artifacts-for-release \
+            SAFENODE_VERSION=latest DEPLOY_PATH=deploy
+          make safe-package-version-artifacts-for-release SAFE_VERSION=latest DEPLOY_PATH=deploy
 
       - uses: shallwefootball/s3-upload-action@master
         name: upload sn_node artifacts to s3
@@ -176,7 +176,7 @@ jobs:
           aws_key_id: ${{ secrets.S3_DEPLOY_AWS_ACCESS_KEY_ID }}
           aws_secret_access_key: ${{ secrets.S3_DEPLOY_AWS_SECRET_ACCESS_KEY }}
           aws_bucket: sn-node
-          source_dir: deploy/prod/sn_node
+          source_dir: deploy/prod/safenode
           destination_dir: ""
 
       - uses: shallwefootball/s3-upload-action@master
