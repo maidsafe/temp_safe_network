@@ -1,74 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1677766675039,
+  "lastUpdate": 1678084983137,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
-      {
-        "commit": {
-          "author": {
-            "email": "qi.ma@maidsafe.net",
-            "name": "qima",
-            "username": "maqi"
-          },
-          "committer": {
-            "email": "joshuef@gmail.com",
-            "name": "joshuef",
-            "username": "joshuef"
-          },
-          "distinct": true,
-          "id": "7e2c4514fa2d923e98c640a012da7e4851bc196a",
-          "message": "chore: log dysfunction during CI split test",
-          "timestamp": "2022-07-14T16:23:50+02:00",
-          "tree_id": "32dc05f6887d6d4dde68dd87dc564120d1cf0bf5",
-          "url": "https://github.com/maidsafe/safe_network/commit/7e2c4514fa2d923e98c640a012da7e4851bc196a"
-        },
-        "date": 1657810982737,
-        "tool": "cargo",
-        "benches": [
-          {
-            "name": "upload-sampling/upload and read 3072b",
-            "value": 527360340,
-            "range": "± 18928399",
-            "unit": "ns/iter"
-          },
-          {
-            "name": "upload-sampling/upload and read 1mb",
-            "value": 552946650,
-            "range": "± 12029763",
-            "unit": "ns/iter"
-          },
-          {
-            "name": "upload-sampling/upload and read 10mb",
-            "value": 1220162941,
-            "range": "± 148650318",
-            "unit": "ns/iter"
-          },
-          {
-            "name": "upload-sampling/upload 3072b",
-            "value": 396036623,
-            "range": "± 30044036",
-            "unit": "ns/iter"
-          },
-          {
-            "name": "upload-sampling/upload 1mb",
-            "value": 394991545,
-            "range": "± 24762509",
-            "unit": "ns/iter"
-          },
-          {
-            "name": "upload-sampling/upload 10mb",
-            "value": 1091489219,
-            "range": "± 55035181",
-            "unit": "ns/iter"
-          },
-          {
-            "name": "generating keys",
-            "value": 5333224,
-            "range": "± 159511",
-            "unit": "ns/iter"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -70390,6 +70324,150 @@ window.BENCHMARK_DATA = {
             "name": "read-sampling/chunk keys/4000",
             "value": 405005769,
             "range": "± 14180514",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "joshuef@gmail.com",
+            "name": "Josh Wilson",
+            "username": "joshuef"
+          },
+          "committer": {
+            "email": "joshuef@gmail.com",
+            "name": "joshuef",
+            "username": "joshuef"
+          },
+          "distinct": true,
+          "id": "2ee7de8e1e660f1b08790edb01b25c8212050ff7",
+          "message": "chore(node): remove need for  started_relocating and improve logging",
+          "timestamp": "2023-03-06T06:46:47+01:00",
+          "tree_id": "75bc5dbbf7dd26844c159cbb0a19109f22c4d0d3",
+          "url": "https://github.com/maidsafe/safe_network/commit/2ee7de8e1e660f1b08790edb01b25c8212050ff7"
+        },
+        "date": 1678084980317,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "serialize/serialize for sending",
+            "value": 2197083,
+            "range": "± 3776",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 102523283,
+            "range": "± 1367526",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 120282612,
+            "range": "± 4387615",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 732559919,
+            "range": "± 6800375",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 85864685,
+            "range": "± 1185395",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 100238951,
+            "range": "± 966024",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 643679919,
+            "range": "± 4633589",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "register-edit-sampling/register_edits/1000",
+            "value": 22536683087,
+            "range": "± 108835021",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/100",
+            "value": 44425780,
+            "range": "± 30160429",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/1000",
+            "value": 2903272349,
+            "range": "± 488544497",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/4000",
+            "value": 5833126654,
+            "range": "± 157715040",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/100",
+            "value": 159692847,
+            "range": "± 14149243",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/1000",
+            "value": 1556166111,
+            "range": "± 49945073",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/4000",
+            "value": 5765924870,
+            "range": "± 173921533",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/100",
+            "value": 41078429,
+            "range": "± 250990",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/1000",
+            "value": 389865378,
+            "range": "± 1788974",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/4000",
+            "value": 1521382002,
+            "range": "± 23371817",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/100",
+            "value": 11855094,
+            "range": "± 299094",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/1000",
+            "value": 98811956,
+            "range": "± 3737655",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/4000",
+            "value": 340232496,
+            "range": "± 2717884",
             "unit": "ns/iter"
           }
         ]
