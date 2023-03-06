@@ -5,18 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.77.10 (2023-03-02)
+## v0.77.11 (2023-03-06)
 
 ### Chore
 
- - <csr-id-4b84cd72c25f7074d966771928685174a76d6ef7/> remove panics for easier debugging
+ - <csr-id-2ee7de8e1e660f1b08790edb01b25c8212050ff7/> remove need for  started_relocating and improve logging
+ - <csr-id-74a8ed5decd543de9484589a0d004e8d98b266ee/> ignore JoinResponse messages when we are already a member.
+   This avoids some heavy lifting validating the response that
+   is not necessary
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 1 commit contributed to the release.
- - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits contributed to the release.
+ - 3 days passed between releases.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -26,12 +30,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Remove need for  started_relocating and improve logging ([`2ee7de8`](https://github.com/maidsafe/safe_network/commit/2ee7de8e1e660f1b08790edb01b25c8212050ff7))
+    - Ignore JoinResponse messages when we are already a member. ([`74a8ed5`](https://github.com/maidsafe/safe_network/commit/74a8ed5decd543de9484589a0d004e8d98b266ee))
+</details>
+
+## v0.77.10 (2023-03-02)
+
+<csr-id-4b84cd72c25f7074d966771928685174a76d6ef7/>
+
+### Chore
+
+ - <csr-id-4b84cd72c25f7074d966771928685174a76d6ef7/> remove panics for easier debugging
+
+### Chore
+
+ - <csr-id-e5872a6684a6858f6d9d6379a6a63b8e3d525ba1/> sn_interface-0.19.5/sn_client-0.81.2/sn_node-0.77.10/sn_cli-0.72.2
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Sn_interface-0.19.5/sn_client-0.81.2/sn_node-0.77.10/sn_cli-0.72.2 ([`e5872a6`](https://github.com/maidsafe/safe_network/commit/e5872a6684a6858f6d9d6379a6a63b8e3d525ba1))
     - Remove panics for easier debugging ([`4b84cd7`](https://github.com/maidsafe/safe_network/commit/4b84cd72c25f7074d966771928685174a76d6ef7))
 </details>
 
 ## v0.77.9 (2023-03-02)
 
 <csr-id-07a803bd6e4cd71b21f3702d93640631d7b8e3d1/>
+<csr-id-3ea30cbdbf18a6f3e7429d4ed0ea58227ffbb62d/>
 
 ### Chore
 
