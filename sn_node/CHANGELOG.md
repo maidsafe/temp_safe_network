@@ -5,18 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.77.12 (2023-03-06)
-
-### Chore
-
- - <csr-id-e1698b479354f21f08bfc1776ff1f88b29ad6bc2/> warn on error while processing NodeMsgs
+## v0.77.13 (2023-03-06)
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
  - 1 commit contributed to the release.
- - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 0 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -26,6 +22,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Refactor: distinguish client and node ids - This removes the ambiguous Peer and creates a clearer path for client and node related logic, while finally resolving the node/peer ambiguity. ([`4097de4`](https://github.com/maidsafe/safe_network/commit/4097de4e979f1cb6b17eb4b90b7ce3861194a4a9))
+</details>
+
+## v0.77.12 (2023-03-06)
+
+<csr-id-e1698b479354f21f08bfc1776ff1f88b29ad6bc2/>
+
+### Chore
+
+ - <csr-id-e1698b479354f21f08bfc1776ff1f88b29ad6bc2/> warn on error while processing NodeMsgs
+
+### Chore
+
+ - <csr-id-2c399d2639f83157ef8ab4e1c0c72e4969848224/> sn_node-0.77.12
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Sn_node-0.77.12 ([`2c399d2`](https://github.com/maidsafe/safe_network/commit/2c399d2639f83157ef8ab4e1c0c72e4969848224))
     - Warn on error while processing NodeMsgs ([`e1698b4`](https://github.com/maidsafe/safe_network/commit/e1698b479354f21f08bfc1776ff1f88b29ad6bc2))
 </details>
 
@@ -33,6 +60,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-id-2ee7de8e1e660f1b08790edb01b25c8212050ff7/>
 <csr-id-74a8ed5decd543de9484589a0d004e8d98b266ee/>
+<csr-id-2566e03dc40a8b2aa63bb35b73d8423a70c6d1d1/>
 
 ### Chore
 

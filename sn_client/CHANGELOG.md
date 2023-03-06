@@ -1113,19 +1113,15 @@ needed, as they keypair itself contains the Arcs we need.
     - Self authentication Example
     - Example to demonstrate Storage API
 
-## v0.81.2 (2023-03-02)
-
-### Chore
-
- - <csr-id-4b84cd72c25f7074d966771928685174a76d6ef7/> remove panics for easier debugging
+## v0.81.3 (2023-03-06)
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
  - 1 commit contributed to the release.
- - 2 days passed between releases.
- - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 3 days passed between releases.
+ - 0 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -1135,10 +1131,44 @@ needed, as they keypair itself contains the Arcs we need.
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Refactor: distinguish client and node ids - This removes the ambiguous Peer and creates a clearer path for client and node related logic, while finally resolving the node/peer ambiguity. ([`4097de4`](https://github.com/maidsafe/safe_network/commit/4097de4e979f1cb6b17eb4b90b7ce3861194a4a9))
+</details>
+
+## v0.81.2 (2023-03-02)
+
+<csr-id-4b84cd72c25f7074d966771928685174a76d6ef7/>
+
+### Chore
+
+ - <csr-id-4b84cd72c25f7074d966771928685174a76d6ef7/> remove panics for easier debugging
+
+### Chore
+
+ - <csr-id-e5872a6684a6858f6d9d6379a6a63b8e3d525ba1/> sn_interface-0.19.5/sn_client-0.81.2/sn_node-0.77.10/sn_cli-0.72.2
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 2 days passed between releases.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Sn_interface-0.19.5/sn_client-0.81.2/sn_node-0.77.10/sn_cli-0.72.2 ([`e5872a6`](https://github.com/maidsafe/safe_network/commit/e5872a6684a6858f6d9d6379a6a63b8e3d525ba1))
     - Remove panics for easier debugging ([`4b84cd7`](https://github.com/maidsafe/safe_network/commit/4b84cd72c25f7074d966771928685174a76d6ef7))
 </details>
 
 ## v0.81.1 (2023-02-27)
+
+<csr-id-08a24be66114afcb8c9878336bb45cb896525778/>
 
 ### Chore
 
