@@ -198,7 +198,7 @@ impl MyNode {
         candidate: SapCandidate,
     ) -> Result<Vec<Cmd>> {
         let recipients = candidate.elders();
-        let (others, myself) = self.split_node_and_self(recipients);
+        let (others, myself) = self.split_nodes_and_self(recipients);
         let nodes = Recipients::Multiple(others);
 
         // sends a promotion message to all of the to-be-Elders with our sig_share over the new sap's public_key

@@ -20,7 +20,8 @@ use std::{
 };
 use xor_name::XorName;
 
-/// The id is the name, derived from its `PublicKey`, and the address of a client.
+/// A Participant is either a Client or a Node, participating in the network.
+/// It consists of the name, derived from its `PublicKey`, and its address.
 #[derive(Copy, Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct Participant {
     name: XorName,

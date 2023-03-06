@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{flow_ctrl::cmds::Cmd, messaging::Recipients, Error, MyNode, Result};
+
 use sn_fault_detection::IssueType;
 use sn_interface::{
     messaging::{
@@ -46,7 +47,7 @@ impl MyNode {
 
         // broadcast the proposal to the recipients
         let mut cmds = vec![];
-        let (other_nodes, myself) = self.split_node_and_self(recipients);
+        let (other_nodes, myself) = self.split_nodes_and_self(recipients);
 
         for node in &other_nodes {
             // log a knowledge issue for each that we're proposing

@@ -152,7 +152,7 @@ impl MyNode {
                 msg_id,
                 msg,
                 auth,
-                sender: ClientId::from(sender),
+                client_id: ClientId::from(sender),
                 send_stream,
             }]),
             NetworkMsg::AntiEntropy(AntiEntropyMsg::AntiEntropy {
@@ -195,8 +195,8 @@ impl MyNode {
         }
     }
 
-    /// Utility to split a list of nodes between others and ourself
-    pub(crate) fn split_node_and_self(
+    /// Utility to split a list of nodes between others and ourself.
+    pub(crate) fn split_nodes_and_self(
         &self,
         all_nodes: Vec<NodeId>,
     ) -> (BTreeSet<NodeId>, Option<NodeId>) {

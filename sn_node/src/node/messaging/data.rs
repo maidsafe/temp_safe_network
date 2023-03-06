@@ -6,9 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::messaging::Recipients;
 use crate::node::{
-    core::NodeContext, flow_ctrl::fault_detection::FaultsCmd, Cmd, Error, MyNode, Result,
+    core::NodeContext, flow_ctrl::fault_detection::FaultsCmd, messaging::Recipients, Cmd, Error,
+    MyNode, Result,
 };
 use crate::storage::{Error as StorageError, StorageLevel};
 

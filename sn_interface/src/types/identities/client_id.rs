@@ -6,6 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use super::Participant;
+
 use std::{
     cmp::Ordering,
     fmt::{self, Display, Formatter},
@@ -14,9 +16,7 @@ use std::{
 };
 use xor_name::XorName;
 
-use super::Participant;
-
-/// The id is the name, derived from its `PublicKey`, and the address of a client.
+/// The id of a client is the name, derived from its `PublicKey`, and its address.
 #[derive(Copy, Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct ClientId {
     name: XorName,

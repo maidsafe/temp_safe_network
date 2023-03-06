@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{core::NodeContext, flow_ctrl::cmds::Cmd, messaging::Recipients, MyNode};
-use rand::{rngs::OsRng, seq::SliceRandom};
+
 use sn_interface::{
     data_copy_count,
     messaging::system::{NodeDataCmd, NodeMsg},
@@ -15,6 +15,7 @@ use sn_interface::{
 };
 
 use itertools::Itertools;
+use rand::{rngs::OsRng, seq::SliceRandom};
 use std::collections::BTreeSet;
 
 // This data will all be replicated into one message, as such we want to keep size
