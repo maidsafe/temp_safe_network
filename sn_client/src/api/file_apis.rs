@@ -576,19 +576,9 @@ mod tests {
 
     // Test storing and reading 5mb file. Try and read from many clients and ensure we do not overwelm nodes.
     #[tokio::test(flavor = "multi_thread")]
-    async fn store_and_read_5mb_from_many_clients() -> Result<()> {
+    async fn store_and_read_5mb_from_many_concurrent_clients() -> Result<()> {
         init_logger();
         let _start_span = tracing::info_span!("store_and_read_5mb_from_many_clients").entered();
-
-        let uploader = create_test_client().await?;
-        // create file with random bytes 5mb
-        let bytes = random_bytes(5 * 1024 * 1024);
-        let file = LargeFile::new(bytes)?;
-
-        // Store file (also verifies that the chunks are stored)
-        let address = uploader.upload_and_verify(file.bytes()).await?;
-
-        debug!("======> Data uploaded");
 
         let concurrent_client_count = 25;
         let clients = create_clients(concurrent_client_count).await?;
@@ -597,9 +587,14 @@ mod tests {
         let mut tasks = vec![];
 
         for client in clients {
+            // create random file with random bytes for this client 5mb
+            let bytes = random_bytes(5 * 1024 * 1024);
+            let file = LargeFile::new(bytes)?;
+            debug!("======> Data uploaded");
+
             let handle: Instrumented<tokio::task::JoinHandle<Result<()>>> =
                 tokio::spawn(async move {
-                    match client.read_bytes(address).await {
+                    match client.upload_and_verify(file.bytes()).await {
                         Ok(_data) => {
                             debug!("client #{:?} got the data", client.public_key());
                         }
