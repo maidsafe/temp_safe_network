@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{messaging::Peers, XorName};
+use crate::node::{messaging::Recipients, XorName};
 
 use qp2p::SendStream;
 use sn_consensus::Decision;
@@ -20,7 +20,7 @@ use sn_interface::{
     network_knowledge::{
         NodeState, SectionAuthorityProvider, SectionKeyShare, SectionTreeUpdate, SectionsDAG,
     },
-    types::{DataAddress, Peer},
+    types::{ClientId, DataAddress, NodeId, Participant},
 };
 
 use custom_debug::Debug;
@@ -54,7 +54,7 @@ pub enum Cmd {
     /// Validate `wire_msg` from `sender`.
     /// Holding the WireMsg that has been received from the network,
     HandleMsg {
-        origin: Peer,
+        sender: Participant,
         wire_msg: WireMsg,
         send_stream: Option<SendStream>,
     },
@@ -62,7 +62,7 @@ pub enum Cmd {
     ProcessNodeMsg {
         msg_id: MsgId,
         msg: NodeMsg,
-        origin: Peer,
+        node_id: NodeId,
         send_stream: Option<SendStream>,
     },
     /// Process a deserialised client msg (after AE checks etc)
@@ -70,7 +70,7 @@ pub enum Cmd {
         msg_id: MsgId,
         msg: ClientMsg,
         auth: AuthorityProof<ClientAuth>,
-        origin: Peer,
+        sender: ClientId,
         send_stream: Option<SendStream>,
     },
     /// Process a deserialised AntiEntropy msg
@@ -78,7 +78,7 @@ pub enum Cmd {
         msg_id: MsgId,
         kind: AntiEntropyKind,
         section_tree_update: SectionTreeUpdate,
-        origin: Peer,
+        sender: Participant,
     },
     /// Allows joining of new nodes.
     SetJoinsAllowed(bool),
@@ -94,14 +94,14 @@ pub enum Cmd {
         signed_sap: SectionSigned<SectionAuthorityProvider>,
         msg_id: MsgId,
         msg: ClientMsg,
-        origin: Peer,
+        client_id: ClientId,
         send_stream: SendStream,
         /// Requester's authority over this message
         auth: AuthorityProof<ClientAuth>,
     },
     /// Handle comms error.
     HandleCommsError {
-        peer: Peer,
+        participant: Participant,
         error: sn_comms::Error,
     },
     /// Handle agreement on a node off proposal.
@@ -133,14 +133,13 @@ pub enum Cmd {
     /// chunks addresses are provided, so that we only retrieve the data right before we send it,
     /// hopefully reducing memory impact or data replication
     EnqueueDataForReplication {
-        // throttle_duration: Duration,
-        recipient: Peer,
+        recipient: NodeId,
         /// Batches of DataAddress to be sent together
         data_batch: Vec<DataAddress>,
     },
     UpdateCaller {
         /// The outdated caller
-        caller: Peer,
+        caller: NodeId,
         /// The id of the causing msg.
         correlation_id: MsgId,
         /// The kind of anti-entropy response.
@@ -152,7 +151,7 @@ pub enum Cmd {
     },
     UpdateCallerOnStream {
         /// The outdated caller
-        caller: Peer,
+        caller: Participant,
         /// The id of the msg.
         msg_id: MsgId,
         /// The kind of anti-entropy response.
@@ -170,21 +169,21 @@ pub enum Cmd {
     SendMsg {
         msg: NetworkMsg,
         msg_id: MsgId,
-        recipients: Peers,
+        recipients: Recipients,
     },
     /// Performs serialisation and signing and sends the msg over a bidi connection
     /// and then enqueues any response returned.
     SendMsgEnqueueAnyResponse {
         msg: NodeMsg,
         msg_id: MsgId,
-        recipients: BTreeSet<Peer>,
+        recipients: BTreeSet<NodeId>,
     },
-    /// Performs serialisation and sends the response NodeMsg to the peer over the given stream.
+    /// Performs serialisation and sends the response NodeMsg to the node over the given stream.
     SendNodeMsgResponse {
         msg: NodeMsg,
         msg_id: MsgId,
         correlation_id: MsgId,
-        recipient: Peer,
+        node_id: NodeId,
         send_stream: SendStream,
     },
     /// Performs serialisation and sends the msg to the client over the given stream.
@@ -193,26 +192,27 @@ pub enum Cmd {
         msg_id: MsgId,
         correlation_id: MsgId,
         send_stream: SendStream,
-        source_client: Peer,
+        client_id: ClientId,
     },
-    /// Performs serialisation and sends the msg to the peer node over a new bi-stream,
+    /// Performs serialisation and sends the msg to the nodes over a new bi-stream,
     /// awaiting for a response which is forwarded to the client.
     SendAndForwardResponseToClient {
         wire_msg: WireMsg,
-        targets: BTreeSet<Peer>,
+        targets: BTreeSet<NodeId>,
         client_stream: SendStream,
-        source_client: Peer,
+        client_id: ClientId,
     },
-    /// Proposes peers as offline
+    /// Proposes nodes as offline
     ProposeVoteNodesOffline(BTreeSet<XorName>),
 }
 
 impl Cmd {
-    pub(crate) fn send_msg(msg: NodeMsg, recipients: Peers) -> Self {
+    // this fn shall be fixed to be more type safe so that unnecessary casting upstream is avoided
+    pub(crate) fn send_msg(msg: NodeMsg, recipients: Recipients) -> Self {
         Cmd::send_network_msg(NetworkMsg::Node(msg), recipients)
     }
 
-    pub(crate) fn send_network_msg(msg: NetworkMsg, recipients: Peers) -> Self {
+    pub(crate) fn send_network_msg(msg: NetworkMsg, recipients: Recipients) -> Self {
         let msg_id = MsgId::new();
         debug!("Sending msg {msg_id:?} to {recipients:?}: {msg:?}");
         Cmd::SendMsg {
@@ -225,7 +225,7 @@ impl Cmd {
     pub(crate) fn send_node_response(
         msg: NodeMsg,
         correlation_id: MsgId,
-        recipient: Peer,
+        node_id: NodeId,
         send_stream: SendStream,
     ) -> Self {
         let msg_id = MsgId::new();
@@ -233,7 +233,7 @@ impl Cmd {
             msg,
             msg_id,
             correlation_id,
-            recipient,
+            node_id,
             send_stream,
         }
     }
@@ -241,7 +241,7 @@ impl Cmd {
     pub(crate) fn send_data_response(
         msg: DataResponse,
         correlation_id: MsgId,
-        source_client: Peer,
+        client_id: ClientId,
         send_stream: SendStream,
     ) -> Self {
         let msg_id = MsgId::new();
@@ -249,7 +249,7 @@ impl Cmd {
             msg,
             msg_id,
             correlation_id,
-            source_client,
+            client_id,
             send_stream,
         }
     }
@@ -303,8 +303,8 @@ impl fmt::Display for Cmd {
             Cmd::UpdateNetworkAndHandleValidClientMsg { msg_id, msg, .. } => {
                 write!(f, "UpdateAndHandleValidClientMsg {msg_id:?}: {msg:?}")
             }
-            Cmd::HandleCommsError { peer, error } => {
-                write!(f, "HandleCommsError({:?}, {:?})", peer.name(), error)
+            Cmd::HandleCommsError { participant, error } => {
+                write!(f, "HandleCommsError({participant:?}, {error:?})")
             }
             Cmd::HandleNodeOffAgreement { .. } => {
                 write!(f, "HandleSectionDecisionAgreement")

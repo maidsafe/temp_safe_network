@@ -1,3 +1,11 @@
+// Copyright 2023 MaidSafe.net limited.
+//
+// This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
+// Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
+// under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied. Please review the Licences for the specific language governing
+// permissions and limitations relating to use of the SAFE Network Software.
+
 use crate::{
     node::{cfg::create_test_capacity_and_root_storage, core::MyNode},
     UsedSpace,
@@ -13,7 +21,7 @@ use sn_interface::{
         MIN_ADULT_AGE,
     },
     test_utils::*,
-    types::{keys::ed25519::gen_keypair, Peer, PublicKey},
+    types::{keys::ed25519::gen_keypair, NodeId, PublicKey},
 };
 
 use bls::SecretKeySet;
@@ -131,7 +139,7 @@ impl<R: RngCore> TestNetworkBuilder<R> {
         let mut nodes = Vec::new();
         for node in node_infos {
             // check MemberType
-            let memb_type = if sap.elders_set().contains(&node.peer()) {
+            let memb_type = if sap.elders_set().contains(&node.id()) {
                 TestMemberType::Elder
             } else {
                 TestMemberType::Adult
@@ -184,10 +192,10 @@ impl<R: RngCore> TestNetworkBuilder<R> {
         );
 
         let elder_count = elders.len();
-        let elders_iter = elders.iter().map(|(node, _)| MyNodeInfo::peer(node));
+        let elders_iter = elders.iter().map(|(node, _)| node.id());
         let members_iter = members
             .iter()
-            .map(|(node, _)| NodeState::joined(node.peer(), None));
+            .map(|(node, _)| NodeState::joined(node.id(), None));
         let sk_set = gen_sk_set(&mut self.rng, elder_count, None);
         let sap = SectionAuthorityProvider::new(
             elders_iter,
@@ -206,7 +214,7 @@ impl<R: RngCore> TestNetworkBuilder<R> {
                     TestMemberType::Adult
                 };
                 // Since we just get `(MyNodeInfo, Comm)` from the user, the user is expected to
-                // hold the `Receiver<MsgFromPeer>` (or this node might've been from a previous
+                // hold the `Receiver<MsgReceived>` (or this node might've been from a previous
                 // churn that is already inserted), hence insert None only if the entry is Vacant.
                 if let Entry::Vacant(entry) = self.receivers.entry(info.public_key()) {
                     let _ = entry.insert(None);
@@ -449,12 +457,12 @@ impl<R: RngCore> TestNetworkBuilder<R> {
     ) {
         let (elders, adults, comm_rx) =
             TestNetwork::gen_node_infos(&prefix, elder_count, adult_count, elder_age_pattern);
-        let elders_for_sap = elders.iter().map(|(node, _)| MyNodeInfo::peer(node));
+        let elders_for_sap = elders.iter().map(|(node, _)| node.id());
         let members = adults
             .iter()
-            .map(|(node, _)| MyNodeInfo::peer(node))
+            .map(|(node, _)| node.id())
             .chain(elders_for_sap.clone())
-            .map(|peer| NodeState::joined(peer, None));
+            .map(|node_id| NodeState::joined(node_id, None));
         let sk_set = gen_sk_set(&mut self.rng, elder_count, sk_threshold_size);
         let sap =
             SectionAuthorityProvider::new(elders_for_sap, prefix, members, sk_set.public_keys(), 0);
@@ -614,19 +622,19 @@ impl TestNetwork {
         }
     }
 
-    /// Get elder/adult `Peer` for a given `Prefix`. The elder_count and adult_count
+    /// Get elder/adult id for a given `Prefix`. The elder_count and adult_count
     /// should be <= the actual count specified in the SAP. Also return the `SectionKeyShare` for
     /// elder nodes.
     ///
     /// If the Prefix contains multiple churn events (multiple SAPs), provide the churn_idx to get a specific
     /// SAP, else the latest SAP for the prefix is used.
-    pub(crate) fn get_peers(
+    pub(crate) fn get_node_ids(
         &self,
         prefix: Prefix,
         elder_count: usize,
         adult_count: usize,
         churn_idx: Option<usize>,
-    ) -> Result<Vec<Peer>> {
+    ) -> Result<Vec<NodeId>> {
         let nodes = self.get_nodes_single_churn(prefix, churn_idx)?;
         let sap_details = self.get_sap_single_churn(prefix, churn_idx)?;
 
@@ -641,11 +649,11 @@ impl TestNetwork {
             "adult_count should be <= {sap_adult_count}"
         );
 
-        let elder_iter = nodes.iter().take(elder_count).map(|(node, ..)| node.peer());
+        let elder_iter = nodes.iter().take(elder_count).map(|(node, ..)| node.id());
         let adult_iter = nodes
             .iter()
             .skip(sap_details.0.elder_count())
-            .map(|(node, ..)| node.peer())
+            .map(|(node, ..)| node.id())
             .take(adult_count);
         Ok(elder_iter.chain(adult_iter).collect())
     }

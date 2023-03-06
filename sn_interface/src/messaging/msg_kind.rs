@@ -19,7 +19,7 @@ use xor_name::XorName;
 pub enum MsgKind {
     /// An update to our NetworkKnowledge.
     AntiEntropy(XorName),
-    /// A data message, with the requesting peer's authority.
+    /// A data message, with the requesting client's authority.
     /// Authority is needed to access private data, such as reading or writing a private file.
     /// is spend tells us if we're dealing with a spend cmd
     /// query index lets us forward the msg to a given index in xorspace

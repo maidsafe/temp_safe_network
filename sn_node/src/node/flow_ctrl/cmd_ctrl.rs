@@ -11,7 +11,7 @@ use crate::node::{
     Error, MyNode, STANDARD_CHANNEL_SIZE,
 };
 
-use sn_interface::types::{DataAddress, Peer};
+use sn_interface::types::{DataAddress, NodeId};
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc,
@@ -23,11 +23,11 @@ use tokio::sync::mpsc::{channel, Receiver, Sender};
 /// all the while logging the correlation between incoming and resulting cmds.
 pub(crate) struct CmdCtrl {
     id_counter: Arc<AtomicUsize>,
-    data_replication_sender: Sender<(Vec<DataAddress>, Peer)>,
+    data_replication_sender: Sender<(Vec<DataAddress>, NodeId)>,
 }
 
 impl CmdCtrl {
-    pub(crate) fn new() -> (Self, Receiver<(Vec<DataAddress>, Peer)>) {
+    pub(crate) fn new() -> (Self, Receiver<(Vec<DataAddress>, NodeId)>) {
         #[cfg(feature = "statemap")]
         sn_interface::statemap::log_metadata();
         let (data_replication_sender, data_replication_receiver) = channel(STANDARD_CHANNEL_SIZE);

@@ -36,9 +36,9 @@ pub enum Error {
     /// SendChannel error for the data replication flow. This is a critical error and the node no longer functions.
     #[error("Data replication channel could not be sent to. This means the receiver has been dropped, the node can no longer replicate data and must shut down.")]
     DataReplicationChannel,
-    /// This peer has no connections, and none will be created
-    #[error("Peer link has no connections ")]
-    NoConnectionsForPeer,
+    /// This node has no connections, and none will be created
+    #[error("Node link has no connections ")]
+    NoConnectionsForNode,
     /// This should not be possible as the channel is stored in node, and used to process child commands
     #[error("No more Cmds will be received or processed. CmdChannel senders have been dropped. ")]
     CmdCtrlChannelDropped,

@@ -37,8 +37,8 @@ pub use crate::storage::DataStorage;
 #[cfg(test)]
 pub(crate) use relocation::{check as relocation_check, ChurnId};
 
+use sn_interface::messaging::system::NodeMsg;
 pub use sn_interface::network_knowledge::MIN_ADULT_AGE;
-use sn_interface::{messaging::system::NodeMsg, types::Peer};
 
 pub use qp2p::SendStream;
 pub use xor_name::{Prefix, XorName, XOR_NAME_LEN}; // TODO remove pub on API update
@@ -50,7 +50,7 @@ mod core {
             flow_ctrl::{cmds::Cmd, fault_detection::FaultsCmd},
             handover::Handover,
             membership::{elder_candidates, try_split_dkg, Membership},
-            messaging::Peers,
+            messaging::Recipients,
             DataStorage, Result, XorName,
         },
         UsedSpace,
@@ -70,7 +70,7 @@ mod core {
             SectionAuthorityProvider, SectionKeyShare, SectionKeysProvider,
         },
         types::{keys::ed25519::Digest256, log_markers::LogMarker},
-        types::{DataAddress, Peer},
+        types::{DataAddress, NodeId},
     };
     use tokio::sync::mpsc::Sender;
 
@@ -120,7 +120,7 @@ mod core {
         // Section administration
         pub(crate) section_proposal_aggregator: SignatureAggregator,
         /// Send data for replication
-        pub(crate) data_replication_sender: Option<Sender<(Vec<DataAddress>, Peer)>>,
+        pub(crate) data_replication_sender: Option<Sender<(Vec<DataAddress>, NodeId)>>,
     }
 
     #[derive(custom_debug::Debug, Clone)]
@@ -332,15 +332,17 @@ mod core {
             let probe = context.network_knowledge.anti_entropy_probe();
             info!("ProbeMsg targets {:?}: {probe:?}", recipients);
 
-            Ok(Cmd::send_network_msg(probe, Peers::Multiple(recipients)))
+            Ok(Cmd::send_network_msg(
+                probe,
+                Recipients::Multiple(recipients),
+            ))
         }
 
         /// Generates a AE probe for our section elders
         pub(crate) fn generate_section_probe_msg(context: &NodeContext) -> Cmd {
             let elders = context.network_knowledge.elders();
             let probe = context.network_knowledge.anti_entropy_probe();
-
-            Cmd::send_network_msg(probe, Peers::Multiple(elders))
+            Cmd::send_network_msg(probe, Recipients::Multiple(elders))
         }
 
         /// Generates section infos for the best elder candidate among the members at the given generation
@@ -407,7 +409,7 @@ mod core {
 
             if elder_candidates
                 .iter()
-                .map(NodeState::peer)
+                .map(|s| s.node_id())
                 .eq(current_elders.iter())
             {
                 vec![]
@@ -421,7 +423,7 @@ mod core {
                 warn!("Ignore attempt to shrink the elders");
                 trace!("current_names  {:?}", current_elders);
                 trace!("expected_names {:?}", elder_candidates);
-                trace!("section_peers {:?}", members);
+                trace!("section_members {:?}", members);
                 vec![]
             } else {
                 let chain_len = self.network_knowledge.section_chain_len();
@@ -660,12 +662,12 @@ mod core {
                     self.network_knowledge
                         .adults()
                         .iter()
-                        .map(|peer| peer.name())
+                        .map(|node_id| node_id.name())
                         .collect(),
                     self.network_knowledge
                         .elders()
                         .iter()
-                        .map(|peer| peer.name())
+                        .map(|node_id| node_id.name())
                         .collect(),
                 )
                 .await;
@@ -792,11 +794,9 @@ mod core {
                 .archived_members()
                 .into_iter()
                 .filter_map(|state| {
-                    // TODO: figure out hot to retain the section sign key info within Decsion
-                    if state.is_relocated()
-                    // && state.sig.public_key == context.network_knowledge.section_key()
-                    {
-                        Some(*state.peer())
+                    // TODO: figure out how to retain the section sign key info within Decsion
+                    if state.is_relocated() {
+                        Some(*state.node_id())
                     } else {
                         None
                     }

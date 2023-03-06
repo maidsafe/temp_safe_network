@@ -12,7 +12,7 @@ use sn_interface::{
     messaging::{
         data::DataResponse, system::NodeMsg, AntiEntropyMsg, Dst, MsgId, MsgKind, WireMsg,
     },
-    types::Peer,
+    types::{ClientId, NodeId, Participant},
 };
 
 use bytes::Bytes;
@@ -27,7 +27,7 @@ impl MyNode {
         msg: NodeMsg,
         msg_id: MsgId,
         correlation_id: MsgId,
-        recipient: Peer,
+        node_id: NodeId,
         context: NodeContext,
         send_stream: SendStream,
     ) -> Result<Option<Cmd>> {
@@ -38,7 +38,7 @@ impl MyNode {
             msg_id,
             kind,
             payload,
-            recipient,
+            Participant::from_node(node_id),
             correlation_id,
             context.network_knowledge.section_key(),
             send_stream,
@@ -49,7 +49,7 @@ impl MyNode {
     pub(crate) async fn send_ae_response(
         msg: AntiEntropyMsg,
         msg_id: MsgId,
-        source_client: Peer,
+        participant: Participant,
         correlation_id: MsgId,
         send_stream: SendStream,
         context: NodeContext,
@@ -59,7 +59,7 @@ impl MyNode {
             msg_id,
             MsgKind::AntiEntropy(context.name),
             WireMsg::serialize_msg_payload(&msg)?,
-            source_client,
+            participant,
             correlation_id,
             context.network_knowledge.section_key(),
             send_stream,
@@ -73,14 +73,14 @@ impl MyNode {
         correlation_id: MsgId,
         send_stream: SendStream,
         context: NodeContext,
-        source_client: Peer,
+        client_id: ClientId,
     ) -> Result<Option<Cmd>> {
         info!("Sending client response msg for {correlation_id:?}");
         send_msg_on_stream(
             msg_id,
             MsgKind::DataResponse(context.name),
             WireMsg::serialize_msg_payload(&msg)?,
-            source_client,
+            Participant::from_client(client_id),
             correlation_id,
             context.network_knowledge.section_key(),
             send_stream,
@@ -94,7 +94,7 @@ impl MyNode {
         msg: NodeMsg,
         msg_id: MsgId,
         context: NodeContext,
-        recipients: BTreeSet<Peer>,
+        recipients: BTreeSet<NodeId>,
     ) -> Result<()> {
         let targets_len = recipients.len();
         trace!("Sending out + awaiting response of {msg_id:?} to {targets_len} holder node/s {recipients:?}");
@@ -124,16 +124,15 @@ impl MyNode {
     pub(crate) fn send_and_forward_response_to_client(
         wire_msg: WireMsg,
         context: NodeContext,
-        targets: BTreeSet<Peer>,
+        targets: BTreeSet<NodeId>,
         client_stream: SendStream,
-        source_client: Peer,
+        client_id: ClientId,
     ) -> Result<()> {
         let msg_id = wire_msg.msg_id();
         let targets_len = targets.len();
 
         debug!(
-            "Sending out {msg_id:?}, coming from {}, to {targets_len} holder node/s {targets:?}",
-            source_client.addr()
+            "Sending out {msg_id:?}, coming from {client_id}, to {targets_len} holder node/s {targets:?}",
         );
 
         let node_bytes: BTreeMap<_, _> = targets
@@ -155,7 +154,7 @@ impl MyNode {
 
         let dst_stream = (
             Dst {
-                name: source_client.name(),
+                name: client_id.name(),
                 section_key: context.network_knowledge.section_key(),
             },
             client_stream,
@@ -174,38 +173,40 @@ async fn send_msg_on_stream(
     msg_id: MsgId,
     kind: MsgKind,
     payload: Bytes,
-    target_peer: Peer,
+    recipient: Participant,
     correlation_id: MsgId,
     section_key: bls::PublicKey,
     mut send_stream: SendStream,
 ) -> Result<Option<Cmd>> {
     let dst = Dst {
-        name: target_peer.name(),
+        name: recipient.name(),
         section_key,
     };
     let wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
     let bytes = wire_msg.serialize().map_err(|_| Error::InvalidMessage)?;
 
     let stream_id = send_stream.id();
-    info!("Sending response {msg_id:?} of msg {correlation_id:?}, to {target_peer:?} over {stream_id}");
+    info!(
+        "Sending response {msg_id:?} of msg {correlation_id:?}, to {recipient:?} over {stream_id}"
+    );
 
     let stream_prio = 10;
     send_stream.set_priority(stream_prio);
-    trace!("Prio set on stream {stream_id}, response {msg_id:?} of msg {correlation_id:?}, to {target_peer:?}");
+    trace!("Prio set on stream {stream_id}, response {msg_id:?} of msg {correlation_id:?}, to {recipient:?}");
 
     if let Err(error) = send_stream.send_user_msg(bytes).await {
         error!(
-            "Could not send response {msg_id:?} of msg {correlation_id:?}, to {target_peer:?} \
+            "Could not send response {msg_id:?} of msg {correlation_id:?}, to {recipient:?} \
             over response {stream_id}: {error:?}"
         );
         return Ok(Some(Cmd::HandleCommsError {
-            peer: target_peer,
+            participant: recipient,
             error: sn_comms::Error::from(error),
         }));
     }
 
     trace!(
-        "Sent: Response {msg_id:?} of msg {correlation_id:?} to {target_peer:?}, over {stream_id}."
+        "Sent: Response {msg_id:?} of msg {correlation_id:?} to {recipient:?}, over {stream_id}."
     );
 
     // unblock + move finish off thread as it's not strictly related to the sending of the msg.
@@ -214,10 +215,12 @@ async fn send_msg_on_stream(
         // Attempt to gracefully terminate the stream.
         // If this errors it does _not_ mean our message has not been sent
         let result = send_stream.finish().await;
-        trace!("Response {msg_id:?} of msg {correlation_id:?} sent to {target_peer:?} over {stream_id_clone}. Stream finished with result: {result:?}");
+        trace!("Response {msg_id:?} of msg {correlation_id:?} sent to {recipient:?} over {stream_id_clone}. Stream finished with result: {result:?}");
     });
 
-    trace!("Sent the response {msg_id:?} of msg {correlation_id:?} to {target_peer:?} over {stream_id}");
+    trace!(
+        "Sent the response {msg_id:?} of msg {correlation_id:?} to {recipient:?} over {stream_id}"
+    );
 
     Ok(None)
 }

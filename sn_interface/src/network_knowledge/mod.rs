@@ -8,7 +8,7 @@
 
 mod errors;
 mod node_info;
-mod section_peers;
+mod section_member_history;
 mod section_tree;
 mod sections_dag;
 
@@ -34,14 +34,14 @@ pub use self::{
 
 use crate::{
     messaging::{
-        system::{SectionPeers as SectionPeersMsg, SectionSig, SectionSigned},
+        system::{SectionMembers, SectionSig, SectionSigned},
         AntiEntropyMsg, Dst, NetworkMsg,
     },
-    types::Peer,
+    types::NodeId,
 };
 
 use bls::PublicKey as BlsPublicKey;
-use section_peers::SectionPeers;
+use section_member_history::SectionMemberHistory;
 use serde::Serialize;
 use sn_consensus::Decision;
 use std::{
@@ -152,7 +152,7 @@ pub struct NetworkKnowledge {
     /// Signed Section Authority Provider
     signed_sap: SectionSigned<SectionAuthorityProvider>,
     /// Members of our section
-    section_peers: SectionPeers,
+    section_members: SectionMemberHistory,
     /// The network section tree, i.e. a map from prefix to SAPs plus all sections keys
     section_tree: SectionTree,
 }
@@ -178,14 +178,14 @@ impl NetworkKnowledge {
             .ok_or(Error::NoMatchingSection)?;
         Ok(Self {
             signed_sap,
-            section_peers: SectionPeers::default(),
+            section_members: SectionMemberHistory::default(),
             section_tree,
         })
     }
 
     /// Creates `NetworkKnowledge` for the first node in the network
     pub fn first_node(
-        peer: Peer,
+        node_id: NodeId,
         genesis_sk_set: bls::SecretKeySet,
     ) -> Result<(Self, SectionKeyShare)> {
         let public_key_set = genesis_sk_set.public_keys();
@@ -193,17 +193,20 @@ impl NetworkKnowledge {
         let secret_key_share = genesis_sk_set.secret_key_share(secret_key_index as u64);
 
         let section_tree = {
-            let genesis_signed_sap =
-                create_first_section_authority_provider(&public_key_set, &secret_key_share, peer)?;
+            let genesis_signed_sap = create_first_section_authority_provider(
+                &public_key_set,
+                &secret_key_share,
+                node_id,
+            )?;
             SectionTree::new(genesis_signed_sap)?
         };
         let mut network_knowledge = Self::new(Prefix::default(), section_tree)?;
 
-        for peer in network_knowledge.signed_sap.elders() {
-            let node_state = NodeState::joined(*peer, None);
+        for node_id in network_knowledge.signed_sap.elders() {
+            let node_state = NodeState::joined(*node_id, None);
             let sig = create_first_sig(&public_key_set, &secret_key_share, &node_state)?;
             let _changed = network_knowledge
-                .section_peers
+                .section_members
                 .update(section_signed_to_decision(SectionSigned {
                     value: node_state,
                     sig,
@@ -256,8 +259,8 @@ impl NetworkKnowledge {
                 // update the signed_sap only if the prefix matches
                 if sap_prefix.matches(our_name) {
                     let our_prev_prefix = self.prefix();
-                    // Remove any peer which doesn't belong to our new section's prefix
-                    self.section_peers.retain(&sap_prefix);
+                    // Remove any node which doesn't belong to our new section's prefix
+                    self.section_members.retain(&sap_prefix);
                     info!("Updated our section's SAP ({our_prev_prefix:?} to {sap_prefix:?}) with new one: {:?}", signed_sap.value);
 
                     let proof_chain = self
@@ -266,7 +269,7 @@ impl NetworkKnowledge {
                         .partial_dag(self.genesis_key(), &signed_sap.section_key())?;
 
                     // Prune list of archived members
-                    self.section_peers
+                    self.section_members
                         .prune_members_archive(&proof_chain, &signed_sap.section_key())?;
 
                     // Switch to new SAP
@@ -288,7 +291,7 @@ impl NetworkKnowledge {
     /// Update our network knowledge with the provided `SectionTreeUpdate`
     pub fn update_section_member_knowledge(
         &mut self,
-        updated_members: Option<SectionPeersMsg>,
+        updated_members: Option<SectionMembers>,
     ) -> Result<bool> {
         trace!("Attempting to update section member's knowledge");
         let mut there_was_an_update = false;
@@ -300,7 +303,7 @@ impl NetworkKnowledge {
                 let prefix = self.prefix();
                 info!(
                     "Updated our section's members ({:?}): {:?}",
-                    prefix, self.section_peers
+                    prefix, self.section_members
                 );
             }
         }
@@ -430,12 +433,12 @@ impl NetworkKnowledge {
         self.section_tree.get_sections_dag().has_key(section_key)
     }
 
-    /// Try to merge this `NetworkKnowledge` members with `peers`.
+    /// Try to merge this `NetworkKnowledge` members with `nodes`.
     /// Checks if we're already up to date before attempting to verify and merge members
-    pub fn merge_members(&mut self, peers: BTreeSet<Decision<NodeState>>) -> Result<bool> {
+    pub fn merge_members(&mut self, nodes: BTreeSet<Decision<NodeState>>) -> Result<bool> {
         let mut there_was_an_update = false;
 
-        for decision in &peers {
+        for decision in &nodes {
             // TODO: Decisioin requires the PublicKeySet to validate,
             //       however NetworkKnowledge only retains the PublicKey info
             // if !decision.validate(&self.section_chain()).is_ok() {
@@ -444,10 +447,10 @@ impl NetworkKnowledge {
             // }
 
             trace!("Updating decision {decision:?}",);
-            there_was_an_update |= self.section_peers.update(decision.clone());
+            there_was_an_update |= self.section_members.update(decision.clone());
         }
 
-        self.section_peers.retain(&self.prefix());
+        self.section_members.retain(&self.prefix());
 
         Ok(there_was_an_update)
     }
@@ -470,7 +473,7 @@ impl NetworkKnowledge {
         }
 
         let updated = self
-            .section_peers
+            .section_members
             .update(section_signed_to_decision(node_state));
         trace!("Section member state, name: {node_name:?}, updated: {updated}");
 
@@ -478,21 +481,21 @@ impl NetworkKnowledge {
     }
 
     /// Returns the members of our section
-    pub fn members(&self) -> BTreeSet<Peer> {
+    pub fn members(&self) -> BTreeSet<NodeId> {
         self.elders().into_iter().chain(self.adults()).collect()
     }
 
     /// Returns the elders of our section
-    pub fn elders(&self) -> BTreeSet<Peer> {
+    pub fn elders(&self) -> BTreeSet<NodeId> {
         self.section_auth().elders_set()
     }
 
     /// Returns live adults from our section.
-    pub fn adults(&self) -> BTreeSet<Peer> {
+    pub fn adults(&self) -> BTreeSet<NodeId> {
         let mut live_adults = BTreeSet::new();
-        for node_state in self.section_peers.members() {
+        for node_state in self.section_members.members() {
             if !self.is_elder(&node_state.name()) {
-                let _ = live_adults.insert(*node_state.peer());
+                let _ = live_adults.insert(*node_state.node_id());
             }
         }
         live_adults
@@ -520,27 +523,27 @@ impl NetworkKnowledge {
 
     /// Returns members that are joined.
     pub fn section_members(&self) -> BTreeSet<NodeState> {
-        self.section_peers.members()
+        self.section_members.members()
     }
 
     /// Returns joined members with Decision info.
     pub fn section_members_with_decision(&self) -> BTreeSet<Decision<NodeState>> {
-        self.section_peers.section_members_with_decision()
+        self.section_members.section_members_with_decision()
     }
 
     /// Returns the list of members that have left our section
     pub fn archived_members(&self) -> BTreeSet<NodeState> {
-        self.section_peers.archived_members()
+        self.section_members.archived_members()
     }
 
     /// Get info for the member with the given name.
     pub fn get_section_member(&self, name: &XorName) -> Option<NodeState> {
-        self.section_peers.get(name)
+        self.section_members.get(name)
     }
 
     /// Get info for the member with the given name.
     pub fn is_section_member(&self, name: &XorName) -> bool {
-        self.section_peers.is_member(name)
+        self.section_members.is_member(name)
     }
 
     pub fn anti_entropy_probe(&self) -> NetworkMsg {
@@ -552,12 +555,12 @@ impl NetworkKnowledge {
 fn create_first_section_authority_provider(
     pk_set: &bls::PublicKeySet,
     sk_share: &bls::SecretKeyShare,
-    peer: Peer,
+    node_id: NodeId,
 ) -> Result<SectionSigned<SectionAuthorityProvider>> {
     let section_auth = SectionAuthorityProvider::new(
-        iter::once(peer),
+        iter::once(node_id),
         Prefix::default(),
-        [NodeState::joined(peer, None)],
+        [NodeState::joined(node_id, None)],
         pk_set.clone(),
         0,
     );
@@ -587,7 +590,7 @@ mod tests {
     use super::{supermajority, NetworkKnowledge};
     use crate::{
         test_utils::{gen_addr, prefix, TestKeys, TestSapBuilder, TestSectionTree},
-        types::Peer,
+        types::NodeId,
     };
 
     use bls::SecretKeySet;
@@ -625,8 +628,8 @@ mod tests {
     {
         let mut rng = thread_rng();
         let sk_gen = SecretKeySet::random(0, &mut rng);
-        let peer = Peer::new(XorName::random(&mut rng), gen_addr());
-        let (mut knowledge, _) = NetworkKnowledge::first_node(peer, sk_gen.clone())?;
+        let node_id = NodeId::new(XorName::random(&mut rng), gen_addr());
+        let (mut knowledge, _) = NetworkKnowledge::first_node(node_id, sk_gen.clone())?;
 
         // section 1
         let (sap1, sk_1, ..) = TestSapBuilder::new(prefix("1")).elder_count(0).build();

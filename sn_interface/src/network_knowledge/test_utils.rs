@@ -1,7 +1,7 @@
 use super::SectionKeysProvider;
 use crate::{
     network_knowledge::{section_keys::build_spent_proof_share, Error, MyNodeInfo, MIN_ADULT_AGE},
-    types::{keys::ed25519, Peer},
+    types::{keys::ed25519, NodeId},
     SectionAuthorityProvider,
 };
 use eyre::{eyre, Context, ContextCompat, Result};
@@ -34,16 +34,16 @@ pub fn gen_addr() -> SocketAddr {
     ([192, 0, 2, 0], port).into()
 }
 
-// Generate a Peer with the given age
-pub fn gen_peer(age: u8) -> Peer {
+// Generate a NodeId with the given age
+pub fn gen_node_id(age: u8) -> NodeId {
     let name = ed25519::gen_name_with_age(age);
-    Peer::new(name, gen_addr())
+    NodeId::new(name, gen_addr())
 }
 
-// Generate a Peer with the given age and prefix
-pub fn gen_peer_in_prefix(age: u8, prefix: Prefix) -> Peer {
+// Generate a NodeId with the given age and prefix
+pub fn gen_node_id_in_prefix(age: u8, prefix: Prefix) -> NodeId {
     let name = ed25519::gen_name_with_age(age);
-    Peer::new(prefix.substituted_in(name), gen_addr())
+    NodeId::new(prefix.substituted_in(name), gen_addr())
 }
 
 // Generate `MyNodeInfo` with the given age and prefix

@@ -20,7 +20,7 @@ use sn_interface::{
     network_knowledge::{
         section_keys::build_spent_proof_share, NetworkKnowledge, SectionTreeUpdate,
     },
-    types::{log_markers::LogMarker, register::User, Peer, ReplicatedData},
+    types::{log_markers::LogMarker, register::User, ClientId, ReplicatedData},
 };
 
 use qp2p::SendStream;
@@ -32,10 +32,10 @@ impl MyNode {
         msg: DataResponse,
         correlation_id: MsgId,
         send_stream: SendStream,
-        source_client: Peer,
+        client_id: ClientId,
     ) -> Cmd {
         debug!("{correlation_id:?} sending cmd response error back to client");
-        Cmd::send_data_response(msg, correlation_id, source_client, send_stream)
+        Cmd::send_data_response(msg, correlation_id, client_id, send_stream)
     }
 
     /// Handle data query
@@ -43,7 +43,7 @@ impl MyNode {
         msg_id: MsgId,
         query: &DataQuery,
         auth: ClientAuth,
-        source_client: Peer,
+        client_id: ClientId,
         send_stream: SendStream,
         context: NodeContext,
     ) -> Vec<Cmd> {
@@ -59,12 +59,7 @@ impl MyNode {
             correlation_id: msg_id,
         };
 
-        vec![Cmd::send_data_response(
-            msg,
-            msg_id,
-            source_client,
-            send_stream,
-        )]
+        vec![Cmd::send_data_response(msg, msg_id, client_id, send_stream)]
     }
 
     /// Handle incoming client msgs.
@@ -76,20 +71,20 @@ impl MyNode {
         msg_id: MsgId,
         msg: ClientMsg,
         auth: AuthorityProof<ClientAuth>,
-        origin: Peer,
+        client_id: ClientId,
         send_stream: SendStream,
     ) -> Result<Vec<Cmd>> {
         trace!("{:?}: {msg_id:?} {msg:?}", LogMarker::ClientMsgToBeHandled);
 
         match msg {
             ClientMsg::Cmd(cmd) => {
-                MyNode::handle_data_cmd(cmd, msg_id, origin, auth, send_stream, context).await
+                MyNode::handle_data_cmd(cmd, msg_id, client_id, auth, send_stream, context).await
             }
             ClientMsg::Query(query) => Ok(MyNode::handle_data_query_where_stored(
                 msg_id,
                 &query,
                 auth.into_inner(),
-                origin,
+                client_id,
                 send_stream,
                 context,
             )
@@ -101,7 +96,7 @@ impl MyNode {
     async fn handle_data_cmd(
         data_cmd: DataCmd,
         msg_id: MsgId,
-        origin: Peer,
+        client_id: ClientId,
         auth: AuthorityProof<ClientAuth>,
         send_stream: SendStream,
         mut context: NodeContext,
@@ -145,7 +140,7 @@ impl MyNode {
                             signed_sap,
                             msg_id,
                             msg: updated_client_msg,
-                            origin,
+                            client_id,
                             send_stream,
                             auth,
                         };
@@ -156,7 +151,9 @@ impl MyNode {
                 // first we validate it here at the Elder
                 let spent_share = match MyNode::validate_spentbook_cmd(cmd, &context) {
                     Ok(share) => share,
-                    Err(e) => return MyNode::send_error(msg_id, data_cmd, e, send_stream, origin),
+                    Err(e) => {
+                        return MyNode::send_error(msg_id, data_cmd, e, send_stream, client_id)
+                    }
                 };
 
                 // then we forward it to data holders
@@ -164,7 +161,7 @@ impl MyNode {
                     msg_id,
                     spent_share,
                     public_key,
-                    origin,
+                    client_id,
                     send_stream,
                     context,
                 );
@@ -173,9 +170,9 @@ impl MyNode {
 
         match data_result {
             Ok(data) => {
-                MyNode::store_data_and_respond(&context, data, send_stream, origin, msg_id).await
+                MyNode::store_data_and_respond(&context, data, send_stream, client_id, msg_id).await
             }
-            Err(error) => MyNode::send_error(msg_id, data_cmd, error, send_stream, origin),
+            Err(error) => MyNode::send_error(msg_id, data_cmd, error, send_stream, client_id),
         }
     }
 
@@ -184,14 +181,18 @@ impl MyNode {
         cmd: DataCmd,
         error: Error,
         send_stream: SendStream,
-        origin: Peer,
+        client_id: ClientId,
     ) -> Result<Vec<Cmd>> {
         let data_response = DataResponse::CmdResponse {
             response: cmd.to_error_response(error.into()),
             correlation_id: msg_id,
         };
-        let cmd =
-            MyNode::send_cmd_error_response_over_stream(data_response, msg_id, send_stream, origin);
+        let cmd = MyNode::send_cmd_error_response_over_stream(
+            data_response,
+            msg_id,
+            send_stream,
+            client_id,
+        );
         Ok(vec![cmd])
     }
 

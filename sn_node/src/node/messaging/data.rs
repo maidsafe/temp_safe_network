@@ -6,9 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::node::messaging::Recipients;
 use crate::node::{
-    core::NodeContext, flow_ctrl::fault_detection::FaultsCmd, messaging::Peers, Cmd, Error, MyNode,
-    Result,
+    core::NodeContext, flow_ctrl::fault_detection::FaultsCmd, Cmd, Error, MyNode, Result,
 };
 use crate::storage::{Error as StorageError, StorageLevel};
 
@@ -23,7 +23,8 @@ use sn_interface::{
     types::{
         log_markers::LogMarker,
         register::{Permissions, Policy, Register, User},
-        DataError, Keypair, Peer, PublicKey, RegisterCmd, ReplicatedData, SPENTBOOK_TYPE_TAG,
+        ClientId, DataError, Keypair, NodeId, Participant, PublicKey, RegisterCmd, ReplicatedData,
+        SPENTBOOK_TYPE_TAG,
     },
 };
 
@@ -39,7 +40,7 @@ impl MyNode {
     pub(crate) fn forward_data_and_respond_to_client(
         context: NodeContext,
         wire_msg: WireMsg,
-        source_client: Peer,
+        client_id: ClientId,
         client_stream: SendStream,
     ) -> Cmd {
         let msg_id = wire_msg.msg_id();
@@ -81,7 +82,7 @@ impl MyNode {
                 data_response,
                 msg_id,
                 client_stream,
-                source_client,
+                client_id,
             );
         }
 
@@ -103,7 +104,7 @@ impl MyNode {
                     data_response,
                     msg_id,
                     client_stream,
-                    source_client,
+                    client_id,
                 );
             }
         }
@@ -112,7 +113,7 @@ impl MyNode {
             wire_msg,
             targets,
             client_stream,
-            source_client,
+            client_id,
         }
     }
 
@@ -147,7 +148,7 @@ impl MyNode {
         msg_id: MsgId,
         share: SpentProofShare,
         public_key: bls::PublicKey,
-        source_client: Peer,
+        client_id: ClientId,
         client_stream: SendStream,
         context: NodeContext,
     ) -> Result<Vec<Cmd>> {
@@ -173,7 +174,7 @@ impl MyNode {
             wire_msg,
             targets,
             client_stream,
-            source_client,
+            client_id,
         }])
     }
 
@@ -183,7 +184,7 @@ impl MyNode {
         context: &NodeContext,
         target: XorName,
         query_index: Option<usize>,
-    ) -> BTreeSet<Peer> {
+    ) -> BTreeSet<NodeId> {
         // TODO: reuse our_members_sorted_by_distance_to API when core is merged into upper layer
         let members = context.network_knowledge.members();
 
@@ -194,7 +195,7 @@ impl MyNode {
             .sorted_by(|lhs, rhs| target.cmp_distance(&lhs.name(), &rhs.name()))
             .take(data_copy_count())
             .enumerate()
-            .filter(|(i, _peer)| {
+            .filter(|(i, _node)| {
                 if let Some(index) = query_index {
                     i == &index
                 } else {
@@ -215,7 +216,7 @@ impl MyNode {
     /// furthest nodes if there was no data sent.
     pub(crate) async fn replicate_data_batch(
         context: &NodeContext,
-        sender: Peer,
+        sender: NodeId,
         data_batch: Vec<ReplicatedData>,
     ) -> Result<Vec<Cmd>> {
         let mut cmds = vec![];
@@ -278,7 +279,7 @@ impl MyNode {
                 LogMarker::DataReorganisationUnderway
             );
             let msg = NodeMsg::NodeDataCmd(NodeDataCmd::SendAnyMissingRelevantData(data_i_have));
-            let cmd = Cmd::send_msg(msg, Peers::Single(sender));
+            let cmd = Cmd::send_msg(msg, Recipients::Single(Participant::from_node(sender)));
             cmds.push(cmd);
         } else if is_full {
             warn!("Not attempting further retrieval of missing data as we are full");

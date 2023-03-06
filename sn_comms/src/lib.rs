@@ -46,23 +46,22 @@ extern crate tracing;
 
 mod error;
 mod listener;
-mod peer_session;
+mod node_link;
 
 pub use self::error::{Error, Result};
 
-use self::peer_session::PeerSession;
+use self::node_link::NodeLink;
 
 use sn_interface::{
     messaging::{
         data::{DataResponse, Error as MsgError},
         Dst, MsgId, MsgKind, WireMsg,
     },
-    types::Peer,
+    types::{NodeId, Participant},
 };
 
-use qp2p::{Endpoint, SendStream, UsrMsgBytes};
-
 use futures::future::join_all;
+use qp2p::{Endpoint, SendStream, UsrMsgBytes};
 use std::{
     collections::{BTreeMap, BTreeSet},
     net::SocketAddr,
@@ -79,11 +78,11 @@ static STANDARD_CHANNEL_SIZE: usize = 100_000;
 #[derive(Debug)]
 pub enum CommEvent {
     /// A msg was received.
-    Msg(MsgFromPeer),
+    Msg(MsgReceived),
     /// A send error occurred.
     Error {
         /// The sender/recipient that failed.
-        peer: Peer,
+        node_id: NodeId,
         /// The failure type.
         error: Error,
     },
@@ -91,9 +90,9 @@ pub enum CommEvent {
 
 /// A msg received on the wire.
 #[derive(Debug)]
-pub struct MsgFromPeer {
-    /// The peer that sent us the msg.
-    pub sender: Peer,
+pub struct MsgReceived {
+    /// The name and socketaddr of sender of the msg.
+    pub sender: Participant,
     /// The msg that we received.
     pub wire_msg: WireMsg,
     /// An optional stream to return msgs on, if
@@ -103,7 +102,7 @@ pub struct MsgFromPeer {
 
 /// Communication component of the node to interact with other nodes.
 ///
-/// Any failed sends are tracked via `CommEvent::Error`, which will track issues for any peers
+/// Any failed sends are tracked via `CommEvent::Error`, which will track issues for any nodes
 /// in the section (otherwise ignoring failed send to out of section nodes or clients).
 #[derive(Clone, Debug)]
 pub struct Comm {
@@ -169,45 +168,45 @@ impl Comm {
     }
 
     /// Sets the available targets to be only those in the passed in set.
-    pub fn set_comm_targets(&self, targets: BTreeSet<Peer>) {
-        // We only remove sessions by calling this function,
-        // No removals are made even if we failed to send using all peer session's connections,
-        // as it's our source of truth for known and connectable peers.
+    pub fn set_comm_targets(&self, targets: BTreeSet<NodeId>) {
+        // We only remove links by calling this function,
+        // No removals are made even if we failed to send using all node link's connections,
+        // as it's our source of truth for known and connectable nodes.
         self.send_cmd(CommCmd::SetTargets(targets))
     }
 
     /// Sends the payload on a new or existing connection.
     #[tracing::instrument(skip(self, bytes))]
-    pub fn send_out_bytes(&self, peer: Peer, msg_id: MsgId, bytes: UsrMsgBytes) {
+    pub fn send_out_bytes(&self, node_id: NodeId, msg_id: MsgId, bytes: UsrMsgBytes) {
         self.send_cmd(CommCmd::Send {
             msg_id,
-            peer,
+            node_id,
             bytes,
         })
     }
 
     /// Sends the payload on a new bidi-stream and pushes the response onto the comm event channel.
     #[tracing::instrument(skip(self, bytes))]
-    pub fn send_and_return_response(&self, peer: Peer, msg_id: MsgId, bytes: UsrMsgBytes) {
+    pub fn send_and_return_response(&self, node_id: NodeId, msg_id: MsgId, bytes: UsrMsgBytes) {
         self.send_cmd(CommCmd::SendAndReturnResponse {
             msg_id,
-            peer,
+            node_id,
             bytes,
         })
     }
 
     /// Sends the payload on new bidi-stream to noe and sends the response on the dst stream.
-    #[tracing::instrument(skip(self, peer_bytes))]
+    #[tracing::instrument(skip(self, node_bytes))]
     pub fn send_and_respond_on_stream(
         &self,
         msg_id: MsgId,
-        peer_bytes: BTreeMap<Peer, UsrMsgBytes>,
+        node_bytes: BTreeMap<NodeId, UsrMsgBytes>,
         expected_targets: usize,
         dst_stream: (Dst, SendStream),
     ) {
         self.send_cmd(CommCmd::SendAndRespondOnStream {
             msg_id,
-            peer_bytes,
+            node_bytes,
             expected_targets,
             dst_stream,
         })
@@ -229,13 +228,13 @@ impl Comm {
 enum CommCmd {
     Send {
         msg_id: MsgId,
-        peer: Peer,
+        node_id: NodeId,
         #[debug(skip)]
         bytes: UsrMsgBytes,
     },
-    SetTargets(BTreeSet<Peer>),
+    SetTargets(BTreeSet<NodeId>),
     SendAndReturnResponse {
-        peer: Peer,
+        node_id: NodeId,
         msg_id: MsgId,
         #[debug(skip)]
         bytes: UsrMsgBytes,
@@ -243,7 +242,7 @@ enum CommCmd {
     SendAndRespondOnStream {
         msg_id: MsgId,
         #[debug(skip)]
-        peer_bytes: BTreeMap<Peer, UsrMsgBytes>,
+        node_bytes: BTreeMap<NodeId, UsrMsgBytes>,
         expected_targets: usize,
         dst_stream: (Dst, SendStream),
     },
@@ -255,59 +254,57 @@ fn process_cmds(
     comm_events: Sender<CommEvent>,
 ) {
     let _handle = task::spawn(async move {
-        let mut sessions = BTreeMap::<Peer, PeerSession>::new();
+        let mut links = BTreeMap::<NodeId, NodeLink>::new();
         while let Some(cmd) = cmd_receiver.recv().await {
             trace!("Comms cmd handling: {cmd:?}");
             match cmd {
-                // This is the only place that mutates `sessions`.
+                // This is the only place that mutates `links`.
                 CommCmd::SetTargets(targets) => {
-                    // Drops sessions that are not among the targets.
-                    sessions.retain(|p, _| targets.contains(p));
-                    // Adds new sessions for each new target.
-                    targets.iter().for_each(|peer| {
-                        if sessions.get(peer).is_none() {
-                            let session = PeerSession::new(*peer, our_endpoint.clone());
-                            let _ = sessions.insert(*peer, session);
+                    // Drops links that are not among the targets.
+                    links.retain(|p, _| targets.contains(p));
+                    // Adds new links for each new target.
+                    targets.iter().for_each(|node_id| {
+                        if links.get(node_id).is_none() {
+                            let link = NodeLink::new(*node_id, our_endpoint.clone());
+                            let _ = links.insert(*node_id, link);
                         }
                     });
                 }
                 CommCmd::Send {
                     msg_id,
-                    peer,
+                    node_id,
                     bytes,
                 } => {
-                    if let Some(session) = get_session(msg_id, peer, &sessions, comm_events.clone())
-                    {
-                        send(msg_id, session, bytes, comm_events.clone())
+                    if let Some(link) = get_link(msg_id, node_id, &links, comm_events.clone()) {
+                        send(msg_id, link, bytes, comm_events.clone())
                     }
                 }
                 CommCmd::SendAndReturnResponse {
-                    peer,
+                    node_id,
                     msg_id,
                     bytes,
                 } => {
-                    if let Some(session) = get_session(msg_id, peer, &sessions, comm_events.clone())
-                    {
-                        send_and_return_response(msg_id, session, bytes, comm_events.clone())
+                    if let Some(link) = get_link(msg_id, node_id, &links, comm_events.clone()) {
+                        send_and_return_response(msg_id, link, bytes, comm_events.clone())
                     }
                 }
                 CommCmd::SendAndRespondOnStream {
                     msg_id,
-                    peer_bytes,
+                    node_bytes,
                     expected_targets,
                     dst_stream,
                 } => {
-                    let peer_bytes = peer_bytes
+                    let node_bytes = node_bytes
                         .into_iter()
-                        .map(|(peer, bytes)| {
-                            let session = get_session(msg_id, peer, &sessions, comm_events.clone());
-                            (peer, (session, bytes))
+                        .map(|(node_id, bytes)| {
+                            let link = get_link(msg_id, node_id, &links, comm_events.clone());
+                            (node_id, (link, bytes))
                         })
                         .collect();
 
                     send_and_respond_on_stream(
                         msg_id,
-                        peer_bytes,
+                        node_bytes,
                         expected_targets,
                         dst_stream,
                         comm_events.clone(),
@@ -318,42 +315,37 @@ fn process_cmds(
     });
 }
 
-fn get_session(
+fn get_link(
     msg_id: MsgId,
-    peer: Peer,
-    sessions: &BTreeMap<Peer, PeerSession>,
+    node_id: NodeId,
+    links: &BTreeMap<NodeId, NodeLink>,
     comm_events: Sender<CommEvent>,
-) -> Option<PeerSession> {
-    debug!("Trying to get {peer:?} session in order to send: {msg_id:?}");
-    match sessions.get(&peer) {
-        Some(session) => Some(session.clone()),
+) -> Option<NodeLink> {
+    debug!("Trying to get {node_id:?} link in order to send: {msg_id:?}");
+    match links.get(&node_id) {
+        Some(link) => Some(link.clone()),
         None => {
-            error!("Sending message (msg_id: {msg_id:?}) to {peer:?} failed: unknown node.");
-            send_error(peer, Error::ConnectingToUnknownNode(msg_id), comm_events);
+            error!("Sending message (msg_id: {msg_id:?}) to {node_id:?} failed: unknown node.");
+            send_error(node_id, Error::ConnectingToUnknownNode(msg_id), comm_events);
             None
         }
     }
 }
 
 #[tracing::instrument(skip_all)]
-fn send(
-    msg_id: MsgId,
-    mut session: PeerSession,
-    bytes: UsrMsgBytes,
-    comm_events: Sender<CommEvent>,
-) {
+fn send(msg_id: MsgId, mut link: NodeLink, bytes: UsrMsgBytes, comm_events: Sender<CommEvent>) {
     let _handle = task::spawn(async move {
         let (h, d, p) = &bytes;
         let bytes_len = h.len() + d.len() + p.len();
-        let peer = session.peer();
-        trace!("Sending message bytes ({bytes_len} bytes) w/ {msg_id:?} to {peer:?}");
-        match session.send(msg_id, bytes).await {
+        let node_id = link.node_id();
+        trace!("Sending message bytes ({bytes_len} bytes) w/ {msg_id:?} to {node_id:?}");
+        match link.send(msg_id, bytes).await {
             Ok(()) => {
-                trace!("Msg {msg_id:?} sent to {peer:?}");
+                trace!("Msg {msg_id:?} sent to {node_id:?}");
             }
             Err(error) => {
-                error!("Sending message (msg_id: {msg_id:?}) to {peer:?} failed: {error}");
-                send_error(peer, Error::FailedSend(msg_id), comm_events.clone());
+                error!("Sending message (msg_id: {msg_id:?}) to {node_id:?} failed: {error}");
+                send_error(node_id, Error::FailedSend(msg_id), comm_events.clone());
             }
         }
     });
@@ -362,34 +354,44 @@ fn send(
 #[tracing::instrument(skip_all)]
 fn send_and_return_response(
     msg_id: MsgId,
-    session: PeerSession,
+    link: NodeLink,
     bytes: UsrMsgBytes,
     comm_events: Sender<CommEvent>,
 ) {
     let _handle = task::spawn(async move {
         let (h, d, p) = &bytes;
         let bytes_len = h.len() + d.len() + p.len();
-        let peer = session.peer();
-        trace!("Sending message bytes ({bytes_len} bytes) w/ {msg_id:?} to {peer:?}");
+        let node_id = link.node_id();
+        trace!("Sending message bytes ({bytes_len} bytes) w/ {msg_id:?} to {node_id:?}");
 
-        let node_response_bytes = match session.send_with_bi_return_response(bytes, msg_id).await {
+        let node_response_bytes = match link.send_with_bi_return_response(bytes, msg_id).await {
             Ok(response_bytes) => {
-                debug!("Peer response from {peer:?} is in for {msg_id:?}");
+                debug!("Node response from {node_id:?} is in for {msg_id:?}");
                 response_bytes
             }
             Err(error) => {
-                error!("Sending message (msg_id: {msg_id:?}) to {peer:?} failed: {error}");
-                send_error(peer, Error::FailedSend(msg_id), comm_events.clone());
+                error!("Sending message (msg_id: {msg_id:?}) to {node_id:?} failed: {error}");
+                send_error(node_id, Error::FailedSend(msg_id), comm_events.clone());
                 return;
             }
         };
         match WireMsg::from(node_response_bytes) {
             Ok(wire_msg) => {
-                listener::msg_received(wire_msg, peer, None, comm_events.clone()).await;
+                listener::msg_received(
+                    wire_msg,
+                    Participant::from_node(node_id),
+                    None,
+                    comm_events.clone(),
+                )
+                .await;
             }
             Err(error) => {
-                error!("Failed sending {msg_id:?} to {peer:?}: {error:?}");
-                send_error(peer, Error::InvalidMsgReceived(msg_id), comm_events.clone());
+                error!("Failed sending {msg_id:?} to {node_id:?}: {error:?}");
+                send_error(
+                    node_id,
+                    Error::InvalidMsgReceived(msg_id),
+                    comm_events.clone(),
+                );
             }
         };
     });
@@ -398,7 +400,7 @@ fn send_and_return_response(
 #[tracing::instrument(skip_all)]
 fn send_and_respond_on_stream(
     msg_id: MsgId,
-    peer_bytes: BTreeMap<Peer, (Option<PeerSession>, UsrMsgBytes)>,
+    node_bytes: BTreeMap<NodeId, (Option<NodeLink>, UsrMsgBytes)>,
     expected_targets: usize,
     dst_stream: (Dst, SendStream),
     comm_events: Sender<CommEvent>,
@@ -406,38 +408,38 @@ fn send_and_respond_on_stream(
     let _handle = task::spawn(async move {
         let (dst, stream) = dst_stream;
 
-        let tasks = peer_bytes
+        let tasks = node_bytes
             .into_iter()
             .map(|pb| (pb, comm_events.clone()))
-            .map(|((peer, (session, bytes)), comm_events)| async move {
-                let session = match session {
-                    Some(session) => session,
-                    None => return (peer, Err(Error::ConnectingToUnknownNode(msg_id))),
+            .map(|((node_id, (link, bytes)), comm_events)| async move {
+                let link = match link {
+                    Some(link) => link,
+                    None => return (node_id, Err(Error::ConnectingToUnknownNode(msg_id))),
                 };
 
                 let node_response_bytes =
-                    match session.send_with_bi_return_response(bytes, msg_id).await {
+                    match link.send_with_bi_return_response(bytes, msg_id).await {
                         Ok(response_bytes) => response_bytes,
                         Err(error) => {
-                            error!("Failed sending {msg_id:?} to {peer:?}: {error:?}");
-                            send_error(peer, Error::FailedSend(msg_id), comm_events);
-                            return (peer, Err(Error::FailedSend(msg_id)));
+                            error!("Failed sending {msg_id:?} to {node_id:?}: {error:?}");
+                            send_error(node_id, Error::FailedSend(msg_id), comm_events);
+                            return (node_id, Err(Error::FailedSend(msg_id)));
                         }
                     };
 
-                debug!("Response from node {peer:?} is in for {msg_id:?}");
-                (peer, Ok(node_response_bytes))
+                debug!("Response from node {node_id:?} is in for {msg_id:?}");
+                (node_id, Ok(node_response_bytes))
             });
 
-        let peer_results: Vec<(Peer, Result<UsrMsgBytes>)> = join_all(tasks).await;
+        let node_results: Vec<(NodeId, Result<UsrMsgBytes>)> = join_all(tasks).await;
 
-        let succeeded: Vec<_> = peer_results
+        let succeeded: Vec<_> = node_results
             .into_iter()
-            .filter_map(|(peer, res)| match res {
-                Ok(bytes) => Some((peer, bytes)),
+            .filter_map(|(node_id, res)| match res {
+                Ok(bytes) => Some((node_id, bytes)),
                 Err(error) => {
-                    error!("Failed sending {msg_id:?} to {peer:?}: {error:?}");
-                    send_error(peer, Error::FailedSend(msg_id), comm_events.clone());
+                    error!("Failed sending {msg_id:?} to {node_id:?}: {error:?}");
+                    send_error(node_id, Error::FailedSend(msg_id), comm_events.clone());
                     None
                 }
             })
@@ -469,11 +471,11 @@ fn send_and_respond_on_stream(
 }
 
 #[tracing::instrument(skip_all)]
-fn send_error(peer: Peer, error: Error, comm_events: Sender<CommEvent>) {
+fn send_error(node_id: NodeId, error: Error, comm_events: Sender<CommEvent>) {
     let _handle = task::spawn(async move {
         let error_msg =
-            format!("Failed to send error {error} of peer {peer} on comm event channel ");
-        if let Err(err) = comm_events.send(CommEvent::Error { peer, error }).await {
+            format!("Failed to send error {error} of node {node_id} on comm event channel ");
+        if let Err(err) = comm_events.send(CommEvent::Error { node_id, error }).await {
             error!("{error_msg} due to {err}.")
         }
     });
@@ -527,7 +529,7 @@ mod tests {
             data::{ClientMsg, DataQuery},
             ClientAuth, Dst, MsgId, MsgKind,
         },
-        types::{ChunkAddress, Keypair, Peer},
+        types::{ChunkAddress, Keypair, NodeId},
     };
 
     use assert_matches::assert_matches;
@@ -546,24 +548,24 @@ mod tests {
     async fn successful_send() -> Result<()> {
         let (comm, _rx) = Comm::new(local_addr(), None)?;
 
-        let (peer0, mut rx0) = new_peer().await?;
-        let (peer1, mut rx1) = new_peer().await?;
+        let (node0, mut rx0) = new_node_id().await?;
+        let (node1, mut rx1) = new_node_id().await?;
 
-        // add peers as known members
-        comm.set_comm_targets([peer0, peer1].into());
+        // add nodes as known members
+        comm.set_comm_targets([node0, node1].into());
 
-        let peer0_msg = new_test_msg(dst(peer0))?;
-        let peer1_msg = new_test_msg(dst(peer1))?;
+        let node0_msg = new_test_msg(dst(node0))?;
+        let node1_msg = new_test_msg(dst(node1))?;
 
-        comm.send_out_bytes(peer0, peer0_msg.msg_id(), peer0_msg.serialize()?);
-        comm.send_out_bytes(peer1, peer1_msg.msg_id(), peer1_msg.serialize()?);
+        comm.send_out_bytes(node0, node0_msg.msg_id(), node0_msg.serialize()?);
+        comm.send_out_bytes(node1, node1_msg.msg_id(), node1_msg.serialize()?);
 
         if let Some(bytes) = rx0.recv().await {
-            assert_eq!(WireMsg::from(bytes)?, peer0_msg);
+            assert_eq!(WireMsg::from(bytes)?, node0_msg);
         }
 
         if let Some(bytes) = rx1.recv().await {
-            assert_eq!(WireMsg::from(bytes)?, peer1_msg);
+            assert_eq!(WireMsg::from(bytes)?, node1_msg);
         }
 
         Ok(())
@@ -573,25 +575,25 @@ mod tests {
     async fn failed_send() -> Result<()> {
         let (comm, mut rx) = Comm::new(local_addr(), None)?;
 
-        let invalid_peer = get_invalid_peer().await?;
-        let invalid_addr = invalid_peer.addr();
-        let msg = new_test_msg(dst(invalid_peer))?;
-        comm.send_out_bytes(invalid_peer, msg.msg_id(), msg.serialize()?);
+        let invalid_dst = get_invalid_node().await?;
+        let invalid_addr = invalid_dst.addr();
+        let msg = new_test_msg(dst(invalid_dst))?;
+        comm.send_out_bytes(invalid_dst, msg.msg_id(), msg.serialize()?);
 
-        if let Some(CommEvent::Error { peer, error }) = rx.recv().await {
-            // the peer is still not set as a known member thus it should have failed
+        if let Some(CommEvent::Error { node_id, error }) = rx.recv().await {
+            // the node is still not set as a known member thus it should have failed
             assert_matches!(error, Error::ConnectingToUnknownNode(_));
-            assert_eq!(peer.addr(), invalid_addr);
+            assert_eq!(node_id.addr(), invalid_addr);
         }
 
-        // let's add the peer as a known member and check again
-        comm.set_comm_targets([invalid_peer].into());
+        // let's add the node as a known member and check again
+        comm.set_comm_targets([invalid_dst].into());
 
-        comm.send_out_bytes(invalid_peer, msg.msg_id(), msg.serialize()?);
+        comm.send_out_bytes(invalid_dst, msg.msg_id(), msg.serialize()?);
 
-        if let Some(CommEvent::Error { peer, error }) = rx.recv().await {
+        if let Some(CommEvent::Error { node_id, error }) = rx.recv().await {
             assert_matches!(error, Error::FailedSend(_));
-            assert_eq!(peer.addr(), invalid_addr);
+            assert_eq!(node_id.addr(), invalid_addr);
         }
 
         Ok(())
@@ -605,17 +607,17 @@ mod tests {
             Endpoint::builder().addr(local_addr()).server()?;
         let recv_addr = recv_endpoint.local_addr();
         let name = xor_name::rand::random();
-        let peer = Peer::new(name, recv_addr);
-        let msg0 = new_test_msg(dst(peer))?;
+        let node_id = NodeId::new(name, recv_addr);
+        let msg0 = new_test_msg(dst(node_id))?;
 
-        // add peer as a known member
-        send_comm.set_comm_targets([peer].into());
+        // add node as a known member
+        send_comm.set_comm_targets([node_id].into());
 
-        send_comm.send_out_bytes(peer, msg0.msg_id(), msg0.serialize()?);
+        send_comm.send_out_bytes(node_id, msg0.msg_id(), msg0.serialize()?);
 
         let mut msg0_received = false;
 
-        // Receive one message and disconnect from the peer
+        // Receive one message and disconnect from the node
         {
             if let Some((_, mut incoming_msgs)) = incoming_connections.next().await {
                 if let Some(msg) = time::timeout(TIMEOUT, incoming_msgs.next()).await?? {
@@ -627,8 +629,8 @@ mod tests {
             assert!(msg0_received);
         }
 
-        let msg1 = new_test_msg(dst(peer))?;
-        send_comm.send_out_bytes(peer, msg1.msg_id(), msg1.serialize()?);
+        let msg1 = new_test_msg(dst(node_id))?;
+        send_comm.send_out_bytes(node_id, msg1.msg_id(), msg1.serialize()?);
 
         let mut msg1_received = false;
 
@@ -651,16 +653,16 @@ mod tests {
 
         let (comm1, _rx1) = Comm::new(local_addr(), None)?;
 
-        let peer = Peer::new(xor_name::rand::random(), addr0);
-        let msg = new_test_msg(dst(peer))?;
+        let node_id = NodeId::new(xor_name::rand::random(), addr0);
+        let msg = new_test_msg(dst(node_id))?;
 
-        // add peer as a known member
-        comm1.set_comm_targets([peer].into());
+        // add node as a known member
+        comm1.set_comm_targets([node_id].into());
 
         // Send a message to establish the connection
-        comm1.send_out_bytes(peer, msg.msg_id(), msg.serialize()?);
+        comm1.send_out_bytes(node_id, msg.msg_id(), msg.serialize()?);
 
-        assert_matches!(rx0.recv().await, Some(CommEvent::Msg(MsgFromPeer { .. })));
+        assert_matches!(rx0.recv().await, Some(CommEvent::Msg(MsgReceived { .. })));
 
         // Drop `comm1` to cause connection lost.
         drop(comm1);
@@ -670,9 +672,9 @@ mod tests {
         Ok(())
     }
 
-    fn dst(peer: Peer) -> Dst {
+    fn dst(node_id: NodeId) -> Dst {
         Dst {
-            name: peer.name(),
+            name: node_id.name(),
             section_key: bls::SecretKey::random().public_key(),
         }
     }
@@ -701,7 +703,7 @@ mod tests {
         ))
     }
 
-    async fn new_peer() -> Result<(Peer, Receiver<UsrMsgBytes>)> {
+    async fn new_node_id() -> Result<(NodeId, Receiver<UsrMsgBytes>)> {
         let (endpoint, mut incoming_connections) =
             Endpoint::builder().addr(local_addr()).server()?;
         let addr = endpoint.local_addr();
@@ -716,22 +718,22 @@ mod tests {
             }
         });
 
-        Ok((Peer::new(xor_name::rand::random(), addr), rx))
+        Ok((NodeId::new(xor_name::rand::random(), addr), rx))
     }
 
-    async fn get_invalid_peer() -> Result<Peer> {
+    async fn get_invalid_node() -> Result<NodeId> {
         let socket = UdpSocket::bind((Ipv4Addr::LOCALHOST, 0)).await?;
         let addr = socket.local_addr()?;
 
         // Keep the socket alive to keep the address bound, but don't read/write to it so any
         // attempt to connect to it will fail.
         let _handle = tokio::task::spawn(async move {
-            debug!("get invalid peer");
+            debug!("get invalid participant");
             future::pending::<()>().await;
             let _ = socket;
         });
 
-        Ok(Peer::new(xor_name::rand::random(), addr))
+        Ok(NodeId::new(xor_name::rand::random(), addr))
     }
 
     fn local_addr() -> SocketAddr {

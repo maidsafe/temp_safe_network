@@ -9,7 +9,7 @@
 mod listeners;
 mod messaging;
 
-use crate::{connections::PeerLinks, Error, Result};
+use crate::{connections::NodeLinks, Error, Result};
 
 use sn_interface::{
     messaging::data::{CmdResponse, QueryResponse},
@@ -36,7 +36,7 @@ pub(super) struct Session {
     /// All elders we know about from AE messages
     pub(super) network: Arc<RwLock<SectionTree>>,
     /// Links to nodes
-    peer_links: PeerLinks,
+    node_links: NodeLinks,
 }
 
 impl Session {
@@ -47,12 +47,12 @@ impl Session {
             .addr(local_addr)
             .idle_timeout(70_000)
             .client()?;
-        let peer_links = PeerLinks::new(endpoint.clone());
+        let node_links = NodeLinks::new(endpoint.clone());
 
         let session = Self {
             endpoint,
             network: Arc::new(RwLock::new(network_contacts)),
-            peer_links,
+            node_links,
         };
 
         Ok(session)

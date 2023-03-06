@@ -10,7 +10,7 @@ use crate::node::{
     core::NodeContext,
     flow_ctrl::cmds::Cmd,
     membership::{self, Membership},
-    messaging::Peers,
+    messaging::Recipients,
     relocation::ChurnId,
     MyNode, Result,
 };
@@ -20,7 +20,7 @@ use sn_consensus::{Decision, Generation, SignedVote, VoteResponse};
 use sn_interface::{
     messaging::system::{JoinResponse, NodeMsg, SectionSig, SectionSigned},
     network_knowledge::{MembershipState, NodeState},
-    types::{log_markers::LogMarker, Peer},
+    types::{log_markers::LogMarker, NodeId, Participant},
 };
 
 use std::{collections::BTreeSet, vec};
@@ -74,11 +74,11 @@ impl MyNode {
 
     pub(crate) fn handle_membership_votes(
         &mut self,
-        peer: Peer,
+        node_id: NodeId,
         signed_votes: Vec<SignedVote<NodeState>>,
     ) -> Result<Vec<Cmd>> {
         trace!(
-            "{:?} {signed_votes:?} from {peer}",
+            "{:?} {signed_votes:?} from {node_id}",
             LogMarker::MembershipVotesBeingHandled
         );
 
@@ -100,7 +100,10 @@ impl MyNode {
                         // We'll send a membership AE request to see if they can help us catch up.
                         debug!("{:?}", LogMarker::MembershipSendingAeUpdateRequest);
                         let msg = NodeMsg::MembershipAE(membership.generation());
-                        cmds.push(Cmd::send_msg(msg, Peers::Single(peer)));
+                        cmds.push(Cmd::send_msg(
+                            msg,
+                            Recipients::Single(Participant::from_node(node_id)),
+                        ));
                         // return the vec w/ the AE cmd there so as not to loop and generate AE for
                         // any subsequent commands
                         return Ok(cmds);
@@ -139,23 +142,21 @@ impl MyNode {
 
     pub(crate) fn handle_membership_anti_entropy(
         membership_context: Option<Membership>,
-        peer: Peer,
+        node_id: NodeId,
         gen: Generation,
     ) -> Option<Cmd> {
         debug!(
-            "{:?} membership anti-entropy request for gen {:?} from {}",
+            "{:?} membership anti-entropy request for gen {gen:?} from {node_id}",
             LogMarker::MembershipAeRequestReceived,
-            gen,
-            peer
         );
 
         if let Some(membership) = membership_context.as_ref() {
             match membership.anti_entropy(gen) {
                 Ok(catchup_votes) => {
-                    trace!("Sending catchup votes to {peer:?}");
+                    trace!("Sending catchup votes to {node_id:?}");
                     Some(Cmd::send_msg(
                         NodeMsg::MembershipVotes(catchup_votes),
-                        Peers::Single(peer),
+                        Recipients::Single(Participant::from_node(node_id)),
                     ))
                 }
                 Err(e) => {
@@ -214,7 +215,7 @@ impl MyNode {
             let excluded_from_relocation =
                 BTreeSet::from_iter(joining_nodes.iter().map(|(n, _)| n.name()));
 
-            cmds.extend(self.try_relocate_peers(churn_id, excluded_from_relocation)?);
+            cmds.extend(self.try_relocate_nodes(churn_id, excluded_from_relocation)?);
         }
 
         cmds.extend(self.trigger_dkg()?);
@@ -225,12 +226,12 @@ impl MyNode {
             self.network_knowledge
                 .adults()
                 .iter()
-                .map(|peer| peer.name())
+                .map(|node_id| node_id.name())
                 .collect(),
             self.network_knowledge
                 .elders()
                 .iter()
-                .map(|peer| peer.name())
+                .map(|node_id| node_id.name())
                 .collect(),
         )
         .await;
@@ -284,44 +285,44 @@ impl MyNode {
         }
     }
 
-    async fn handle_node_joined(&mut self, new_info: NodeState, signature: Signature) -> Vec<Cmd> {
+    async fn handle_node_joined(&mut self, new_state: NodeState, signature: Signature) -> Vec<Cmd> {
         let sig = SectionSig {
             public_key: self.network_knowledge.section_key(),
             signature,
         };
 
-        let new_info = SectionSigned {
-            value: new_info,
+        let new_state = SectionSigned {
+            value: new_state,
             sig,
         };
 
-        if !self.network_knowledge.update_member(new_info.clone()) {
-            info!("ignore Online: {}", new_info.peer());
+        if !self.network_knowledge.update_member(new_state.clone()) {
+            info!("ignore Online: {}", new_state.node_id());
             return vec![];
         }
 
-        self.add_new_adult_to_trackers(new_info.name()).await;
+        self.add_new_adult_to_trackers(new_state.name()).await;
 
-        info!("handle Online: {:?}", new_info.value);
+        info!("handle Online: {:?}", new_state.value);
 
         vec![]
     }
 
     // Send `NodeApproval` to a joining node which makes it a section member
     pub(crate) fn send_node_approvals(&self, decision: Decision<NodeState>) -> Cmd {
-        let peers: BTreeSet<_> = decision
+        let nodes: BTreeSet<_> = decision
             .proposals
             .keys()
             .filter(|n| n.state() == MembershipState::Joined)
-            .map(|n| *n.peer())
+            .map(|n| *n.node_id())
             .collect();
         let prefix = self.network_knowledge.prefix();
-        info!("Section {prefix:?} has approved new peers {peers:?}.");
+        info!("Section {prefix:?} has approved new nodes {nodes:?}.");
 
         let msg = NodeMsg::JoinResponse(JoinResponse::Approved(decision));
 
         trace!("{}", LogMarker::SendNodeApproval);
-        Cmd::send_msg(msg, Peers::Multiple(peers))
+        Cmd::send_msg(msg, Recipients::Multiple(nodes))
     }
 
     pub(crate) fn handle_node_left(
@@ -344,17 +345,20 @@ impl MyNode {
         info!(
             "{}: {}",
             LogMarker::AcceptedNodeAsOffline,
-            node_state.peer()
+            node_state.node_id()
         );
 
         // If this is an Offline agreement where the new node state is Relocated,
-        // we then need to send the Relocate msg to the peer attaching the signed NodeState
+        // we then need to send the Relocate msg to the node attaching the signed NodeState
         // containing the relocation details.
         if node_state.is_relocated() {
-            let peer = *node_state.peer();
-            info!("Notify relocation to node {:?}", peer);
+            let node_id = *node_state.node_id();
+            info!("Notify relocation to node {node_id:?}");
             let msg = NodeMsg::CompleteRelocation(node_state);
-            Some(Cmd::send_msg(msg, Peers::Single(peer)))
+            Some(Cmd::send_msg(
+                msg,
+                Recipients::Single(Participant::from_node(node_id)),
+            ))
         } else {
             None
         }

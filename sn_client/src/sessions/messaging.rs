@@ -15,7 +15,7 @@ use sn_interface::{
         ClientAuth, Dst, MsgId, MsgKind, WireMsg,
     },
     network_knowledge::supermajority,
-    types::{ChunkAddress, Peer},
+    types::{ChunkAddress, NodeId},
 };
 
 use bytes::Bytes;
@@ -49,15 +49,15 @@ impl Session {
         }
 
         let mut tasks = vec![];
-        for peer in relevant_elders {
+        for elder in relevant_elders {
             let session = self.clone();
 
             let task = async move {
                 let connect_now = true;
                 // We don't retry here.. if we fail it will be retried on a per message basis
                 let _ = session
-                    .peer_links
-                    .get_or_create_link(&peer, connect_now, None)
+                    .node_links
+                    .get_or_create_link(&elder, connect_now, None)
                     .await;
             };
             tasks.push(task);
@@ -130,7 +130,7 @@ impl Session {
     async fn send_msg_and_check_acks(
         &self,
         msg_id: MsgId,
-        elders: Vec<Peer>,
+        elders: Vec<NodeId>,
         wire_msg: WireMsg,
     ) -> Result<()> {
         let send_cmd_tasks = self.send_msg(elders.clone(), wire_msg).await?;
@@ -162,7 +162,7 @@ impl Session {
     async fn send_to_one_or_more(
         &self,
         target: XorName,
-        all_elders: Vec<Peer>,
+        all_elders: Vec<NodeId>,
         wire_msg: WireMsg,
     ) -> Result<()> {
         let msg_id = wire_msg.msg_id();
@@ -208,10 +208,10 @@ impl Session {
     fn pick_elders(
         &self,
         target: XorName,
-        elders: Vec<Peer>,
+        elders: Vec<NodeId>,
         skip: usize,
         take: usize,
-    ) -> Vec<Peer> {
+    ) -> Vec<NodeId> {
         use itertools::Itertools;
         elders
             .into_iter()
@@ -226,7 +226,7 @@ impl Session {
     async fn we_have_sufficient_acks_for_cmd(
         &self,
         msg_id: MsgId,
-        elders: Vec<Peer>,
+        elders: Vec<NodeId>,
         expected_acks: usize,
         mut send_cmd_tasks: JoinSet<MsgResponse>,
     ) -> Result<()> {
@@ -290,7 +290,7 @@ impl Session {
         debug!("CmdErrors for {msg_id:?} received from: {received_errors:?}");
         debug!("Failures for {msg_id:?} with: {failures:?}");
 
-        let missing_responses: Vec<Peer> = elders
+        let missing_responses: Vec<NodeId> = elders
             .iter()
             .cloned()
             .filter(|p| {
@@ -326,7 +326,7 @@ impl Session {
         query_node_index: usize,
         auth: ClientAuth,
         payload: Bytes,
-        dst_section_info: Option<(bls::PublicKey, Vec<Peer>)>,
+        dst_section_info: Option<(bls::PublicKey, Vec<NodeId>)>,
     ) -> Result<QueryResponse> {
         let endpoint = self.endpoint.clone();
 
@@ -383,7 +383,7 @@ impl Session {
     async fn check_query_responses(
         &self,
         msg_id: MsgId,
-        elders: Vec<Peer>,
+        elders: Vec<NodeId>,
         chunk_addr: Option<ChunkAddress>,
         mut send_query_tasks: JoinSet<MsgResponse>,
     ) -> Result<QueryResponse> {
@@ -394,7 +394,7 @@ impl Session {
         let elders_len = elders.len();
 
         while let Some(msg_resp) = send_query_tasks.join_next().await {
-            let (peer_address, response) = match msg_resp {
+            let (node_address, response) = match msg_resp {
                 Ok(MsgResponse::QueryResponse(src, resp)) => (src, resp),
                 Ok(MsgResponse::CmdResponse(src, resp)) => {
                     debug!("Unexpected cmd response received from {src:?} for {msg_id:?} when awaiting a QueryResponse: {resp:?}");
@@ -443,7 +443,7 @@ impl Session {
                 | QueryResponse::GetChunk(Err(_)) => {
                     debug!(
                         "QueryResponse error #{discarded_responses} for {msg_id:?} received \
-                        from {peer_address:?} (but may be overridden by a non-error response \
+                        from {node_address:?} (but may be overridden by a non-error response \
                         from another elder): {:#?}",
                         &response
                     );
@@ -451,7 +451,7 @@ impl Session {
                     discarded_responses += 1;
                 }
                 QueryResponse::GetRegister(Ok(ref register)) => {
-                    debug!("okay got register from {peer_address:?}");
+                    debug!("okay got register from {node_address:?}");
                     // TODO: properly merge all registers
                     if let Some(QueryResponse::GetRegister(Ok(prior_response))) = &valid_response {
                         if register.size() > prior_response.size() {
@@ -464,13 +464,13 @@ impl Session {
                     }
                 }
                 QueryResponse::ReadRegister(Ok(_)) => {
-                    debug!("okay _read_ register from {peer_address:?}");
+                    debug!("okay _read_ register from {node_address:?}");
                     if valid_response.is_none() {
                         valid_response = Some(*response);
                     }
                 }
                 QueryResponse::SpentProofShares(Ok(ref spentproof_set)) => {
-                    debug!("okay _read_ spentproofs from {peer_address:?}");
+                    debug!("okay _read_ spentproofs from {node_address:?}");
                     // TODO: properly merge all registers
                     if let Some(QueryResponse::SpentProofShares(Ok(prior_response))) =
                         &valid_response
@@ -509,7 +509,7 @@ impl Session {
         } else {
             Err(Error::NoResponse {
                 msg_id,
-                peers: elders,
+                nodes: elders,
             })
         }
     }
@@ -519,7 +519,7 @@ impl Session {
     pub(crate) async fn get_query_elders(
         &self,
         dst: XorName,
-    ) -> Result<(bls::PublicKey, Vec<Peer>)> {
+    ) -> Result<(bls::PublicKey, Vec<NodeId>)> {
         let sap = self.network.read().await.closest(&dst, None).cloned();
         let (section_pk, mut elders) = if let Some(sap) = &sap {
             (sap.section_key(), sap.elders_vec())
@@ -546,7 +546,7 @@ impl Session {
         Ok((section_pk, elders))
     }
 
-    async fn get_cmd_elders(&self, dst_address: XorName) -> Result<(bls::PublicKey, Vec<Peer>)> {
+    async fn get_cmd_elders(&self, dst_address: XorName) -> Result<(bls::PublicKey, Vec<NodeId>)> {
         let a_close_sap = self
             .network
             .read()
@@ -586,7 +586,7 @@ impl Session {
     #[instrument(skip_all, level = "trace")]
     pub(super) async fn send_msg(
         &self,
-        nodes: Vec<Peer>,
+        nodes: Vec<NodeId>,
         wire_msg: WireMsg,
     ) -> Result<JoinSet<MsgResponse>> {
         let msg_id = wire_msg.msg_id();
@@ -595,43 +595,43 @@ impl Session {
 
         let mut tasks = JoinSet::new();
 
-        for (peer_index, peer) in nodes.into_iter().enumerate() {
+        for (node_index, node_id) in nodes.into_iter().enumerate() {
             let session = self.clone();
             let bytes = bytes.clone();
 
             let _abort_handle = tasks.spawn(async move {
                 let mut connect_now = false;
-                debug!("Trying to send msg {msg_id:?} to {peer:?}");
+                debug!("Trying to send msg {msg_id:?} to {node_id:?}");
                 loop {
                     let link = session
-                        .peer_links
-                        .get_or_create_link(&peer, connect_now, Some(msg_id))
+                        .node_links
+                        .get_or_create_link(&node_id, connect_now, Some(msg_id))
                         .await;
                     match link.send_bi(bytes.clone(), msg_id).await {
                         Ok(recv_stream) => {
                             debug!(
-                                "That's {msg_id:?} sent to {peer:?}... starting receive listener"
+                                "That's {msg_id:?} sent to {node_id:?}... starting receive listener"
                             );
                             // let's listen for responses on the bi-stream
                             break session
-                                .recv_stream_listener(msg_id, peer, peer_index, recv_stream)
+                                .recv_stream_listener(msg_id, node_id, node_index, recv_stream)
                                 .await;
                         }
                         Err(error) if !connect_now => {
-                            // Let's retry (only once) to reconnect to this peer and send the msg.
+                            // Let's retry (only once) to reconnect to this node and send the msg.
                             error!(
-                                "Failed to send {msg_id:?} to {peer:?} on a new \
+                                "Failed to send {msg_id:?} to {node_id:?} on a new \
                                 bi-stream: {error:?}. Creating a new connection to retry once ..."
                             );
-                            session.peer_links.remove_link_from_peer_links(&peer).await;
+                            session.node_links.remove(&node_id).await;
                             connect_now = true;
                             continue;
                         }
                         Err(error) => {
-                            error!("Error sending {msg_id:?} bidi to {peer:?}: {error:?}");
-                            session.peer_links.remove_link_from_peer_links(&peer).await;
+                            error!("Error sending {msg_id:?} bidi to {node_id:?}: {error:?}");
+                            session.node_links.remove(&node_id).await;
                             break MsgResponse::Failure(
-                                peer.addr(),
+                                node_id.addr(),
                                 Error::FailedToInitateBiDiStream { msg_id, error },
                             );
                         }

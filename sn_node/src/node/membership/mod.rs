@@ -468,10 +468,11 @@ impl Membership {
 mod tests {
     use super::Error;
     use crate::node::flow_ctrl::tests::network_builder::TestNetworkBuilder;
+    use sn_interface::{network_knowledge::NodeState, test_utils::gen_node_id};
+
     use assert_matches::assert_matches;
     use eyre::Result;
     use rand::thread_rng;
-    use sn_interface::{network_knowledge::NodeState, test_utils::gen_peer};
     use xor_name::Prefix;
 
     #[tokio::test]
@@ -487,8 +488,8 @@ mod tests {
             .membership
             .expect("Membership for the elder should've been initialized");
 
-        let state1 = NodeState::joined(gen_peer(5), None);
-        let state2 = NodeState::joined(gen_peer(5), None);
+        let state1 = NodeState::joined(gen_node_id(5), None);
+        let state2 = NodeState::joined(gen_node_id(5), None);
 
         let _ = membership.propose(state1, &prefix)?;
         assert_matches!(

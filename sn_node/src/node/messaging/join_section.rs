@@ -37,7 +37,7 @@ mod tests {
             cmd_utils::{get_next_msg, TestMsgTracker, TestNode},
             network_builder::{TestNetwork, TestNetworkBuilder},
         },
-        messaging::Peers,
+        messaging::Recipients,
         MIN_ADULT_AGE,
     };
 
@@ -45,13 +45,11 @@ mod tests {
     use sn_interface::{
         elder_count, init_logger,
         messaging::{
-            MsgId,
-            {
-                system::{JoinRejectReason, JoinResponse},
-                NetworkMsg,
-            },
+            system::{JoinRejectReason, JoinResponse},
+            MsgId, NetworkMsg,
         },
         network_knowledge::{MembershipState, NetworkKnowledge},
+        types::Participant,
     };
 
     use assert_matches::assert_matches;
@@ -140,15 +138,15 @@ mod tests {
 
         let mut nodes = env.get_nodes(prefix, 1, 0, None)?;
         let mut elder = nodes.pop().expect("One elder should exist.");
-        let elder_peer = elder.info().peer();
+        let elder_node_id = elder.info().id();
 
         let elder_context = elder.context();
 
-        let joiner_peer = joining_node.info().peer();
+        let joiner_node_id = joining_node.info().id();
         let some_cmd = MyNode::handle_join(
             &mut elder,
             &elder_context,
-            joiner_peer,
+            joiner_node_id,
             MsgId::new(),
             None,
             None,
@@ -168,20 +166,20 @@ mod tests {
                 let vote = votes.first().expect("A vote should exist.");
                 let proposals = vote.proposals();
                 let node_state = proposals.first().expect("A proposal should exist.");
-                let peer = node_state.peer();
+                let node_id = node_state.node_id();
                 let state = node_state.state();
                 let previous_name = node_state.previous_name();
                 let age = node_state.age();
-                assert_eq!(peer, &joiner_peer);
+                assert_eq!(node_id, &joiner_node_id);
                 assert_matches!(state, MembershipState::Joined);
                 assert_matches!(previous_name, None);
                 assert_eq!(age, MIN_ADULT_AGE);
             });
             // verify the recipients
-            assert_matches!(recipients, Peers::Multiple(recipients) => {
+            assert_matches!(recipients, Recipients::Multiple(recipients) => {
                 let recipient = recipients.first().expect("A recipient should exist.");
                 // the only elder sent a msg to itself
-                assert_eq!(recipient, &elder_peer);
+                assert_eq!(recipient, &elder_node_id);
             });
         });
 
@@ -212,11 +210,11 @@ mod tests {
 
         let adult_context = adult.context();
 
-        let joiner_peer = joining_node.info().peer();
+        let joiner_node_id = joining_node.info().id();
         let cmd = MyNode::handle_join(
             &mut adult,
             &adult_context,
-            joiner_peer,
+            joiner_node_id,
             MsgId::new(),
             None,
             None,
@@ -254,11 +252,11 @@ mod tests {
 
         let elder_context = elder.context();
 
-        let joiner_peer = joining_node.info().peer();
+        let joiner_node_id = joining_node.info().id();
         let cmd = MyNode::handle_join(
             &mut elder,
             &elder_context,
-            joiner_peer,
+            joiner_node_id,
             MsgId::new(),
             None,
             None,
@@ -294,11 +292,11 @@ mod tests {
 
         let elder_context = elder.context();
 
-        let joiner_peer = joining_node.info().peer();
+        let joiner_node_id = joining_node.info().id();
         let cmd = MyNode::handle_join(
             &mut elder,
             &elder_context,
-            joiner_peer,
+            joiner_node_id,
             MsgId::new(),
             None,
             None,
@@ -337,11 +335,11 @@ mod tests {
 
         let elder_context = elder.context();
 
-        let joiner_peer = joining_node.info().peer();
+        let joiner_node_id = joining_node.info().id();
         let some_cmd = MyNode::handle_join(
             &mut elder,
             &elder_context,
-            joiner_peer,
+            joiner_node_id,
             MsgId::new(),
             None,
             None,
@@ -360,8 +358,8 @@ mod tests {
             // the msg should be a rejection for joins disallowed
             assert_matches!(msg, NodeMsg::JoinResponse(JoinResponse::Rejected(JoinRejectReason::JoinsDisallowed)));
             // the recipient should be the joining node
-            assert_matches!(recipients, Peers::Single(recipient) => {
-                assert_eq!(recipient, &joiner_peer);
+            assert_matches!(recipients, Recipients::Single(recipient) => {
+                assert_eq!(recipient, &Participant::from_node(joiner_node_id));
             });
         });
 
@@ -510,7 +508,7 @@ mod tests {
                 tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
 
                 while let Some(msg) = get_next_msg(comm_rx).await {
-                    let mut cmds = node.test_handle_msg_from_peer(msg, None).await?;
+                    let mut cmds = node.test_handle_msg(msg, None).await?;
                     while !cmds.is_empty() {
                         match node.process_cmd(cmds.remove(0)).await {
                             Ok(new_cmds) => cmds.extend(new_cmds),

@@ -14,12 +14,12 @@ pub(crate) mod network_builder;
 use crate::node::{
     core::MyNode,
     flow_ctrl::tests::network_builder::{TestNetwork, TestNetworkBuilder},
-    messaging::Peers,
+    messaging::Recipients,
     Cmd, Error,
 };
 use cmd_utils::{handle_online_cmd, ProcessAndInspectCmds};
 
-use sn_comms::{CommEvent, MsgFromPeer};
+use sn_comms::{CommEvent, MsgReceived};
 use sn_dbc::Hash;
 use sn_interface::{
     dbcs::gen_genesis_dbc,
@@ -38,7 +38,7 @@ use sn_interface::{
         MIN_ADULT_AGE,
     },
     test_utils::*,
-    types::{keys::ed25519, PublicKey},
+    types::{keys::ed25519, Participant, PublicKey},
 };
 
 use assert_matches::assert_matches;
@@ -74,7 +74,7 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
     );
 
     let relocation_dst = RelocationDst::new(xor_name::rand::random());
-    let relocated_state = NodeState::relocated(old_info.peer(), Some(old_name), relocation_dst);
+    let relocated_state = NodeState::relocated(old_info.id(), Some(old_name), relocation_dst);
     let section_signed_state = TestKeys::get_section_signed(&sk_set.secret_key(), relocated_state)?;
 
     let info = RelocationInfo::new(section_signed_state, new_info.name());
@@ -95,7 +95,7 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
     let mut elder_node = env.get_nodes(prefix, 1, 0, None)?.remove(0);
 
     ProcessAndInspectCmds::new(Cmd::HandleMsg {
-        origin: new_info.peer(),
+        sender: Participant::from_node(new_info.id()),
         wire_msg,
         send_stream: None,
     })
@@ -118,11 +118,11 @@ async fn handle_agreement_on_online() -> Result<()> {
         .build()?;
     let mut node = env.get_nodes(prefix, 1, 0, None)?.remove(0);
     let sk_set = env.get_secret_key_set(prefix, None)?;
-    let new_peer = gen_peer(MIN_ADULT_AGE);
-    let join_approval_sent = handle_online_cmd(&new_peer, &sk_set, &mut node).await?;
+    let new_node = gen_node_id(MIN_ADULT_AGE);
+    let join_approval_sent = handle_online_cmd(&new_node, &sk_set, &mut node).await?;
     assert!(join_approval_sent.0);
 
-    assert!(node.network_knowledge().is_adult(&new_peer.name()));
+    assert!(node.network_knowledge().is_adult(&new_node.name()));
 
     Ok(())
 }
@@ -149,13 +149,13 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
     let mut expected_new_elders = section
         .elders()
         .into_iter()
-        .filter(|peer| peer.age() == MIN_ADULT_AGE + 1)
+        .filter(|node_id| node_id.age() == MIN_ADULT_AGE + 1)
         .collect::<BTreeSet<_>>();
 
-    // Handle agreement on Online of a peer that is older than the youngest
-    // current elder - that means this peer is going to be promoted.
-    let new_peer = gen_peer(MIN_ADULT_AGE + 1);
-    let node_state = NodeState::joined(new_peer, None);
+    // Handle agreement on Online of a node that is older than the youngest
+    // current elder - that means this node is going to be promoted.
+    let new_node = gen_node_id(MIN_ADULT_AGE + 1);
+    let node_state = NodeState::joined(new_node, None);
 
     let membership_decision = section_decision(&sk_set, node_state.clone())?;
 
@@ -169,7 +169,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
 
     // Verify we sent a `DkgStart` message with the expected participants.
     let mut dkg_start_sent = false;
-    let _changed = expected_new_elders.insert(new_peer);
+    let _changed = expected_new_elders.insert(new_node);
 
     while let Some(cmd) = cmds.next(&mut node).await? {
         let (msg, recipients) = match cmd {
@@ -193,12 +193,12 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
 
         let expected_dkg_start_recipients: BTreeSet<_> = expected_new_elders
             .iter()
-            .filter(|peer| peer.name() != node_name)
+            .filter(|node_id| node_id.name() != node_name)
             .cloned()
             .collect();
 
-        assert_matches!(recipients, Peers::Multiple(peers) => {
-            assert_eq!(peers, &expected_dkg_start_recipients);
+        assert_matches!(recipients, Recipients::Multiple(nodes) => {
+            assert_eq!(nodes, &expected_dkg_start_recipients);
         });
 
         dkg_start_sent = true;
@@ -217,15 +217,15 @@ async fn handle_join_request_of_rejoined_node() -> Result<()> {
         .build()?;
     let mut node = env.get_nodes(prefix, 1, 0, None)?.remove(0);
 
-    // Make a left peer.
-    let peer = gen_peer_in_prefix(MIN_ADULT_AGE, prefix);
+    // Make a left node.
+    let node_id = gen_node_id_in_prefix(MIN_ADULT_AGE, prefix);
     node.membership
         .as_mut()
         .ok_or_else(|| eyre!("Membership for the node must be set"))?
-        .force_bootstrap(NodeState::left(peer, None));
+        .force_bootstrap(NodeState::left(node_id, None));
 
-    // Simulate the same peer rejoining
-    let node_state = NodeState::joined(peer, None);
+    // Simulate the same node rejoining
+    let node_state = NodeState::joined(node_id, None);
     let join_cmd = node.propose_membership_change(node_state);
 
     // A rejoining node will always be rejected
@@ -249,7 +249,7 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
     let sk_set = env.get_secret_key_set(prefix, None)?;
 
     // get the node state of the non_elder node
-    let node_state = env.get_nodes(prefix, 0, 1, None)?.remove(0).info().peer();
+    let node_state = env.get_nodes(prefix, 0, 1, None)?.remove(0).info().id();
     let node_state = NodeState::left(node_state, None);
 
     let proposal = node_state.clone();
@@ -276,12 +276,12 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
     let mut node = elders.remove(0);
     let sk_set = env.get_secret_key_set(prefix, None)?;
 
-    let remove_elder = elders.remove(0);
-    let remove_elder_peer = remove_elder.info().peer();
-    let remove_elder = NodeState::left(remove_elder_peer, None);
+    let elder = elders.remove(0);
+    let elder_id = elder.info().id();
+    let offline_elder = NodeState::left(elder_id, None);
 
     // Handle agreement on the Offline proposal
-    let proposal = remove_elder.clone();
+    let proposal = offline_elder.clone();
     let sig = TestKeys::get_section_sig_bytes(&sk_set.secret_key(), &get_single_sig(&proposal));
 
     ProcessAndInspectCmds::new(Cmd::HandleNodeOffAgreement { proposal, sig })
@@ -353,7 +353,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
         .insert(TestKeys::get_section_key_share(&sk_set1, 0));
 
     ProcessAndInspectCmds::new(Cmd::HandleMsg {
-        origin: sender.peer(),
+        sender: Participant::from_node(sender.id()),
         wire_msg,
         send_stream: None,
     })
@@ -410,7 +410,7 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
 
     assert!(matches!(
         ProcessAndInspectCmds::new(Cmd::HandleMsg {
-            origin: sender.peer(),
+            sender: Participant::from_node(sender.id()),
             wire_msg,
             send_stream: None,
         },)
@@ -447,14 +447,17 @@ async fn msg_to_self() -> Result<()> {
 
     // don't use the cmd collection fn, as it skips Cmd::SendMsg
     let cmds = MyNode::process_cmd(
-        Cmd::send_msg(node_msg.clone(), Peers::Single(info.peer())),
+        Cmd::send_msg(
+            node_msg.clone(),
+            Recipients::Single(Participant::from_node(info.id())),
+        ),
         &mut node,
     )
     .await?;
 
     assert!(cmds.is_empty());
 
-    let msg_type = assert_matches!(comm_rx.recv().await, Some(CommEvent::Msg(MsgFromPeer { sender, wire_msg, .. })) => {
+    let msg_type = assert_matches!(comm_rx.recv().await, Some(CommEvent::Msg(MsgReceived { sender, wire_msg, .. })) => {
         assert_eq!(sender.addr(), info.addr);
         assert_matches!(wire_msg.into_msg(), Ok(msg_type) => msg_type)
     });
@@ -478,7 +481,7 @@ async fn handle_elders_update() -> Result<()> {
     // to-be-elder with age 7
     let (elders0, ..) = TestNetwork::gen_node_infos(&prefix, elder_count(), 1, Some(&[6]));
     let mut elders1 = elders0.clone();
-    let promoted_peer = {
+    let promoted_node = {
         let (promoted_node, promoted_comm, _) = TestNetwork::gen_info(MIN_ADULT_AGE + 2, None);
         (promoted_node, promoted_comm)
     };
@@ -486,10 +489,10 @@ async fn handle_elders_update() -> Result<()> {
     let members = elders1
         .clone()
         .into_iter()
-        .chain(vec![promoted_peer.clone()]);
+        .chain(vec![promoted_node.clone()]);
 
-    let demoted_peer = elders1.remove(elders1.len() - 1);
-    elders1.push(promoted_peer.clone());
+    let demoted_node = elders1.remove(elders1.len() - 1);
+    elders1.push(promoted_node.clone());
 
     let env = TestNetworkBuilder::new(StdRng::seed_from_u64(123))
         .sap_with_members(prefix, elders0, members.clone())
@@ -509,7 +512,7 @@ async fn handle_elders_update() -> Result<()> {
         .insert(TestKeys::get_section_key_share(&sk_set1, 0));
 
     // Create `HandleNewEldersAgreement` cmd. This will demote one of the
-    // current elders and promote the oldest peer.
+    // current elders and promote the oldest node.
     let elders_1: BTreeSet<_> = sap1.elders_set();
     let bytes = bincode::serialize(&sap1.sig.public_key).expect("Failed to serialize");
     let sig = TestKeys::get_section_sig_bytes(&sk_set0.secret_key(), &bytes);
@@ -524,7 +527,7 @@ async fn handle_elders_update() -> Result<()> {
         let (msg, recipients) = match cmd {
             Cmd::SendMsg {
                 msg,
-                recipients: Peers::Multiple(recipients),
+                recipients: Recipients::Multiple(recipients),
                 ..
             } => (msg, recipients),
             _ => continue,
@@ -552,11 +555,11 @@ async fn handle_elders_update() -> Result<()> {
     }
 
     let update_expected_recipients: HashSet<_> = env
-        .get_peers(prefix, elder_count(), 1, Some(0))?
+        .get_node_ids(prefix, elder_count(), 1, Some(0))?
         .into_iter()
-        .filter(|peer| *peer != info.peer())
-        .chain(iter::once(promoted_peer.0.peer()))
-        .chain(iter::once(demoted_peer.0.peer()))
+        .filter(|node_id| *node_id != info.id())
+        .chain(iter::once(promoted_node.0.id()))
+        .chain(iter::once(demoted_node.0.id()))
         .collect();
 
     assert_eq!(update_actual_recipients, update_expected_recipients);
@@ -574,46 +577,46 @@ async fn handle_demote_during_split() -> Result<()> {
     let prefix0 = prefix("0");
     let prefix1 = prefix("1");
 
-    // `peers_a` + `info` are pre-split elders.
-    // `peers_a` + `peer_c` are prefix-0 post-split elders.
-    let (mut peers_a, ..) =
+    // `nodes_a` + `info` are pre-split elders.
+    // `nodes_a` + `node_c` are prefix-0 post-split elders.
+    let (mut nodes_a, ..) =
         TestNetwork::gen_node_infos(&prefix0, elder_count(), 0, Some(&[MIN_ADULT_AGE]));
 
-    let info = peers_a
+    let info = nodes_a
         .pop()
         .unwrap_or_else(|| panic!("No nodes generated!"));
     let node_name = info.0.name();
 
-    // `peers_b` are prefix-1 post-split elders.
-    let (peers_b, ..) =
+    // `nodes_b` are prefix-1 post-split elders.
+    let (nodes_b, ..) =
         TestNetwork::gen_node_infos(&prefix1, elder_count(), 0, Some(&[MIN_ADULT_AGE]));
-    // `peer_c` is a prefix-0 post-split elder.
-    let peer_c = {
-        let (peer_c, comm, _) = TestNetwork::gen_info(MIN_ADULT_AGE, Some(prefix0));
-        (peer_c, comm)
+    // `node_c` is a prefix-0 post-split elder.
+    let node_c = {
+        let (node_c, comm, _) = TestNetwork::gen_info(MIN_ADULT_AGE, Some(prefix0));
+        (node_c, comm)
     };
     // all members
-    let members = peers_a
+    let members = nodes_a
         .iter()
-        .chain(peers_b.iter())
+        .chain(nodes_b.iter())
         .cloned()
-        .chain([info.clone(), peer_c.clone()]);
+        .chain([info.clone(), node_c.clone()]);
 
     let env = TestNetworkBuilder::new(thread_rng())
         // pre-split section
         .sap_with_members(
             Prefix::default(),
-            peers_a.iter().cloned().chain(iter::once(info.clone())),
+            nodes_a.iter().cloned().chain(iter::once(info.clone())),
             members.clone(),
         )
         // post-split prefix-0
         .sap_with_members(
             prefix0,
-            peers_a.iter().cloned().chain(iter::once(peer_c.clone())),
+            nodes_a.iter().cloned().chain(iter::once(node_c.clone())),
             members.clone(),
         )
         // post-split prefix-1
-        .sap_with_members(prefix1, peers_b.clone(), members)
+        .sap_with_members(prefix1, nodes_b.clone(), members)
         .build()?;
 
     let sk_set_gen = env.get_secret_key_set(Prefix::default(), None)?;

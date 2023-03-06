@@ -18,7 +18,7 @@ use sn_interface::{
         MsgId, MsgKind, NetworkMsg, WireMsg,
     },
     network_knowledge::SectionTreeUpdate,
-    types::{log_markers::LogMarker, Peer},
+    types::{log_markers::LogMarker, NodeId},
 };
 
 use bytes::Bytes;
@@ -29,7 +29,7 @@ const MAX_AE_RETRIES_TO_ATTEMPT: u8 = 5;
 // If the msg was resent due to AE response, we internally pass the information
 // about where the msg was resent to, and the bi-stream to read the response on.
 struct MsgResent {
-    new_peer: Peer,
+    new_node_id: NodeId,
     new_recv_stream: RecvStream,
 }
 
@@ -38,8 +38,8 @@ impl Session {
     async fn receive_with_ae(
         &self,
         mut recv_stream: RecvStream,
-        mut peer: Peer,
-        peer_index: usize,
+        mut node_id: NodeId,
+        node_index: usize,
         msg_id: MsgId,
     ) -> Result<(MsgId, DataResponse), Error> {
         // Unless we receive AntiEntropy responses, which require re-sending the
@@ -47,8 +47,8 @@ impl Session {
         let mut attempt = 0;
         loop {
             let stream_id = recv_stream.id();
-            debug!("Waiting for response msg on {stream_id} from {peer:?} @ index: {peer_index} for {msg_id:?}, attempt #{attempt}");
-            let addr = peer.addr();
+            debug!("Waiting for response msg on {stream_id} from {node_id:?} @ index: {node_index} for {msg_id:?}, attempt #{attempt}");
+            let addr = node_id.addr();
             if attempt > MAX_AE_RETRIES_TO_ATTEMPT {
                 return Err(Error::AntiEntropyMaxRetries {
                     msg_id,
@@ -71,16 +71,22 @@ impl Session {
                 ) => {
                     debug!(
                         "AntiEntropy msg received for {msg_id:?} \
-                        from {peer:?}"
+                        from {node_id:?}"
                     );
 
                     let ae_resp_outcome = self
-                        .handle_ae_msg(section_tree_update, bounced_msg, peer, peer_index, msg_id)
+                        .handle_ae_msg(
+                            section_tree_update,
+                            bounced_msg,
+                            node_id,
+                            node_index,
+                            msg_id,
+                        )
                         .await;
 
                     match ae_resp_outcome {
                         Ok(MsgResent {
-                            new_peer,
+                            new_node_id,
                             new_recv_stream,
                         }) => {
                             recv_stream = new_recv_stream;
@@ -89,7 +95,7 @@ impl Session {
                                 LogMarker::ReceiveCompleted,
                                 addr,
                             );
-                            peer = new_peer;
+                            node_id = new_node_id;
                             attempt += 1;
                             continue;
                         }
@@ -98,12 +104,12 @@ impl Session {
                 }
                 (response_id, msg) => {
                     warn!(
-                        "Unexpected msg type received on {stream_id} from {peer:?} in response \
+                        "Unexpected msg type received on {stream_id} from {node_id:?} in response \
                         to {msg_id:?}: {msg:?} with {response_id:?}"
                     );
                     return Err(Error::UnexpectedNetworkMsg {
                         correlation_id: msg_id,
-                        peer,
+                        node_id,
                         msg,
                     });
                 }
@@ -116,18 +122,18 @@ impl Session {
     pub(crate) async fn recv_stream_listener(
         &self,
         msg_id: MsgId,
-        peer: Peer,
-        peer_index: usize,
+        node_id: NodeId,
+        node_index: usize,
         recv_stream: RecvStream,
     ) -> MsgResponse {
         let stream_id = recv_stream.id();
 
         // Unless we receive AntiEntropy responses, which require re-sending the
         // message, the first msg received is the response we expect and return
-        let addr = peer.addr();
+        let addr = node_id.addr();
         let result = {
             let (msg_id, resp_msg) = match self
-                .receive_with_ae(recv_stream, peer, peer_index, msg_id)
+                .receive_with_ae(recv_stream, node_id, node_index, msg_id)
                 .await
             {
                 Ok(resp_info) => resp_info,
@@ -141,7 +147,7 @@ impl Session {
                 } => {
                     trace!(
                         "QueryResponse with id {msg_id:?} regarding correlation_id \
-                        {correlation_id:?} from {peer:?} with response: {response:?}"
+                        {correlation_id:?} from {node_id:?} with response: {response:?}"
                     );
                     MsgResponse::QueryResponse(addr, Box::new(response))
                 }
@@ -151,7 +157,7 @@ impl Session {
                 } => {
                     trace!(
                         "CmdResponse with id {msg_id:?} regarding correlation_id \
-                        {correlation_id:?} from {peer:?} with response {response:?}"
+                        {correlation_id:?} from {node_id:?} with response {response:?}"
                     );
                     MsgResponse::CmdResponse(addr, Box::new(response))
                 }
@@ -168,7 +174,7 @@ impl Session {
         trace!(
             "{} of correlation {msg_id:?} to {}, on {}, with {result:?}",
             LogMarker::ReceiveCompleted,
-            peer.addr(),
+            node_id.addr(),
             stream_id
         );
 
@@ -181,25 +187,25 @@ impl Session {
         &self,
         section_tree_update: SectionTreeUpdate,
         bounced_msg: UsrMsgBytes,
-        src_peer: Peer,
-        src_peer_index: usize,
+        src_node: NodeId,
+        src_node_index: usize,
         correlation_id: MsgId,
     ) -> Result<MsgResent> {
         let target_sap = section_tree_update.signed_sap.value.clone();
         debug!(
-            "Received Anti-Entropy msg from {src_peer}@{src_peer_index}, with SAP: {target_sap:?}"
+            "Received Anti-Entropy msg from {src_node}@{src_node_index}, with SAP: {target_sap:?}"
         );
 
         // Try to update our network knowledge first
-        self.update_network_knowledge(section_tree_update, src_peer)
+        self.update_network_knowledge(section_tree_update, src_node)
             .await;
 
         let (msg_id, elders, query_index, payload, dst, auth) = self
-            .new_target_elders(src_peer, bounced_msg, correlation_id)
+            .new_target_elders(src_node, bounced_msg, correlation_id)
             .await?;
 
         // The actual order of Elders doesn't really matter. All that matters is we pass each AE response
-        // we get through the same hoops, to then be able to ping a new Elder on a 1-1 basis for the src_peer
+        // we get through the same hoops, to then be able to ping a new Elder on a 1-1 basis for the src_node
         // we initially targetted.
         let ordered_elders: Vec<_> = elders
             .into_iter()
@@ -208,7 +214,7 @@ impl Session {
 
         // We send this to only one elder for each AE message we get in. We _should_ have one per elder we sent to,
         // deterministically sent to closest elder based upon the initial sender index
-        let target_elder = ordered_elders.get(src_peer_index);
+        let target_elder = ordered_elders.get(src_node_index);
 
         // there should always be one
         if let Some(elder) = target_elder {
@@ -224,10 +230,10 @@ impl Session {
             );
             let bytes = wire_msg.serialize()?;
 
-            debug!("{msg_id:?} AE bounced msg going out again. Resending original message (sent to index {src_peer_index:?} peer: {src_peer:?}) to new section elder {elder:?}");
+            debug!("{msg_id:?} AE bounced msg going out again. Resending original message (sent to index {src_node_index:?} node: {src_node:?}) to new section elder {elder:?}");
 
             let link = self
-                .peer_links
+                .node_links
                 .get_or_create_link(elder, false, Some(correlation_id))
                 .await;
             let new_recv_stream = link
@@ -236,7 +242,7 @@ impl Session {
                 .map_err(|error| Error::FailedToInitateBiDiStream { msg_id, error })?;
 
             Ok(MsgResent {
-                new_peer: *elder,
+                new_node_id: *elder,
                 new_recv_stream,
             })
         } else {
@@ -249,7 +255,7 @@ impl Session {
     async fn update_network_knowledge(
         &self,
         section_tree_update: SectionTreeUpdate,
-        src_peer: Peer,
+        src_node: NodeId,
     ) {
         debug!("Attempting to update our network knowledge...");
         let sap = section_tree_update.signed_sap.value.clone();
@@ -270,7 +276,7 @@ impl Session {
             Err(err) => {
                 warn!(
                     "Anti-Entropy: failed to update remote section SAP and DAG \
-                    sent by: {src_peer:?}, section key: {:?}, w/ err: {err:?}",
+                    sent by: {src_node:?}, section key: {:?}, w/ err: {err:?}",
                     sap.section_key()
                 );
             }
@@ -283,13 +289,13 @@ impl Session {
     #[allow(clippy::type_complexity)]
     async fn new_target_elders(
         &self,
-        src_peer: Peer,
+        src_node: NodeId,
         bounced_msg: UsrMsgBytes,
         correlation_id: MsgId,
     ) -> Result<
         (
             MsgId,
-            Vec<Peer>,
+            Vec<NodeId>,
             Option<usize>,
             Bytes,
             Dst,
@@ -309,14 +315,14 @@ impl Session {
                 warn!("Unexpected bounced msg received in AE response: {msg:?}");
                 return Err(Error::UnexpectedNetworkMsg {
                     correlation_id,
-                    peer: src_peer,
+                    node_id: src_node,
                     msg,
                 });
             }
         };
 
         trace!(
-            "Bounced msg {msg_id:?} received in an AE response: {client_msg:?} from {src_peer:?}"
+            "Bounced msg {msg_id:?} received in an AE response: {client_msg:?} from {src_node:?}"
         );
 
         let knowlege = self.network.read().await;
@@ -327,7 +333,7 @@ impl Session {
             .closest(&bounced_msg_dst.name, None)
             .ok_or(Error::NoCloseSapFound(bounced_msg_dst.name))?;
 
-        trace!("{msg_id:?} from  {src_peer:?}. New SAP of for bounced msg: {best_sap:?}");
+        trace!("{msg_id:?} from  {src_node:?}. New SAP of for bounced msg: {best_sap:?}");
 
         let target_elders = best_sap.elders_vec();
         if target_elders.is_empty() {

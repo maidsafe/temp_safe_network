@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{
-    core::NodeContext, flow_ctrl::cmds::Cmd, messaging::Peers, Error, MyNode, Result,
+    core::NodeContext, flow_ctrl::cmds::Cmd, messaging::Recipients, Error, MyNode, Result,
 };
 
 use qp2p::SendStream;
@@ -17,7 +17,7 @@ use sn_interface::{
         MsgId,
     },
     network_knowledge::{NodeState, RelocationProof, MIN_ADULT_AGE},
-    types::{log_markers::LogMarker, Peer},
+    types::{log_markers::LogMarker, NodeId, Participant},
 };
 
 // Message handling
@@ -25,12 +25,12 @@ impl MyNode {
     pub(crate) fn handle_join(
         node: &mut MyNode,
         context: &NodeContext,
-        peer: Peer,
+        node_id: NodeId,
         correlation_id: MsgId,
         relocation: Option<RelocationProof>,
         send_stream: Option<SendStream>,
     ) -> Result<Vec<Cmd>> {
-        trace!("Handling join from {peer:?}");
+        trace!("Handling join from {node_id:?}");
 
         // Ignore a join request if we are not elder.
         if !context.is_elder {
@@ -43,8 +43,8 @@ impl MyNode {
             return Ok(vec![]);
         }
         let our_prefix = context.network_knowledge.prefix();
-        if !our_prefix.matches(&peer.name()) {
-            debug!("Unreachable path; {peer} name doesn't match our prefix. Should be covered by AE. Dropping the msg.");
+        if !our_prefix.matches(&node_id.name()) {
+            debug!("Unreachable path; {node_id} name doesn't match our prefix. Should be covered by AE. Dropping the msg.");
             return Ok(vec![]);
         }
 
@@ -56,7 +56,7 @@ impl MyNode {
                 .network_knowledge
                 .verify_section_key_is_known(src_key)
             {
-                warn!("Peer {} is trying to join with signature by unknown source section key {src_key:?}. Message is dropped.", peer.name());
+                warn!("Node {} is trying to join with signature by unknown source section key {src_key:?}. Message is dropped.", node_id.name());
                 return Ok(vec![]);
             }
 
@@ -64,36 +64,39 @@ impl MyNode {
             proof.verify()?;
 
             // Verify the age..
-            MyNode::verify_relocated_age(&peer, &proof)?;
+            MyNode::verify_relocated_age(&node_id, &proof)?;
 
             // NB: Relocated nodes that try to join, are accepted even if joins are disallowed.
             Some(proof.previous_name())
         } else {
             // New node ->
-            if !MyNode::is_infant_node(&peer) {
-                debug!("Unreachable path; {peer} age is invalid: {}. This should be a hard coded value in join logic. Dropping the msg.", peer.age());
+            if !MyNode::is_infant_node(&node_id) {
+                debug!("Unreachable path; {node_id} age is invalid: {}. This should be a hard coded value in join logic. Dropping the msg.", node_id.age());
                 return Ok(vec![]);
             }
 
             if !context.joins_allowed {
-                trace!("Rejecting join request from {peer} - joins currently not allowed.");
+                trace!("Rejecting join request from {node_id} - joins currently not allowed.");
                 let msg = NodeMsg::JoinResponse(JoinResponse::Rejected(
                     JoinRejectReason::JoinsDisallowed,
                 ));
                 trace!("{}", LogMarker::SendJoinRejected);
-                trace!("Sending {msg:?} to {peer}");
+                trace!("Sending {msg:?} to {node_id}");
 
                 // Send it over response stream if we have one
                 if let Some(stream) = send_stream {
                     return Ok(vec![Cmd::send_node_response(
                         msg,
                         correlation_id,
-                        peer,
+                        node_id,
                         stream,
                     )]);
                 }
 
-                return Ok(vec![Cmd::send_msg(msg, Peers::Single(peer))]);
+                return Ok(vec![Cmd::send_msg(
+                    msg,
+                    Recipients::Single(Participant::from_node(node_id)),
+                )]);
             }
 
             None
@@ -106,13 +109,13 @@ impl MyNode {
             cmds.push(Cmd::send_node_response(
                 NodeMsg::JoinResponse(JoinResponse::UnderConsideration),
                 correlation_id,
-                peer,
+                node_id,
                 send_stream,
             ));
         }
 
         // We propose membership
-        let node_state = NodeState::joined(peer, previous_name);
+        let node_state = NodeState::joined(node_id, previous_name);
 
         if let Some(cmd) = node.propose_membership_change(node_state) {
             cmds.push(cmd);
@@ -120,20 +123,20 @@ impl MyNode {
         Ok(cmds)
     }
 
-    pub(crate) fn is_infant_node(peer: &Peer) -> bool {
+    pub(crate) fn is_infant_node(node_id: &NodeId) -> bool {
         // Age should be MIN_ADULT_AGE for joining infant.
-        peer.age() == MIN_ADULT_AGE
+        node_id.age() == MIN_ADULT_AGE
     }
 
-    pub(crate) fn verify_relocated_age(peer: &Peer, proof: &RelocationProof) -> Result<()> {
-        let name = peer.name();
-        let peer_age = peer.age();
+    pub(crate) fn verify_relocated_age(node_id: &NodeId, proof: &RelocationProof) -> Result<()> {
+        let name = node_id.name();
+        let new_age = node_id.age();
         let previous_age = proof.previous_age();
 
-        // We require peer current age to be one more than the previous age.
-        if peer_age != previous_age.saturating_add(1) {
+        // We require node new age to be one more than the previous age.
+        if new_age != previous_age.saturating_add(1) {
             info!(
-                "Invalid relocation from {name} - peer new age ({peer_age}) should be one more than peer's previous age ({previous_age}), or same if {}.", u8::MAX
+                "Invalid relocation from {name} - node new age ({new_age}) should be one more than node's previous age ({previous_age}), or same if {}.", u8::MAX
             );
             return Err(Error::InvalidRelocationDetails);
         }

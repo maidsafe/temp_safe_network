@@ -5,11 +5,11 @@
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
-use super::{CommEvent, MsgFromPeer};
+use super::{CommEvent, MsgReceived};
 
 use sn_interface::{
     messaging::{MsgKind, WireMsg},
-    types::{log_markers::LogMarker, Peer},
+    types::{log_markers::LogMarker, Participant},
 };
 
 use qp2p::{Connection, ConnectionIncoming, IncomingConnections};
@@ -74,13 +74,13 @@ pub(crate) async fn listen_for_msgs(
                     | MsgKind::DataResponse(name) => *name,
                 };
 
-                let peer = Peer::new(src_name, remote_address);
+                let src = Participant::new(src_name, remote_address);
                 let msg_id = wire_msg.msg_id();
                 debug!(
-                        "Msg {msg_id:?} received, over conn_id={conn_id}, from: {peer:?}{stream_info} was: {wire_msg:?}"
+                        "Msg {msg_id:?} received, over conn_id={conn_id}, from: {src:?}{stream_info} was: {wire_msg:?}"
                     );
 
-                msg_received(wire_msg, peer, send_stream, comm_events.clone()).await;
+                msg_received(wire_msg, src, send_stream, comm_events.clone()).await;
             }
             Err(error) => {
                 warn!("Error on connection {conn_id} with {remote_address}: {error:?}");
@@ -93,13 +93,13 @@ pub(crate) async fn listen_for_msgs(
 
 pub(crate) async fn msg_received(
     wire_msg: WireMsg,
-    peer: Peer,
+    sender: Participant,
     send_stream: Option<qp2p::SendStream>,
     comm_events: Sender<CommEvent>,
 ) {
     let msg_id = wire_msg.msg_id();
-    let msg_event = CommEvent::Msg(MsgFromPeer {
-        sender: peer,
+    let msg_event = CommEvent::Msg(MsgReceived {
+        sender,
         wire_msg,
         send_stream,
     });

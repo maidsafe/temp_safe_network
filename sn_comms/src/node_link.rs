@@ -10,7 +10,7 @@ use super::Result;
 
 use sn_interface::{
     messaging::MsgId,
-    types::{log_markers::LogMarker, Peer},
+    types::{log_markers::LogMarker, NodeId},
 };
 
 use qp2p::{Connection, Endpoint, UsrMsgBytes};
@@ -24,56 +24,56 @@ use tokio::time::{sleep, Duration};
 type ConnId = String;
 
 /// These retries are how may _new_ connection attempts do we make.
-/// If we fail all of these, HandlePeerFailedSend will be triggered
-/// for section nodes, which in turn kicks off fault tracking
+/// If we fail all of these, an error is raised, which in turn
+/// kicks off fault tracking for section nodes.
 const MAX_SENDJOB_RETRIES: usize = 3;
 
 const CONN_RETRY_WAIT: Duration = Duration::from_millis(100);
 
-/// A session to a peer in our network.
+/// A link to a node in our network.
 ///
-/// Using the session will open a connection if there is none there.
-/// The session is a way to keep connections to a peer in one place
+/// Using the link will open a connection if there is none there.
+/// The link is a way to keep connections to a node in one place
 /// and use them efficiently; converge to a single one regardless of concurrent
-/// comms initiation between the peers, and so on.
-/// The session shall be kept around as long as the peer is deemed worth to keep contact with.
+/// comms initiation between the nodes, and so on.
+/// The link shall be kept around as long as the node is deemed worth to keep contact with.
 #[derive(Clone)]
-pub(crate) struct PeerSession {
-    peer: Peer,
+pub(crate) struct NodeLink {
+    node_id: NodeId,
     endpoint: Endpoint,
-    connections: PeerConnections,
+    connections: NodeConnections,
 }
 
-type PeerConnections = Arc<DashMap<ConnId, Arc<Connection>>>;
+type NodeConnections = Arc<DashMap<ConnId, Arc<Connection>>>;
 
-impl PeerSession {
-    pub(crate) fn new(peer: Peer, endpoint: Endpoint) -> Self {
+impl NodeLink {
+    pub(crate) fn new(node_id: NodeId, endpoint: Endpoint) -> Self {
         Self {
-            peer,
+            node_id,
             endpoint,
-            connections: PeerConnections::default(),
+            connections: NodeConnections::default(),
         }
     }
 
-    pub(crate) fn peer(&self) -> Peer {
-        self.peer
+    pub(crate) fn node_id(&self) -> NodeId {
+        self.node_id
     }
 
     /// Sends out a UsrMsg on a bidi connection and awaits response bytes.
     /// As such this may be long running if response is returned slowly.
-    /// When sending a msg to a peer, if it fails with an existing
+    /// When sending a msg to a node, if it fails with an existing
     /// cached connection, it will keep retrying till it either:
     /// a. finds another cached connection which it succeeded with,
     /// b. or it cleaned them all up from the cache creating a new connection
-    ///    to the peer as last attempt.
+    ///    to the node as last attempt.
     pub(crate) async fn send_with_bi_return_response(
         &self,
         bytes: UsrMsgBytes,
         msg_id: MsgId,
-    ) -> Result<UsrMsgBytes, PeerSessionError> {
-        let peer = self.peer;
+    ) -> Result<UsrMsgBytes, NodeLinkError> {
+        let node_id = self.node_id;
         trace!(
-            "Sending {msg_id:?} via a bi-stream to {peer:?}, we have {} cached connections.",
+            "Sending {msg_id:?} via a bi-stream to {node_id:?}, we have {} cached connections.",
             self.connections.len()
         );
         let mut attempt = 0;
@@ -91,9 +91,9 @@ impl PeerSession {
                 );
                 (conn, false)
             } else {
-                trace!("Sending {msg_id:?} via bi-di-stream over new connection to {peer:?}, attempt #{attempt}.");
+                trace!("Sending {msg_id:?} via bi-di-stream over new connection to {node_id:?}, attempt #{attempt}.");
                 let conn =
-                    create_connection(peer, &self.endpoint, self.connections.clone(), msg_id)
+                    create_connection(node_id, &self.endpoint, self.connections.clone(), msg_id)
                         .await?;
                 (conn, true)
             };
@@ -101,7 +101,7 @@ impl PeerSession {
             attempt += 1;
 
             let conn_id = conn.id();
-            trace!("Connection {conn_id} got to {peer:?} for {msg_id:?}");
+            trace!("Connection {conn_id} got to {node_id:?} for {msg_id:?}");
             let (mut send_stream, recv_stream) = match conn.open_bi().await {
                 Ok(bi_stream) => bi_stream,
                 Err(err) => {
@@ -111,7 +111,7 @@ impl PeerSession {
                     match is_last_attempt {
                         true => {
                             error!("Last attempt reached for {msg_id:?}, erroring out...");
-                            break Err(PeerSessionError::Connection(err));
+                            break Err(NodeLinkError::Connection(err));
                         }
                         false => {
                             // tiny wait for comms/dashmap to cope with removal
@@ -123,14 +123,14 @@ impl PeerSession {
             };
 
             let stream_id = send_stream.id();
-            trace!("bidi {stream_id} opened for {msg_id:?} to {peer:?}");
+            trace!("bidi {stream_id} opened for {msg_id:?} to {node_id:?}");
             send_stream.set_priority(10);
             if let Err(err) = send_stream.send_user_msg(bytes.clone()).await {
                 error!("Error sending bytes for {msg_id:?} over {stream_id}: {err:?}");
                 // remove that broken conn
                 let _conn = self.connections.remove(&conn_id);
                 match is_last_attempt {
-                    true => break Err(PeerSessionError::Send(err)),
+                    true => break Err(NodeLinkError::Send(err)),
                     false => {
                         // tiny wait for comms/dashmap to cope with removal
                         sleep(CONN_RETRY_WAIT).await;
@@ -139,7 +139,7 @@ impl PeerSession {
                 }
             }
 
-            trace!("{msg_id:?} sent on {stream_id} to {peer:?}");
+            trace!("{msg_id:?} sent on {stream_id} to {node_id:?}");
 
             // unblock + move finish off thread as it's not strictly related to the sending of the msg.
             let stream_id_clone = stream_id.clone();
@@ -147,16 +147,16 @@ impl PeerSession {
                 // Attempt to gracefully terminate the stream.
                 // If this errors it does _not_ mean our message has not been sent
                 let result = send_stream.finish().await;
-                trace!("{msg_id:?} finished {stream_id_clone} to {peer:?}: {result:?}");
+                trace!("{msg_id:?} finished {stream_id_clone} to {node_id:?}: {result:?}");
             });
 
             match recv_stream.read().await {
                 Ok(response) => break Ok(response),
                 Err(err) => {
-                    error!("Error receiving response to {msg_id:?} from {peer:?} over {stream_id}: {err:?}");
+                    error!("Error receiving response to {msg_id:?} from {node_id:?} over {stream_id}: {err:?}");
                     let _conn = self.connections.remove(&conn_id);
                     if is_last_attempt {
-                        break Err(PeerSessionError::Recv(err));
+                        break Err(NodeLinkError::Recv(err));
                     }
 
                     // tiny wait for comms/dashmap to cope with removal
@@ -171,17 +171,16 @@ impl PeerSession {
         &mut self,
         msg_id: MsgId,
         bytes: UsrMsgBytes,
-    ) -> Result<(), PeerSessionError> {
+    ) -> Result<(), NodeLinkError> {
         let mut connection_retries = 0;
 
-        trace!("Send job sent to PeerSessionWorker: {msg_id:?}");
-        let peer = self.peer;
+        let node_id = self.node_id;
 
         loop {
-            trace!("Sending to peer over connection: {msg_id:?}");
+            trace!("Sending to {node_id} over connection: {msg_id:?}");
 
             if connection_retries > MAX_SENDJOB_RETRIES {
-                let error_to_report = PeerSessionError::MaxRetriesReached(MAX_SENDJOB_RETRIES);
+                let error_to_report = NodeLinkError::MaxRetriesReached(MAX_SENDJOB_RETRIES);
                 debug!("{error_to_report}: {msg_id:?}");
                 return Err(error_to_report);
             }
@@ -197,7 +196,7 @@ impl PeerSession {
             let conn = match self.get_or_connect(msg_id).await {
                 Ok(conn) => conn,
                 Err(error) => {
-                    error!("Error when attempting to send {msg_id:?} to peer. Job will be reenqueued for another attempt after a small timeout: {error:?}");
+                    error!("Error when attempting to send {msg_id:?} to node. Job will be reenqueued for another attempt after a small timeout: {error:?}");
 
                     // only increment connection attempts if our connections set is empty
                     // and so we'll be trying to create a fresh connection
@@ -224,18 +223,18 @@ impl PeerSession {
                 Err(err) => {
                     if err.is_local_close() {
                         let conns_count = self.connections.len();
-                        error!("Peer connection dropped when trying to send {msg_id:?} (we still have {conns_count:?} connections): {err:?}");
+                        error!("Node connection dropped when trying to send {msg_id:?} (we still have {conns_count:?} connections): {err:?}");
                         // we can retry if we've more connections!
                         if conns_count <= 1 {
                             debug!(
-                                "No connections left on this session to {peer:?}, terminating session.",
+                                "No connections left on this session to {node_id:?}, terminating session.",
                             );
                             connection_retries += 1;
                         }
                     }
 
                     warn!(
-                        "Transient error while attempting to send, re-trying job {msg_id:?} {err:?}. Connection id was {:?}",conn_id
+                        "Transient error while attempting to send, re-trying job {msg_id:?} {err:?}. Connection id was {conn_id:?}"
                     );
 
                     // we await here in case the connection is fresh and has not yet been added
@@ -246,9 +245,9 @@ impl PeerSession {
     }
 
     // Gets an existing connection or creates a new one
-    async fn get_or_connect(&mut self, msg_id: MsgId) -> Result<Arc<Connection>, PeerSessionError> {
-        let peer = self.peer;
-        trace!("{msg_id:?} Grabbing a connection from peer session to {peer:?}");
+    async fn get_or_connect(&mut self, msg_id: MsgId) -> Result<Arc<Connection>, NodeLinkError> {
+        let node_id = self.node_id;
+        trace!("{msg_id:?} Grabbing a connection to {node_id:?} from cached set.");
 
         let conn = self
             .connections
@@ -256,21 +255,21 @@ impl PeerSession {
             .next()
             .map(|entry| entry.value().clone());
         if let Some(conn) = conn {
-            trace!("{msg_id:?} Connection found to {peer:?}");
+            trace!("{msg_id:?} Connection found to {node_id:?}");
             Ok(conn)
         } else {
-            trace!("{msg_id:?} No connection found to {peer:?}, creating a new one.");
-            create_connection(peer, &self.endpoint, self.connections.clone(), msg_id).await
+            trace!("{msg_id:?} No connection found to {node_id:?}, creating a new one.");
+            create_connection(node_id, &self.endpoint, self.connections.clone(), msg_id).await
         }
     }
 
-    /// Send a message to the peer using the given connection.
+    /// Send a message to the node using the given connection.
     #[instrument(skip_all)]
     async fn send_with_connection(
         conn: Arc<Connection>,
         bytes: UsrMsgBytes,
-        connections: PeerConnections,
-    ) -> Result<(), PeerSessionError> {
+        connections: NodeConnections,
+    ) -> Result<(), NodeLinkError> {
         let conn_id = conn.id();
         let conns_count = connections.len();
         trace!("We have {conns_count} open connections to node {conn_id}.");
@@ -286,23 +285,23 @@ impl PeerSession {
 
             debug!("Connection removed from session: {conn_id}");
             // dont close just let the conn timeout incase msgs are coming in...
-            // it's removed from out Peer tracking, so won't be used again for sending.
-            PeerSessionError::Send(error)
+            // it's removed from our node tracking, so won't be used again for sending.
+            NodeLinkError::Send(error)
         })
     }
 }
 
 async fn create_connection(
-    peer: Peer,
+    node_id: NodeId,
     endpoint: &Endpoint,
-    connections: PeerConnections,
+    connections: NodeConnections,
     msg_id: MsgId,
-) -> Result<Arc<Connection>, PeerSessionError> {
-    debug!("{msg_id:?} create conn attempt to {peer:?}");
+) -> Result<Arc<Connection>, NodeLinkError> {
+    debug!("{msg_id:?} create conn attempt to {node_id:?}");
     let (conn, _) = endpoint
-        .connect_to(&peer.addr())
+        .connect_to(&node_id.addr())
         .await
-        .map_err(PeerSessionError::Connection)?;
+        .map_err(NodeLinkError::Connection)?;
 
     trace!(
         "{msg_id:?}: {} to {} (id: {})",
@@ -312,34 +311,34 @@ async fn create_connection(
     );
 
     let conn_id = conn.id();
-    debug!("Inserting connection into peer session: {conn_id}");
+    debug!("Inserting connection into node link: {conn_id}");
 
     let conn = Arc::new(conn);
     let _ = connections.insert(conn_id.clone(), conn.clone());
-    debug!("Connection INSERTED into peer session: {conn_id}");
+    debug!("Connection INSERTED into node link: {conn_id}");
 
     Ok(conn)
 }
 
 /// Errors that can be returned from `Comm::send_to_one`.
 #[derive(Debug, Error)]
-pub(super) enum PeerSessionError {
+pub(super) enum NodeLinkError {
     #[error("Failed to connect: {0:?}")]
     Connection(qp2p::ConnectionError),
     #[error("Failed to send a message: {0:?}")]
     Send(qp2p::SendError),
     #[error("Failed to receive a message: {0:?}")]
     Recv(qp2p::RecvError),
-    #[error("Max number of attempts ({0}) to send msg to the peer has been reached")]
+    #[error("Max number of attempts ({0}) to send msg to the node has been reached")]
     MaxRetriesReached(usize),
 }
 
-impl PeerSessionError {
+impl NodeLinkError {
     fn is_local_close(&self) -> bool {
         matches!(
             self,
-            PeerSessionError::Connection(qp2p::ConnectionError::Closed(qp2p::Close::Local))
-                | PeerSessionError::Send(qp2p::SendError::ConnectionLost(
+            NodeLinkError::Connection(qp2p::ConnectionError::Closed(qp2p::Close::Local))
+                | NodeLinkError::Send(qp2p::SendError::ConnectionLost(
                     qp2p::ConnectionError::Closed(qp2p::Close::Local)
                 ))
         )

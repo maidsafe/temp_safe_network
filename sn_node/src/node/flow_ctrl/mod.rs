@@ -24,15 +24,15 @@ use crate::node::{
         cmds::Cmd,
         fault_detection::{FaultChannels, FaultsCmd},
     },
-    messaging::Peers,
+    messaging::Recipients,
     Error, MyNode, STANDARD_CHANNEL_SIZE,
 };
 
-use sn_comms::{CommEvent, MsgFromPeer};
+use sn_comms::{CommEvent, MsgReceived};
 use sn_fault_detection::FaultDetection;
 use sn_interface::{
     messaging::system::{JoinRejectReason, NodeDataCmd, NodeMsg},
-    types::{log_markers::LogMarker, DataAddress, Peer},
+    types::{log_markers::LogMarker, DataAddress, NodeId, Participant},
 };
 
 use std::{
@@ -85,7 +85,7 @@ impl FlowCtrl {
         mut cmd_ctrl: CmdCtrl,
         join_retry_timeout: Duration,
         incoming_msg_events: Receiver<CommEvent>,
-        data_replication_receiver: Receiver<(Vec<DataAddress>, Peer)>,
+        data_replication_receiver: Receiver<(Vec<DataAddress>, NodeId)>,
         fault_cmds_channels: (Sender<FaultsCmd>, Receiver<FaultsCmd>),
     ) -> (Sender<(Cmd, Vec<usize>)>, Receiver<RejoinReason>) {
         let node_context = node.context();
@@ -96,13 +96,13 @@ impl FlowCtrl {
             .network_knowledge
             .adults()
             .iter()
-            .map(|peer| peer.name())
+            .map(|node_id| node_id.name())
             .collect::<BTreeSet<XorName>>();
         let elders = node_context
             .network_knowledge
             .elders()
             .iter()
-            .map(|peer| peer.name())
+            .map(|node_id| node_id.name())
             .collect::<BTreeSet<XorName>>();
         let fault_channels = {
             let tracker = FaultDetection::new(all_members, elders);
@@ -257,23 +257,21 @@ impl FlowCtrl {
     /// Listens on data_replication_receiver on a new thread, sorts and batches data, generating SendMsg Cmds
     async fn send_out_data_for_replication(
         node_data_storage: DataStorage,
-        mut data_replication_receiver: Receiver<(Vec<DataAddress>, Peer)>,
+        mut data_replication_receiver: Receiver<(Vec<DataAddress>, NodeId)>,
         cmd_channel: Sender<(Cmd, Vec<usize>)>,
     ) {
         // start a new thread to kick off data replication
         let _handle = tokio::task::spawn(async move {
-            // is there a simple way to dedupe common data going to many peers?
+            // is there a simple way to dedupe common data going to many nodes?
             // is any overhead reduction worth the increased complexity?
-            while let Some((data_addresses, peer)) = data_replication_receiver.recv().await {
+            while let Some((data_addresses, node_id)) = data_replication_receiver.recv().await {
                 let send_cmd_channel = cmd_channel.clone();
                 let data_storage = node_data_storage.clone();
                 // move replication off thread so we don't block the receiver
                 let _handle = tokio::task::spawn(async move {
                     debug!(
-                        "{:?} Data {:?} to: {:?}",
+                        "{:?} Data {data_addresses:?} to: {node_id:?}",
                         LogMarker::SendingMissingReplicatedData,
-                        data_addresses,
-                        peer,
                     );
 
                     let mut data_bundle = vec![];
@@ -288,12 +286,13 @@ impl FlowCtrl {
                             }
                         };
                     }
-                    trace!("Sending out data batch to {peer:?}");
+                    trace!("Sending out data batch to {node_id:?}");
                     let msg = NodeMsg::NodeDataCmd(NodeDataCmd::ReplicateDataBatch(data_bundle));
 
-                    let cmd = Cmd::send_msg(msg, Peers::Single(peer));
+                    let cmd =
+                        Cmd::send_msg(msg, Recipients::Single(Participant::from_node(node_id)));
                     if let Err(error) = send_cmd_channel.send((cmd, vec![])).await {
-                        error!("Failed to enqueue send msg command for replication of data batch to {peer:?}: {error:?}");
+                        error!("Failed to enqueue send msg command for replication of data batch to {node_id:?}: {error:?}");
                     }
                 });
             }
@@ -322,8 +321,11 @@ impl FlowCtrl {
                 );
 
                 let cmd = match event {
-                    CommEvent::Error { peer, error } => Cmd::HandleCommsError { peer, error },
-                    CommEvent::Msg(MsgFromPeer {
+                    CommEvent::Error { node_id, error } => Cmd::HandleCommsError {
+                        participant: Participant::from_node(node_id),
+                        error,
+                    },
+                    CommEvent::Msg(MsgReceived {
                         sender,
                         wire_msg,
                         send_stream,
@@ -346,7 +348,7 @@ impl FlowCtrl {
                         }
 
                         Cmd::HandleMsg {
-                            origin: sender,
+                            sender,
                             wire_msg,
                             send_stream,
                         }

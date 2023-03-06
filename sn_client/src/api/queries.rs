@@ -17,7 +17,7 @@ use sn_interface::{
         data::{ClientMsg, DataQuery, QueryResponse},
         ClientAuth, WireMsg,
     },
-    types::{Peer, PublicKey, Signature},
+    types::{NodeId, PublicKey, Signature},
 };
 
 use backoff::{backoff::Backoff, ExponentialBackoff};
@@ -156,7 +156,7 @@ impl Client {
         client_pk: PublicKey,
         serialised_query: Bytes,
         signature: Signature,
-        dst_section_info: Option<(bls::PublicKey, Vec<Peer>)>,
+        dst_section_info: Option<(bls::PublicKey, Vec<NodeId>)>,
     ) -> Result<QueryResponse> {
         let auth = ClientAuth {
             public_key: client_pk,

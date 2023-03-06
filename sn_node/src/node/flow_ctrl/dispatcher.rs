@@ -6,11 +6,12 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{messaging::Peers, Cmd, Error, MyNode, Result};
+use crate::node::{messaging::Recipients, Cmd, Error, MyNode, Result};
 
 use sn_interface::{
     messaging::{AntiEntropyMsg, NetworkMsg},
     network_knowledge::SectionTreeUpdate,
+    types::{NodeId, Participant},
 };
 
 use std::time::Instant;
@@ -37,7 +38,7 @@ impl MyNode {
                         section_tree_update,
                         kind,
                     }),
-                    Peers::Single(caller),
+                    Recipients::Single(Participant::from_node(caller)), // we're doing a mapping again here.. but this is a necessary evil while transitioning to more clarity and type safety, i.e. TO BE FIXED
                 )])
             }
             Cmd::UpdateCallerOnStream {
@@ -64,8 +65,9 @@ impl MyNode {
             Cmd::SendMsg {
                 msg,
                 msg_id,
-                recipients,
+                recipients, // NB: SendMsg only calls out via comms, so it should be possible to make this a set of node ids!
             } => {
+                let recipients = recipients.into_iter().map(NodeId::from).collect();
                 MyNode::send_msg(msg, msg_id, recipients, context)?;
                 Ok(vec![])
             }
@@ -82,14 +84,14 @@ impl MyNode {
                 wire_msg,
                 targets,
                 client_stream,
-                source_client,
+                client_id,
             } => {
                 MyNode::send_and_forward_response_to_client(
                     wire_msg,
                     context,
                     targets,
                     client_stream,
-                    source_client,
+                    client_id,
                 )?;
                 Ok(vec![])
             }
@@ -97,13 +99,13 @@ impl MyNode {
                 msg,
                 msg_id,
                 correlation_id,
-                recipient,
+                node_id,
                 send_stream,
             } => Ok(MyNode::send_node_msg_response(
                 msg,
                 msg_id,
                 correlation_id,
-                recipient,
+                node_id,
                 context,
                 send_stream,
             )
@@ -115,14 +117,14 @@ impl MyNode {
                 msg_id,
                 correlation_id,
                 send_stream,
-                source_client,
+                client_id,
             } => Ok(MyNode::send_data_response(
                 msg,
                 msg_id,
                 correlation_id,
                 send_stream,
                 context,
-                source_client,
+                client_id,
             )
             .await?
             .into_iter()
@@ -134,46 +136,46 @@ impl MyNode {
             Cmd::ProcessNodeMsg {
                 msg_id,
                 msg,
-                origin,
+                node_id,
                 send_stream,
-            } => MyNode::handle_node_msg(node, context, msg_id, msg, origin, send_stream).await,
+            } => MyNode::handle_node_msg(node, context, msg_id, msg, node_id, send_stream).await,
             Cmd::ProcessClientMsg {
                 msg_id,
                 msg,
                 auth,
-                origin,
+                sender,
                 send_stream,
             } => {
                 trace!("Client msg {msg_id:?} reached its destination.");
 
-                // TODO: clarify this err w/ peer
                 let Some(stream) = send_stream else {
-                        error!("No stream for client tho....");
+                        error!("No stream for client {sender} tho....");
+                        // TODO: clarify this err w/ client id
                         return Err(Error::NoClientResponseStream);
                     };
-                MyNode::handle_client_msg_for_us(context, msg_id, msg, auth, origin, stream).await
+                MyNode::handle_client_msg_for_us(context, msg_id, msg, auth, sender, stream).await
             }
             Cmd::ProcessAeMsg {
                 msg_id,
                 kind,
                 section_tree_update,
-                origin,
+                sender,
             } => {
-                trace!("Handling msg: AE from {origin}: {msg_id:?}");
-                MyNode::handle_anti_entropy_msg(node, context, section_tree_update, kind, origin)
+                trace!("Handling msg: AE from {sender}: {msg_id:?}");
+                MyNode::handle_anti_entropy_msg(node, context, section_tree_update, kind, sender)
                     .await
             }
             Cmd::HandleMsg {
-                origin,
+                sender,
                 wire_msg,
                 send_stream,
-            } => MyNode::handle_msg(node, origin, wire_msg, send_stream).await,
+            } => MyNode::handle_msg(node, sender, wire_msg, send_stream).await,
             Cmd::UpdateNetworkAndHandleValidClientMsg {
                 proof_chain,
                 signed_sap,
                 msg_id,
                 msg,
-                origin,
+                client_id,
                 auth,
                 send_stream,
             } => {
@@ -190,7 +192,7 @@ impl MyNode {
 
                 let context = if updated { node.context() } else { context };
 
-                MyNode::handle_client_msg_for_us(context, msg_id, msg, auth, origin, send_stream)
+                MyNode::handle_client_msg_for_us(context, msg_id, msg, auth, client_id, send_stream)
                     .await
             }
             Cmd::HandleNodeOffAgreement { proposal, sig } => {
@@ -211,9 +213,9 @@ impl MyNode {
                 node.handle_new_sections_agreement(sap1, sig1, sap2, sig2)
                     .await
             }
-            Cmd::HandleCommsError { peer, error } => {
+            Cmd::HandleCommsError { participant, error } => {
                 trace!("Comms error {error}");
-                node.handle_comms_error(peer, error);
+                node.handle_comms_error(participant, error);
                 Ok(vec![])
             }
             Cmd::HandleDkgOutcome {

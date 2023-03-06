@@ -6,8 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{messaging::Peers, Cmd, MyNode};
-use sn_comms::{CommEvent, MsgFromPeer};
+use crate::node::{messaging::Recipients, Cmd, MyNode};
+use sn_comms::{CommEvent, MsgReceived};
 use sn_interface::{
     messaging::{
         data::ClientMsg,
@@ -16,7 +16,7 @@ use sn_interface::{
         AuthorityProof, ClientAuth, Dst, MsgId, MsgKind, NetworkMsg,
     },
     network_knowledge::{test_utils::*, NodeState},
-    types::{Keypair, Peer},
+    types::{Keypair, NodeId},
 };
 
 use assert_matches::assert_matches;
@@ -37,11 +37,11 @@ use xor_name::XorName;
 pub(crate) struct JoinApprovalSent(pub(crate) bool);
 
 pub(crate) async fn handle_online_cmd(
-    peer: &Peer,
+    node_id: &NodeId,
     sk_set: &bls::SecretKeySet,
     node: &mut MyNode,
 ) -> Result<JoinApprovalSent> {
-    let node_state = NodeState::joined(*peer, None);
+    let node_state = NodeState::joined(*node_id, None);
     let membership_decision = section_decision(sk_set, node_state)?;
 
     let mut all_cmds =
@@ -61,8 +61,8 @@ pub(crate) async fn handle_online_cmd(
 
         match msg {
             NodeMsg::JoinResponse(JoinResponse::Approved { .. }) => {
-                assert_matches!(recipients, Peers::Multiple(peers) => {
-                    assert_eq!(peers, &BTreeSet::from([*peer]));
+                assert_matches!(recipients, Recipients::Multiple(nodes) => {
+                    assert_eq!(nodes, &BTreeSet::from([*node_id]));
                 });
                 approval_sent.0 = true;
             }
@@ -118,8 +118,8 @@ impl ProcessAndInspectCmds {
             .client()
             .expect("failed to create new client endpoint");
 
-        let peer = context.info.peer();
-        let node_addr = peer.addr();
+        let node_id = context.info.id();
+        let node_addr = node_id.addr();
         let (client_conn, _) = client_endpoint
             .connect_to(&node_addr)
             .await
@@ -130,7 +130,7 @@ impl ProcessAndInspectCmds {
             .expect("failed to open bi-stream from new client endpoint");
 
         let dst = Dst {
-            name: peer.name(),
+            name: node_id.name(),
             section_key: context.network_knowledge.section_key(),
         };
         let wire_msg = WireMsg::new_msg(msg_id, serialised_payload, msg_kind, dst);
@@ -145,11 +145,17 @@ impl ProcessAndInspectCmds {
         });
 
         match comm_rx.recv().await {
-            Some(CommEvent::Msg(MsgFromPeer {
+            Some(CommEvent::Msg(MsgReceived {
                 send_stream: Some(send_stream),
                 ..
             })) => {
-                let cmds = MyNode::handle_msg(node, peer, wire_msg, Some(send_stream)).await?;
+                let cmds = MyNode::handle_msg(
+                    node,
+                    sn_interface::types::Participant::from_node(node_id),
+                    wire_msg,
+                    Some(send_stream),
+                )
+                .await?;
                 Ok(Self::from(cmds))
             }
             _ => Err(crate::node::error::Error::NoClientResponseStream),
@@ -239,11 +245,11 @@ impl TestNode {
             .wrap_err(format!("Failed to process {cmd_string}"))
     }
 
-    /// Handle and keep track of Msg from Peers
-    /// Contains optional relocation_old_name to deal with name change during relocation
-    pub(crate) async fn test_handle_msg_from_peer(
+    /// Handle and keep track of msgs from clients and nodes.
+    /// Contains optional relocation_old_name to deal with name change during relocation.
+    pub(crate) async fn test_handle_msg(
         &mut self,
-        msg: MsgFromPeer,
+        msg: MsgReceived,
         relocation_old_name: Option<XorName>,
     ) -> Result<Vec<Cmd>> {
         let msg_id = msg.wire_msg.msg_id();
@@ -264,7 +270,7 @@ impl TestNode {
         }
 
         let handle_node_msg_cmd = Cmd::HandleMsg {
-            origin: msg.sender,
+            sender: msg.sender,
             wire_msg: msg.wire_msg,
             send_stream: msg.send_stream,
         };
@@ -300,7 +306,7 @@ impl TestMsgTracker {
             msg_id, recipients, ..
         } = cmd
         {
-            let recp = recipients.get().into_iter().map(|p| p.name()).collect();
+            let recp = recipients.clone().into_iter().map(|p| p.name()).collect();
             info!("Tracking {msg_id:?} for {recp:?}, cmd {cmd}");
             let _ = self.tracker.insert(*msg_id, recp);
         } else if let Cmd::SendMsgEnqueueAnyResponse {
@@ -311,13 +317,13 @@ impl TestMsgTracker {
             info!("Tracking {msg_id:?} for {recp:?}, cmd {cmd}");
             let _ = self.tracker.insert(*msg_id, recp);
         } else if let Cmd::SendNodeMsgResponse {
-            msg_id, recipient, ..
+            msg_id, node_id, ..
         } = cmd
         {
-            info!("Tracking {msg_id:?} for {recipient:?}, cmd {cmd}");
+            info!("Tracking {msg_id:?} for {node_id:?}, cmd {cmd}");
             let _ = self
                 .tracker
-                .insert(*msg_id, BTreeSet::from([recipient.name()]));
+                .insert(*msg_id, BTreeSet::from([node_id.name()]));
         } else if let Cmd::UpdateCallerOnStream { caller, msg_id, .. } = cmd {
             info!("Tracking {msg_id:?} for {caller:?}, cmd {cmd}");
             let _ = self
@@ -326,14 +332,14 @@ impl TestMsgTracker {
         }
     }
 
-    // Untrack the msg when we receive a MsgFromPeer
+    // Untrack the msg when we receive a MsgReceived
     pub(crate) fn untrack(&mut self, msg_id: MsgId, our_name: &XorName) -> bool {
         info!("Untracking {msg_id:?} for {our_name:?}");
         let removed;
         if let Entry::Occupied(mut entry) = self.tracker.entry(msg_id) {
-            let peers = entry.get_mut();
-            removed = peers.remove(our_name);
-            if peers.is_empty() {
+            let nodes = entry.get_mut();
+            removed = nodes.remove(our_name);
+            if nodes.is_empty() {
                 let _ = entry.remove();
             }
         } else {
@@ -360,20 +366,20 @@ impl Cmd {
         } = self
         {
             let new_recipients = match recipients {
-                Peers::Single(peer) => {
-                    if filter_list.contains(&peer.name()) {
-                        Peers::Multiple(BTreeSet::new())
+                Recipients::Single(dst) => {
+                    if filter_list.contains(&dst.name()) {
+                        Recipients::Multiple(BTreeSet::new())
                     } else {
-                        Peers::Single(*peer)
+                        Recipients::Single(*dst)
                     }
                 }
-                Peers::Multiple(peers) => {
-                    let peers = peers
+                Recipients::Multiple(nodes) => {
+                    let nodes = nodes
                         .iter()
-                        .filter(|peer| !filter_list.contains(&peer.name()))
+                        .filter(|node| !filter_list.contains(&node.name()))
                         .cloned()
                         .collect();
-                    Peers::Multiple(peers)
+                    Recipients::Multiple(nodes)
                 }
             };
             *recipients = new_recipients;
@@ -384,8 +390,8 @@ impl Cmd {
     }
 }
 
-// Receive the next `MsgFromPeer` if the buffer is not empty. Returns None if the buffer is currently empty
-pub(crate) async fn get_next_msg(comm_rx: &mut Receiver<CommEvent>) -> Option<MsgFromPeer> {
+// Receive the next `MsgReceived` if the buffer is not empty. Returns None if the buffer is currently empty
+pub(crate) async fn get_next_msg(comm_rx: &mut Receiver<CommEvent>) -> Option<MsgReceived> {
     tokio::time::sleep(std::time::Duration::from_millis(10)).await;
     match comm_rx.try_recv() {
         Ok(CommEvent::Msg(msg)) => Some(msg),

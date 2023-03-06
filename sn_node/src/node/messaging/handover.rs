@@ -11,15 +11,17 @@ use crate::node::{
     flow_ctrl::cmds::Cmd,
     handover::{Error as HandoverError, Handover},
     membership::{elder_candidates, try_split_dkg},
-    messaging::Peers,
-    Error, MyNode, NodeMsg, Peer, Result,
+    messaging::Recipients,
+    Error, MyNode, NodeMsg, Result,
 };
+
 use sn_consensus::{Generation, SignedVote, VoteResponse};
 use sn_interface::{
     messaging::{system::SectionSigned, MsgId, SectionSigShare},
     network_knowledge::{NodeState, SapCandidate, SectionAuthUtils, SectionAuthorityProvider},
-    types::{log_markers::LogMarker, SectionSig},
+    types::{log_markers::LogMarker, NodeId, Participant, SectionSig},
 };
+
 use std::collections::{BTreeMap, BTreeSet};
 use tracing::warn;
 use xor_name::{Prefix, XorName};
@@ -31,7 +33,7 @@ impl MyNode {
         msg_id: MsgId,
         sap: SectionAuthorityProvider,
         sig_share: SectionSigShare,
-        sender: Peer,
+        sender: NodeId,
     ) -> Result<Vec<Cmd>> {
         trace!("Handling post DKG handover request {msg_id:?} from {sender:?}: {sap:?}");
 
@@ -196,8 +198,8 @@ impl MyNode {
         candidate: SapCandidate,
     ) -> Result<Vec<Cmd>> {
         let recipients = candidate.elders();
-        let (others, myself) = self.split_peers_and_self(recipients);
-        let peers = Peers::Multiple(others);
+        let (others, myself) = self.split_node_and_self(recipients);
+        let nodes = Recipients::Multiple(others);
 
         // sends a promotion message to all of the to-be-Elders with our sig_share over the new sap's public_key
         // it is aggregated by them to obtain a section signed section pub key (proof of inheritance)
@@ -210,7 +212,7 @@ impl MyNode {
                     sap: sap.clone(),
                     sig_share: sig_share.clone(),
                 };
-                cmds.push(Cmd::send_msg(msg, peers));
+                cmds.push(Cmd::send_msg(msg, nodes));
 
                 // handle our own if we are elder
                 if let Some(elder) = myself {
@@ -231,7 +233,7 @@ impl MyNode {
                     sap1: sap1.clone(),
                     sig_share1: sig_share1.clone(),
                 };
-                cmds.push(Cmd::send_msg(msg, peers));
+                cmds.push(Cmd::send_msg(msg, nodes));
 
                 // handle our own if we are elder
                 if let Some(elder) = myself {
@@ -258,7 +260,7 @@ impl MyNode {
         context: &NodeContext,
         handover_state: &mut Handover,
         signed_vote: SignedVote<SapCandidate>,
-        peer: Peer,
+        node_id: NodeId,
     ) -> Result<Vec<Cmd>> {
         match handover_state.handle_signed_vote(signed_vote.clone()) {
             Ok(VoteResponse::Broadcast(signed_vote)) => {
@@ -329,14 +331,14 @@ impl MyNode {
         // in regular handover the previous SAP's prefix is the same
         let previous_gen_sap = self.get_sap_for_prefix(sap.prefix())?;
         let members = self.get_members_at_gen(sap.membership_gen())?;
-        let received_candidates: BTreeSet<&Peer> = sap.elders().collect();
+        let received_candidates: BTreeSet<NodeId> = sap.elders().copied().collect();
 
-        let expected_peers: BTreeSet<Peer> =
+        let expected_candidates: BTreeSet<NodeId> =
             elder_candidates(members.values().cloned(), &previous_gen_sap)
                 .iter()
-                .map(|node| *node.peer())
+                .map(|node| node.node_id())
+                .copied()
                 .collect();
-        let expected_candidates: BTreeSet<&Peer> = expected_peers.iter().collect();
         if received_candidates != expected_candidates {
             trace!("InvalidElderCandidates: received SAP at gen {} with candidates {:#?}, expected candidates {:#?}", sap.membership_gen(), received_candidates, expected_candidates);
             return Err(Error::InvalidElderCandidates);
@@ -358,18 +360,24 @@ impl MyNode {
         let dummy_chain_len = 0;
         let dummy_gen = 0;
 
-        let received_candidates1: BTreeSet<&Peer> = sap1.elders().collect();
-        let received_candidates2: BTreeSet<&Peer> = sap2.elders().collect();
+        let received_candidates1: BTreeSet<&NodeId> = sap1.elders().collect();
+        let received_candidates2: BTreeSet<&NodeId> = sap2.elders().collect();
 
         if let Some((dkg1, dkg2)) =
             try_split_dkg(&members, &previous_gen_sap, dummy_chain_len, dummy_gen)
         {
-            let expected_peers1: BTreeSet<Peer> =
-                dkg1.elders.iter().map(|(n, a)| Peer::new(*n, *a)).collect();
-            let expected_peers2: BTreeSet<Peer> =
-                dkg2.elders.iter().map(|(n, a)| Peer::new(*n, *a)).collect();
-            let expected_candidates1: BTreeSet<&Peer> = expected_peers1.iter().collect();
-            let expected_candidates2: BTreeSet<&Peer> = expected_peers2.iter().collect();
+            let expected_nodes1: BTreeSet<NodeId> = dkg1
+                .elders
+                .iter()
+                .map(|(n, a)| NodeId::new(*n, *a))
+                .collect();
+            let expected_nodes2: BTreeSet<NodeId> = dkg2
+                .elders
+                .iter()
+                .map(|(n, a)| NodeId::new(*n, *a))
+                .collect();
+            let expected_candidates1: BTreeSet<&NodeId> = expected_nodes1.iter().collect();
+            let expected_candidates2: BTreeSet<&NodeId> = expected_nodes2.iter().collect();
 
             // the order of these SAPs is not absolute, so we try both comparisons
             if (received_candidates1 != expected_candidates1
@@ -445,7 +453,7 @@ impl MyNode {
 
     fn handle_handover_vote(
         &mut self,
-        peer: Peer,
+        node_id: NodeId,
         signed_vote: SignedVote<SapCandidate>,
     ) -> Result<Vec<Cmd>> {
         self.check_signed_vote_saps(&signed_vote)?;
@@ -454,7 +462,7 @@ impl MyNode {
             Some(handover_state) => {
                 let had_consensus_value = handover_state.consensus_value().is_some();
                 let mut state = handover_state.clone();
-                let mut cmds = MyNode::handle_vote(context, &mut state, signed_vote, peer)?;
+                let mut cmds = MyNode::handle_vote(context, &mut state, signed_vote, node_id)?;
 
                 // check for unsuccessful termination
                 state.handle_empty_set_decision();
@@ -488,7 +496,7 @@ impl MyNode {
 
     pub(crate) fn handle_handover_msg(
         &mut self,
-        peer: Peer,
+        node_id: NodeId,
         signed_votes: Vec<SignedVote<SapCandidate>>,
     ) -> Result<Vec<Cmd>> {
         trace!("{}", LogMarker::HandoverMsgBeingHandled);
@@ -496,7 +504,7 @@ impl MyNode {
         let mut cmds = vec![];
 
         for vote in signed_votes {
-            match self.handle_handover_vote(peer, vote) {
+            match self.handle_handover_vote(node_id, vote) {
                 Ok(vec) => {
                     cmds.extend(vec);
                 }
@@ -504,7 +512,10 @@ impl MyNode {
                     // We hit an error while processing this vote, perhaps we are missing information.
                     // We'll send a handover AE request to see if they can help us catch up.
                     debug!("{:?}", LogMarker::HandoverSendingAeUpdateRequest);
-                    cmds.push(Cmd::send_msg(NodeMsg::HandoverAE(gen), Peers::Single(peer)));
+                    cmds.push(Cmd::send_msg(
+                        NodeMsg::HandoverAE(gen),
+                        Recipients::Single(Participant::from_node(node_id)),
+                    ));
                     // return the vec w/ the AE cmd there so as not to loop and generate AE for
                     // any subsequent commands
                     return Ok(cmds);
@@ -518,19 +529,21 @@ impl MyNode {
         Ok(cmds)
     }
 
-    pub(crate) fn handle_handover_anti_entropy(&self, peer: Peer, gen: Generation) -> Option<Cmd> {
+    pub(crate) fn handle_handover_anti_entropy(
+        &self,
+        node_id: NodeId,
+        gen: Generation,
+    ) -> Option<Cmd> {
         trace!(
-            "{:?} handover anti-entropy request for gen {:?} from {}",
+            "{:?} handover anti-entropy request for gen {gen:?} from {node_id}",
             LogMarker::HandoverAeRequestReceived,
-            gen,
-            peer,
         );
 
         if let Some(handover) = self.handover_voting.as_ref() {
             match handover.anti_entropy(gen) {
                 Ok(catchup_votes) => Some(Cmd::send_msg(
                     NodeMsg::HandoverVotes(catchup_votes),
-                    Peers::Single(peer),
+                    Recipients::Single(Participant::from_node(node_id)),
                 )),
                 Err(e) => {
                     error!("Handover - Error while processing anti-entropy {:?}", e);

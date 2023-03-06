@@ -11,7 +11,7 @@ mod relocation;
 pub use relocation::{RelocationDst, RelocationInfo, RelocationProof, RelocationState};
 
 use crate::network_knowledge::{section_has_room_for_node, Error, Result};
-use crate::types::Peer;
+use crate::types::NodeId;
 
 use serde::{Deserialize, Serialize};
 use std::{
@@ -35,8 +35,8 @@ pub enum MembershipState {
 /// Information about a member of our section.
 #[derive(Clone, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct NodeState {
-    peer: Peer,
-    /// Current state of the peer
+    node_id: NodeId,
+    /// Current membership state of the node.
     state: MembershipState,
     /// To avoid sybil attack via relocation, a relocated node's original name will be recorded.
     previous_name: Option<XorName>,
@@ -61,9 +61,9 @@ impl Debug for NodeState {
 
 impl NodeState {
     // Creates a `NodeState` in the `Joined` state.
-    pub fn joined(peer: Peer, previous_name: Option<XorName>) -> Self {
+    pub fn joined(node_id: NodeId, previous_name: Option<XorName>) -> Self {
         Self {
-            peer,
+            node_id,
             state: MembershipState::Joined,
             previous_name,
         }
@@ -71,9 +71,9 @@ impl NodeState {
 
     // Creates a `NodeState` in the `Left` state.
     #[cfg(any(test, feature = "test-utils"))]
-    pub fn left(peer: Peer, previous_name: Option<XorName>) -> Self {
+    pub fn left(node_id: NodeId, previous_name: Option<XorName>) -> Self {
         Self {
-            peer,
+            node_id,
             state: MembershipState::Left,
             previous_name,
         }
@@ -82,12 +82,12 @@ impl NodeState {
     // Creates a `NodeState` in the `Relocated` state.
     #[cfg(any(test, feature = "test-utils"))]
     pub fn relocated(
-        peer: Peer,
+        node_id: NodeId,
         previous_name: Option<XorName>,
         relocation_dst: RelocationDst,
     ) -> Self {
         Self {
-            peer,
+            node_id,
             state: MembershipState::Relocated(relocation_dst),
             previous_name,
         }
@@ -121,7 +121,7 @@ impl NodeState {
                     Err(Error::TryJoinLater)
                 } else if let Some(existing_node) = current_joined_members
                     .values()
-                    .find(|n| n.peer().addr() == self.peer().addr())
+                    .find(|n| n.node_id().addr() == self.node_id().addr())
                 {
                     warn!("Rejecting join since we have an existing node with this address: {existing_node:?}");
                     Err(Error::ExistingMemberSocketAddrConflict)
@@ -146,16 +146,16 @@ impl NodeState {
         }
     }
 
-    pub fn peer(&self) -> &Peer {
-        &self.peer
+    pub fn node_id(&self) -> &NodeId {
+        &self.node_id
     }
 
     pub fn name(&self) -> XorName {
-        self.peer.name()
+        self.node_id.name()
     }
 
     pub fn addr(&self) -> SocketAddr {
-        self.peer.addr()
+        self.node_id.addr()
     }
 
     pub fn state(&self) -> MembershipState {
@@ -167,7 +167,7 @@ impl NodeState {
     }
 
     pub fn age(&self) -> u8 {
-        self.peer.age()
+        self.node_id.age()
     }
 
     // Returns true if the state is a Relocated node
