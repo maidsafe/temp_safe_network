@@ -8,8 +8,7 @@
 
 use super::NodeState;
 
-use crate::types::keys::ed25519::Digest256;
-use crate::types::NodeId;
+use crate::types::{keys::ed25519::Digest256, NodeId};
 
 use sn_consensus::Generation;
 

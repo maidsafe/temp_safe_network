@@ -828,7 +828,7 @@ impl MyNode {
                 sig_share: sig_share.clone(),
             };
             let current_elders: Vec<_> = self.network_knowledge.section_auth().elders_vec();
-            let (other_elders, myself) = self.split_node_and_self(current_elders);
+            let (other_elders, myself) = self.split_nodes_and_self(current_elders);
             let nodes = Recipients::Multiple(other_elders);
             cmds.push(Cmd::send_msg(msg, nodes));
 

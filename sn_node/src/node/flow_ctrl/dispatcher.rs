@@ -143,17 +143,18 @@ impl MyNode {
                 msg_id,
                 msg,
                 auth,
-                sender,
+                client_id,
                 send_stream,
             } => {
                 trace!("Client msg {msg_id:?} reached its destination.");
 
                 let Some(stream) = send_stream else {
-                        error!("No stream for client {sender} tho....");
+                        error!("No stream for client {client_id} tho....");
                         // TODO: clarify this err w/ client id
                         return Err(Error::NoClientResponseStream);
                     };
-                MyNode::handle_client_msg_for_us(context, msg_id, msg, auth, sender, stream).await
+                MyNode::handle_client_msg_for_us(context, msg_id, msg, auth, client_id, stream)
+                    .await
             }
             Cmd::ProcessAeMsg {
                 msg_id,

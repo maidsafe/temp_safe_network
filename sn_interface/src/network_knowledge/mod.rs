@@ -20,7 +20,6 @@ pub mod test_utils;
 #[cfg(any(test, feature = "test-utils"))]
 pub use section_tree::test_utils as test_utils_st;
 
-use self::node_state::ChurnId;
 pub use self::{
     errors::{Error, Result},
     node_info::MyNodeInfo,
@@ -31,6 +30,8 @@ pub use self::{
     sections_dag::SectionsDAG,
 };
 
+use self::{node_state::ChurnId, section_member_history::SectionMemberHistory};
+
 use crate::{
     messaging::{
         system::{SectionMembers, SectionSig, SectionSigned},
@@ -39,10 +40,10 @@ use crate::{
     types::NodeId,
 };
 
-use bls::PublicKey as BlsPublicKey;
-use section_member_history::SectionMemberHistory;
-use serde::Serialize;
 use sn_consensus::Decision;
+
+use bls::PublicKey as BlsPublicKey;
+use serde::Serialize;
 use std::{
     collections::{BTreeMap, BTreeSet},
     iter,

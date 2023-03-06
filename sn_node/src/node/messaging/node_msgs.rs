@@ -341,7 +341,7 @@ impl MyNode {
                     return Ok(vec![])
                 };
                 // NB!! `sender` is actually a node here and should not be casted to ClientId! But since we are reusing the
-                // `store_data_and_respond` fn which is used when a forwarded client cmd comes in, we have cast to ClientId here.. TO BE FIXED.
+                // `store_data_and_respond` fn which is used when a forwarded client cmd comes in, we have to cast to ClientId here.. TO BE FIXED.
                 let sender = ClientId::from(Participant::from_node(node_id));
                 // store data and respond w/ack on the response stream
                 MyNode::store_data_and_respond(&context, data, stream, sender, msg_id).await

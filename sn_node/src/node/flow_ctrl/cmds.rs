@@ -70,7 +70,7 @@ pub enum Cmd {
         msg_id: MsgId,
         msg: ClientMsg,
         auth: AuthorityProof<ClientAuth>,
-        sender: ClientId,
+        client_id: ClientId,
         send_stream: Option<SendStream>,
     },
     /// Process a deserialised AntiEntropy msg
