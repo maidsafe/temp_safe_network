@@ -10,11 +10,12 @@ use crate::node::flow_ctrl::cmds::Cmd;
 use crate::node::{MyNode, Result};
 
 use sn_interface::{
-    messaging::system::{SectionSig, SectionSigShare, SectionSigned},
-    messaging::MsgId,
+    messaging::{
+        system::{SectionSig, SectionSigShare, SectionSigned},
+        MsgId,
+    },
     network_knowledge::{SectionAuthorityProvider, SectionTreeUpdate},
-    types::log_markers::LogMarker,
-    types::Peer,
+    types::{log_markers::LogMarker, NodeId},
 };
 
 impl MyNode {
@@ -23,7 +24,7 @@ impl MyNode {
         msg_id: MsgId,
         sap: SectionSigned<SectionAuthorityProvider>,
         sig_share: SectionSigShare,
-        sender: Peer,
+        sender: NodeId,
     ) -> Result<Vec<Cmd>> {
         info!("Handling handover promotion message {msg_id:?} by {sender:?} with sap: {sap:?}");
         let our_prefix = self.network_knowledge.prefix();
@@ -78,7 +79,7 @@ impl MyNode {
         sig_share1: SectionSigShare,
         sap2: SectionSigned<SectionAuthorityProvider>,
         sig_share2: SectionSigShare,
-        sender: Peer,
+        sender: NodeId,
     ) -> Result<Vec<Cmd>> {
         trace!("Handling section split promotion message {msg_id:?} by {sender:?} with saps: {sap1:?} {sap2:?}");
         let our_prefix = self.network_knowledge.prefix();

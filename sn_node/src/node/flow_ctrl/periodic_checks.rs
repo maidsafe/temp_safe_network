@@ -253,7 +253,7 @@ impl FlowCtrl {
 
     //     let msg_id = MsgId::new();
     //     let our_info = node.info();
-    //     let origin = our_info.peer();
+    //     let origin = our_info.id();
 
     //     let auth = auth(&node, &msg)?;
 

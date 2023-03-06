@@ -8,7 +8,7 @@
 
 use crate::node::{
     flow_ctrl::cmds::Cmd,
-    messaging::Peers,
+    messaging::Recipients,
     relocation::{find_nodes_to_relocate, ChurnId},
     MyNode, Result,
 };
@@ -20,7 +20,7 @@ use sn_interface::{
         node_state::{RelocationDst, RelocationInfo},
         Error, MembershipState, NodeState, RelocationProof, RelocationState,
     },
-    types::{keys::ed25519, log_markers::LogMarker},
+    types::{keys::ed25519, log_markers::LogMarker, Participant},
 };
 
 use std::collections::BTreeSet;
@@ -28,12 +28,12 @@ use xor_name::XorName;
 
 // Relocation
 impl MyNode {
-    pub(crate) fn try_relocate_peers(
+    pub(crate) fn try_relocate_nodes(
         &mut self,
         churn_id: ChurnId,
         excluded: BTreeSet<XorName>,
     ) -> Result<Vec<Cmd>> {
-        info!("Try to find relocate peers, excluded {excluded:?}");
+        info!("Try to find relocate nodes, excluded {excluded:?}");
         // Do not carry out relocation when there is not enough elder nodes.
         if self.network_knowledge.section_auth().elder_count() < elder_count() {
             warn!(
@@ -51,12 +51,12 @@ impl MyNode {
         {
             info!(
                 "Begin relocation flow for {:?} to {relocation_dst:?} (on churn of {churn_id})",
-                node_state.peer(),
+                node_state.node_id(),
             );
 
             let cmd = Cmd::send_msg(
                 NodeMsg::PrepareToRelocate(RelocationDst::new(relocation_dst)),
-                Peers::Single(*node_state.peer()),
+                Recipients::Single(Participant::from_node(*node_state.node_id())),
             );
             cmds.push(cmd);
         }
@@ -124,7 +124,7 @@ impl MyNode {
             warn!("Relocate: Could not verify section signature of our relocation");
             return Err(super::Error::InvalidSignature);
         }
-        if self.name() != signed_relocation.peer().name() {
+        if self.name() != signed_relocation.node_id().name() {
             // not for us, drop it
             warn!("Relocate: The received section signed relocation is not for us.");
             return Ok(None);
@@ -200,7 +200,7 @@ mod tests {
             AntiEntropyKind, AntiEntropyMsg, NetworkMsg,
         },
         network_knowledge::{recommended_section_size, NodeState, RelocationDst, MIN_ADULT_AGE},
-        test_utils::{gen_peer, gen_peer_in_prefix, prefix, section_decision, TestKeys},
+        test_utils::{gen_node_id, gen_node_id_in_prefix, prefix, section_decision, TestKeys},
     };
 
     use assert_matches::assert_matches;
@@ -226,7 +226,7 @@ mod tests {
         age: u8,
     ) -> Result<Decision<NodeState>> {
         loop {
-            let node_state = NodeState::joined(gen_peer(MIN_ADULT_AGE), None);
+            let node_state = NodeState::joined(gen_node_id(MIN_ADULT_AGE), None);
             let decision = section_decision(sk_set, node_state.clone())?;
 
             let sig: bls::Signature = decision.proposals[&node_state].clone();
@@ -251,14 +251,14 @@ mod tests {
         let mut section = env.get_network_knowledge(prefix, None)?;
         let sk_set = env.get_secret_key_set(prefix, None)?;
 
-        let relocated_peer = gen_peer_in_prefix(MIN_ADULT_AGE - 1, prefix);
-        let node_state = NodeState::joined(relocated_peer, None);
+        let relocated_node = gen_node_id_in_prefix(MIN_ADULT_AGE - 1, prefix);
+        let node_state = NodeState::joined(relocated_node, None);
         let node_state = TestKeys::get_section_signed(&sk_set.secret_key(), node_state)?;
         assert!(section.update_member(node_state));
         // update our node with the new network_knowledge
         node.network_knowledge = section.clone();
 
-        let membership_decision = create_relocation_trigger(&sk_set, relocated_peer.age())?;
+        let membership_decision = create_relocation_trigger(&sk_set, relocated_node.age())?;
 
         let mut cmds =
             ProcessAndInspectCmds::new(Cmd::HandleMembershipDecision(membership_decision));
@@ -315,7 +315,7 @@ mod tests {
 
         // Initialize relocation manually without using ChurnIds
         let relocation_node_old_name = env
-            .get_peers(Prefix::default(), 0, 1, None)?
+            .get_node_ids(Prefix::default(), 0, 1, None)?
             .remove(0)
             .name();
         for node in node_instances.iter().filter_map(|((_, name), node)| {
@@ -427,7 +427,7 @@ mod tests {
 
         // Initialize relocation manually without using ChurnIds. Here, the adult from prefix0 is
         // to be relocated to prefix1
-        let relocation_node_old_name = env.get_peers(prefix0, 0, 1, None)?.remove(0).name();
+        let relocation_node_old_name = env.get_node_ids(prefix0, 0, 1, None)?.remove(0).name();
 
         // Only the elders in prefix0 should propose the SectionStateVote
         for test_node in node_instances
@@ -574,7 +574,7 @@ mod tests {
                 tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
 
                 while let Some(msg) = get_next_msg(comm_rx).await {
-                    for cmd in node.test_handle_msg_from_peer(msg, Some(name)).await? {
+                    for cmd in node.test_handle_msg(msg, Some(name)).await? {
                         info!("Got cmd {}", cmd);
                         if let Cmd::SendMsg { .. } = &cmd {
                             assert!(node.process_cmd(cmd).await?.is_empty());

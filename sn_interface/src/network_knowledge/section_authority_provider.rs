@@ -10,7 +10,7 @@ use super::NodeState;
 use crate::{
     messaging::system::{DkgSessionId, SectionSig, SectionSigned},
     network_knowledge::SectionsDAG,
-    types::Peer,
+    types::NodeId,
 };
 use bls::{PublicKey, PublicKeySet};
 use serde::{Deserialize, Serialize};
@@ -62,7 +62,7 @@ pub struct SectionAuthorityProvider {
     /// Public key set of the section.
     public_key_set: PublicKeySet,
     /// The section's complete set of elders.
-    elders: BTreeSet<Peer>,
+    elders: BTreeSet<NodeId>,
     /// The section members at the time of this elder churn.
     members: BTreeSet<NodeState>,
     /// The membership generation this SAP was instantiated on
@@ -81,7 +81,7 @@ pub enum SapCandidate {
 }
 
 impl SapCandidate {
-    pub fn elders(&self) -> Vec<Peer> {
+    pub fn elders(&self) -> Vec<NodeId> {
         match self {
             SapCandidate::ElderHandover(sap) => sap.elders_vec(),
             SapCandidate::SectionSplit(sap1, sap2) => {
@@ -94,25 +94,25 @@ impl SapCandidate {
 impl Debug for SectionAuthorityProvider {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         #[derive(Debug)]
-        enum PeerStatus {
+        enum NodeStatus {
             Elder,
             Member,
         }
-        let elders: BTreeSet<_> = self.elders.iter().map(|peer| peer.name()).collect();
+        let elders: BTreeSet<_> = self.elders.iter().map(|node_id| node_id.name()).collect();
         let mut elder_count = 0;
-        let mut peers: Vec<_> = self
+        let mut nodes: Vec<_> = self
             .members()
-            .map(|peer| {
-                let status = if elders.contains(&peer.name()) {
+            .map(|node| {
+                let status = if elders.contains(&node.name()) {
                     elder_count += 1;
-                    PeerStatus::Elder
+                    NodeStatus::Elder
                 } else {
-                    PeerStatus::Member
+                    NodeStatus::Member
                 };
-                (peer, status)
+                (node, status)
             })
             .collect();
-        peers.sort_by_key(|(_, is_elder)| !matches!(is_elder, PeerStatus::Elder));
+        nodes.sort_by_key(|(_, is_elder)| !matches!(is_elder, NodeStatus::Elder));
 
         let mut f = f.debug_struct(format!("SAP {:?}", self.prefix).as_str());
         let f = f
@@ -128,7 +128,7 @@ impl Debug for SectionAuthorityProvider {
             .field("members", &self.members().collect::<Vec<_>>())
             .finish()
         } else {
-            f.field("peers", &peers).finish()
+            f.field("nodes", &nodes).finish()
         }
     }
 }
@@ -149,7 +149,7 @@ impl SectionAuthorityProvider {
         membership_gen: Generation,
     ) -> Self
     where
-        E: IntoIterator<Item = Peer>,
+        E: IntoIterator<Item = NodeId>,
         M: IntoIterator<Item = NodeState>,
     {
         Self {
@@ -163,7 +163,7 @@ impl SectionAuthorityProvider {
 
     pub fn from_dkg_session(session_id: &DkgSessionId, pk_set: PublicKeySet) -> Self {
         Self::new(
-            session_id.elder_peers(),
+            session_id.elder_ids(),
             session_id.prefix,
             session_id.bootstrap_members.clone(),
             pk_set,
@@ -175,8 +175,8 @@ impl SectionAuthorityProvider {
         self.prefix
     }
 
-    // TODO: this should return &BTreeSet<Peer>, let the caller turn it into an iter
-    pub fn elders(&self) -> impl Iterator<Item = &Peer> + '_ {
+    // TODO: this should return &BTreeSet<NodeId>, let the caller turn it into an iter
+    pub fn elders(&self) -> impl Iterator<Item = &NodeId> + '_ {
         self.elders.iter()
     }
 
@@ -189,12 +189,12 @@ impl SectionAuthorityProvider {
     }
 
     /// A convenience function since we often use SAP elders as recipients.
-    pub fn elders_vec(&self) -> Vec<Peer> {
+    pub fn elders_vec(&self) -> Vec<NodeId> {
         self.elders.iter().cloned().collect()
     }
 
     /// A convenience function since we often use SAP elders as recipients.
-    pub fn elders_set(&self) -> BTreeSet<Peer> {
+    pub fn elders_set(&self) -> BTreeSet<NodeId> {
         self.elders.iter().cloned().collect()
     }
 
@@ -213,18 +213,18 @@ impl SectionAuthorityProvider {
         self.elders.iter().any(|elder| &elder.name() == name)
     }
 
-    /// Returns the elder `Peer` with the given `name`.
-    pub fn get_elder(&self, name: &XorName) -> Option<&Peer> {
+    /// Returns the elder `NodeId` with the given `name`.
+    pub fn get_elder(&self, name: &XorName) -> Option<&NodeId> {
         self.elders.iter().find(|elder| elder.name() == *name)
     }
 
     /// Returns the set of elder names.
     pub fn names(&self) -> BTreeSet<XorName> {
-        self.elders.iter().map(Peer::name).collect()
+        self.elders.iter().map(NodeId::name).collect()
     }
 
     pub fn addresses(&self) -> Vec<SocketAddr> {
-        self.elders.iter().map(Peer::addr).collect()
+        self.elders.iter().map(NodeId::addr).collect()
     }
 
     /// Key of the section.
@@ -385,7 +385,7 @@ pub mod test_utils {
             let members = elder_nodes
                 .iter()
                 .chain(adult_nodes.iter())
-                .map(|i| NodeState::joined(i.peer(), None));
+                .map(|i| NodeState::joined(i.id(), None));
 
             let sk_set = if let Some(sk) = self.sk_set {
                 sk
@@ -394,7 +394,7 @@ pub mod test_utils {
             };
 
             let sap = SectionAuthorityProvider::new(
-                elder_nodes.iter().map(|i| i.peer()),
+                elder_nodes.iter().map(|i| i.id()),
                 self.prefix,
                 members,
                 sk_set.public_keys(),

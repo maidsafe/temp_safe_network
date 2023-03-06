@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::system::SectionPeers;
+use super::system::SectionMembers;
 
 use crate::network_knowledge::SectionTreeUpdate;
 
@@ -32,20 +32,20 @@ pub enum AntiEntropyMsg {
 
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize, custom_debug::Debug)]
 pub enum AntiEntropyKind {
-    /// This AE message is sent to a peer when a message with outdated section
+    /// This AE message is sent to a node or client when a message with outdated section
     /// information was received, attaching the bounced message so
-    /// the peer can resend it with up to date destination information.
+    /// the node or client can resend it with up to date destination information.
     Retry {
         #[debug(skip)]
         bounced_msg: UsrMsgBytes,
     },
-    /// This AE message is sent to a peer when a message needs to be sent to a
-    /// different and/or closest section, attaching the bounced message so the peer
+    /// This AE message is sent to a node or client when a message needs to be sent to a
+    /// different and/or closest section, attaching the bounced message so the node or client
     /// can resend it to the correct section with up to date destination information.
     Redirect {
         #[debug(skip)]
         bounced_msg: UsrMsgBytes,
     },
-    /// This AE message is sent to update a peer when we notice they are behind
-    Update { members: SectionPeers },
+    /// This AE message is sent to update a node or client when we notice they are behind
+    Update { members: SectionMembers },
 }

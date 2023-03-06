@@ -69,7 +69,7 @@ pub enum NodeSubCommands {
         local_addr: Option<SocketAddr>,
         /// External address of the node, to use when writing connection info.
         ///
-        /// If unspecified, it will be queried from a peer; if there are no peers, the `local-addr` will
+        /// If unspecified, it will be queried from a node; if there are no nodes, the `local-addr` will
         /// be used, if specified.
         ///
         /// This option can also be used when you're trying to join a remote network, but your join

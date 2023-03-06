@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, Error, MyNode, Result};
+use crate::node::{flow_ctrl::cmds::Cmd, messaging::Recipients, Error, MyNode, Result};
 use sn_fault_detection::IssueType;
 use sn_interface::{
     messaging::{
@@ -14,14 +14,14 @@ use sn_interface::{
         MsgId,
     },
     network_knowledge::NodeState,
-    types::{log_markers::LogMarker, Peer, SectionSig},
+    types::{log_markers::LogMarker, NodeId, SectionSig},
 };
 
 impl MyNode {
     /// Send section state proposal to `recipients`
     pub(crate) fn send_node_off_proposal(
         &mut self,
-        recipients: Vec<Peer>,
+        recipients: Vec<NodeId>,
         proposal: NodeState,
     ) -> Result<Vec<Cmd>> {
         info!("Sending section state proposal: {proposal:?} to {recipients:?}");
@@ -46,20 +46,20 @@ impl MyNode {
 
         // broadcast the proposal to the recipients
         let mut cmds = vec![];
-        let (other_peers, myself) = self.split_peers_and_self(recipients);
+        let (other_nodes, myself) = self.split_node_and_self(recipients);
 
-        for node in &other_peers {
+        for node in &other_nodes {
             // log a knowledge issue for each that we're proposing
             // when they vote, this will be untracked
             self.track_node_issue(node.name(), IssueType::ElderVoting);
         }
 
-        let peers = Peers::Multiple(other_peers);
+        let nodes = Recipients::Multiple(other_nodes);
         let msg = NodeMsg::ProposeNodeOff {
             vote_node_off: proposal.clone(),
             sig_share: sig_share.clone(),
         };
-        cmds.push(Cmd::send_msg(msg, peers));
+        cmds.push(Cmd::send_msg(msg, nodes));
 
         // handle ourselves if we are in the recipients
         if let Some(me) = myself {
@@ -79,7 +79,7 @@ impl MyNode {
         msg_id: MsgId,
         proposal: NodeState,
         sig_share: SectionSigShare,
-        sender: Peer,
+        sender: NodeId,
     ) -> Result<Vec<Cmd>> {
         // proposals from other sections shall be ignored
         let our_prefix = self.network_knowledge.prefix();
@@ -147,7 +147,7 @@ impl MyNode {
     fn handle_offline_agreement(&mut self, node_state: NodeState) -> Option<Cmd> {
         info!(
             "Agreement - proposing membership change with node offline: {}",
-            node_state.peer()
+            node_state.node_id()
         );
         self.propose_membership_change(node_state)
     }

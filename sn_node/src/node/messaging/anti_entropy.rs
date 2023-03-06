@@ -9,7 +9,7 @@
 use crate::node::{
     core::NodeContext,
     flow_ctrl::{cmds::Cmd, RejoinReason},
-    messaging::Peers,
+    messaging::Recipients,
     Error, MyNode, Result,
 };
 
@@ -17,7 +17,7 @@ use sn_fault_detection::IssueType;
 use sn_interface::{
     messaging::{AntiEntropyKind, AntiEntropyMsg, MsgId, MsgKind, NetworkMsg, WireMsg},
     network_knowledge::{NetworkKnowledge, SectionTreeUpdate},
-    types::{log_markers::LogMarker, Peer, PublicKey},
+    types::{log_markers::LogMarker, NodeId, Participant, PublicKey},
 };
 
 use bls::PublicKey as BlsPublicKey;
@@ -36,11 +36,11 @@ impl MyNode {
             .section_members()
             .into_iter()
             .filter(|info| info.name() != our_name)
-            .map(|info| *info.peer())
+            .map(|info| *info.node_id())
             .collect();
 
         if recipients.is_empty() {
-            warn!("No peers of our section found in our network knowledge to send AE-Update");
+            warn!("No members of our section found in our network knowledge to send AE-Update");
             return Ok(None);
         }
 
@@ -51,7 +51,7 @@ impl MyNode {
                 let prev_pk = prev_pk.unwrap_or(*self.section_chain().genesis_key());
                 Ok(Some(MyNode::send_ae_update_to_nodes(
                     context,
-                    Peers::Multiple(recipients),
+                    Recipients::Multiple(recipients),
                     prev_pk,
                 )))
             }
@@ -65,7 +65,7 @@ impl MyNode {
     /// Send `AntiEntropy` update message to the specified nodes.
     pub(crate) fn send_ae_update_to_nodes(
         context: &NodeContext,
-        recipients: Peers,
+        recipients: Recipients,
         section_pk: BlsPublicKey,
     ) -> Cmd {
         let members = context.network_knowledge.section_members_with_decision();
@@ -93,7 +93,7 @@ impl MyNode {
         {
             let promoted_sibling_elders: BTreeSet<_> = sibling_sap
                 .elders()
-                .filter(|peer| !prev_context.network_knowledge.elders().contains(peer))
+                .filter(|elder| !prev_context.network_knowledge.elders().contains(elder))
                 .cloned()
                 .collect();
 
@@ -109,7 +109,7 @@ impl MyNode {
             // Send AE update to sibling section's new Elders
             Ok(vec![MyNode::send_ae_update_to_nodes(
                 prev_context,
-                Peers::Multiple(promoted_sibling_elders),
+                Recipients::Multiple(promoted_sibling_elders),
                 previous_section_key,
             )])
         } else {
@@ -119,7 +119,7 @@ impl MyNode {
     }
 
     // Private helper to generate a SectionTreeUpdate to update
-    // a peer abot our SAP, with proof_chain and members list.
+    // a participant about our SAP, with proof_chain and members list.
     fn generate_ae_section_tree_update(
         context: &NodeContext,
         dst_section_key: Option<BlsPublicKey>,
@@ -144,7 +144,7 @@ impl MyNode {
         starting_context: NodeContext,
         section_tree_update: SectionTreeUpdate,
         kind: AntiEntropyKind,
-        sender: Peer,
+        sender: Participant,
     ) -> Result<Vec<Cmd>> {
         let sap = section_tree_update.signed_sap.value.clone();
 
@@ -216,10 +216,15 @@ impl MyNode {
         }
 
         // Check if we need to resend any messages and who should we send it to.
-        let (bounced_msg, target_peer) = match kind {
+        let (bounced_msg, recipient) = match kind {
             AntiEntropyKind::Update { .. } => {
                 // log the msg as received. Elders track this for other elders in fault detection
-                latest_context.untrack_node_issue(sender.name(), IssueType::AeProbeMsg);
+                if latest_context
+                    .network_knowledge
+                    .is_section_member(&sender.name())
+                {
+                    latest_context.untrack_node_issue(sender.name(), IssueType::AeProbeMsg);
+                }
                 return Ok(cmds);
             } // Nope, bail early
             AntiEntropyKind::Retry { bounced_msg } => {
@@ -243,7 +248,7 @@ impl MyNode {
 
                 trace!("{}", LogMarker::AeResendAfterRedirect);
 
-                (bounced_msg, chosen_dst_elder)
+                (bounced_msg, Participant::from_node(chosen_dst_elder))
             }
         };
 
@@ -265,17 +270,17 @@ impl MyNode {
             return Ok(cmds);
         }
 
-        trace!("Resending original {msg_id:?} to {target_peer:?} with {msg_to_resend:?}");
+        trace!("Resending original {msg_id:?} to {recipient:?} with {msg_to_resend:?}");
         trace!("{}", LogMarker::AeResendAfterRedirect);
 
-        cmds.push(Cmd::send_msg(msg_to_resend, Peers::Single(target_peer)));
+        cmds.push(Cmd::send_msg(msg_to_resend, Recipients::Single(recipient)));
         Ok(cmds)
     }
 
     /// Generate and return AE commands for a given wire_msg and section_tree_update
     pub(crate) fn generate_anti_entropy_cmds(
         wire_msg: &WireMsg,
-        origin: Peer,
+        src: Participant,
         section_tree_update: SectionTreeUpdate,
         kind: AntiEntropyKind,
         send_stream: Option<SendStream>,
@@ -293,14 +298,14 @@ impl MyNode {
         let mut cmds = vec![];
         if matches!(wire_msg.kind(), MsgKind::Node { .. }) {
             cmds.push(Cmd::TrackNodeIssue {
-                name: origin.name(),
+                name: src.name(),
                 issue: sn_fault_detection::IssueType::NetworkKnowledge,
             });
         }
 
         if let Some(stream) = send_stream {
             cmds.push(Cmd::UpdateCallerOnStream {
-                caller: origin,
+                caller: src,
                 msg_id: MsgId::new(),
                 correlation_id: msg_id,
                 kind,
@@ -310,13 +315,13 @@ impl MyNode {
             return Ok(cmds);
         } else if matches!(wire_msg.kind(), MsgKind::Client { .. }) {
             // TODO: error
-            error!("No response stream from client. Dropping message");
+            error!("Client msg without response stream, from {src}. Dropping message");
             return Ok(vec![]);
         }
 
         trace!("Attempting to send AE response over fresh conn for {msg_id:?}");
         cmds.push(Cmd::UpdateCaller {
-            caller: origin,
+            caller: NodeId::from(src), // clients should only connect to us on bi-stream, so at this point we are certain to have a node
             correlation_id: msg_id,
             kind,
             section_tree_update,
@@ -329,7 +334,7 @@ impl MyNode {
     pub(crate) fn check_for_entropy(
         wire_msg: &WireMsg,
         network_knowledge: &NetworkKnowledge,
-        sender: &Peer,
+        sender: &Participant,
     ) -> Result<Option<(SectionTreeUpdate, AntiEntropyKind)>> {
         let msg_id = wire_msg.msg_id();
         let dst = wire_msg.dst();
@@ -399,7 +404,7 @@ impl MyNode {
 }
 
 // Private helper to generate a SectionTreeUpdate to update
-// a peer about our SAP, with proof_chain and members list.
+// a participant about our SAP, with proof_chain and members list.
 fn generate_ae_section_tree_update(
     network_knowledge: &NetworkKnowledge,
     dst_section_key: Option<BlsPublicKey>,
@@ -455,7 +460,7 @@ mod tests {
         };
 
         let context = node.context();
-        let sender = node.info().peer();
+        let sender = Participant::from_node(node.info().id());
 
         let ae_msg = MyNode::check_for_entropy(&msg, &context.network_knowledge, &sender)?;
 
@@ -493,7 +498,7 @@ mod tests {
         };
 
         let context = node.context();
-        let sender = node.info().peer();
+        let sender = Participant::from_node(node.info().id());
 
         let (section_tree_update, _kind) =
             MyNode::check_for_entropy(&wire_msg, &context.network_knowledge, &sender)?
@@ -543,7 +548,7 @@ mod tests {
             name: our_prefix.substituted_in(xor_name::rand::random()),
         };
 
-        let sender = node.info().peer();
+        let sender = Participant::from_node(node.info().id());
         let (section_tree_update, _kind) =
             MyNode::check_for_entropy(&msg, network_knowledge, &sender)?
                 .context("no entropy found")?;
@@ -578,7 +583,7 @@ mod tests {
         };
 
         let context = node.context();
-        let sender = node.info().peer();
+        let sender = Participant::from_node(node.info().id());
 
         let (section_tree_update, _kind) =
             MyNode::check_for_entropy(&msg, &context.network_knowledge, &sender)?

@@ -14,7 +14,7 @@ use sn_interface::{
         system::NodeMsg,
         Error as MessagingError, MsgId, NetworkMsg,
     },
-    types::{Error as DtError, Peer},
+    types::{Error as DtError, NodeId},
 };
 
 use bls::PublicKey;
@@ -67,7 +67,7 @@ pub enum Error {
     },
     /// Initial network contact failed
     #[error("Initial network contact probe failed. Attempted contacts: {0:?}")]
-    NetworkContact(Vec<Peer>),
+    NetworkContact(Vec<NodeId>),
     /// Client has not gone through qp2p bootstrap process yet
     #[error(
         "Client has not yet acquired enough/any network knowledge for destination \
@@ -149,21 +149,21 @@ pub enum Error {
         /// Address name of the chunk
         address: XorName,
     },
-    /// Remote peer closed the bi-stream we expected a response on
-    #[error("The bi-stream we expected a msg response on, for {msg_id:?}, was closed by remote peer: {peer:?}")]
+    /// Node closed the bi-stream we expected a response on
+    #[error("The bi-stream we expected a msg response on, for {msg_id:?}, was closed by remote node: {node_id:?}")]
     ResponseStreamClosed {
         /// MsgId of the msg sent
         msg_id: MsgId,
-        /// Peer the msg was sent to
-        peer: Peer,
+        /// Node the msg was sent to
+        node_id: NodeId,
     },
     /// Failed to obtain a response from Elders.
-    #[error("Failed to obtain any response for {msg_id:?} from: {peers:?}")]
+    #[error("Failed to obtain any response for {msg_id:?} from: {nodes:?}")]
     NoResponse {
         /// MsgId of the msg sent
         msg_id: MsgId,
-        /// Peers the msg was sent to
-        peers: Vec<Peer>,
+        /// Nodes the msg was sent to
+        nodes: Vec<NodeId>,
     },
     /// Timeout when awaiting command ACK from Elders.
     #[error("Timeout after {elapsed:?} when awaiting command ACK from Elders for {msg_id:?}, data address {dst_address}")]
@@ -184,22 +184,22 @@ pub enum Error {
         response: QueryResponse,
     },
     /// Unexpected NodeMsg received
-    #[error("Unexpected type of NodeMsg received from {peer} in response to {correlation_id:?}. Received: {msg:?}")]
+    #[error("Unexpected type of NodeMsg received from {node_id} in response to {correlation_id:?}. Received: {msg:?}")]
     UnexpectedNodeMsg {
         /// MsgId of the msg sent
         correlation_id: MsgId,
-        /// Peer the unexpected msg was received from
-        peer: Peer,
+        /// The node that the unexpected msg was received from
+        node_id: NodeId,
         /// Unexpected msg received
         msg: NodeMsg,
     },
     /// Unexpected msg type received
-    #[error("Unexpected type of message received from {peer} in response to {correlation_id:?}. Received: {msg:?}")]
+    #[error("Unexpected type of message received from {node_id} in response to {correlation_id:?}. Received: {msg:?}")]
     UnexpectedNetworkMsg {
         /// MsgId of the msg sent
         correlation_id: MsgId,
-        /// Peer the unexpected msg was received from
-        peer: Peer,
+        /// The node that the unexpected msg was received from
+        node_id: NodeId,
         /// Unexpected msg received
         msg: NetworkMsg,
     },
@@ -236,20 +236,20 @@ pub enum Error {
     #[error(transparent)]
     QuicP2p(#[from] qp2p::RecvError),
     /// QuicP2p Connection error.
-    #[error("Failed to stablish a connection with node {peer:?}: {error}.")]
+    #[error("Failed to stablish a connection with node {node_id:?}: {error}.")]
     QuicP2pConnection {
         /// Node the connection was attempted to be stablished with
-        peer: Peer,
+        node_id: NodeId,
         /// The error encountered when attempting to stablish the connection
         error: qp2p::ConnectionError,
         /// MsgId of the msg that was going to be sent
         msg_id: MsgId,
     },
     /// QuicP2p Send error.
-    #[error("Failed to send a message to node {peer:?}: {error}.")]
+    #[error("Failed to send a message to node {node_id:?}: {error}.")]
     QuicP2pSend {
         /// Node the message was attempted to be sent to
-        peer: Peer,
+        node_id: NodeId,
         /// The error encountered when attempting to send the message
         error: qp2p::SendError,
         /// MsgId of the msg attempted to send

@@ -13,24 +13,24 @@ use bls::PublicKey as BlsPublicKey;
 use ed25519_dalek::{PublicKey as EdPublicKey, Signature as EdSignature, Verifier as _};
 use serde::{Deserialize, Serialize};
 
-/// Authority of a network peer.
+/// Authority of a network client.
 #[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
 pub struct ClientAuth {
-    /// Peer's public key.
+    /// Client's public key.
     pub public_key: PublicKey,
-    /// Peer's signature.
+    /// Client's signature.
     pub signature: Signature,
 }
 
-/// Authority of a single peer.
+/// Authority of a node.
 #[derive(Clone, Eq, PartialEq, custom_debug::Debug, serde::Deserialize, serde::Serialize)]
 pub struct NodeSig {
-    /// Section key of the source.
+    /// Section key of the node.
     pub section_pk: BlsPublicKey,
-    /// Public key of the source peer.
+    /// Public key of the node.
     #[debug(with = "PublicKey::fmt_ed25519")]
     pub node_ed_pk: EdPublicKey,
-    /// Ed25519 signature of the message corresponding to the public key of the source peer.
+    /// Ed25519 signature of the message corresponding to the public key of the node.
     #[debug(with = "Signature::fmt_ed25519")]
     #[serde(with = "serde_bytes")]
     pub signature: EdSignature,

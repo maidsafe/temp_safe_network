@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::types::{utils::calc_age, Peer, PublicKey};
+use crate::types::{utils::calc_age, NodeId, PublicKey};
 use ed25519_dalek::Keypair;
 use std::{
     fmt::{self, Display, Formatter},
@@ -33,8 +33,8 @@ impl MyNodeInfo {
         }
     }
 
-    pub fn peer(&self) -> Peer {
-        Peer::new(self.name(), self.addr)
+    pub fn id(&self) -> NodeId {
+        NodeId::new(self.name(), self.addr)
     }
 
     pub fn name(&self) -> XorName {

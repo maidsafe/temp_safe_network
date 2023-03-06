@@ -14,16 +14,16 @@ use std::{
 };
 use xor_name::XorName;
 
-use super::utils::calc_age;
+use super::Participant;
 
-/// A Peer with name, derived from its `PublicKey`, and an address.
+/// The id is the name, derived from its `PublicKey`, and the address of a client.
 #[derive(Copy, Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct Peer {
+pub struct ClientId {
     name: XorName,
     addr: SocketAddr,
 }
 
-impl Peer {
+impl ClientId {
     pub fn new(name: XorName, addr: SocketAddr) -> Self {
         Self { name, addr }
     }
@@ -36,35 +36,27 @@ impl Peer {
         self.addr
     }
 
-    /// Returns the age.
-    pub fn age(&self) -> u8 {
-        calc_age(&self.name)
-    }
-
-    pub fn from(addr: SocketAddr, public_key: ed25519_dalek::PublicKey) -> Peer {
-        Peer {
-            addr,
-            name: XorName::from(super::PublicKey::from(public_key)),
-        }
+    pub fn from(sender: Participant) -> Self {
+        Self::new(sender.name, sender.addr)
     }
 }
 
-impl Display for Peer {
+impl Display for ClientId {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "{} at {}", self.name(), self.addr(),)
     }
 }
 
-impl Eq for Peer {}
+impl Eq for ClientId {}
 
-impl Hash for Peer {
+impl Hash for ClientId {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.name().hash(state);
         self.addr().hash(state);
     }
 }
 
-impl Ord for Peer {
+impl Ord for ClientId {
     fn cmp(&self, other: &Self) -> Ordering {
         self.name()
             .cmp(&other.name())
@@ -72,19 +64,19 @@ impl Ord for Peer {
     }
 }
 
-impl PartialEq for Peer {
+impl PartialEq for ClientId {
     fn eq(&self, other: &Self) -> bool {
         self.name() == other.name() && self.addr() == other.addr()
     }
 }
 
-impl PartialEq<&Self> for Peer {
+impl PartialEq<&Self> for ClientId {
     fn eq(&self, other: &&Self) -> bool {
         self.name() == other.name() && self.addr() == other.addr()
     }
 }
 
-impl PartialOrd for Peer {
+impl PartialOrd for ClientId {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }

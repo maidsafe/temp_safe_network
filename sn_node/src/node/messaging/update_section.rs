@@ -6,12 +6,12 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{core::NodeContext, flow_ctrl::cmds::Cmd, messaging::Peers, MyNode};
+use crate::node::{core::NodeContext, flow_ctrl::cmds::Cmd, messaging::Recipients, MyNode};
 use rand::{rngs::OsRng, seq::SliceRandom};
 use sn_interface::{
     data_copy_count,
     messaging::system::{NodeDataCmd, NodeMsg},
-    types::{log_markers::LogMarker, DataAddress, Peer},
+    types::{log_markers::LogMarker, DataAddress, NodeId},
 };
 
 use itertools::Itertools;
@@ -22,12 +22,12 @@ use std::collections::BTreeSet;
 static MAX_REPLICATION_BATCH_SIZE: usize = 25;
 
 impl MyNode {
-    /// Given what data the peer has, we shall calculate what data the peer is missing that
-    /// we have, and send such data to the peer.
+    /// Given what data the node has, we shall calculate what data the node is missing that
+    /// we have, and send such data to the node.
     #[instrument(skip(context, data_sender_has))]
     pub(crate) async fn get_missing_data_for_node(
         context: &NodeContext,
-        sender: Peer,
+        sender: NodeId,
         data_sender_has: Vec<DataAddress>,
     ) -> Option<Cmd> {
         debug!("Getting missing data for node");
@@ -105,12 +105,12 @@ impl MyNode {
         );
 
         if members.is_empty() {
-            warn!("We have no peers to ask for data!");
+            warn!("We have no nodes to ask for data!");
         } else {
             trace!("Sending our data list to: {:?}", members);
         }
 
         let msg = NodeMsg::NodeDataCmd(NodeDataCmd::SendAnyMissingRelevantData(data_i_have));
-        Cmd::send_msg(msg, Peers::Multiple(members))
+        Cmd::send_msg(msg, Recipients::Multiple(members))
     }
 }

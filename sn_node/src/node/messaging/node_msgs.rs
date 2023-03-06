@@ -8,7 +8,8 @@
 
 use crate::{
     node::{
-        core::NodeContext, flow_ctrl::cmds::Cmd, messaging::Peers, MyNode, RejoinReason, Result,
+        core::NodeContext, flow_ctrl::cmds::Cmd, messaging::Recipients, MyNode, RejoinReason,
+        Result,
     },
     storage::{Error as StorageError, StorageLevel},
 };
@@ -22,21 +23,26 @@ use sn_interface::{
         Dst, MsgId, NetworkMsg, WireMsg,
     },
     network_knowledge::{MembershipState, NetworkKnowledge},
-    types::{log_markers::LogMarker, Keypair, Peer, PublicKey, ReplicatedData},
+    types::{
+        log_markers::LogMarker, ClientId, Keypair, NodeId, Participant, PublicKey, ReplicatedData,
+    },
 };
 use std::collections::BTreeSet;
 use xor_name::XorName;
 
 impl MyNode {
-    /// Send a (`NetworkMsg`) to peers
+    /// Send a (`NetworkMsg`) to nodes
+    /// NB: Since we are sending via comms, which only sends to nodes in our section
+    /// this is only taking node ids as recipients.
+    /// IF we need to send to clients here as well, we'll need to update the fn signature.
     pub(crate) fn send_msg(
         msg: NetworkMsg,
         msg_id: MsgId,
-        recipients: Peers,
+        recipients: BTreeSet<NodeId>,
         context: NodeContext,
     ) -> Result<()> {
         debug!("Sending msg: {msg_id:?}");
-        let peer_msgs = into_msg_bytes(
+        let msgs = into_msg_bytes(
             &context.network_knowledge,
             context.name,
             msg,
@@ -44,9 +50,8 @@ impl MyNode {
             recipients,
         )?;
 
-        peer_msgs
-            .into_iter()
-            .for_each(|(peer, msg)| context.comm.send_out_bytes(peer, msg_id, msg));
+        msgs.into_iter()
+            .for_each(|(node_id, msg)| context.comm.send_out_bytes(node_id, msg_id, msg));
 
         Ok(())
     }
@@ -55,7 +60,7 @@ impl MyNode {
     pub(crate) fn send_to_elders(context: &NodeContext, msg: NodeMsg) -> Cmd {
         let sap = context.network_knowledge.section_auth();
         let recipients = sap.elders_set();
-        Cmd::send_msg(msg, Peers::Multiple(recipients))
+        Cmd::send_msg(msg, Recipients::Multiple(recipients))
     }
 
     /// Send a (`NodeMsg`) message to all Elders in our section, await all responses & enqueue
@@ -73,7 +78,7 @@ impl MyNode {
         context: &NodeContext,
         data: ReplicatedData,
         send_stream: SendStream,
-        source_client: Peer,
+        client_id: ClientId,
         correlation_id: MsgId,
     ) -> Result<Vec<Cmd>> {
         let mut cmds = vec![];
@@ -135,7 +140,7 @@ impl MyNode {
         cmds.push(Cmd::send_data_response(
             msg,
             correlation_id,
-            source_client,
+            client_id,
             send_stream,
         ));
 
@@ -149,28 +154,28 @@ impl MyNode {
         context: NodeContext,
         msg_id: MsgId,
         msg: NodeMsg,
-        sender: Peer,
+        node_id: NodeId,
         send_stream: Option<SendStream>,
     ) -> Result<Vec<Cmd>> {
         debug!("{:?}: {msg_id:?}", LogMarker::NodeMsgToBeHandled);
 
         match msg {
             NodeMsg::TryJoin(relocation) => {
-                trace!("Handling msg {:?}: TryJoin from {}", msg_id, sender);
-                MyNode::handle_join(node, &context, sender, msg_id, relocation, send_stream)
+                trace!("Handling msg {:?}: TryJoin from {}", msg_id, node_id);
+                MyNode::handle_join(node, &context, node_id, msg_id, relocation, send_stream)
                     .map(|c| c.into_iter().collect())
             }
             NodeMsg::PrepareToRelocate(relocation_trigger) => {
-                trace!("Handling PrepareToRelocate msg from {sender}: {msg_id:?}");
+                trace!("Handling PrepareToRelocate msg from {node_id}: {msg_id:?}");
                 Ok(node.prepare_to_relocate(relocation_trigger, context.name))
             }
             NodeMsg::ProceedRelocation(dst) => {
-                trace!("Handling ProceedRelocation msg from {sender}: {msg_id:?}");
-                Ok(node.proceed_relocation(sender.name(), dst)?)
+                trace!("Handling ProceedRelocation msg from {node_id}: {msg_id:?}");
+                Ok(node.proceed_relocation(node_id.name(), dst)?)
             }
 
             NodeMsg::CompleteRelocation(signed_relocation) => {
-                trace!("Handling CompleteRelocation msg from {sender}: {msg_id:?}");
+                trace!("Handling CompleteRelocation msg from {node_id}: {msg_id:?}");
                 Ok(node.relocate(signed_relocation)?.into_iter().collect())
             }
             // The approval or rejection of a join (approval both for new network joiner as well as
@@ -219,21 +224,21 @@ impl MyNode {
                     }
                 }
             }
-            NodeMsg::HandoverVotes(votes) => node.handle_handover_msg(sender, votes),
+            NodeMsg::HandoverVotes(votes) => node.handle_handover_msg(node_id, votes),
             NodeMsg::HandoverAE(gen) => Ok(node
-                .handle_handover_anti_entropy(sender, gen)
+                .handle_handover_anti_entropy(node_id, gen)
                 .into_iter()
                 .collect()),
             NodeMsg::MembershipVotes(votes) => {
                 let mut cmds = vec![];
-                cmds.extend(node.handle_membership_votes(sender, votes)?);
+                cmds.extend(node.handle_membership_votes(node_id, votes)?);
                 Ok(cmds)
             }
             NodeMsg::MembershipAE(gen) => {
                 let membership_context = { node.membership.clone() };
 
                 Ok(
-                    MyNode::handle_membership_anti_entropy(membership_context, sender, gen)
+                    MyNode::handle_membership_anti_entropy(membership_context, node_id, gen)
                         .into_iter()
                         .collect(),
                 )
@@ -243,31 +248,22 @@ impl MyNode {
                 sig_share,
             } => {
                 if node.is_not_elder() {
-                    trace!(
-                        "Adult handling a ProposeSectionState msg from {}: {:?}",
-                        sender,
-                        msg_id
-                    );
+                    trace!("Adult handling a ProposeSectionState msg from {node_id}: {msg_id:?}",);
                 }
 
-                trace!(
-                    "Handling ProposeSectionState msg: {proposal:?} from {}: {:?}",
-                    sender,
-                    msg_id
-                );
-                node.untrack_node_issue(sender.name(), IssueType::ElderVoting);
-                node.handle_section_state_proposal(msg_id, proposal, sig_share, sender)
+                trace!("Handling ProposeSectionState msg {proposal:?} from {node_id}: {msg_id:?}",);
+                node.untrack_node_issue(node_id.name(), IssueType::ElderVoting);
+                node.handle_section_state_proposal(msg_id, proposal, sig_share, node_id)
             }
             NodeMsg::DkgStart(session_id, elder_sig) => {
                 trace!(
-                    "Handling msg: DkgStart s{} {:?}: {} elders from {}",
+                    "Handling msg: DkgStart s{} {:?}: {} elders from {node_id}",
                     session_id.sh(),
                     session_id.prefix,
                     session_id.elders.len(),
-                    sender
                 );
 
-                node.untrack_node_issue(sender.name(), IssueType::Dkg);
+                node.untrack_node_issue(node_id.name(), IssueType::Dkg);
                 node.handle_dkg_start(session_id, elder_sig)
             }
             NodeMsg::DkgEphemeralPubKey {
@@ -277,12 +273,11 @@ impl MyNode {
                 sig,
             } => {
                 trace!(
-                    "{} s{} from {}",
+                    "{} s{} from {node_id}",
                     LogMarker::DkgHandleEphemeralPubKey,
                     session_id.sh(),
-                    sender
                 );
-                node.handle_dkg_ephemeral_pubkey(&session_id, section_auth, pub_key, sig, sender)
+                node.handle_dkg_ephemeral_pubkey(&session_id, section_auth, pub_key, sig, node_id)
             }
             NodeMsg::DkgVotes {
                 session_id,
@@ -290,19 +285,17 @@ impl MyNode {
                 votes,
             } => {
                 trace!(
-                    "{} s{} from {}: {:?}",
+                    "{} s{} from {node_id}: {votes:?}",
                     LogMarker::DkgVotesHandling,
                     session_id.sh(),
-                    sender,
-                    votes
                 );
-                node.untrack_node_issue(sender.name(), IssueType::Dkg);
+                node.untrack_node_issue(node_id.name(), IssueType::Dkg);
 
-                node.handle_dkg_votes(&session_id, pub_keys, votes, sender)
+                node.handle_dkg_votes(&session_id, pub_keys, votes, node_id)
             }
             NodeMsg::DkgAE(session_id) => {
-                trace!("Handling msg: DkgAE s{} from {}", session_id.sh(), sender);
-                node.handle_dkg_anti_entropy(session_id, sender)
+                trace!("Handling msg: DkgAE s{} from {}", session_id.sh(), node_id);
+                node.handle_dkg_anti_entropy(session_id, node_id)
             }
             NodeMsg::NodeEvent(NodeEvent::CouldNotStoreData {
                 node_id,
@@ -341,17 +334,21 @@ impl MyNode {
                 Ok(cmds)
             }
             NodeMsg::NodeDataCmd(NodeDataCmd::StoreData(data)) => {
+                // NB: We would only reach here if this is a Spentbook cmd.
                 trace!("Attempting to store data locally: {:?}", data.address());
                 // TODO: proper err
                 let Some(stream) = send_stream else {
                     return Ok(vec![])
                 };
+                // NB!! `sender` is actually a node here and should not be casted to ClientId! But since we are reusing the
+                // `store_data_and_respond` fn which is used when a forwarded client cmd comes in, we have cast to ClientId here.. TO BE FIXED.
+                let sender = ClientId::from(Participant::from_node(node_id));
                 // store data and respond w/ack on the response stream
                 MyNode::store_data_and_respond(&context, data, stream, sender, msg_id).await
             }
             NodeMsg::NodeDataCmd(NodeDataCmd::ReplicateDataBatch(data_collection)) => {
                 info!("ReplicateDataBatch MsgId: {:?}", msg_id);
-                MyNode::replicate_data_batch(&context, sender, data_collection).await
+                MyNode::replicate_data_batch(&context, node_id, data_collection).await
             }
             NodeMsg::NodeDataCmd(NodeDataCmd::SendAnyMissingRelevantData(known_data_addresses)) => {
                 info!(
@@ -361,7 +358,7 @@ impl MyNode {
                 );
 
                 Ok(
-                    MyNode::get_missing_data_for_node(&context, sender, known_data_addresses)
+                    MyNode::get_missing_data_for_node(&context, node_id, known_data_addresses)
                         .await
                         .into_iter()
                         .collect(),
@@ -369,11 +366,11 @@ impl MyNode {
             }
             NodeMsg::RequestHandover { sap, sig_share } => {
                 info!("RequestHandover with msg_id {msg_id:?}");
-                node.handle_handover_request(msg_id, sap, sig_share, sender)
+                node.handle_handover_request(msg_id, sap, sig_share, node_id)
             }
             NodeMsg::SectionHandoverPromotion { sap, sig_share } => {
                 info!("SectionHandoverPromotion with msg_id {msg_id:?}");
-                node.handle_handover_promotion(msg_id, sap, sig_share, sender)
+                node.handle_handover_promotion(msg_id, sap, sig_share, node_id)
             }
             NodeMsg::SectionSplitPromotion {
                 sap0,
@@ -383,7 +380,7 @@ impl MyNode {
             } => {
                 info!("SectionSplitPromotion with msg_id {msg_id:?}");
                 node.handle_section_split_promotion(
-                    msg_id, sap0, sig_share0, sap1, sig_share1, sender,
+                    msg_id, sap0, sig_share0, sap1, sig_share1, node_id,
                 )
             }
         }
@@ -397,13 +394,9 @@ pub(crate) fn into_msg_bytes(
     our_node_name: XorName,
     msg: NetworkMsg,
     msg_id: MsgId,
-    recipients: Peers,
-) -> Result<Vec<(Peer, UsrMsgBytes)>> {
+    recipients: BTreeSet<NodeId>,
+) -> Result<Vec<(NodeId, UsrMsgBytes)>> {
     let (kind, payload) = MyNode::serialize_msg(our_node_name, &msg)?;
-    let recipients = match recipients {
-        Peers::Single(peer) => vec![peer],
-        Peers::Multiple(peers) => peers.into_iter().collect(),
-    };
 
     // we first generate the XorName
     let dst = Dst {
@@ -415,16 +408,16 @@ pub(crate) fn into_msg_bytes(
     let _bytes = initial_wire_msg.serialize_and_cache_bytes()?;
 
     let mut msgs = vec![];
-    for peer in recipients {
-        match network_knowledge.generate_dst(&peer.name()) {
+    for node_id in recipients {
+        match network_knowledge.generate_dst(&node_id.name()) {
             Ok(dst) => {
                 debug!("Dst generated for outgoing msg is: {dst:?}");
                 // TODO log error here isntead of throwing
                 let all_the_bytes = initial_wire_msg.serialize_with_new_dst(&dst)?;
-                msgs.push((peer, all_the_bytes));
+                msgs.push((node_id, all_the_bytes));
             }
             Err(error) => {
-                error!("Could not get route for {peer:?}: {error}");
+                error!("Could not get route for {node_id:?}: {error}");
             }
         }
     }

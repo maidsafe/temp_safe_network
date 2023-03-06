@@ -25,39 +25,38 @@ mod update_section;
 
 use crate::node::{flow_ctrl::cmds::Cmd, Error, MyNode, Result};
 
-use qp2p::SendStream;
 use sn_interface::{
     messaging::{AntiEntropyMsg, MsgKind, NetworkMsg, WireMsg},
-    types::{log_markers::LogMarker, Peer},
+    types::{log_markers::LogMarker, ClientId, NodeId, Participant},
 };
 
+use qp2p::SendStream;
 use std::collections::BTreeSet;
 
 #[derive(Debug, Clone)]
-pub enum Peers {
-    Single(Peer),
-    Multiple(BTreeSet<Peer>),
+pub enum Recipients {
+    Single(Participant),
+    Multiple(BTreeSet<NodeId>),
 }
 
-impl Peers {
-    #[allow(unused)]
-    pub(crate) fn get(&self) -> BTreeSet<Peer> {
-        match self {
-            Self::Single(peer) => BTreeSet::from([*peer]),
-            Self::Multiple(peers) => peers.clone(),
+impl Recipients {
+    #[cfg(test)]
+    pub(crate) fn get(&self) -> BTreeSet<Participant> {
+        match self.clone() {
+            Self::Single(p) => BTreeSet::from([p]),
+            Self::Multiple(nodes) => nodes.into_iter().map(Participant::from_node).collect(),
         }
     }
 }
 
-impl IntoIterator for Peers {
-    type Item = Peer;
-
+impl IntoIterator for Recipients {
+    type Item = Participant;
     type IntoIter = Box<dyn Iterator<Item = Self::Item>>;
 
     fn into_iter(self) -> Self::IntoIter {
         match self {
-            Peers::Single(p) => Box::new(std::iter::once(p)),
-            Peers::Multiple(ps) => Box::new(ps.into_iter()),
+            Recipients::Single(p) => Box::new(std::iter::once(p)),
+            Recipients::Multiple(ps) => Box::new(ps.into_iter().map(Participant::from_node)),
         }
     }
 }
@@ -67,35 +66,46 @@ impl MyNode {
     #[instrument(skip(node, wire_msg, send_stream))]
     pub(crate) async fn handle_msg(
         node: &MyNode,
-        origin: Peer,
+        sender: Participant,
         wire_msg: WireMsg,
         send_stream: Option<SendStream>,
     ) -> Result<Vec<Cmd>> {
         let msg_id = wire_msg.msg_id();
         let msg_kind = wire_msg.kind();
 
-        trace!("Handling msg {msg_id:?}. from {origin:?} Checking for AE first...");
+        trace!("Handling msg {msg_id:?}. from {sender:?} Checking for AE first...");
 
         let context = node.context();
 
         // alternatively we could flag in msg kind for this...
-        // todo: this peer is actually client + forwarder ip....
+        // todo: this sender is actually client + forwarder ip....
 
         // we've forwaded it to ourselves as we're the holder. This prevents a loop.
         // TODO: cut that wee loop down
-        let is_from_us = origin.addr() == context.info.addr;
+        let is_from_us = sender.addr() == context.info.addr;
         let is_for_us =
             is_from_us || wire_msg.dst().name == context.name || msg_kind.is_client_spend();
+
+        // 1. is_from_us happens when we as an Elder forwarded a data msg to ourselves as data holder.
+        // 2. client msg directly to us, only exists for
+        //    A: payments (which today is DataCmd::Spentbook)
+        //    B: AeProbe
+
+        // When we have implemented the proper Spentbook type, we have type safety and
+        // can only receive the specific client Spend cmd to us as Elder (client doesn't send it to others than the 7 Elder recipients),
+        // i.e. it is never _forwarded_.
+        // thus all msgs are then to us if dst.name == our name.
+        // The msg from Elders to nodes are StoreSpentShare which are not forwarded either, but always to "us".
 
         // first check for AE, if this isn't an ae msg itself
         if !msg_kind.is_ae_msg() {
             let entropy =
-                MyNode::check_for_entropy(&wire_msg, &context.network_knowledge, &origin)?;
+                MyNode::check_for_entropy(&wire_msg, &context.network_knowledge, &sender)?;
             if let Some((update, ae_kind)) = entropy {
                 debug!("bailing early, AE found for {msg_id:?}");
                 return MyNode::generate_anti_entropy_cmds(
                     &wire_msg,
-                    origin,
+                    sender,
                     update,
                     ae_kind,
                     send_stream,
@@ -111,8 +121,12 @@ impl MyNode {
                 };
 
                 trace!("{:?}: {msg_id:?} ", LogMarker::ClientMsgToBeForwarded);
-                let cmd =
-                    MyNode::forward_data_and_respond_to_client(context, wire_msg, origin, stream);
+                let cmd = MyNode::forward_data_and_respond_to_client(
+                    context,
+                    wire_msg,
+                    ClientId::from(sender),
+                    stream,
+                );
                 return Ok(vec![cmd]);
             }
         }
@@ -131,14 +145,14 @@ impl MyNode {
             NetworkMsg::Node(msg) => Ok(vec![Cmd::ProcessNodeMsg {
                 msg_id,
                 msg,
-                origin,
+                node_id: NodeId::from(sender),
                 send_stream,
             }]),
             NetworkMsg::Client { auth, msg } => Ok(vec![Cmd::ProcessClientMsg {
                 msg_id,
                 msg,
                 auth,
-                origin,
+                sender: ClientId::from(sender),
                 send_stream,
             }]),
             NetworkMsg::AntiEntropy(AntiEntropyMsg::AntiEntropy {
@@ -148,11 +162,11 @@ impl MyNode {
                 msg_id,
                 section_tree_update,
                 kind,
-                origin,
+                sender,
             }]),
             // Respond to a probe msg
-            // We always respond to probe msgs if we're an elder as health checks use this to see if a node is alive
-            // and repsonsive, as well as being a method of keeping nodes up to date.
+            // We always respond to probe msgs if we're an elder as health checks use this to see if elders are alive
+            // and repsonsive, as well as being a method for a sender of the probe to keep up to date.
             NetworkMsg::AntiEntropy(AntiEntropyMsg::Probe(section_key)) => {
                 debug!("Aeprobe in");
                 let mut cmds = vec![];
@@ -162,10 +176,10 @@ impl MyNode {
                     // normal AE rules should have applied
                     return Ok(cmds);
                 }
-                trace!("Received Probe message from {}: {:?}", origin, msg_id);
+                trace!("Received Probe message from {}: {:?}", sender, msg_id);
                 cmds.push(MyNode::send_ae_update_to_nodes(
                     &context,
-                    Peers::Single(origin),
+                    Recipients::Single(sender),
                     section_key,
                 ));
                 Ok(cmds)
@@ -174,23 +188,23 @@ impl MyNode {
                 error!(
                     "Data response {msg_id:?}, from {}, has been dropped since it's not \
                     meant to be handled this way (it is directly forwarded to client): {other:?}",
-                    origin.addr()
+                    sender.addr()
                 );
                 Ok(vec![])
             }
         }
     }
 
-    /// Utility to split a list of peers between others and ourself
-    pub(crate) fn split_peers_and_self(
+    /// Utility to split a list of nodes between others and ourself
+    pub(crate) fn split_node_and_self(
         &self,
-        all_peers: Vec<Peer>,
-    ) -> (BTreeSet<Peer>, Option<Peer>) {
+        all_nodes: Vec<NodeId>,
+    ) -> (BTreeSet<NodeId>, Option<NodeId>) {
         let our_name = self.info().name();
-        let (peers, ourself): (BTreeSet<_>, BTreeSet<_>) = all_peers
+        let (nodes, ourself): (BTreeSet<_>, BTreeSet<_>) = all_nodes
             .into_iter()
-            .partition(|peer| peer.name() != our_name);
+            .partition(|node_id| node_id.name() != our_name);
         let optional_self = ourself.into_iter().next();
-        (peers, optional_self)
+        (nodes, optional_self)
     }
 }

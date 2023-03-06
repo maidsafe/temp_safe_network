@@ -7,11 +7,14 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::NodeState;
+
 use crate::types::keys::ed25519::Digest256;
-use crate::types::Peer;
+use crate::types::NodeId;
+
+use sn_consensus::Generation;
+
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
-use sn_consensus::Generation;
 use std::{
     collections::{BTreeMap, BTreeSet},
     net::SocketAddr,
@@ -66,10 +69,10 @@ impl DkgSessionId {
         self.elders.keys().copied()
     }
 
-    pub fn elder_peers(&self) -> impl Iterator<Item = Peer> + '_ {
+    pub fn elder_ids(&self) -> impl Iterator<Item = NodeId> + '_ {
         self.elders
             .iter()
-            .map(|(name, addr)| Peer::new(*name, *addr))
+            .map(|(name, addr)| NodeId::new(*name, *addr))
     }
 
     pub fn elder_index(&self, elder: XorName) -> Option<usize> {

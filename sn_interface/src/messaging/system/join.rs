@@ -21,7 +21,7 @@ pub struct JoinRequest {
 /// Response to a request to join a section
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum JoinResponse {
-    /// Message sent to joining peer containing the current node's
+    /// Message sent to joining node containing the current node's
     /// state as a member of the section.
     Approved(Decision<NodeState>),
     /// Join was rejected
@@ -33,7 +33,7 @@ pub enum JoinResponse {
 /// Reason of a join request being rejected
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum JoinRejectReason {
-    /// No new peers are currently accepted for joining
+    /// No new nodes are currently accepted for joining
     /// NB: Relocated nodes that try to join, are accepted even if joins are disallowed.
     JoinsDisallowed,
     /// The requesting node is not externally reachable

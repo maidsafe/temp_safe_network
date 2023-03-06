@@ -11,7 +11,7 @@ mod link;
 pub(crate) use link::Link;
 pub use link::LinkError;
 
-use sn_interface::{messaging::MsgId, types::Peer};
+use sn_interface::{messaging::MsgId, types::NodeId};
 
 use qp2p::Endpoint;
 use std::{collections::BTreeMap, fmt::Debug, sync::Arc};
@@ -21,12 +21,12 @@ use tokio::sync::RwLock;
 /// It keeps a Link instance per node, and it's designed to make sure
 /// underlying I/O connection resources are not leaked, overused or left dangling.
 #[derive(Clone, Debug)]
-pub(super) struct PeerLinks {
-    links: Arc<RwLock<BTreeMap<Peer, Link>>>,
+pub(super) struct NodeLinks {
+    links: Arc<RwLock<BTreeMap<NodeId, Link>>>,
     endpoint: Endpoint,
 }
 
-impl PeerLinks {
+impl NodeLinks {
     pub(super) fn new(endpoint: Endpoint) -> Self {
         Self {
             links: Arc::new(RwLock::new(BTreeMap::new())),
@@ -38,53 +38,53 @@ impl PeerLinks {
     /// I.e. it will not connect here, but on calling send on the returned link.
     pub(super) async fn get_or_create_link(
         &self,
-        peer: &Peer,
+        node_id: &NodeId,
         connect_now: bool,
         msg_id: Option<MsgId>,
     ) -> Link {
-        if let Some(link) = self.get(peer).await {
+        if let Some(link) = self.get(node_id).await {
             if connect_now {
                 if let Err(error) = link.create_connection_if_none_exist(msg_id).await {
                     error!(
-                        "Error during create connection attempt for link to {peer:?}: {error:?}"
+                        "Error during create connection attempt for link to {node_id:?}: {error:?}"
                     );
                 }
             }
             return link;
         }
 
-        // if peer is not in list, the entire list needs to be locked
+        // if node is not in list, the entire list needs to be locked
         // i.e. first comms to any node, will impact all sending at that instant..
         // however, first comms should be a minor part of total time spent using link,
         // so that is ok
         let mut links = self.links.write().await;
-        match links.get(peer).cloned() {
+        match links.get(node_id).cloned() {
             // someone else inserted in the meanwhile, so use that
             Some(link) => link,
             // still not in list, go ahead and create + insert
             None => {
-                let link = Link::new(*peer, self.endpoint.clone());
+                let link = Link::new(*node_id, self.endpoint.clone());
                 if connect_now {
                     if let Err(error) = link.create_connection_if_none_exist(msg_id).await {
-                        error!("Error during create connection attempt for link to {peer:?}: {error:?}");
+                        error!("Error during create connection attempt for link to {node_id:?}: {error:?}");
                     }
                 }
-                let _ = links.insert(*peer, link.clone());
+                let _ = links.insert(*node_id, link.clone());
                 link
             }
         }
     }
 
-    async fn get(&self, peer: &Peer) -> Option<Link> {
+    async fn get(&self, node_id: &NodeId) -> Option<Link> {
         let links = self.links.read().await;
-        links.get(peer).cloned()
+        links.get(node_id).cloned()
     }
 
-    /// Removes a link from PeerLinks.
+    /// Removes a link from NodeLinks.
     /// It does NOT disconnect it, as it could still be used to receveive messages on
-    pub(super) async fn remove_link_from_peer_links(&self, peer: &Peer) {
-        debug!("removing link with {peer:?}");
+    pub(super) async fn remove(&self, node_id: &NodeId) {
+        debug!("removing link with {node_id:?}");
         let mut links = self.links.write().await;
-        let _existing_link = links.remove(peer);
+        let _existing_link = links.remove(node_id);
     }
 }

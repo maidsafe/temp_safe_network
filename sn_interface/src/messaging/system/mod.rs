@@ -32,8 +32,8 @@ use std::{
 };
 use xor_name::XorName;
 
-/// List of peers of a section
-pub type SectionPeers = BTreeSet<Decision<NodeState>>;
+/// List of nodes of a section
+pub type SectionMembers = BTreeSet<Decision<NodeState>>;
 
 #[derive(Clone, PartialEq, Serialize, Deserialize, custom_debug::Debug)]
 #[allow(clippy::large_enum_variant, clippy::derive_partial_eq_without_eq)]

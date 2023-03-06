@@ -38,7 +38,7 @@ pub(super) fn find_nodes_to_relocate(
     churn_id: &ChurnId,
     excluded: BTreeSet<XorName>,
 ) -> Vec<(NodeState, XorName)> {
-    // Find the peers that pass the relocation check and take only the oldest ones to avoid
+    // Find the nodes that pass the relocation check and take only the oldest ones to avoid
     // relocating too many nodes at the same time.
     // Capped by criteria that cannot relocate too many node at once.
     let section_members = network_knowledge.section_members();
@@ -57,7 +57,7 @@ pub(super) fn find_nodes_to_relocate(
     let max_reloctions = elder_count() / 2;
     let allowed_relocations = min(section_size - recommended_section_size, max_reloctions);
 
-    // Find the peers that pass the relocation check
+    // Find the nodes that pass the relocation check
     let mut candidates: Vec<_> = section_members
         .into_iter()
         .filter(|state| network_knowledge.is_adult(&state.name()))
@@ -79,10 +79,10 @@ pub(super) fn find_nodes_to_relocate(
 
     candidates
         .into_iter()
-        .filter(|peer| peer.age() == max_age)
-        .map(|peer| {
-            let dst_section = XorName::from_content_parts(&[&peer.name().0, &churn_id.0]);
-            (peer, dst_section)
+        .filter(|node| node.age() == max_age)
+        .map(|node| {
+            let dst_section = XorName::from_content_parts(&[&node.name().0, &churn_id.0]);
+            (node, dst_section)
         })
         .take(allowed_relocations)
         .collect()
@@ -120,7 +120,7 @@ mod tests {
         elder_count,
         network_knowledge::{NodeState, SectionAuthorityProvider, SectionTree, MIN_ADULT_AGE},
         test_utils::TestKeys,
-        types::Peer,
+        types::NodeId,
     };
 
     use eyre::Result;
@@ -148,28 +148,28 @@ mod tests {
         #[test]
         #[allow(clippy::unwrap_used)]
         fn proptest_actions(
-            peers in arbitrary_unique_peers(2..(recommended_section_size() + elder_count()), MIN_ADULT_AGE..MAX_AGE),
+            nodes in arbitrary_unique_nodes(2..(recommended_section_size() + elder_count()), MIN_ADULT_AGE..MAX_AGE),
             signature_trailing_zeros in 0..MAX_AGE)
         {
-            proptest_actions_impl(peers, signature_trailing_zeros).unwrap()
+            proptest_actions_impl(nodes, signature_trailing_zeros).unwrap()
         }
     }
 
-    fn proptest_actions_impl(peers: Vec<Peer>, signature_trailing_zeros: u8) -> Result<()> {
+    fn proptest_actions_impl(nodes: Vec<NodeId>, signature_trailing_zeros: u8) -> Result<()> {
         let sk_set = bls::SecretKeySet::random(0, &mut thread_rng());
         let sk = sk_set.secret_key();
 
-        // Create `Section` with `peers` as its members and set the `elder_count()` oldest peers as
+        // Create `Section` with `nodes` as its members and set the `elder_count()` oldest nodes as
         // the elders.
         let sap = SectionAuthorityProvider::new(
-            peers
+            nodes
                 .iter()
-                .sorted_by_key(|peer| peer.age())
+                .sorted_by_key(|node_id| node_id.age())
                 .rev()
                 .take(elder_count())
                 .cloned(),
             Prefix::default(),
-            peers.iter().map(|p| NodeState::joined(*p, None)),
+            nodes.iter().map(|p| NodeState::joined(*p, None)),
             sk_set.public_keys(),
             0,
         );
@@ -177,8 +177,8 @@ mod tests {
         let tree = SectionTree::new(sap)?;
         let mut network_knowledge = NetworkKnowledge::new(Prefix::default(), tree)?;
 
-        for peer in &peers {
-            let info = NodeState::joined(*peer, None);
+        for node_id in &nodes {
+            let info = NodeState::joined(*node_id, None);
             let info = TestKeys::get_section_signed(&sk, info)?;
             assert!(network_knowledge.update_member(info));
         }
@@ -190,40 +190,40 @@ mod tests {
         let relocations =
             find_nodes_to_relocate(&network_knowledge, &churn_id, BTreeSet::default());
 
-        let allowed_relocations = if peers.len() > recommended_section_size() {
-            min(elder_count() / 2, peers.len() - recommended_section_size())
+        let allowed_relocations = if nodes.len() > recommended_section_size() {
+            min(elder_count() / 2, nodes.len() - recommended_section_size())
         } else {
             0
         };
 
-        // Only the oldest matching peers should be relocated.
-        let expected_relocated_age = peers
+        // Only the oldest matching nodes should be relocated.
+        let expected_relocated_age = nodes
             .iter()
-            .filter(|peer| network_knowledge.is_adult(&peer.name()))
-            .map(Peer::age)
+            .filter(|node| network_knowledge.is_adult(&node.name()))
+            .map(NodeId::age)
             .filter(|age| *age <= signature_trailing_zeros)
             .max();
 
-        let mut expected_relocated_peers: Vec<_> = peers
+        let mut expected_relocated_nodes: Vec<_> = nodes
             .iter()
-            .filter(|peer| network_knowledge.is_adult(&peer.name()))
-            .filter(|peer| Some(peer.age()) == expected_relocated_age)
+            .filter(|node_id| network_knowledge.is_adult(&node_id.name()))
+            .filter(|node_id| Some(node_id.age()) == expected_relocated_age)
             .collect();
 
         let churn_id_name = XorName::from_content(&churn_id.0);
-        expected_relocated_peers
+        expected_relocated_nodes
             .sort_by(|lhs, rhs| churn_id_name.cmp_distance(&lhs.name(), &rhs.name()));
-        let expected_relocated_peers: Vec<_> = expected_relocated_peers
+        let expected_relocated_nodes: Vec<_> = expected_relocated_nodes
             .iter()
             .take(allowed_relocations)
             .collect();
 
-        assert_eq!(expected_relocated_peers.len(), relocations.len());
+        assert_eq!(expected_relocated_nodes.len(), relocations.len());
 
         // NOTE: `zip` works here, as both collections are sorted by the same criteria.
-        for (peer, (state, dst)) in expected_relocated_peers.into_iter().zip(relocations) {
-            assert_eq!(peer.name(), state.peer().name());
-            let dst_section = XorName::from_content_parts(&[&peer.name().0, &churn_id.0]);
+        for (node_id, (state, dst)) in expected_relocated_nodes.into_iter().zip(relocations) {
+            assert_eq!(node_id.name(), state.node_id().name()); // Note: shouldn't addr also be compared?
+            let dst_section = XorName::from_content_parts(&[&node_id.name().0, &churn_id.0]);
             assert_eq!(dst_section, dst);
         }
 
@@ -265,19 +265,19 @@ mod tests {
         }
     }
 
-    // Generate Vec<Peer> where no two peers have the same name.
-    fn arbitrary_unique_peers(
+    // Generate Vec<NodeId> where no two nodes have the same name.
+    fn arbitrary_unique_nodes(
         count: impl Into<SizeRange>,
         age: impl Strategy<Value = u8>,
-    ) -> impl Strategy<Value = Vec<Peer>> {
+    ) -> impl Strategy<Value = Vec<NodeId>> {
         proptest::collection::btree_map(arbitrary_bytes(), (any::<SocketAddr>(), age), count)
-            .prop_map(|peers| {
-                peers
+            .prop_map(|nodes| {
+                nodes
                     .into_iter()
                     .map(|(mut bytes, (addr, age))| {
                         bytes[XOR_NAME_LEN - 1] = age;
                         let name = XorName(bytes);
-                        Peer::new(name, addr)
+                        NodeId::new(name, addr)
                     })
                     .collect()
             })

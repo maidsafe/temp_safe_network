@@ -19,7 +19,7 @@ use sn_interface::{
     dbcs::gen_genesis_dbc,
     messaging::system::SectionSigned,
     network_knowledge::{NetworkKnowledge, SectionsDAG, GENESIS_DBC_SK},
-    types::{log_markers::LogMarker, Peer},
+    types::{log_markers::LogMarker, NodeId},
     SectionAuthorityProvider,
 };
 
@@ -37,13 +37,12 @@ impl MyNode {
         genesis_sk_set: bls::SecretKeySet,
         fault_cmds_sender: mpsc::Sender<FaultsCmd>,
     ) -> Result<(Self, Dbc)> {
-        let peer = Peer::from(comm.socket_addr(), keypair.public);
-
+        let node_id = NodeId::from_key(comm.socket_addr(), keypair.public);
         let genesis_dbc =
             gen_genesis_dbc(&genesis_sk_set, &bls::SecretKey::from_hex(GENESIS_DBC_SK)?)?;
 
         let (network_knowledge, section_key_share) =
-            NetworkKnowledge::first_node(peer, genesis_sk_set)?;
+            NetworkKnowledge::first_node(node_id, genesis_sk_set)?;
 
         let node = Self::new(
             comm,

@@ -10,7 +10,7 @@ use crate::node::{
     core::DkgSessionInfo,
     dkg::{check_ephemeral_dkg_key, DkgPubKeys},
     flow_ctrl::cmds::Cmd,
-    messaging::Peers,
+    messaging::Recipients,
     Error, MyNode, Result,
 };
 
@@ -20,7 +20,7 @@ use sn_interface::{
         AuthorityProof, MsgId, SectionSig,
     },
     network_knowledge::{SectionAuthorityProvider, SectionKeyShare},
-    types::{self, log_markers::LogMarker, Peer},
+    types::{self, log_markers::LogMarker, NodeId, Participant},
 };
 
 use bls::{PublicKey as BlsPublicKey, PublicKeySet, SecretKeyShare};
@@ -29,12 +29,12 @@ use sn_sdkg::{DkgSignedVote, VoteResponse};
 use std::collections::BTreeSet;
 use xor_name::XorName;
 
-/// Helper to get our DKG peers (excluding us)
-fn dkg_peers(our_index: usize, session_id: &DkgSessionId) -> BTreeSet<Peer> {
+/// Helper to get our DKG nodes (excluding us)
+fn dkg_nodes(our_index: usize, session_id: &DkgSessionId) -> BTreeSet<NodeId> {
     session_id
-        .elder_peers()
+        .elder_ids()
         .enumerate()
-        .filter_map(|(index, peer)| (index != our_index).then_some(peer))
+        .filter_map(|(index, node_id)| (index != our_index).then_some(node_id))
         .collect()
 }
 
@@ -71,7 +71,7 @@ impl MyNode {
     /// - Section Split
     pub(crate) fn send_dkg_start(&mut self, session_id: DkgSessionId) -> Result<Vec<Cmd>> {
         // Send DKG start to all candidates
-        let recipients = Vec::from_iter(session_id.elder_peers());
+        let recipients = Vec::from_iter(session_id.elder_ids());
 
         trace!(
             "{} s{} {:?} with {:?} to {:?}",
@@ -102,7 +102,7 @@ impl MyNode {
 
         // send it to the other participants
         if !others.is_empty() {
-            cmds.push(Cmd::send_msg(node_msg, Peers::Multiple(others)))
+            cmds.push(Cmd::send_msg(node_msg, Recipients::Multiple(others)))
         }
 
         // handle our own
@@ -144,7 +144,7 @@ impl MyNode {
         participant_index: usize,
         votes: Vec<DkgSignedVote>,
     ) -> Cmd {
-        let recipients = dkg_peers(participant_index, session_id);
+        let recipients = dkg_nodes(participant_index, session_id);
         trace!(
             "{} s{}: {:?}",
             LogMarker::DkgBroadcastVote,
@@ -156,12 +156,12 @@ impl MyNode {
             pub_keys,
             votes,
         };
-        Cmd::send_msg(node_msg, Peers::Multiple(recipients))
+        Cmd::send_msg(node_msg, Recipients::Multiple(recipients))
     }
 
-    fn request_dkg_ae(&self, session_id: &DkgSessionId, sender: Peer) -> Cmd {
+    fn request_dkg_ae(&self, session_id: &DkgSessionId, sender: NodeId) -> Cmd {
         let node_msg = NodeMsg::DkgAE(session_id.clone());
-        Cmd::send_msg(node_msg, Peers::Single(sender))
+        Cmd::send_msg(node_msg, Recipients::Single(Participant::from_node(sender)))
     }
 
     fn aggregate_dkg_start(
@@ -279,7 +279,7 @@ impl MyNode {
             LogMarker::DkgBroadcastEphemeralPubKey,
             session_id.sh(),
         );
-        let peers = dkg_peers(our_id, &session_id);
+        let nodes = dkg_nodes(our_id, &session_id);
         let node_msg = NodeMsg::DkgEphemeralPubKey {
             session_id,
             section_auth,
@@ -287,7 +287,7 @@ impl MyNode {
             sig,
         };
 
-        let cmd = Cmd::send_msg(node_msg, Peers::Multiple(peers));
+        let cmd = Cmd::send_msg(node_msg, Recipients::Multiple(nodes));
         Ok(vec![cmd])
     }
 
@@ -297,7 +297,7 @@ impl MyNode {
         section_auth: AuthorityProof<SectionSig>,
         pub_key: BlsPublicKey,
         sig: Signature,
-        sender: Peer,
+        sender: NodeId,
     ) -> Result<Vec<Cmd>> {
         trace!(
             "Detected missed dkg start for s{:?} after msg from {sender:?}",
@@ -345,7 +345,7 @@ impl MyNode {
         section_auth: AuthorityProof<SectionSig>,
         pub_key: BlsPublicKey,
         sig: Signature,
-        sender: Peer,
+        sender: NodeId,
     ) -> Result<Vec<Cmd>> {
         // make sure we are in this dkg session
         let name = types::keys::ed25519::name(&self.keypair.public);
@@ -405,7 +405,7 @@ impl MyNode {
         &mut self,
         session_id: &DkgSessionId,
         pub_keys: DkgPubKeys,
-        sender: Peer,
+        sender: NodeId,
         our_id: usize,
         vote_response: VoteResponse,
     ) -> (Vec<Cmd>, Vec<Cmd>) {
@@ -441,7 +441,7 @@ impl MyNode {
         session_id: &DkgSessionId,
         msg_keys: DkgPubKeys,
         votes: Vec<DkgSignedVote>,
-        sender: Peer,
+        sender: NodeId,
     ) -> Result<Vec<Cmd>> {
         // make sure we are in this dkg session
         let name = types::keys::ed25519::name(&self.keypair.public);
@@ -539,7 +539,7 @@ impl MyNode {
     fn gossip_missing_votes(
         &self,
         session_id: &DkgSessionId,
-        sender: Peer,
+        sender: NodeId,
         their_votes_len: usize,
     ) -> Result<Vec<Cmd>> {
         let our_votes = self.dkg_voter.get_all_votes(session_id)?;
@@ -555,7 +555,7 @@ impl MyNode {
                 pub_keys,
                 votes: our_votes,
             };
-            let cmd = Cmd::send_msg(node_msg, Peers::Single(sender));
+            let cmd = Cmd::send_msg(node_msg, Recipients::Single(Participant::from_node(sender)));
             Ok(vec![cmd])
         } else {
             Ok(vec![])
@@ -565,7 +565,7 @@ impl MyNode {
     pub(crate) fn handle_dkg_anti_entropy(
         &self,
         session_id: DkgSessionId,
-        sender: Peer,
+        sender: NodeId,
     ) -> Result<Vec<Cmd>> {
         let pub_keys = self.dkg_voter.get_dkg_keys(&session_id)?;
         let votes = self.dkg_voter.get_all_votes(&session_id)?;
@@ -579,7 +579,7 @@ impl MyNode {
             pub_keys,
             votes,
         };
-        let cmd = Cmd::send_msg(node_msg, Peers::Single(sender));
+        let cmd = Cmd::send_msg(node_msg, Recipients::Single(Participant::from_node(sender)));
         Ok(vec![cmd])
     }
 
@@ -658,14 +658,14 @@ impl MyNode {
         );
 
         // broadcast our key
-        let peers = dkg_peers(our_id, &session_id);
+        let nodes = dkg_nodes(our_id, &session_id);
         let node_msg = NodeMsg::DkgEphemeralPubKey {
             session_id,
             section_auth,
             pub_key: *pub_key,
             sig: *sig,
         };
-        let cmd = Cmd::send_msg(node_msg, Peers::Multiple(peers));
+        let cmd = Cmd::send_msg(node_msg, Recipients::Multiple(nodes));
         vec![cmd]
     }
 
@@ -828,9 +828,9 @@ impl MyNode {
                 sig_share: sig_share.clone(),
             };
             let current_elders: Vec<_> = self.network_knowledge.section_auth().elders_vec();
-            let (other_elders, myself) = self.split_peers_and_self(current_elders);
-            let peers = Peers::Multiple(other_elders);
-            cmds.push(Cmd::send_msg(msg, peers));
+            let (other_elders, myself) = self.split_node_and_self(current_elders);
+            let nodes = Recipients::Multiple(other_elders);
+            cmds.push(Cmd::send_msg(msg, nodes));
 
             // Handle it if we are an elder
             if let Some(elder) = myself {
@@ -864,7 +864,7 @@ mod tests {
             NetworkMsg, SectionSigShare,
         },
         network_knowledge::{supermajority, NodeState, SectionKeyShare},
-        types::Peer,
+        types::NodeId,
     };
 
     use assert_matches::assert_matches;
@@ -904,7 +904,7 @@ mod tests {
                 info!("\n\n NODE: {name}");
 
                 while let Some(msg) = get_next_msg(comm_rx).await {
-                    let cmds = test_node.test_handle_msg_from_peer(msg, None).await?;
+                    let cmds = test_node.test_handle_msg(msg, None).await?;
                     for cmd in cmds {
                         info!("Got cmd {}", cmd);
                         if let Cmd::SendMsg { .. } = &cmd {
@@ -963,7 +963,7 @@ mod tests {
                 info!("\n\n NODE: {name}");
 
                 while let Some(msg) = get_next_msg(comm_rx).await {
-                    for mut cmd in test_node.test_handle_msg_from_peer(msg, None).await? {
+                    for mut cmd in test_node.test_handle_msg(msg, None).await? {
                         info!("Got cmd {}", cmd);
                         if let Cmd::SendMsg { .. } = cmd {
                             cmd.filter_recipients(BTreeSet::from([dead_node]))?;
@@ -983,7 +983,7 @@ mod tests {
         Ok(())
     }
 
-    // We randomly drop an outbound `NodeMsg` to a peer, this will effectively stall the dkg since
+    // We randomly drop an outbound `NodeMsg` to a node, this will effectively stall the dkg since
     // some nodes don't receive certain votes. We solve this by gossiping the votes from a random
     // node until we reach termination.
     #[tokio::test]
@@ -1014,7 +1014,7 @@ mod tests {
                 tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
 
                 while let Some(msg) = get_next_msg(comm_rx).await {
-                    for mut cmd in test_node.test_handle_msg_from_peer(msg, None).await? {
+                    for mut cmd in test_node.test_handle_msg(msg, None).await? {
                         info!("Got cmd {}", cmd);
                         if let Cmd::SendMsg { ref recipients, .. } = cmd {
                             // (1/node_count) chance to drop a msg
@@ -1025,7 +1025,7 @@ mod tests {
                                     .into_iter()
                                     .map(|p| p.name())
                                     .nth(rng.gen::<usize>() % recp_count)
-                                    .ok_or_else(|| eyre!("Contains node_count peers"))?;
+                                    .ok_or_else(|| eyre!("Contains node_count nodes"))?;
                                 cmd.filter_recipients(BTreeSet::from([drop_recp]))?;
                             };
                             assert!(test_node.process_cmd(cmd).await?.is_empty());
@@ -1128,10 +1128,7 @@ mod tests {
         }
         let bootstrap_members = elders
             .iter()
-            .map(|(name, addr)| {
-                let peer = Peer::new(*name, *addr);
-                NodeState::joined(peer, None)
-            })
+            .map(|(name, addr)| NodeState::joined(NodeId::new(*name, *addr), None))
             .collect::<BTreeSet<_>>();
         // A DKG session which just creates a new key for the same set of elders
         let session_id = DkgSessionId {

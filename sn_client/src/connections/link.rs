@@ -6,34 +6,35 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::Peer;
-
 use qp2p::{Connection, Endpoint, RecvStream, StreamError, UsrMsgBytes};
-use sn_interface::{messaging::MsgId, types::log_markers::LogMarker};
+use sn_interface::{
+    messaging::MsgId,
+    types::{log_markers::LogMarker, NodeId},
+};
 use std::{collections::BTreeMap, sync::Arc};
 use tokio::sync::RwLock;
 
 type ConnId = String;
 
-/// A link to a peer in the network.
+/// A link to a node in the network.
 ///
 /// The upper layers will add incoming connections to the link,
 /// and use the link to send msgs.
 /// Using the link will open a connection if there is none there.
-/// The link is a way to keep connections to a peer in one place
+/// The link is a way to keep connections to a node in one place
 /// and use them efficiently; converge to a single one regardless of concurrent
-/// comms initiation between the peers, and so on.
+/// comms initiation between the client a node, and so on.
 #[derive(Clone, Debug)]
 pub(crate) struct Link {
-    peer: Peer,
+    node_id: NodeId,
     endpoint: Endpoint,
     connections: Arc<RwLock<BTreeMap<ConnId, Arc<Connection>>>>,
 }
 
 impl Link {
-    pub(crate) fn new(peer: Peer, endpoint: Endpoint) -> Self {
+    pub(crate) fn new(node_id: NodeId, endpoint: Endpoint) -> Self {
         Self {
-            peer,
+            node_id,
             endpoint,
             connections: Arc::new(RwLock::new(BTreeMap::new())),
         }
@@ -44,22 +45,22 @@ impl Link {
         bytes: UsrMsgBytes,
         msg_id: MsgId,
     ) -> Result<RecvStream, LinkError> {
-        let peer = self.peer;
-        debug!("sending bidi msg out... {msg_id:?} to {peer:?}");
+        let node_id = self.node_id;
+        debug!("sending bidi msg out... {msg_id:?} to {node_id:?}");
         let conn = self.get_or_connect(msg_id).await?;
         debug!(
-            "connection got {msg_id:?} to {peer:?}, conn_id={}",
+            "connection got {msg_id:?} to {node_id:?}, conn_id={}",
             conn.id()
         );
         let (mut send_stream, recv_stream) = conn.open_bi().await.map_err(LinkError::Connection)?;
 
-        debug!("{msg_id:?} to {peer:?} bidi opened");
+        debug!("{msg_id:?} to {node_id:?} bidi opened");
         send_stream.set_priority(10);
         send_stream
             .send_user_msg(bytes.clone())
             .await
             .map_err(LinkError::Send)?;
-        debug!("{msg_id:?} bidi msg sent to {peer:?}");
+        debug!("{msg_id:?} bidi msg sent to {node_id:?}");
 
         // Attempt to gracefully terminate the stream.
         match send_stream.finish().await {
@@ -70,7 +71,7 @@ impl Link {
             // Propagate any other error, which means we should probably retry on a higher level.
             Err(err) => Err(LinkError::Send(err)),
         }?;
-        debug!("{msg_id:?} to {peer:?} bidi finished");
+        debug!("{msg_id:?} to {node_id:?} bidi finished");
 
         Ok(recv_stream)
     }
@@ -85,7 +86,7 @@ impl Link {
             // first caller will find none again, but the subsequent callers
             // will access only after the first one finished creating a new connection
             // thus will find a connection here:
-            debug!("{msg_id:?} creating conn with {:?}", self.peer);
+            debug!("{msg_id:?} creating conn with {:?}", self.node_id);
             self.create_connection_if_none_exist(Some(msg_id)).await
         } else {
             debug!("{msg_id:?} connections do exist...");
@@ -108,29 +109,29 @@ impl Link {
         &self,
         msg_id: Option<MsgId>,
     ) -> Result<Arc<Connection>, LinkError> {
-        let peer = self.peer;
+        let node_id = self.node_id;
         // grab write lock to prevent many many conns being opened at once
-        debug!("[CONN WRITE]: {msg_id:?} to {peer:?}");
+        debug!("[CONN WRITE]: {msg_id:?} to {node_id:?}");
         let mut conns_write_lock = self.connections.write().await;
-        debug!("[CONN WRITE]: lock obtained {msg_id:?} to {peer:?}");
+        debug!("[CONN WRITE]: lock obtained {msg_id:?} to {node_id:?}");
 
         // let's double check we havent got a connection meanwhile
         if let Some(conn) = conns_write_lock.iter().next().map(|(_, c)| c.clone()) {
             debug!(
-                "{msg_id:?} Connection already exists in Link to {peer:?}, using that, conn_id={}",
+                "{msg_id:?} Connection already exists in Link to {node_id:?}, using that, conn_id={}",
                 conn.id()
             );
             return Ok(conn);
         }
 
-        debug!("{msg_id:?} creating conn to {peer:?}");
+        debug!("{msg_id:?} creating conn to {node_id:?}");
         let (conn, _incoming_msgs) = self
             .endpoint
-            .connect_to(&peer.addr())
+            .connect_to(&node_id.addr())
             .await
             .map_err(LinkError::Connection)?;
 
-        debug!("{msg_id:?} conn creating done {peer:?}");
+        debug!("{msg_id:?} conn creating done {node_id:?}");
         trace!(
             "{} to {} (id: {})",
             LogMarker::ConnectionOpened,
@@ -149,8 +150,8 @@ impl Link {
 #[derive(Debug)]
 /// Errors returned when using a Link
 pub enum LinkError {
-    /// Failed to connect to a peer
+    /// Failed to connect to a node
     Connection(qp2p::ConnectionError),
-    /// Failed to send a msg to a peer
+    /// Failed to send a msg to a node
     Send(qp2p::SendError),
 }
