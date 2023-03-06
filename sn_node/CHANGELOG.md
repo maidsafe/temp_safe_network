@@ -5,22 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.77.11 (2023-03-06)
+## v0.77.12 (2023-03-06)
 
 ### Chore
 
- - <csr-id-2ee7de8e1e660f1b08790edb01b25c8212050ff7/> remove need for  started_relocating and improve logging
- - <csr-id-74a8ed5decd543de9484589a0d004e8d98b266ee/> ignore JoinResponse messages when we are already a member.
-   This avoids some heavy lifting validating the response that
-   is not necessary
+ - <csr-id-e1698b479354f21f08bfc1776ff1f88b29ad6bc2/> warn on error while processing NodeMsgs
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
- - 3 days passed between releases.
- - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 1 commit contributed to the release.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -30,6 +26,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Warn on error while processing NodeMsgs ([`e1698b4`](https://github.com/maidsafe/safe_network/commit/e1698b479354f21f08bfc1776ff1f88b29ad6bc2))
+</details>
+
+## v0.77.11 (2023-03-06)
+
+<csr-id-2ee7de8e1e660f1b08790edb01b25c8212050ff7/>
+<csr-id-74a8ed5decd543de9484589a0d004e8d98b266ee/>
+
+### Chore
+
+ - <csr-id-2ee7de8e1e660f1b08790edb01b25c8212050ff7/> remove need for  started_relocating and improve logging
+ - <csr-id-74a8ed5decd543de9484589a0d004e8d98b266ee/> ignore JoinResponse messages when we are already a member.
+   This avoids some heavy lifting validating the response that
+   is not necessary
+
+### Chore
+
+ - <csr-id-2566e03dc40a8b2aa63bb35b73d8423a70c6d1d1/> sn_interface-0.19.6/sn_node-0.77.11
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 3 days passed between releases.
+ - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Sn_interface-0.19.6/sn_node-0.77.11 ([`2566e03`](https://github.com/maidsafe/safe_network/commit/2566e03dc40a8b2aa63bb35b73d8423a70c6d1d1))
     - Remove need for  started_relocating and improve logging ([`2ee7de8`](https://github.com/maidsafe/safe_network/commit/2ee7de8e1e660f1b08790edb01b25c8212050ff7))
     - Ignore JoinResponse messages when we are already a member. ([`74a8ed5`](https://github.com/maidsafe/safe_network/commit/74a8ed5decd543de9484589a0d004e8d98b266ee))
 </details>
@@ -37,6 +69,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## v0.77.10 (2023-03-02)
 
 <csr-id-4b84cd72c25f7074d966771928685174a76d6ef7/>
+<csr-id-e5872a6684a6858f6d9d6379a6a63b8e3d525ba1/>
 
 ### Chore
 
