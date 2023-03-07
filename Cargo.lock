@@ -4247,7 +4247,7 @@ dependencies = [
  "signature",
  "sn_comms",
  "sn_consensus",
- "sn_dbc 9.0.0",
+ "sn_dbc",
  "sn_fault_detection",
  "sn_interface",
  "sn_sdkg",
