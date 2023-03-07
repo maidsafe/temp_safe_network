@@ -430,7 +430,7 @@ mod tests {
         messaging::{AntiEntropyMsg, Dst, MsgId, MsgKind},
         network_knowledge::MyNodeInfo,
         test_utils::prefix,
-        types::{keys::ed25519, RewardPeer},
+        types::{keys::ed25519, RewardNodeId},
     };
 
     use bls::SecretKey;
@@ -599,8 +599,8 @@ mod tests {
 
     fn create_msg(src_section_prefix: &Prefix, src_section_pk: BlsPublicKey) -> Result<WireMsg> {
         let keypair = ed25519::gen_keypair(&src_section_prefix.range_inclusive(), MIN_ADULT_AGE);
-        let peer = RewardPeer::random_w_key(keypair.public);
-        let sender = MyNodeInfo::new(keypair, peer);
+        let node_id = RewardNodeId::random_w_key(keypair.public);
+        let sender = MyNodeInfo::new(keypair, node_id);
 
         // just some message we can construct easily
         let payload_msg = AntiEntropyMsg::Probe(src_section_pk);

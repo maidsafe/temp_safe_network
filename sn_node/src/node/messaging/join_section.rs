@@ -143,7 +143,7 @@ mod tests {
         let joiner_node_id = info.id();
         let some_cmd = MyNode::handle_join(
             joiner_node_id,
-            JoinDetails::New(info.reward_id().reward_key()),
+            JoinDetails::New(info.reward_node_id().reward_key()),
             MsgId::new(),
             None,
             &mut elder,
@@ -212,7 +212,7 @@ mod tests {
         let joiner_node_id = info.id();
         let cmds = MyNode::handle_join(
             joiner_node_id,
-            JoinDetails::New(info.reward_id().reward_key()),
+            JoinDetails::New(info.reward_node_id().reward_key()),
             MsgId::new(),
             None,
             &mut adult,
@@ -255,7 +255,7 @@ mod tests {
         let joiner_node_id = info.id();
         let cmds = MyNode::handle_join(
             joiner_node_id,
-            JoinDetails::New(info.reward_id().reward_key()),
+            JoinDetails::New(info.reward_node_id().reward_key()),
             MsgId::new(),
             None,
             &mut elder,
@@ -296,7 +296,7 @@ mod tests {
         let joiner_node_id = info.id();
         let cmds = MyNode::handle_join(
             joiner_node_id,
-            JoinDetails::New(info.reward_id().reward_key()),
+            JoinDetails::New(info.reward_node_id().reward_key()),
             MsgId::new(),
             None,
             &mut elder,
@@ -340,7 +340,7 @@ mod tests {
         let joiner_node_id = info.id();
         let cmds = MyNode::handle_join(
             joiner_node_id,
-            JoinDetails::New(info.reward_id().reward_key()),
+            JoinDetails::New(info.reward_node_id().reward_key()),
             MsgId::new(),
             None,
             &mut elder,

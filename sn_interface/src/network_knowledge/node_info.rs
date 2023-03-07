@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::types::{utils::calc_age, NodeId, PublicKey, RewardPeer};
+use crate::types::{utils::calc_age, NodeId, PublicKey, RewardNodeId};
 use ed25519_dalek::Keypair;
 use std::{
     fmt::{self, Display, Formatter},
@@ -18,7 +18,7 @@ use xor_name::XorName;
 /// Information and state of our node
 #[derive(Clone, custom_debug::Debug)]
 pub struct MyNodeInfo {
-    pub node_id: RewardPeer,
+    pub reward_node_id: RewardNodeId,
     // Keep the secret key in Arc to allow Clone while also preventing multiple copies to exist in
     // memory which might be insecure.
     #[debug(skip)]
@@ -26,27 +26,27 @@ pub struct MyNodeInfo {
 }
 
 impl MyNodeInfo {
-    pub fn new(keypair: Keypair, node_id: RewardPeer) -> Self {
+    pub fn new(keypair: Keypair, reward_node_id: RewardNodeId) -> Self {
         Self {
-            node_id,
+            reward_node_id,
             keypair: Arc::new(keypair),
         }
     }
 
     pub fn id(&self) -> NodeId {
-        NodeId::new(self.name(), self.addr())
+        self.reward_node_id.node_id()
     }
 
-    pub fn reward_id(&self) -> RewardPeer {
-        self.node_id
+    pub fn reward_node_id(&self) -> RewardNodeId {
+        self.reward_node_id
     }
 
     pub fn addr(&self) -> SocketAddr {
-        self.node_id.addr()
+        self.reward_node_id.addr()
     }
 
     pub fn name(&self) -> XorName {
-        self.node_id.name()
+        self.reward_node_id.name()
     }
 
     pub fn public_key(&self) -> PublicKey {

@@ -10,7 +10,7 @@ use super::NodeState;
 use crate::{
     messaging::system::{DkgSessionId, SectionSig, SectionSigned},
     network_knowledge::SectionsDAG,
-    types::{NodeId, RewardPeer},
+    types::{NodeId, RewardNodeId},
 };
 
 use bls::{PublicKey, PublicKeySet};
@@ -63,7 +63,7 @@ pub struct SectionAuthorityProvider {
     /// Public key set of the section.
     public_key_set: PublicKeySet,
     /// The section's complete set of elders.
-    elders: BTreeSet<RewardPeer>,
+    elders: BTreeSet<RewardNodeId>,
     /// The section members at the time of this elder churn.
     members: BTreeSet<NodeState>,
     /// The membership generation this SAP was instantiated on
@@ -150,7 +150,7 @@ impl SectionAuthorityProvider {
         membership_gen: Generation,
     ) -> Self
     where
-        E: IntoIterator<Item = RewardPeer>,
+        E: IntoIterator<Item = RewardNodeId>,
         M: IntoIterator<Item = NodeState>,
     {
         Self {
@@ -176,8 +176,8 @@ impl SectionAuthorityProvider {
         self.prefix
     }
 
-    // TODO: this should return &BTreeSet<RewardPeer>, let the caller turn it into an iter
-    pub fn elders(&self) -> impl Iterator<Item = &RewardPeer> + '_ {
+    // TODO: this should return &BTreeSet<RewardNodeId>, let the caller turn it into an iter
+    pub fn elders(&self) -> impl Iterator<Item = &RewardNodeId> + '_ {
         self.elders.iter()
     }
 
@@ -394,7 +394,7 @@ pub mod test_utils {
             let members = elder_nodes
                 .iter()
                 .chain(adult_nodes.iter())
-                .map(|i| NodeState::joined(i.reward_id(), None));
+                .map(|i| NodeState::joined(i.reward_node_id(), None));
 
             let sk_set = if let Some(sk) = self.sk_set {
                 sk
@@ -403,7 +403,7 @@ pub mod test_utils {
             };
 
             let sap = SectionAuthorityProvider::new(
-                elder_nodes.iter().map(|i| i.reward_id()),
+                elder_nodes.iter().map(|i| i.reward_node_id()),
                 self.prefix,
                 members,
                 sk_set.public_keys(),

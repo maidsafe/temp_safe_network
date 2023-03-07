@@ -22,7 +22,6 @@ mod cache;
 mod chunk;
 mod errors;
 mod identities;
-mod reward_peer;
 
 pub use crate::messaging::{
     data::{Error as DataError, RegisterCmd},
@@ -33,14 +32,13 @@ pub use address::{ChunkAddress, DataAddress, RegisterAddress, SpentbookAddress};
 pub use cache::Cache;
 pub use chunk::{Chunk, MAX_CHUNK_SIZE_IN_BYTES};
 pub use errors::{Error, Result};
-pub use identities::{ClientId, NodeId, Participant};
+pub use identities::{ClientId, NodeId, Participant, RewardNodeId};
 pub use keys::{
     keypair::{BlsKeypairShare, Encryption, Keypair, OwnerType, Signing},
     public_key::{bls_from_hex, PublicKey},
     secret_key::SecretKey,
     signature::{Signature, SignatureShare},
 };
-pub use reward_peer::RewardPeer;
 
 use serde::{Deserialize, Serialize};
 use xor_name::XorName;

@@ -77,14 +77,14 @@ pub(crate) fn try_split_dkg(
     // create the DKG session IDs
     let zero_id = DkgSessionId {
         prefix: zero_prefix,
-        elders: BTreeSet::from_iter(zero_elders.iter().map(|node| *node.reward_id())),
+        elders: BTreeSet::from_iter(zero_elders.iter().map(|node| *node.reward_node_id())),
         section_chain_len,
         bootstrap_members: zero,
         membership_gen,
     };
     let one_id = DkgSessionId {
         prefix: one_prefix,
-        elders: BTreeSet::from_iter(one_elders.iter().map(|node| *node.reward_id())),
+        elders: BTreeSet::from_iter(one_elders.iter().map(|node| *node.reward_node_id())),
         section_chain_len,
         bootstrap_members: one,
         membership_gen,

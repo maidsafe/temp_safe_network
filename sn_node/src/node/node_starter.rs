@@ -17,7 +17,7 @@ use crate::UsedSpace;
 use sn_comms::Comm;
 use sn_interface::{
     network_knowledge::{NetworkKnowledge, SectionTree, MIN_ADULT_AGE},
-    types::{keys::ed25519, log_markers::LogMarker, NodeId, RewardPeer},
+    types::{keys::ed25519, log_markers::LogMarker, NodeId, RewardNodeId},
 };
 
 use std::{path::Path, sync::Arc, time::Duration};
@@ -163,7 +163,7 @@ async fn start_genesis_node(
     // Genesis node having a fix age of 255.
     let keypair = ed25519::gen_keypair(&Prefix::default().range_inclusive(), 255);
     let node_name = ed25519::name(&keypair.public);
-    let peer = RewardPeer::new(NodeId::new(node_name, comm.socket_addr()), reward_key);
+    let node_id = RewardNodeId::new(NodeId::new(node_name, comm.socket_addr()), reward_key);
 
     info!(
         "{} Starting a new network as the genesis node (PID: {}).",
@@ -175,7 +175,7 @@ async fn start_genesis_node(
     // as well as the owner of the genesis DBC minted by this first node of the network.
     let genesis_sk_set = bls::SecretKeySet::random(0, &mut rand::thread_rng());
     let (node, genesis_dbc) = MyNode::first_node(
-        peer,
+        node_id,
         comm,
         keypair,
         used_space.clone(),
@@ -212,7 +212,7 @@ async fn start_normal_node(
 ) -> Result<MyNode> {
     let keypair = ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE);
     let node_name = ed25519::name(&keypair.public);
-    let peer = RewardPeer::new(NodeId::new(node_name, comm.socket_addr()), reward_key);
+    let node_id = RewardNodeId::new(NodeId::new(node_name, comm.socket_addr()), reward_key);
 
     info!("{} Bootstrapping as a new node.", node_name);
     let section_tree_path = config.network_contacts_file().ok_or_else(|| {
@@ -231,7 +231,7 @@ async fn start_normal_node(
     );
 
     let node = MyNode::new(
-        peer,
+        node_id,
         comm,
         Arc::new(keypair),
         network_knowledge,

@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::NodeState;
-use crate::types::{keys::ed25519::Digest256, NodeId, RewardPeer};
+use crate::types::{keys::ed25519::Digest256, NodeId, RewardNodeId};
 
 use sn_consensus::Generation;
 
@@ -23,7 +23,7 @@ pub struct DkgSessionId {
     /// Prefix of the session we are elder candidates for
     pub prefix: Prefix,
     /// Other Elders in this dkg session
-    pub elders: BTreeSet<RewardPeer>,
+    pub elders: BTreeSet<RewardNodeId>,
     /// The length of the section chain main branch.
     pub section_chain_len: u64,
     /// The bootstrap members for the next Membership instance.
@@ -68,7 +68,7 @@ impl DkgSessionId {
         self.elders.iter().map(|e| e.node_id())
     }
 
-    pub fn elders(&self) -> impl Iterator<Item = RewardPeer> + '_ {
+    pub fn elders(&self) -> impl Iterator<Item = RewardNodeId> + '_ {
         self.elders.iter().cloned()
     }
 

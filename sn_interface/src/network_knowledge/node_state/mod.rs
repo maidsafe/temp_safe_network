@@ -11,7 +11,7 @@ mod relocation;
 pub use relocation::{RelocationDst, RelocationInfo, RelocationProof, RelocationState};
 
 use crate::network_knowledge::{section_has_room_for_node, Error, Result};
-use crate::types::{NodeId, RewardPeer};
+use crate::types::{NodeId, RewardNodeId};
 
 use serde::{Deserialize, Serialize};
 use std::{
@@ -35,7 +35,7 @@ pub enum MembershipState {
 /// Information about a member of our section.
 #[derive(Clone, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct NodeState {
-    node_id: RewardPeer,
+    reward_node_id: RewardNodeId,
     /// Current membership state of the node.
     state: MembershipState,
     /// To avoid sybil attack via relocation, a relocated node's original name will be recorded.
@@ -61,9 +61,9 @@ impl Debug for NodeState {
 
 impl NodeState {
     // Creates a `NodeState` in the `Joined` state.
-    pub fn joined(node_id: RewardPeer, previous_name: Option<XorName>) -> Self {
+    pub fn joined(reward_node_id: RewardNodeId, previous_name: Option<XorName>) -> Self {
         Self {
-            node_id,
+            reward_node_id,
             state: MembershipState::Joined,
             previous_name,
         }
@@ -71,9 +71,9 @@ impl NodeState {
 
     // Creates a `NodeState` in the `Left` state.
     #[cfg(any(test, feature = "test-utils"))]
-    pub fn left(node_id: RewardPeer, previous_name: Option<XorName>) -> Self {
+    pub fn left(reward_node_id: RewardNodeId, previous_name: Option<XorName>) -> Self {
         Self {
-            node_id,
+            reward_node_id,
             state: MembershipState::Left,
             previous_name,
         }
@@ -82,12 +82,12 @@ impl NodeState {
     // Creates a `NodeState` in the `Relocated` state.
     #[cfg(any(test, feature = "test-utils"))]
     pub fn relocated(
-        node_id: RewardPeer,
+        reward_node_id: RewardNodeId,
         previous_name: Option<XorName>,
         relocation_dst: RelocationDst,
     ) -> Self {
         Self {
-            node_id,
+            reward_node_id,
             state: MembershipState::Relocated(relocation_dst),
             previous_name,
         }
@@ -150,16 +150,16 @@ impl NodeState {
         NodeId::new(self.name(), self.addr())
     }
 
-    pub fn reward_id(&self) -> &RewardPeer {
-        &self.node_id
+    pub fn reward_node_id(&self) -> &RewardNodeId {
+        &self.reward_node_id
     }
 
     pub fn name(&self) -> XorName {
-        self.node_id.name()
+        self.reward_node_id.name()
     }
 
     pub fn addr(&self) -> SocketAddr {
-        self.node_id.addr()
+        self.reward_node_id.addr()
     }
 
     pub fn state(&self) -> MembershipState {
@@ -171,7 +171,7 @@ impl NodeState {
     }
 
     pub fn age(&self) -> u8 {
-        self.node_id.age()
+        self.reward_node_id.age()
     }
 
     // Returns true if the state is a Relocated node

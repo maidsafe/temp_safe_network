@@ -127,7 +127,7 @@ impl RelocationProof {
 
     /// Reward key of the relocating node.
     pub fn reward_key(&self) -> bls::PublicKey {
-        self.info.signed_relocation.reward_id().reward_key()
+        self.info.signed_relocation.reward_node_id().reward_key()
     }
 
     // ed25519_dalek::Signature has overly verbose debug output, so we provide our own

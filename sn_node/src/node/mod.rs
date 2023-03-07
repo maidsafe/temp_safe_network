@@ -70,7 +70,7 @@ mod core {
             SectionAuthorityProvider, SectionKeyShare, SectionKeysProvider,
         },
         types::{
-            keys::ed25519::Digest256, log_markers::LogMarker, DataAddress, NodeId, RewardPeer,
+            keys::ed25519::Digest256, log_markers::LogMarker, DataAddress, NodeId, RewardNodeId,
         },
     };
     use tokio::sync::mpsc::Sender;
@@ -93,7 +93,7 @@ mod core {
     }
 
     pub(crate) struct MyNode {
-        pub(crate) node_id: RewardPeer,
+        pub(crate) id: RewardNodeId,
         pub(crate) comm: Comm,
         pub(crate) keypair: Arc<Keypair>,
         root_storage_dir: PathBuf,
@@ -200,7 +200,7 @@ mod core {
 
         #[allow(clippy::too_many_arguments)]
         pub(crate) fn new(
-            node_id: RewardPeer,
+            id: RewardNodeId,
             comm: Comm,
             keypair: Arc<Keypair>, //todo: Keypair, only test design blocks this
             network_knowledge: NetworkKnowledge,
@@ -245,7 +245,7 @@ mod core {
 
             let node = Self {
                 comm,
-                node_id,
+                id,
                 keypair,
                 network_knowledge,
                 section_keys_provider,
@@ -277,17 +277,17 @@ mod core {
 
         pub(crate) fn info(&self) -> MyNodeInfo {
             MyNodeInfo {
-                node_id: self.node_id,
+                reward_node_id: self.id,
                 keypair: self.keypair.clone(),
             }
         }
 
         pub(crate) fn name(&self) -> XorName {
-            self.node_id.name()
+            self.id.name()
         }
 
         pub(crate) fn reward_key(&self) -> PublicKey {
-            self.node_id.reward_key()
+            self.id.reward_key()
         }
 
         ////////////////////////////////////////////////////////////////////////////
@@ -415,7 +415,7 @@ mod core {
 
             if elder_candidates
                 .iter()
-                .map(|s| s.reward_id())
+                .map(|s| s.reward_node_id())
                 .eq(current_elders.iter())
             {
                 vec![]
@@ -435,7 +435,10 @@ mod core {
                 let chain_len = self.network_knowledge.section_chain_len();
                 let session_id = DkgSessionId {
                     prefix: sap.prefix(),
-                    elders: elder_candidates.iter().map(|c| *c.reward_id()).collect(),
+                    elders: elder_candidates
+                        .iter()
+                        .map(|c| *c.reward_node_id())
+                        .collect(),
                     section_chain_len: chain_len,
                     bootstrap_members: BTreeSet::from_iter(members.into_values()),
                     membership_gen,
@@ -557,7 +560,7 @@ mod core {
                 .iter()
                 .map(|m| m.name())
                 .collect();
-            let is_member = |p: &RewardPeer| current_section_members.contains(&p.name());
+            let is_member = |p: &RewardNodeId| current_section_members.contains(&p.name());
             let missing_members_hashes = Vec::from_iter(
                 self.dkg_sessions_info
                     .iter()

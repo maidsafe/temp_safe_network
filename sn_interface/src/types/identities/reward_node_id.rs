@@ -19,12 +19,12 @@ use xor_name::XorName;
 /// A NodeId with name, derived from its `PublicKey`,
 /// an address, and a reward key to which rewards can be paid.
 #[derive(Copy, Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct RewardPeer {
+pub struct RewardNodeId {
     node_id: NodeId,
     reward_key: bls::PublicKey,
 }
 
-impl RewardPeer {
+impl RewardNodeId {
     pub fn new(node_id: NodeId, reward_key: bls::PublicKey) -> Self {
         Self {
             node_id,
@@ -93,22 +93,22 @@ impl RewardPeer {
     }
 }
 
-impl Display for RewardPeer {
+impl Display for RewardNodeId {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "{}, w reward key {:?}", self.node_id(), self.reward_key)
     }
 }
 
-impl Eq for RewardPeer {}
+impl Eq for RewardNodeId {}
 
-impl Hash for RewardPeer {
+impl Hash for RewardNodeId {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.node_id.hash(state);
         self.reward_key.hash(state);
     }
 }
 
-impl Ord for RewardPeer {
+impl Ord for RewardNodeId {
     fn cmp(&self, other: &Self) -> Ordering {
         self.node_id
             .cmp(&other.node_id)
@@ -116,19 +116,19 @@ impl Ord for RewardPeer {
     }
 }
 
-impl PartialEq for RewardPeer {
+impl PartialEq for RewardNodeId {
     fn eq(&self, other: &Self) -> bool {
         self.node_id == other.node_id && self.reward_key == other.reward_key
     }
 }
 
-impl PartialEq<&Self> for RewardPeer {
+impl PartialEq<&Self> for RewardNodeId {
     fn eq(&self, other: &&Self) -> bool {
         self.node_id == other.node_id && self.reward_key == other.reward_key
     }
 }
 
-impl PartialOrd for RewardPeer {
+impl PartialOrd for RewardNodeId {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }

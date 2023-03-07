@@ -8,9 +8,11 @@
 
 mod client_id;
 mod node_id;
+mod reward_node_id;
 
 pub use client_id::ClientId;
 pub use node_id::NodeId;
+pub use reward_node_id::RewardNodeId;
 
 use std::{
     cmp::Ordering,

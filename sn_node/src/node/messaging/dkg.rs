@@ -1123,11 +1123,11 @@ mod tests {
     async fn start_dkg(nodes: &mut BTreeMap<XorName, TestNode>) -> Result<DkgSessionId> {
         let mut elders = BTreeSet::new();
         for (_, node) in nodes.iter() {
-            let _ = elders.insert(node.node.info().reward_id());
+            let _ = elders.insert(node.node.info().reward_node_id());
         }
         let bootstrap_members = elders
             .iter()
-            .map(|peer| NodeState::joined(*peer, None))
+            .map(|node_id| NodeState::joined(*node_id, None))
             .collect::<BTreeSet<_>>();
         // A DKG session which just creates a new key for the same set of elders
         let session_id = DkgSessionId {

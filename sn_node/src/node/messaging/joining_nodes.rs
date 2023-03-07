@@ -16,7 +16,7 @@ use sn_interface::{
         MsgId,
     },
     network_knowledge::{NodeState, RelocationProof, MIN_ADULT_AGE},
-    types::{log_markers::LogMarker, NodeId, Participant, RewardPeer},
+    types::{log_markers::LogMarker, NodeId, Participant, RewardNodeId},
 };
 
 use qp2p::SendStream;
@@ -32,9 +32,9 @@ impl MyNode {
         context: &NodeContext,
     ) -> Result<Vec<Cmd>> {
         let (reward_node_id, relocation) = match details {
-            JoinDetails::New(reward_key) => (RewardPeer::new(node_id, reward_key), None),
+            JoinDetails::New(reward_key) => (RewardNodeId::new(node_id, reward_key), None),
             JoinDetails::Relocation(proof) => {
-                (RewardPeer::new(node_id, proof.reward_key()), Some(proof))
+                (RewardNodeId::new(node_id, proof.reward_key()), Some(proof))
             }
         };
         trace!("Handling join from {reward_node_id:?}");

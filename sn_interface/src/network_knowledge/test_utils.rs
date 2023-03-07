@@ -1,7 +1,7 @@
 use super::SectionKeysProvider;
 use crate::{
     network_knowledge::{section_keys::build_spent_proof_share, Error, MyNodeInfo, MIN_ADULT_AGE},
-    types::{keys::ed25519, NodeId, RewardPeer},
+    types::{keys::ed25519, NodeId, RewardNodeId},
     SectionAuthorityProvider,
 };
 use eyre::{eyre, Context, ContextCompat, Result};
@@ -46,23 +46,23 @@ pub fn gen_node_id_in_prefix(age: u8, prefix: Prefix) -> NodeId {
     NodeId::random_w_name(prefix.substituted_in(name))
 }
 
-/// Generate a RewardPeer with the given age
-pub fn gen_reward_node_id(age: u8) -> RewardPeer {
+/// Generate a RewardNodeId with the given age
+pub fn gen_reward_node_id(age: u8) -> RewardNodeId {
     let name = ed25519::gen_name_with_age(age);
-    RewardPeer::random_w_name(name)
+    RewardNodeId::random_w_name(name)
 }
 
-/// Generate a RewardPeer with the given age and prefix
-pub fn gen_reward_node_id_in_prefix(age: u8, prefix: Prefix) -> RewardPeer {
+/// Generate a RewardNodeId with the given age and prefix
+pub fn gen_reward_node_id_in_prefix(age: u8, prefix: Prefix) -> RewardNodeId {
     let name = ed25519::gen_name_with_age(age);
-    RewardPeer::random_w_name(prefix.substituted_in(name))
+    RewardNodeId::random_w_name(prefix.substituted_in(name))
 }
 
 /// Generate `MyNodeInfo` with the given age and prefix
 pub fn gen_info(age: u8, prefix: Option<Prefix>) -> MyNodeInfo {
     let keypair = ed25519::gen_keypair(&prefix.unwrap_or_default().range_inclusive(), age);
-    let peer = RewardPeer::random_w_key(keypair.public);
-    MyNodeInfo::new(keypair, peer)
+    let node_id = RewardNodeId::random_w_key(keypair.public);
+    MyNodeInfo::new(keypair, node_id)
 }
 
 /// Create `elder+adult` Nodes sorted by their names.

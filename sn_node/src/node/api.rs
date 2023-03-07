@@ -19,7 +19,7 @@ use sn_interface::{
     dbcs::gen_genesis_dbc,
     messaging::system::SectionSigned,
     network_knowledge::{NetworkKnowledge, SectionsDAG, GENESIS_DBC_SK},
-    types::{log_markers::LogMarker, NodeId, RewardPeer},
+    types::{log_markers::LogMarker, NodeId, RewardNodeId},
     SectionAuthorityProvider,
 };
 
@@ -30,7 +30,7 @@ use tokio::sync::mpsc;
 
 impl MyNode {
     pub(crate) fn first_node(
-        node_id: RewardPeer,
+        node_id: RewardNodeId,
         comm: Comm,
         keypair: Keypair,
         used_space: UsedSpace,
@@ -65,8 +65,8 @@ impl MyNode {
     ) -> Result<()> {
         // try to relocate to the section that matches our current name
         self.network_knowledge.switch_section(dst_sap)?;
-        let new_id = NodeId::from_key(self.node_id.addr(), new_keypair.public);
-        self.node_id = RewardPeer::new(new_id, self.node_id.reward_key());
+        let new_id = NodeId::from_key(self.id.addr(), new_keypair.public);
+        self.id = RewardNodeId::new(new_id, self.id.reward_key());
         self.keypair = Arc::new(new_keypair);
         Ok(())
     }

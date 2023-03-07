@@ -37,7 +37,7 @@ use crate::{
         system::{SectionMembers, SectionSig, SectionSigned},
         AntiEntropyMsg, Dst, NetworkMsg,
     },
-    types::{NodeId, RewardPeer},
+    types::{NodeId, RewardNodeId},
 };
 
 use bls::PublicKey as BlsPublicKey;
@@ -185,7 +185,7 @@ impl NetworkKnowledge {
 
     /// Creates `NetworkKnowledge` for the first node in the network
     pub fn first_node(
-        node_id: RewardPeer,
+        id: RewardNodeId,
         genesis_sk_set: bls::SecretKeySet,
     ) -> Result<(Self, SectionKeyShare)> {
         let public_key_set = genesis_sk_set.public_keys();
@@ -193,17 +193,14 @@ impl NetworkKnowledge {
         let secret_key_share = genesis_sk_set.secret_key_share(secret_key_index as u64);
 
         let section_tree = {
-            let genesis_signed_sap = create_first_section_authority_provider(
-                &public_key_set,
-                &secret_key_share,
-                node_id,
-            )?;
+            let genesis_signed_sap =
+                create_first_section_authority_provider(&public_key_set, &secret_key_share, id)?;
             SectionTree::new(genesis_signed_sap)?
         };
         let mut network_knowledge = Self::new(Prefix::default(), section_tree)?;
 
-        for node_id in network_knowledge.signed_sap.elders() {
-            let node_state = NodeState::joined(*node_id, None);
+        for node in network_knowledge.signed_sap.elders() {
+            let node_state = NodeState::joined(*node, None);
             let sig = create_first_sig(&public_key_set, &secret_key_share, &node_state)?;
             let _changed = network_knowledge
                 .section_members
@@ -555,7 +552,7 @@ impl NetworkKnowledge {
 fn create_first_section_authority_provider(
     pk_set: &bls::PublicKeySet,
     sk_share: &bls::SecretKeyShare,
-    node_id: RewardPeer,
+    node_id: RewardNodeId,
 ) -> Result<SectionSigned<SectionAuthorityProvider>> {
     let section_auth = SectionAuthorityProvider::new(
         iter::once(node_id),
@@ -590,7 +587,7 @@ mod tests {
     use super::{supermajority, NetworkKnowledge};
     use crate::{
         test_utils::{prefix, TestKeys, TestSapBuilder, TestSectionTree},
-        types::RewardPeer,
+        types::RewardNodeId,
     };
 
     use bls::SecretKeySet;
@@ -627,7 +624,7 @@ mod tests {
     {
         let mut rng = thread_rng();
         let sk_gen = SecretKeySet::random(0, &mut rng);
-        let node_id = RewardPeer::random();
+        let node_id = RewardNodeId::random();
         let (mut knowledge, _) = NetworkKnowledge::first_node(node_id, sk_gen.clone())?;
 
         // section 1

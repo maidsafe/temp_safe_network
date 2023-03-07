@@ -38,7 +38,7 @@ use sn_interface::{
         MIN_ADULT_AGE,
     },
     test_utils::*,
-    types::{keys::ed25519, Participant, PublicKey, RewardPeer},
+    types::{keys::ed25519, Participant, PublicKey, RewardNodeId},
 };
 
 use assert_matches::assert_matches;
@@ -69,12 +69,12 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
     let old_keypair = old_info.keypair.clone();
 
     let new_keypair = ed25519::gen_keypair(&prefix.range_inclusive(), old_info.age() + 1);
-    let reward_peer = RewardPeer::random_w_key(new_keypair.public);
-    let new_info = MyNodeInfo::new(new_keypair, reward_peer);
+    let reward_node_id = RewardNodeId::random_w_key(new_keypair.public);
+    let new_info = MyNodeInfo::new(new_keypair, reward_node_id);
 
     let relocation_dst = RelocationDst::new(xor_name::rand::random());
     let relocated_state =
-        NodeState::relocated(old_info.reward_id(), Some(old_name), relocation_dst);
+        NodeState::relocated(old_info.reward_node_id(), Some(old_name), relocation_dst);
     let section_signed_state = TestKeys::get_section_signed(&sk_set.secret_key(), relocated_state)?;
 
     let info = RelocationInfo::new(section_signed_state, new_info.name());
@@ -250,7 +250,7 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
         .get_nodes(prefix, 0, 1, None)?
         .remove(0)
         .info()
-        .reward_id();
+        .reward_node_id();
     let node_state = NodeState::left(node_state, None);
 
     let proposal = node_state.clone();
@@ -278,7 +278,7 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
     let sk_set = env.get_secret_key_set(prefix, None)?;
 
     let elder = elders.remove(0);
-    let elder_id = elder.info().reward_id();
+    let elder_id = elder.info().reward_node_id();
     let offline_elder = NodeState::left(elder_id, None);
 
     // Handle agreement on the Offline proposal
