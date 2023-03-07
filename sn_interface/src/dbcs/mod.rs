@@ -6,6 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+mod reasons;
+
+pub use reasons::DbcReason;
+
 use sn_dbc::{
     rng, Dbc, Error as DbcError, Hash, IndexedSignatureShare, Owner, OwnerOnce, PedersenGens,
     RevealedCommitment, RevealedInput, SpentProofContent, SpentProofShare, Token,
@@ -14,10 +18,6 @@ use sn_dbc::{
 
 use std::{fmt::Debug, result};
 use thiserror::Error;
-
-mod reasons;
-
-pub use reasons::DbcReason;
 
 /// Amount of tokens to be owned by the Genesis DBC.
 /// At the inception of the Network a total supply of 4,525,524,120 whole tokens will be created.

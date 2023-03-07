@@ -6,11 +6,11 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use super::Error;
+
 use serde::{Deserialize, Serialize};
 use sn_dbc::Hash;
 use xor_name::XorName;
-
-use super::Error;
 
 /// DBC reason for being spent
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]

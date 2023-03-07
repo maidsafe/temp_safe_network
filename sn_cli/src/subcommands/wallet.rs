@@ -75,7 +75,7 @@ pub enum WalletSubCommands {
         #[clap(long = "save")]
         save: Option<PathBuf>,
         /// The reason why this DBC is spent
-        /// (Used for data payments: currently not yet implemented)
+        /// (Used for data payments among other things: currently not yet implemented)
         #[clap(long = "reason")]
         reason: Option<DbcReason>,
     },
