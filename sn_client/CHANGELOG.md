@@ -1113,11 +1113,47 @@ needed, as they keypair itself contains the Arcs we need.
     - Self authentication Example
     - Example to demonstrate Storage API
 
+## v0.81.5 (2023-03-07)
+
+### Refactor
+
+ - <csr-id-ecbdd14cfaa963777b903bfba549eb170113e503/> reduce churn interval; retry con
+   The nodes are launched every 5s instead of 30s. The client connection
+   will be retried up to 5 times, with 1.5s delay.
+ - <csr-id-311b204dc3413409f89c9dd73cce9e7d6dfa6a95/> disable re-attempts for connect
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Reduce churn interval; retry con ([`ecbdd14`](https://github.com/maidsafe/safe_network/commit/ecbdd14cfaa963777b903bfba549eb170113e503))
+    - Disable re-attempts for connect ([`311b204`](https://github.com/maidsafe/safe_network/commit/311b204dc3413409f89c9dd73cce9e7d6dfa6a95))
+</details>
+
 ## v0.81.4 (2023-03-07)
+
+<csr-id-9251e0dfa08e9a36c9b55fe1709cdfbc38668cd3/>
+<csr-id-87e59a24bcabd0c710fa0c8871bafe1b68c89b5e/>
+<csr-id-5959754ccb70bbb468d4d01265c6e605e9b821b5/>
 
 ### Other
 
  - <csr-id-9251e0dfa08e9a36c9b55fe1709cdfbc38668cd3/> reduce churn interval
+
+### Chore
+
+ - <csr-id-c3db5e8ceafcbdff8eafb787d1ad8b80bb470849/> sn_client-0.81.4
 
 ### Test
 
@@ -1128,8 +1164,8 @@ needed, as they keypair itself contains the Arcs we need.
 
 <csr-read-only-do-not-edit/>
 
- - 3 commits contributed to the release.
- - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 4 commits contributed to the release.
+ - 4 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -1139,12 +1175,15 @@ needed, as they keypair itself contains the Arcs we need.
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Sn_client-0.81.4 ([`c3db5e8`](https://github.com/maidsafe/safe_network/commit/c3db5e8ceafcbdff8eafb787d1ad8b80bb470849))
     - Reduce churn interval ([`9251e0d`](https://github.com/maidsafe/safe_network/commit/9251e0dfa08e9a36c9b55fe1709cdfbc38668cd3))
     - Add bench for concurrent client uploads ([`87e59a2`](https://github.com/maidsafe/safe_network/commit/87e59a24bcabd0c710fa0c8871bafe1b68c89b5e))
     - Increase concurrent weight of client test ([`5959754`](https://github.com/maidsafe/safe_network/commit/5959754ccb70bbb468d4d01265c6e605e9b821b5))
 </details>
 
 ## v0.81.3 (2023-03-06)
+
+<csr-id-4b8d391f5f9fbdfb4de28e969ad1b1c4f4a13ebf/>
 
 ### Chore
 
