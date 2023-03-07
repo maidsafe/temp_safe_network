@@ -59,22 +59,7 @@ impl PublicKey {
     ///
     /// It is often useful to parse such raw strings in user-facing apps like CLI.
     pub fn bls_from_hex(hex: &str) -> Result<Self> {
-        let bytes = hex::decode(hex).map_err(|err| {
-            Error::FailedToParse(format!(
-                "Couldn't parse BLS public key bytes from hex: {err}",
-            ))
-        })?;
-        let bytes_fixed_len: [u8; bls::PK_SIZE] = bytes.as_slice().try_into()
-            .map_err(|_| Error::FailedToParse(format!(
-                "Couldn't parse BLS public key bytes from hex. The provided string must represent exactly {} bytes.",
-                bls::PK_SIZE
-            )))?;
-        let pk = bls::PublicKey::from_bytes(bytes_fixed_len).map_err(|err| {
-            Error::FailedToParse(format!(
-                "Couldn't parse BLS public key from fixed-length byte array: {err}",
-            ))
-        })?;
-        Ok(Self::from(pk))
+        Ok(Self::from(bls_from_hex(hex)?))
     }
 
     /// Returns the bytes of the underlying public key.
@@ -227,6 +212,29 @@ impl UpperHex for PublicKey {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "{}", hex::encode_upper(self.to_bytes()))
     }
+}
+
+/// Construct a BLS public key from a hex-encoded string.
+///
+/// It is often useful to parse such raw strings in user-facing apps like CLI.
+pub fn bls_from_hex<T: AsRef<[u8]>>(hex: T) -> Result<bls::PublicKey> {
+    let bytes = hex::decode(hex).map_err(|err| {
+        Error::FailedToParse(format!(
+            "Couldn't parse BLS public key bytes from hex: {err}",
+        ))
+    })?;
+    let bytes_fixed_len: [u8; bls::PK_SIZE] = bytes.as_slice().try_into()
+        .map_err(|_| Error::FailedToParse(format!(
+            "Couldn't parse BLS public key bytes from hex. The provided string must represent exactly {} bytes.",
+            bls::PK_SIZE
+        )))?;
+    let pk = bls::PublicKey::from_bytes(bytes_fixed_len).map_err(|err| {
+        Error::FailedToParse(format!(
+            "Couldn't parse BLS public key from fixed-length byte array: {err}",
+        ))
+    })?;
+
+    Ok(pk)
 }
 
 #[cfg(test)]

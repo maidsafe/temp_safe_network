@@ -226,6 +226,9 @@ impl MyNode {
         spent_transactions: &BTreeSet<DbcTransaction>,
         context: &NodeContext,
     ) -> Result<SpentProofShare> {
+        // verify that fee is paid (we are included as output)
+        MyNode::verify_fee(context.reward_key, tx)?;
+
         // verify the spent proofs
         MyNode::verify_spent_proofs(spent_proofs, &context.network_knowledge)?;
 
@@ -268,6 +271,11 @@ impl MyNode {
         )?;
 
         Ok(spent_proof_share)
+    }
+
+    fn verify_fee(_our_key: PublicKey, _tx: &DbcTransaction) -> Result<()> {
+        // TODO: check that we have an output to us, and that it is of sufficient value.
+        Ok(())
     }
 
     // Verify spent proof signatures are valid, and each spent proof is signed by a known section key.

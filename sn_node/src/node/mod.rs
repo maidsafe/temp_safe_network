@@ -96,6 +96,7 @@ mod core {
         root_storage_dir: PathBuf,
         pub(crate) data_storage: DataStorage, // Adult only before cache
         pub(crate) keypair: Arc<Keypair>,
+        pub(crate) reward_key: PublicKey,
         // Network resources
         pub(crate) section_keys_provider: SectionKeysProvider,
         pub(crate) network_knowledge: NetworkKnowledge,
@@ -129,6 +130,7 @@ mod core {
         pub(crate) name: XorName,
         pub(crate) info: MyNodeInfo,
         pub(crate) keypair: Arc<Keypair>,
+        pub(crate) reward_key: PublicKey,
         pub(crate) network_knowledge: NetworkKnowledge,
         pub(crate) section_keys_provider: SectionKeysProvider,
         #[debug(skip)]
@@ -185,6 +187,7 @@ mod core {
                 name: self.name(),
                 info: self.info(),
                 keypair: self.keypair.clone(),
+                reward_key: self.reward_key,
                 network_knowledge: self.network_knowledge().clone(),
                 section_keys_provider: self.section_keys_provider.clone(),
                 comm: self.comm.clone(),
@@ -196,9 +199,11 @@ mod core {
             }
         }
 
+        #[allow(clippy::too_many_arguments)]
         pub(crate) fn new(
             comm: Comm,
             keypair: Arc<Keypair>, //todo: Keypair, only test design blocks this
+            reward_key: PublicKey,
             network_knowledge: NetworkKnowledge,
             section_key_share: Option<SectionKeyShare>,
             used_space: UsedSpace,
@@ -244,6 +249,7 @@ mod core {
                 comm,
                 addr,
                 keypair,
+                reward_key,
                 network_knowledge,
                 section_keys_provider,
                 root_storage_dir,
