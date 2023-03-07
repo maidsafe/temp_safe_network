@@ -1113,15 +1113,23 @@ needed, as they keypair itself contains the Arcs we need.
     - Self authentication Example
     - Example to demonstrate Storage API
 
-## v0.81.3 (2023-03-06)
+## v0.81.4 (2023-03-07)
+
+### Other
+
+ - <csr-id-9251e0dfa08e9a36c9b55fe1709cdfbc38668cd3/> reduce churn interval
+
+### Test
+
+ - <csr-id-87e59a24bcabd0c710fa0c8871bafe1b68c89b5e/> add bench for concurrent client uploads
+ - <csr-id-5959754ccb70bbb468d4d01265c6e605e9b821b5/> increase concurrent weight of client test
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 1 commit contributed to the release.
- - 3 days passed between releases.
- - 0 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 3 commits contributed to the release.
+ - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -1131,12 +1139,41 @@ needed, as they keypair itself contains the Arcs we need.
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Reduce churn interval ([`9251e0d`](https://github.com/maidsafe/safe_network/commit/9251e0dfa08e9a36c9b55fe1709cdfbc38668cd3))
+    - Add bench for concurrent client uploads ([`87e59a2`](https://github.com/maidsafe/safe_network/commit/87e59a24bcabd0c710fa0c8871bafe1b68c89b5e))
+    - Increase concurrent weight of client test ([`5959754`](https://github.com/maidsafe/safe_network/commit/5959754ccb70bbb468d4d01265c6e605e9b821b5))
+</details>
+
+## v0.81.3 (2023-03-06)
+
+### Chore
+
+ - <csr-id-4b8d391f5f9fbdfb4de28e969ad1b1c4f4a13ebf/> sn_interface-0.19.7/sn_comms-0.5.1/sn_client-0.81.3/sn_node-0.77.13/sn_cli-0.72.3
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 3 days passed between releases.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Sn_interface-0.19.7/sn_comms-0.5.1/sn_client-0.81.3/sn_node-0.77.13/sn_cli-0.72.3 ([`4b8d391`](https://github.com/maidsafe/safe_network/commit/4b8d391f5f9fbdfb4de28e969ad1b1c4f4a13ebf))
     - Refactor: distinguish client and node ids - This removes the ambiguous Peer and creates a clearer path for client and node related logic, while finally resolving the node/peer ambiguity. ([`4097de4`](https://github.com/maidsafe/safe_network/commit/4097de4e979f1cb6b17eb4b90b7ce3861194a4a9))
 </details>
 
 ## v0.81.2 (2023-03-02)
 
 <csr-id-4b84cd72c25f7074d966771928685174a76d6ef7/>
+<csr-id-e5872a6684a6858f6d9d6379a6a63b8e3d525ba1/>
 
 ### Chore
 
