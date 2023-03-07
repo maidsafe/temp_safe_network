@@ -5,14 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.77.13 (2023-03-06)
+## v0.77.14 (2023-03-07)
+
+### Bug Fixes
+
+ - <csr-id-854c860aee7ddecfdc829ba2e5810afb64eda612/> relocation_dst is replaced by relocation_trigger
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
  - 1 commit contributed to the release.
- - 0 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -22,12 +26,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Relocation_dst is replaced by relocation_trigger ([`854c860`](https://github.com/maidsafe/safe_network/commit/854c860aee7ddecfdc829ba2e5810afb64eda612))
+</details>
+
+## v0.77.13 (2023-03-06)
+
+### Chore
+
+ - <csr-id-4b8d391f5f9fbdfb4de28e969ad1b1c4f4a13ebf/> sn_interface-0.19.7/sn_comms-0.5.1/sn_client-0.81.3/sn_node-0.77.13/sn_cli-0.72.3
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Sn_interface-0.19.7/sn_comms-0.5.1/sn_client-0.81.3/sn_node-0.77.13/sn_cli-0.72.3 ([`4b8d391`](https://github.com/maidsafe/safe_network/commit/4b8d391f5f9fbdfb4de28e969ad1b1c4f4a13ebf))
     - Refactor: distinguish client and node ids - This removes the ambiguous Peer and creates a clearer path for client and node related logic, while finally resolving the node/peer ambiguity. ([`4097de4`](https://github.com/maidsafe/safe_network/commit/4097de4e979f1cb6b17eb4b90b7ce3861194a4a9))
 </details>
 
 ## v0.77.12 (2023-03-06)
 
 <csr-id-e1698b479354f21f08bfc1776ff1f88b29ad6bc2/>
+<csr-id-2c399d2639f83157ef8ab4e1c0c72e4969848224/>
 
 ### Chore
 
