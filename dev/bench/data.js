@@ -1,74 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1678107615770,
+  "lastUpdate": 1678185405388,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
-      {
-        "commit": {
-          "author": {
-            "email": "26634292+bors[bot]@users.noreply.github.com",
-            "name": "bors[bot]",
-            "username": "bors[bot]"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": false,
-          "id": "f664d797b56e7cbf03893c98d6c27d9c6d882be4",
-          "message": "Merge #1324 #1345 #1346\n\n1324: feat(msgs): validate w low prio before handling r=joshuef a=oetyng\n\nDeserializes and validates at lower prio, to cut off an overload attack angle.\r\nAfter validity of msg has been established, the msg is dealt with according to its type prio.\n\n1345: Chore refactor send msg cmd r=joshuef a=joshuef\n\ntweaks to reduce SendMsg cmd load.\r\n\r\nas https://github.com/maidsafe/safe_network/pull/1342 but without the change to the Sendmsg priority\n\n1346: chore(dsyfunction): relax knowledge penalty. r=Yoga07 a=joshuef\n\nWe've seen some CI nodes being booted due to knowledge issues, so relaxing\r\nthis should help there'\r\n\r\n<!--\r\nThanks for contributing to the project! We recommend you check out our \"Guide to contributing\" page if you haven't already: https://github.com/maidsafe/QA/blob/master/CONTRIBUTING.md\r\n\r\nWrite your comment below this line: -->\r\n\n\nCo-authored-by: oetyng <oetyng@gmail.com>\nCo-authored-by: Josh Wilson <joshuef@gmail.com>",
-          "timestamp": "2022-07-18T08:32:13Z",
-          "tree_id": "2a828f22d662daa3d405e4efed03b496797069b7",
-          "url": "https://github.com/maidsafe/safe_network/commit/f664d797b56e7cbf03893c98d6c27d9c6d882be4"
-        },
-        "date": 1658138092249,
-        "tool": "cargo",
-        "benches": [
-          {
-            "name": "upload-sampling/upload and read 3072b",
-            "value": 630070197,
-            "range": "± 44154038",
-            "unit": "ns/iter"
-          },
-          {
-            "name": "upload-sampling/upload and read 1mb",
-            "value": 685094344,
-            "range": "± 22088645",
-            "unit": "ns/iter"
-          },
-          {
-            "name": "upload-sampling/upload and read 10mb",
-            "value": 941480883,
-            "range": "± 64570005",
-            "unit": "ns/iter"
-          },
-          {
-            "name": "upload-sampling/upload 3072b",
-            "value": 395276651,
-            "range": "± 38705383",
-            "unit": "ns/iter"
-          },
-          {
-            "name": "upload-sampling/upload 1mb",
-            "value": 394877977,
-            "range": "± 20567884",
-            "unit": "ns/iter"
-          },
-          {
-            "name": "upload-sampling/upload 10mb",
-            "value": 1088208683,
-            "range": "± 34767689",
-            "unit": "ns/iter"
-          },
-          {
-            "name": "generating keys",
-            "value": 4089119,
-            "range": "± 50040",
-            "unit": "ns/iter"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -70858,6 +70792,156 @@ window.BENCHMARK_DATA = {
             "name": "read-sampling/chunk keys/4000",
             "value": 381088954,
             "range": "± 3223216",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "joshuef@gmail.com",
+            "name": "Josh Wilson",
+            "username": "joshuef"
+          },
+          "committer": {
+            "email": "joshuef@gmail.com",
+            "name": "joshuef",
+            "username": "joshuef"
+          },
+          "distinct": true,
+          "id": "9251e0dfa08e9a36c9b55fe1709cdfbc38668cd3",
+          "message": "ci: reduce churn interval",
+          "timestamp": "2023-03-07T08:23:33Z",
+          "tree_id": "baf4c28c93d5eafc1347a611fc916fc229301553",
+          "url": "https://github.com/maidsafe/safe_network/commit/9251e0dfa08e9a36c9b55fe1709cdfbc38668cd3"
+        },
+        "date": 1678185401905,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "serialize/serialize for sending",
+            "value": 2678414,
+            "range": "± 84921",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 133082825,
+            "range": "± 2162665",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 152970912,
+            "range": "± 4377164",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 939471995,
+            "range": "± 12499388",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 113076020,
+            "range": "± 1123858",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 129061076,
+            "range": "± 1174229",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 823217815,
+            "range": "± 11383539",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/concurrent upload and verify 10mb",
+            "value": 8230552337,
+            "range": "± 80250682",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "register-edit-sampling/register_edits/1000",
+            "value": 27636333262,
+            "range": "± 221956532",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/100",
+            "value": 72337616,
+            "range": "± 42675949",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/1000",
+            "value": 3201220996,
+            "range": "± 240976862",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/4000",
+            "value": 10157769746,
+            "range": "± 696541720",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/100",
+            "value": 266467908,
+            "range": "± 7423813",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/1000",
+            "value": 2508292029,
+            "range": "± 113489657",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/4000",
+            "value": 9920316617,
+            "range": "± 571780753",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/100",
+            "value": 58377184,
+            "range": "± 1112697",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/1000",
+            "value": 582893050,
+            "range": "± 14000387",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/4000",
+            "value": 2214946753,
+            "range": "± 22634382",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/100",
+            "value": 13063939,
+            "range": "± 1242543",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/1000",
+            "value": 115895322,
+            "range": "± 7370333",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/4000",
+            "value": 388453868,
+            "range": "± 5555821",
             "unit": "ns/iter"
           }
         ]
