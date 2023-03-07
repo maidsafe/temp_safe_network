@@ -32,6 +32,7 @@ impl MyNode {
     pub(crate) fn first_node(
         comm: Comm,
         keypair: Keypair,
+        reward_key: bls::PublicKey,
         used_space: UsedSpace,
         root_storage_dir: PathBuf,
         genesis_sk_set: bls::SecretKeySet,
@@ -47,6 +48,7 @@ impl MyNode {
         let node = Self::new(
             comm,
             Arc::new(keypair),
+            reward_key,
             network_knowledge,
             Some(section_key_share),
             used_space,

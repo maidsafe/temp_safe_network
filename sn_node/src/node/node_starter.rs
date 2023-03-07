@@ -17,10 +17,9 @@ use crate::UsedSpace;
 use sn_comms::Comm;
 use sn_interface::{
     network_knowledge::{NetworkKnowledge, SectionTree, MIN_ADULT_AGE},
-    types::{keys::ed25519, log_markers::LogMarker, PublicKey as TypesPublicKey},
+    types::{keys::ed25519, log_markers::LogMarker},
 };
 
-use rand_07::rngs::OsRng;
 use std::{path::Path, sync::Arc, time::Duration};
 use tokio::{
     fs,
@@ -59,20 +58,20 @@ pub async fn new_node(
     let root_dir = root_dir_buf.as_path();
     fs::create_dir_all(root_dir).await?;
 
-    let _reward_key = match get_reward_pk(root_dir).await? {
-        Some(public_key) => TypesPublicKey::Ed25519(public_key),
+    let reward_key = match get_reward_pk(root_dir).await? {
+        Some(public_key) => public_key,
         None => {
-            let mut rng = OsRng;
-            let keypair = ed25519_dalek::Keypair::generate(&mut rng);
-            store_new_reward_keypair(root_dir, &keypair).await?;
-            TypesPublicKey::Ed25519(keypair.public)
+            let secret_key = bls::SecretKey::random();
+            let public_key = secret_key.public_key();
+            store_new_reward_keypair(root_dir, &secret_key).await?;
+            public_key
         }
     };
 
     let used_space = UsedSpace::new(config.min_capacity(), config.max_capacity());
 
     let (cmd_channel, rejoin_network_rx) =
-        start_node(config, used_space, root_dir, join_retry_timeout).await?;
+        start_node(config, used_space, root_dir, reward_key, join_retry_timeout).await?;
 
     Ok((cmd_channel, rejoin_network_rx))
 }
@@ -82,6 +81,7 @@ async fn start_node(
     config: &Config,
     used_space: UsedSpace,
     root_storage_dir: &Path,
+    reward_key: bls::PublicKey,
     join_retry_timeout: Duration,
 ) -> Result<(CmdChannel, mpsc::Receiver<RejoinReason>)> {
     let (fault_cmds_sender, fault_cmds_receiver) =
@@ -94,6 +94,7 @@ async fn start_node(
             comm,
             used_space,
             root_storage_dir,
+            reward_key,
             fault_cmds_sender.clone(),
         )
         .await?
@@ -103,6 +104,7 @@ async fn start_node(
             comm,
             used_space,
             root_storage_dir,
+            reward_key,
             fault_cmds_sender.clone(),
         )
         .await?
@@ -155,6 +157,7 @@ async fn start_genesis_node(
     comm: Comm,
     used_space: UsedSpace,
     root_storage_dir: &Path,
+    reward_key: bls::PublicKey,
     fault_cmds_sender: mpsc::Sender<FaultsCmd>,
 ) -> Result<MyNode> {
     // Genesis node having a fix age of 255.
@@ -173,6 +176,7 @@ async fn start_genesis_node(
     let (node, genesis_dbc) = MyNode::first_node(
         comm,
         keypair,
+        reward_key,
         used_space.clone(),
         root_storage_dir.to_path_buf(),
         genesis_sk_set,
@@ -202,6 +206,7 @@ async fn start_normal_node(
     comm: Comm,
     used_space: UsedSpace,
     root_storage_dir: &Path,
+    reward_key: bls::PublicKey,
     fault_cmds_sender: mpsc::Sender<FaultsCmd>,
 ) -> Result<MyNode> {
     let keypair = ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE);
@@ -225,6 +230,7 @@ async fn start_normal_node(
     let node = MyNode::new(
         comm,
         Arc::new(keypair),
+        reward_key,
         network_knowledge,
         None,
         used_space.clone(),
