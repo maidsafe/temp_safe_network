@@ -14,13 +14,11 @@ on:
   pull_request:
     branches: ["*"]
 
-
 env:
   CARGO_INCREMENTAL: 0 # bookkeeping for incremental builds has overhead, not useful in CI.
   NODE_COUNT: 14
 
 jobs:
-
   pre_job:
     # continue-on-error: true # Uncomment once integration is finished
     runs-on: ubuntu-latest
@@ -32,8 +30,8 @@ jobs:
         uses: fkirc/skip-duplicate-actions@v5
         with:
           # All of these options are optional, so you can remove them if you are happy with the defaults
-          concurrent_skipping: 'never'
-          skip_after_successful_duplicate: 'true'
+          concurrent_skipping: "never"
+          skip_after_successful_duplicate: "true"
           do_not_skip: '["pull_request", "workflow_dispatch", "schedule"]'
 
   cargo-udeps:
@@ -57,7 +55,7 @@ jobs:
   # TODO: Reenable when blst has been updated and this isn't just red the whole time.
 
   # cargo-deny:
-#           if: "!startsWith(github.event.head_commit.message, 'chore(release):')"
+  #           if: "!startsWith(github.event.head_commit.message, 'chore(release):')"
   #   runs-on: ubuntu-latest
   #   steps:
   #   - uses: actions/checkout@v2
@@ -557,7 +555,7 @@ jobs:
         continue-on-error: true
 
   # e2e-split:
-#   #        if: "!startsWith(github.event.head_commit.message, 'chore(release):')"
+  #   #        if: "!startsWith(github.event.head_commit.message, 'chore(release):')"
   #   # disabled temporarily since `self-hosted-ubuntu` runner not available for NodeRefactorBranch branch
   #   if: false
   #   name: E2E tests w/ full network
@@ -850,7 +848,7 @@ jobs:
 
   cli:
     needs: pre_job
-    if: "!startsWith(github.event.head_commit.message, 'chore(release):') && needs.pre_job.outputs.should_skip != 'true'"
+    if: "!startsWith(github.event.head_commit.message, 'chore(release):')"
     name: Run CLI tests
     runs-on: ${{ matrix.os }}
     strategy:
