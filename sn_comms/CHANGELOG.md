@@ -5,15 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.6.0 (2023-03-08)
+
 ## v0.5.1 (2023-03-06)
+
+### Chore
+
+ - <csr-id-4b8d391f5f9fbdfb4de28e969ad1b1c4f4a13ebf/> sn_interface-0.19.7/sn_comms-0.5.1/sn_client-0.81.3/sn_node-0.77.13/sn_cli-0.72.3
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 1 commit contributed to the release.
+ - 2 commits contributed to the release.
  - 7 days passed between releases.
- - 0 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -23,10 +29,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Sn_interface-0.19.7/sn_comms-0.5.1/sn_client-0.81.3/sn_node-0.77.13/sn_cli-0.72.3 ([`4b8d391`](https://github.com/maidsafe/safe_network/commit/4b8d391f5f9fbdfb4de28e969ad1b1c4f4a13ebf))
     - Refactor: distinguish client and node ids - This removes the ambiguous Peer and creates a clearer path for client and node related logic, while finally resolving the node/peer ambiguity. ([`4097de4`](https://github.com/maidsafe/safe_network/commit/4097de4e979f1cb6b17eb4b90b7ce3861194a4a9))
 </details>
 
 ## v0.5.0 (2023-02-27)
+
+<csr-id-7b046d3bf9c2de4d7aea170197ba4f3e2392fe89/>
 
 ### Chore
 
