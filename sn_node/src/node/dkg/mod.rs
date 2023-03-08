@@ -116,12 +116,12 @@ impl DkgVoter {
     /// this function mutates nothing and returns an error
     pub(crate) fn gen_ephemeral_key(
         &mut self,
-        session_id_hash: Digest256,
+        session_id: &DkgSessionId,
         our_name: XorName,
         keypair: &Arc<Keypair>,
     ) -> Result<(BlsPublicKey, Signature)> {
         // error out if we already have a key
-        if self.dkg_ephemeral_keys.get(&session_id_hash).is_some() {
+        if self.dkg_ephemeral_keys.get(&session_id.hash()).is_some() {
             return Err(Error::DkgEphemeralKeyAlreadyGenerated);
         }
 
@@ -138,11 +138,11 @@ impl DkgVoter {
         // insert the key
         let _did_insert = self
             .dkg_ephemeral_keys
-            .insert(session_id_hash, ephemeral_keys);
+            .insert(session_id.hash(), ephemeral_keys);
 
         debug!(
             "Signing Dkg ephemeral key s{} from {:?} key_sig: {:?} pubkey: {:?}",
-            session_id_hash.iter().sum::<u8>(),
+            session_id.sh(),
             our_name,
             key_sig,
             new_pub_key,
