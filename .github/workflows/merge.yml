@@ -109,7 +109,6 @@ jobs:
 
   build-arm:
     needs: pre_job
-    if: needs.pre_job.outputs.should_skip != 'true'
     name: build arm
     runs-on: ${{ matrix.os }}
     strategy:
@@ -130,8 +129,10 @@ jobs:
           toolchain: stable
           override: true
       - shell: bash
+        if: needs.pre_job.outputs.should_skip != 'true'
         run: make gha-build-${{ matrix.target }}
       - uses: actions/upload-artifact@main
+        if: needs.pre_job.outputs.should_skip != 'true'
         with:
           name: safe_network-${{ matrix.target }}
           path: |
@@ -140,7 +141,7 @@ jobs:
 
   unit:
     needs: pre_job
-    if: "!startsWith(github.event.head_commit.message, 'chore(release):') && needs.pre_job.outputs.should_skip != 'true'"
+    if: "!startsWith(github.event.head_commit.message, 'chore(release):')"
     name: Unit Tests
     runs-on: ${{ matrix.os }}
     strategy:
@@ -158,52 +159,62 @@ jobs:
           override: true
 
       - uses: Swatinem/rust-cache@v1
+        if: needs.pre_job.outputs.should_skip != 'true'
         continue-on-error: true
         with:
           cache-on-failure: true
           sharedKey: ${{github.run_id}}-unit
 
       - name: Build sn_interface tests before running
+        if: needs.pre_job.outputs.should_skip != 'true'
         run: cd sn_interface && cargo test --no-run --release
         timeout-minutes: 50
 
       - name: Run sn_interface tests
+        if: needs.pre_job.outputs.should_skip != 'true'
         timeout-minutes: 25
         run: cd sn_interface && cargo test --release
 
       - name: Build sn_fault_detection tests before running
+        if: needs.pre_job.outputs.should_skip != 'true'
         run: cd sn_fault_detection && cargo test --no-run --release
         timeout-minutes: 50
 
       - name: Run sn_fault_detection tests
+        if: needs.pre_job.outputs.should_skip != 'true'
         timeout-minutes: 14
         env:
           RUST_LOG: sn_fault_detection
         run: cd sn_fault_detection && cargo test --release
 
       - name: Run sn_comms tests
+        if: needs.pre_job.outputs.should_skip != 'true'
         timeout-minutes: 10
         run: cargo test --release -p sn_comms
 
       - name: Build sn_node tests before running
+        if: needs.pre_job.outputs.should_skip != 'true'
         run: cd sn_node && cargo test --no-run --release
         timeout-minutes: 50
 
       - name: Run sn_node tests
+        if: needs.pre_job.outputs.should_skip != 'true'
         timeout-minutes: 20
         run: cd sn_node && cargo test --release
 
       - name: Build sn_cli tests before running
+        if: needs.pre_job.outputs.should_skip != 'true'
         run: cd sn_cli && cargo test --no-run --release --features data-network
         timeout-minutes: 50
 
       - name: Run sn_cli tests
+        if: needs.pre_job.outputs.should_skip != 'true'
         timeout-minutes: 25
         run: cd sn_cli && cargo test --release --bin safe --features data-network
 
   e2e:
     needs: pre_job
-    if: "!startsWith(github.event.head_commit.message, 'chore(release):') && needs.pre_job.outputs.should_skip != 'true'"
+    if: "!startsWith(github.event.head_commit.message, 'chore(release):')"
     name: E2E tests
     runs-on: ${{ matrix.os }}
     strategy:
@@ -239,34 +250,40 @@ jobs:
         if: matrix.os == 'windows-latest'
 
       - name: Build sn bins
+        if: needs.pre_job.outputs.should_skip != 'true'
         run: cd sn_node && cargo build --release --bins
         timeout-minutes: 60
 
       - name: Build testnet
+        if: needs.pre_job.outputs.should_skip != 'true'
         run: cd testnet && cargo build --release --bin testnet
         timeout-minutes: 60
 
       - name: Start the network
+        if: needs.pre_job.outputs.should_skip != 'true'
         run: ./target/release/testnet --interval 30000
         id: section-startup
         env:
           RUST_LOG: "sn_node,sn_comms,sn_consensus,sn_fault_detection,sn_interface=trace"
 
       - name: Wait for all nodes to join
+        if: needs.pre_job.outputs.should_skip != 'true'
         shell: bash
         run: ./resources/scripts/wait_for_nodes_to_join.sh
         timeout-minutes: 5
 
       - name: Check we have expected elders
+        if: needs.pre_job.outputs.should_skip != 'true'
         shell: bash
         run: rg "7 Elders, " ~/.safe/node/local-test-network -u
 
       - name: Build all tests before running non ubuntu
+        if: needs.pre_job.outputs.should_skip != 'true'
         run: cd sn_client && cargo test --no-run --release --features check-replicas
         timeout-minutes: 50
 
       - name: Run client tests (ubuntu)
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'ubuntu-latest' && needs.pre_job.outputs.should_skip != 'true'
         env:
           SN_CMD_TIMEOUT: 10
           SN_QUERY_TIMEOUT: 10
@@ -275,13 +292,14 @@ jobs:
         timeout-minutes: 7
 
       - name: Run client tests
-        if: matrix.os != 'ubuntu-latest'
+        if: matrix.os != 'ubuntu-latest' && needs.pre_job.outputs.should_skip != 'true'
         env:
           RUST_LOG: "sn_client=trace,qp2p=debug"
         run: cd sn_client && cargo test --release --features check-replicas
         timeout-minutes: 15
 
       - name: Run example app for file API against local network
+        if: needs.pre_job.outputs.should_skip != 'true'
         timeout-minutes: 2
         shell: bash
         run: cd sn_client && cargo run --release --example client_files
@@ -289,14 +307,14 @@ jobs:
       - name: Ensure no nodes have left during test runs
         timeout-minutes: 1
         shell: bash
-        if: matrix.os != 'windows-latest'
+        if: matrix.os != 'windows-latest' && needs.pre_job.outputs.should_skip != 'true'
         # we just want to print out the info. If there is none, an exit code of 1 is returned, so here we return true
         run: rg "Membership - decided" $HOME/.safe/node/local-test-network | rg Left || true
 
       - name: Are nodes still running...?
         shell: bash
         timeout-minutes: 1
-        if: failure() && matrix.os != 'windows-latest'
+        if: failure() && matrix.os != 'windows-latest' && needs.pre_job.outputs.should_skip != 'true'
         continue-on-error: true
         run: |
           echo "$(pgrep sn_node | wc -l) nodes still running"
@@ -305,7 +323,7 @@ jobs:
       - name: Kill all nodes
         shell: bash
         timeout-minutes: 1
-        if: failure()
+        if: failure() && needs.pre_job.outputs.should_skip != 'true'
         continue-on-error: true
         run: |
           pkill sn_node
@@ -329,19 +347,19 @@ jobs:
         shell: bash
         continue-on-error: true
         run: find ~/.safe/node/local-test-network -iname '*.log*' | tar -zcvf log_files.tar.gz --files-from -
-        if: failure()
+        if: failure() && needs.pre_job.outputs.should_skip != 'true'
 
       - name: Upload Node Logs
         uses: actions/upload-artifact@main
         with:
           name: sn_node_logs_e2e_${{matrix.os}}
           path: log_files.tar.gz
-        if: failure()
+        if: failure() && needs.pre_job.outputs.should_skip != 'true'
         continue-on-error: true
 
   e2e-msg-happy-path:
     needs: pre_job
-    if: "!startsWith(github.event.head_commit.message, 'chore(release):') && needs.pre_job.outputs.should_skip != 'true'"
+    if: "!startsWith(github.event.head_commit.message, 'chore(release):')"
     name: E2E tests (msg happy path)
     runs-on: ${{ matrix.os }}
     strategy:
@@ -377,34 +395,40 @@ jobs:
         if: matrix.os == 'windows-latest'
 
       - name: Build sn bins
+        if: needs.pre_job.outputs.should_skip != 'true'
         run: cd sn_node && cargo build --release --bins
         timeout-minutes: 60
 
       - name: Build testnet
+        if: needs.pre_job.outputs.should_skip != 'true'
         run: cd testnet && cargo build --release --bin testnet
         timeout-minutes: 60
 
       - name: Start the network
+        if: needs.pre_job.outputs.should_skip != 'true'
         run: ./target/release/testnet --interval 30000
         id: section-startup
         env:
           RUST_LOG: "sn_node,sn_comms,sn_consensus,sn_dysfunction,sn_interface=trace"
 
       - name: Wait for all nodes to join
+        if: needs.pre_job.outputs.should_skip != 'true'
         shell: bash
         run: ./resources/scripts/wait_for_nodes_to_join.sh
         timeout-minutes: 5
 
       - name: Check we have expected elders
+        if: needs.pre_job.outputs.should_skip != 'true'
         shell: bash
         run: rg "7 Elders, " ~/.safe/node/local-test-network -u
 
       - name: Build all tests before running non ubuntu
+        if: needs.pre_job.outputs.should_skip != 'true'
         run: cd sn_client && cargo test --no-run --release --features msg-happy-path
         timeout-minutes: 50
 
       - name: Run client tests (ubuntu)
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'ubuntu-latest' && needs.pre_job.outputs.should_skip != 'true'
         env:
           SN_CMD_TIMEOUT: 10
           SN_QUERY_TIMEOUT: 10
@@ -413,13 +437,14 @@ jobs:
         timeout-minutes: 7
 
       - name: Run client tests
-        if: matrix.os != 'ubuntu-latest'
+        if: matrix.os != 'ubuntu-latest' && needs.pre_job.outputs.should_skip != 'true'
         env:
           RUST_LOG: "sn_client=trace,qp2p=debug"
         run: cd sn_client && cargo test --release --features msg-happy-path
         timeout-minutes: 15
 
       - name: Run example app for file API against local network
+        if: needs.pre_job.outputs.should_skip != 'true'
         timeout-minutes: 2
         shell: bash
         run: cd sn_client && cargo run --release --features msg-happy-path --example client_files
@@ -427,14 +452,14 @@ jobs:
       - name: Ensure no nodes have left during test runs
         timeout-minutes: 1
         shell: bash
-        if: matrix.os != 'windows-latest'
+        if: matrix.os != 'windows-latest' && needs.pre_job.outputs.should_skip != 'true'
         # we just want to print out the info. If there is none, an exit code of 1 is returned, so here we return true
         run: rg "Membership - decided" $HOME/.safe/node/local-test-network | rg Left || true
 
       - name: Are nodes still running...?
         shell: bash
         timeout-minutes: 1
-        if: failure() && matrix.os != 'windows-latest'
+        if: failure() && matrix.os != 'windows-latest' && needs.pre_job.outputs.should_skip != 'true'
         continue-on-error: true
         run: |
           echo "$(pgrep sn_node | wc -l) nodes still running"
@@ -443,7 +468,7 @@ jobs:
       - name: Kill all nodes
         shell: bash
         timeout-minutes: 1
-        if: failure()
+        if: failure() && needs.pre_job.outputs.should_skip != 'true'
         continue-on-error: true
         run: |
           pkill sn_node
@@ -467,19 +492,19 @@ jobs:
         shell: bash
         continue-on-error: true
         run: find ~/.safe/node/local-test-network -iname '*.log*' | tar -zcvf log_files.tar.gz --files-from -
-        if: failure()
+        if: failure() && needs.pre_job.outputs.should_skip != 'true'
 
       - name: Upload Node Logs
         uses: actions/upload-artifact@main
         with:
           name: sn_node_logs_e2e_msg_happy_path_${{matrix.os}}
           path: log_files.tar.gz
-        if: failure()
+        if: failure() && needs.pre_job.outputs.should_skip != 'true'
         continue-on-error: true
 
   e2e-churn:
     needs: pre_job
-    if: "!startsWith(github.event.head_commit.message, 'chore(release):') && needs.pre_job.outputs.should_skip != 'true'"
+    if: "!startsWith(github.event.head_commit.message, 'chore(release):')"
     name: E2E Churn test
     runs-on: ubuntu-latest
     env:
@@ -496,20 +521,23 @@ jobs:
       - name: Build network churn data integrity test
         shell: bash
         run: cargo build --release --example churn
-
+        
       # This starts a NODE_COUNT node network, and then adds 12 more nodes. We should kill before moving on to split checks
       - name: Run network churn data integrity test
+        if: needs.pre_job.outputs.should_skip != 'true'
         timeout-minutes: 55 # made 55 for now due to slow network startup
         shell: bash
         run: cargo run --release --example churn
 
       - name: Ensure no nodes have left during test runs
+        if: needs.pre_job.outputs.should_skip != 'true'
         timeout-minutes: 1
         shell: bash
         # we just want to print out the info. If there is none, an exit code of 1 is returned, so here we return true
         run: rg "Membership - decided" $HOME/.safe/node/local-test-network | rg Left || true
 
       - name: Are nodes still running...?
+        if: needs.pre_job.outputs.should_skip != 'true'
         shell: bash
         timeout-minutes: 1
         continue-on-error: true
@@ -520,7 +548,7 @@ jobs:
       - name: Kill all nodes
         shell: bash
         timeout-minutes: 1
-        if: failure()
+        if: failure() && needs.pre_job.outputs.should_skip != 'true'
         continue-on-error: true
         run: |
           pkill sn_node
@@ -546,14 +574,14 @@ jobs:
         shell: bash
         continue-on-error: true
         run: find ~/.safe/node/local-test-network -iname '*.log*' | tar -zcvf log_files.tar.gz --files-from -
-        if: failure()
+        if: failure() && needs.pre_job.outputs.should_skip != 'true'
 
       - name: Upload Node Logs
         uses: actions/upload-artifact@main
         with:
           name: sn_node_logs_churn_self_hosted_ubuntu
           path: log_files.tar.gz
-        if: failure()
+        if: failure() && needs.pre_job.outputs.should_skip != 'true'
         continue-on-error: true
 
   # e2e-split:
@@ -732,7 +760,7 @@ jobs:
 
   api:
     needs: pre_job
-    if: "!startsWith(github.event.head_commit.message, 'chore(release):') && needs.pre_job.outputs.should_skip != 'true'"
+    if: "!startsWith(github.event.head_commit.message, 'chore(release):')"
     name: Run API tests
     runs-on: ${{ matrix.os }}
     strategy:
@@ -768,29 +796,35 @@ jobs:
         if: matrix.os == 'windows-latest'
 
       - name: Build sn bins
+        if: needs.pre_job.outputs.should_skip != 'true'
         run: cd sn_node && cargo build --release --bins
         timeout-minutes: 60
 
       - name: Build testnet
+        if: needs.pre_job.outputs.should_skip != 'true'
         run: cd testnet && cargo build --release --bin testnet
         timeout-minutes: 60
 
       - name: Start the network
+        if: needs.pre_job.outputs.should_skip != 'true'
         run: ./target/release/testnet --interval 30000
         id: section-startup
         env:
           RUST_LOG: "sn_node,sn_comms,sn_consensus,sn_fault_detection=trace,sn_interface=trace"
 
       - name: Wait for all nodes to join
+        if: needs.pre_job.outputs.should_skip != 'true'
         shell: bash
         run: ./resources/scripts/wait_for_nodes_to_join.sh
         timeout-minutes: 5
 
       - name: Build all tests before running
+        if: needs.pre_job.outputs.should_skip != 'true'
         run: cd sn_api && cargo test --no-run --release --features check-replicas
         timeout-minutes: 50
 
       - name: Run API tests
+        if: needs.pre_job.outputs.should_skip != 'true'
         env:
           RUST_LOG: "sn_api=trace,sn_client=trace"
         run: cd sn_api && cargo test --release --features check-replicas
@@ -799,7 +833,7 @@ jobs:
       - name: Are nodes still running...?
         shell: bash
         timeout-minutes: 1
-        if: failure() && matrix.os
+        if: failure() && matrix.os && needs.pre_job.outputs.should_skip != 'true'
         run: |
           echo "$(pgrep sn_node | wc -l) nodes still running"
           ls $HOME/.safe/node/local-test-network
@@ -807,7 +841,7 @@ jobs:
       - name: Kill all nodes
         shell: bash
         timeout-minutes: 1
-        if: failure()
+        if: failure() && needs.pre_job.outputs.should_skip != 'true'
         continue-on-error: true
         run: |
           pkill sn_node
@@ -816,7 +850,7 @@ jobs:
       - name: Ensure no nodes have left during test runs
         timeout-minutes: 1
         shell: bash
-        if: matrix.os != 'windows-latest'
+        if: matrix.os != 'windows-latest' && needs.pre_job.outputs.should_skip != 'true'
         # we just want to print out the info. If there is none, an exit code of 1 is returned, so here we return true
         run: rg "Membership - decided" $HOME/.safe/node/local-test-network | rg Left || true
 
@@ -838,19 +872,19 @@ jobs:
         shell: bash
         continue-on-error: true
         run: find ~/.safe/node/local-test-network -iname '*.log*' | tar -zcvf log_files.tar.gz --files-from -
-        if: failure()
+        if: failure() && needs.pre_job.outputs.should_skip != 'true'
 
       - name: Upload Node Logs
         uses: actions/upload-artifact@main
         with:
           name: sn_node_logs_api_${{matrix.os}}
           path: log_files.tar.gz
-        if: failure()
+        if: failure() && needs.pre_job.outputs.should_skip != 'true'
         continue-on-error: true
 
   cli:
     needs: pre_job
-    if: "!startsWith(github.event.head_commit.message, 'chore(release):') && needs.pre_job.outputs.should_skip != 'true'"
+    if: "!startsWith(github.event.head_commit.message, 'chore(release):')"
     name: Run CLI tests
     runs-on: ${{ matrix.os }}
     strategy:
@@ -875,50 +909,57 @@ jobs:
 
       - name: install ripgrep ubuntu
         run: sudo apt-get install ripgrep
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'ubuntu-latest' && needs.pre_job.outputs.should_skip != 'true'
 
       - name: install ripgrep mac
         run: brew install ripgrep
-        if: matrix.os == 'macos-latest'
+        if: matrix.os == 'macos-latest' && needs.pre_job.outputs.should_skip != 'true'
 
       - name: install ripgrep windows
         run: choco install ripgrep
-        if: matrix.os == 'windows-latest'
+        if: matrix.os == 'windows-latest' && needs.pre_job.outputs.should_skip != 'true'
 
       - name: Build sn bins
+        if: needs.pre_job.outputs.should_skip != 'true'
         run: cd sn_node && cargo build --release --bins
         timeout-minutes: 60
 
       - name: Build testnet
+        if: needs.pre_job.outputs.should_skip != 'true'
         run: cd testnet && cargo build --release --bin testnet
         timeout-minutes: 60
 
       - name: Start the network
+        if: needs.pre_job.outputs.should_skip != 'true'
         run: ./target/release/testnet --interval 30000
         id: section-startup
         env:
           RUST_LOG: "sn_node,sn_comms,sn_consensus,sn_fault_detection=trace,sn_interface=trace"
 
       - name: Wait for all nodes to join
+        if: needs.pre_job.outputs.should_skip != 'true'
         shell: bash
         run: ./resources/scripts/wait_for_nodes_to_join.sh
         timeout-minutes: 5
 
       - name: Generate keys for test run
+        if: needs.pre_job.outputs.should_skip != 'true'
         run: cargo run --package sn_cli --release -- keys create --for-cli
 
       - name: Build all tests before running
+        if: needs.pre_job.outputs.should_skip != 'true'
         run: cd sn_cli && cargo test --no-run --release --features check-replicas,data-network
         timeout-minutes: 50
 
       - name: Run CLI tests
+        if: needs.pre_job.outputs.should_skip != 'true'
         run: cd sn_cli && cargo test --release --features check-replicas,data-network -- --test-threads=1
         timeout-minutes: 7
 
       - name: Are nodes still running...?
         shell: bash
         timeout-minutes: 1
-        if: failure() && matrix.os
+        if: failure() && matrix.os && needs.pre_job.outputs.should_skip != 'true'
         run: |
           echo "$(pgrep sn_node | wc -l) nodes still running"
           ls $HOME/.safe/node/local-test-network
@@ -926,7 +967,7 @@ jobs:
       - name: Kill all nodes
         shell: bash
         timeout-minutes: 1
-        if: failure()
+        if: failure() && needs.pre_job.outputs.should_skip != 'true'
         continue-on-error: true
         run: |
           pkill sn_node
@@ -935,7 +976,7 @@ jobs:
       - name: Ensure no nodes have left during test runs
         timeout-minutes: 1
         shell: bash
-        if: matrix.os != 'windows-latest'
+        if: matrix.os != 'windows-latest' && needs.pre_job.outputs.should_skip != 'true'
         # we just want to print out the info. If there is none, an exit code of 1 is returned, so here we return true
         run: rg "Membership - decided" $HOME/.safe/node/local-test-network | rg Left || true
 
@@ -957,12 +998,12 @@ jobs:
         shell: bash
         continue-on-error: true
         run: find ~/.safe/node/local-test-network -iname '*.log*' | tar -zcvf log_files.tar.gz --files-from -
-        if: failure()
+        if: failure() && needs.pre_job.outputs.should_skip != 'true'
 
       - name: Upload Node Logs
         uses: actions/upload-artifact@main
         with:
           name: sn_node_logs_cli_${{matrix.os}}
           path: log_files.tar.gz
-        if: failure()
+        if: failure() && needs.pre_job.outputs.should_skip != 'true'
         continue-on-error: true
