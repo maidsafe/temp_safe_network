@@ -257,7 +257,7 @@ impl MyNode {
         let (ephemeral_pub_key, sig) =
             match self
                 .dkg_voter
-                .gen_ephemeral_key(session_id.hash(), our_name, &self.keypair)
+                .gen_ephemeral_key(&session_id, our_name, &self.keypair)
             {
                 Ok(k) => k,
                 Err(Error::DkgEphemeralKeyAlreadyGenerated) => {
