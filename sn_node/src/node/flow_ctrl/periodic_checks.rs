@@ -9,7 +9,9 @@
 use super::FlowCtrl;
 
 use crate::node::{
-    core::NodeContext, flow_ctrl::cmds::Cmd, membership::Membership, node_starter::CmdChannel,
+    core::NodeContext,
+    flow_ctrl::{cmds::Cmd, CmdProcessorEvent},
+    membership::Membership,
     MyNode,
 };
 
@@ -18,7 +20,7 @@ use sn_interface::{
 };
 
 use std::{collections::BTreeSet, time::Duration};
-use tokio::time::Instant;
+use tokio::{sync::mpsc::Sender, time::Instant};
 
 const PROBE_INTERVAL: Duration = Duration::from_secs(300);
 const REQUEST_TO_RELOCATE_TIMEOUT_SEC: Duration = Duration::from_secs(30);
@@ -88,10 +90,13 @@ impl FlowCtrl {
         }
 
         // move cmd spawn off thread to not block
-        let sender_channel = self.cmd_sender_channel.clone();
+        let sender_channel = self.preprocess_cmd_sender_channel.clone();
         let _handle = tokio::spawn(async move {
             for cmd in cmds {
-                if let Err(error) = sender_channel.send((cmd, vec![])).await {
+                if let Err(error) = sender_channel
+                    .send(super::CmdProcessorEvent::Cmd(cmd))
+                    .await
+                {
                     error!("Error queuing periodic check: {error:?}");
                 }
             }
@@ -223,7 +228,7 @@ impl FlowCtrl {
         if self.timestamps.last_dkg_msg_check.elapsed() > MISSING_DKG_MSG_INTERVAL {
             trace!(" ----> dkg msg periodics start");
             self.timestamps.last_dkg_msg_check = now;
-            Self::check_for_missed_dkg_messages(node, self.cmd_sender_channel.clone());
+            Self::check_for_missed_dkg_messages(node, self.preprocess_cmd_sender_channel.clone());
             trace!(" ----> dkg msg periodics done");
         }
 
@@ -344,7 +349,7 @@ impl FlowCtrl {
     }
 
     /// Checks the interval since last dkg vote received
-    fn check_for_missed_dkg_messages(node: &MyNode, sender_channel: CmdChannel) {
+    fn check_for_missed_dkg_messages(node: &MyNode, sender_channel: Sender<CmdProcessorEvent>) {
         info!("Checking for DKG missed messages");
 
         let dkg_voter = &node.dkg_voter;
@@ -360,7 +365,7 @@ impl FlowCtrl {
                 // move cmd spawn off thread to not block
                 let _handle = tokio::spawn(async move {
                     for cmd in cmds {
-                        if let Err(error) = sender_channel.send((cmd, vec![])).await {
+                        if let Err(error) = sender_channel.send(CmdProcessorEvent::Cmd(cmd)).await {
                             error!("Error sending DKG gossip msgs {error:?}");
                         }
                     }

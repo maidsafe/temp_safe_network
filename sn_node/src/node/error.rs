@@ -202,6 +202,8 @@ pub enum Error {
     DbcError(#[from] DbcError),
     #[error("BLS error: {0}")]
     BlsError(#[from] bls::Error),
+    #[error("Tokio channel could not be sent to: {0}")]
+    TokioChannel(String),
     #[cfg(feature = "otlp")]
     #[error("OpenTelemetry Tracing error: {0}")]
     OpenTelemetryTracing(#[from] opentelemetry::trace::TraceError),
