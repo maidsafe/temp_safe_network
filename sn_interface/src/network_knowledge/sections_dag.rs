@@ -37,7 +37,7 @@ impl Debug for SectionInfo {
             .chain(self.sig.to_bytes().into_iter())
             .collect();
         let hex = hex::encode(bytes);
-        let hex: String = hex.chars().into_iter().take(10).collect();
+        let hex: String = hex.chars().take(10).collect();
         write!(formatter, "SectionInfo({hex})")
     }
 }

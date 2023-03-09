@@ -192,7 +192,7 @@ mod tests {
 
         // init dummy section
         let elders_sk = SecretKeySet::random(7, &mut rng);
-        let mut nodes_handover_state = Vec::from_iter((1..=7).into_iter().map(|id| {
+        let mut nodes_handover_state = Vec::from_iter((1..=7).map(|id| {
             Handover::from(
                 (id, elders_sk.secret_key_share(id as usize)),
                 elders_sk.public_keys(),
