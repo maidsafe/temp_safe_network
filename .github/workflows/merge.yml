@@ -966,3 +966,23 @@ jobs:
           path: log_files.tar.gz
         if: failure()
         continue-on-error: true
+
+  # make sure all the jobs are not failed.
+  # Note that the duplicated jobs might be skipped.
+  merge-after-tests:
+    needs:
+      - pre_job
+      - cargo-udeps
+      - lint
+      - checks
+      - build-arm
+      - unit
+      - e2e
+      - e2e-msg-happy-path
+      - e2e-churn
+      - api
+      - cli
+    runs-on: ubuntu-latest
+    if: "! failure()"
+    steps:
+      - run: echo "All checks passed, ready to merge"
