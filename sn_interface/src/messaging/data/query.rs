@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{register::RegisterQuery, spentbook::SpentbookQuery};
+use super::{register::RegisterQuery, spentbook::SpendQuery};
 use crate::types::ChunkAddress;
 use serde::{Deserialize, Serialize};
 use xor_name::XorName;
@@ -32,7 +32,7 @@ pub enum DataQuery {
     /// [`Register`]: crate::types::register::Register
     Register(RegisterQuery),
     /// Spentbook read operation.
-    Spentbook(SpentbookQuery),
+    Spentbook(SpendQuery),
 }
 
 impl DataQuery {

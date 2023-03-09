@@ -131,6 +131,7 @@ mod core {
         pub(crate) info: MyNodeInfo,
         pub(crate) keypair: Arc<Keypair>,
         pub(crate) reward_key: PublicKey,
+        pub(crate) store_cost: sn_dbc::Token,
         pub(crate) network_knowledge: NetworkKnowledge,
         pub(crate) section_keys_provider: SectionKeysProvider,
         #[debug(skip)]
@@ -188,6 +189,7 @@ mod core {
                 info: self.info(),
                 keypair: self.keypair.clone(),
                 reward_key: self.reward_key,
+                store_cost: sn_dbc::Token::from_nano(1), // hard coded for now
                 network_knowledge: self.network_knowledge().clone(),
                 section_keys_provider: self.section_keys_provider.clone(),
                 comm: self.comm.clone(),

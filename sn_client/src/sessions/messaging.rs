@@ -11,7 +11,7 @@ use crate::{Error, Result};
 
 use sn_interface::{
     messaging::{
-        data::{DataQuery, QueryResponse},
+        data::{DataQuery, QueryResponse, SpendQuery},
         ClientAuth, Dst, MsgId, MsgKind, WireMsg,
     },
     network_knowledge::supermajority,
@@ -359,7 +359,7 @@ impl Session {
         };
         let kind = MsgKind::Client {
             auth,
-            is_spend: false,
+            is_spend: matches!(query, DataQuery::Spentbook(SpendQuery::GetFees(_))),
             query_index: Some(query_node_index),
         };
         let wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
@@ -469,10 +469,10 @@ impl Session {
                         valid_response = Some(*response);
                     }
                 }
-                QueryResponse::SpentProofShares(Ok(ref spentproof_set)) => {
+                QueryResponse::GetSpentProofShares(Ok(ref spentproof_set)) => {
                     debug!("okay _read_ spentproofs from {node_address:?}");
                     // TODO: properly merge all registers
-                    if let Some(QueryResponse::SpentProofShares(Ok(prior_response))) =
+                    if let Some(QueryResponse::GetSpentProofShares(Ok(prior_response))) =
                         &valid_response
                     {
                         if spentproof_set.len() > prior_response.len() {

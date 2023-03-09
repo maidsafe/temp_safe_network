@@ -26,6 +26,8 @@ pub enum MsgKind {
     // TODO: Should query index be a part of Dst?
     Client {
         auth: ClientAuth,
+        /// This is `true` if the msg is to be handled first/directly at Elders,
+        /// such as a spend or a fee query. (FIX: This pattern is quite confusing.)
         is_spend: bool,
         query_index: Option<usize>,
     },
