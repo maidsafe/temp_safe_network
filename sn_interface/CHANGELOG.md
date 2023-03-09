@@ -6,14 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## v0.20.1 (2023-03-08)
+## v0.20.2 (2023-03-09)
+
+### Chore
+
+ - <csr-id-0ff8d0bef0c8c9a4ef38d094337b25070f7e7ac0/> clean up a few things from commit 4097de4
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
  - 1 commit contributed to the release.
- - 0 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 1 day passed between releases.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -23,10 +28,79 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Clean up a few things from commit 4097de4 ([`0ff8d0b`](https://github.com/maidsafe/safe_network/commit/0ff8d0bef0c8c9a4ef38d094337b25070f7e7ac0))
+</details>
+
+## v0.20.1 (2023-03-08)
+
+### Chore
+
+ - <csr-id-2f99d36a8606dc2bb39ac025adcd358fc48fcb91/> sn_interface-0.20.1/sn_node-0.78.1
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Sn_interface-0.20.1/sn_node-0.78.1 ([`2f99d36`](https://github.com/maidsafe/safe_network/commit/2f99d36a8606dc2bb39ac025adcd358fc48fcb91))
     - Feat(rewards): add bls pub key to node - This is the first step to simple dbc tx fees and rewards for Elders. - It allows Elders to check if dbc transactions contain any output for them. ([`a05fa20`](https://github.com/maidsafe/safe_network/commit/a05fa20f371e4a5a84c795f470e24cd5b0c4ec3b))
 </details>
 
+## v0.20.0 (2023-03-08)
+
+<csr-id-1e531f807b1c920e61ec9ad2490f6590bf43fdd2/>
+<csr-id-0da345d4875484dd4e4172b10049c72fc3feb74e/>
+<csr-id-c8cfa6c774ceeff71d2ae671b07d4122b94100c9/>
+
+### Chore
+
+ - <csr-id-1e531f807b1c920e61ec9ad2490f6590bf43fdd2/> sn_interface-0.20.0/sn_comms-0.6.0/sn_client-0.82.0/sn_node-0.78.0/sn_api-0.80.0/sn_cli-0.73.0
+ - <csr-id-0da345d4875484dd4e4172b10049c72fc3feb74e/> tidying up
+ - <csr-id-c8cfa6c774ceeff71d2ae671b07d4122b94100c9/> bump sn_dbc version
+
+### New Features
+
+ - <csr-id-fa49b0d05d944f0ab1141b3c18bd61ac345b2fed/> encapsulate Dbc reasons
+
+### New Features (BREAKING)
+
+ - <csr-id-97ee1eb5a55a0b4dbea9ea8a512351dd3219a6ed/> DBC reasons
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 5 commits contributed to the release.
+ - 5 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Sn_interface-0.20.0/sn_comms-0.6.0/sn_client-0.82.0/sn_node-0.78.0/sn_api-0.80.0/sn_cli-0.73.0 ([`1e531f8`](https://github.com/maidsafe/safe_network/commit/1e531f807b1c920e61ec9ad2490f6590bf43fdd2))
+    - Tidying up ([`0da345d`](https://github.com/maidsafe/safe_network/commit/0da345d4875484dd4e4172b10049c72fc3feb74e))
+    - Encapsulate Dbc reasons ([`fa49b0d`](https://github.com/maidsafe/safe_network/commit/fa49b0d05d944f0ab1141b3c18bd61ac345b2fed))
+    - Bump sn_dbc version ([`c8cfa6c`](https://github.com/maidsafe/safe_network/commit/c8cfa6c774ceeff71d2ae671b07d4122b94100c9))
+    - DBC reasons ([`97ee1eb`](https://github.com/maidsafe/safe_network/commit/97ee1eb5a55a0b4dbea9ea8a512351dd3219a6ed))
+</details>
+
 ## v0.19.8 (2023-03-07)
+
+<csr-id-08ff83803a422aae67373fabe2ebe4d4d5476021/>
 
 ### Chore
 
@@ -288,44 +362,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Remove more unused pub ([`9a2f912`](https://github.com/maidsafe/safe_network/commit/9a2f912effa46112c8481dd259c9f203ee775e2e))
     - Fix clippy lints; fmt ([`5fcb670`](https://github.com/maidsafe/safe_network/commit/5fcb6700fa26c0825191feb87c8d4a4653e50eef))
     - Remove unused pub fn/methods ([`3fda80a`](https://github.com/maidsafe/safe_network/commit/3fda80a40c508d16fbe097091252a98b01f8f339))
-</details>
-
-## v0.20.0 (2023-03-08)
-
-### Chore
-
- - <csr-id-1e531f807b1c920e61ec9ad2490f6590bf43fdd2/> sn_interface-0.20.0/sn_comms-0.6.0/sn_client-0.82.0/sn_node-0.78.0/sn_api-0.80.0/sn_cli-0.73.0
- - <csr-id-0da345d4875484dd4e4172b10049c72fc3feb74e/> tidying up
- - <csr-id-c8cfa6c774ceeff71d2ae671b07d4122b94100c9/> bump sn_dbc version
-
-### New Features
-
- - <csr-id-fa49b0d05d944f0ab1141b3c18bd61ac345b2fed/> encapsulate Dbc reasons
-
-### New Features (BREAKING)
-
- - <csr-id-97ee1eb5a55a0b4dbea9ea8a512351dd3219a6ed/> DBC reasons
-
-### Commit Statistics
-
-<csr-read-only-do-not-edit/>
-
- - 5 commits contributed to the release.
- - 5 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' were seen in commit messages
-
-### Commit Details
-
-<csr-read-only-do-not-edit/>
-
-<details><summary>view details</summary>
-
- * **Uncategorized**
-    - Sn_interface-0.20.0/sn_comms-0.6.0/sn_client-0.82.0/sn_node-0.78.0/sn_api-0.80.0/sn_cli-0.73.0 ([`1e531f8`](https://github.com/maidsafe/safe_network/commit/1e531f807b1c920e61ec9ad2490f6590bf43fdd2))
-    - Tidying up ([`0da345d`](https://github.com/maidsafe/safe_network/commit/0da345d4875484dd4e4172b10049c72fc3feb74e))
-    - Encapsulate Dbc reasons ([`fa49b0d`](https://github.com/maidsafe/safe_network/commit/fa49b0d05d944f0ab1141b3c18bd61ac345b2fed))
-    - Bump sn_dbc version ([`c8cfa6c`](https://github.com/maidsafe/safe_network/commit/c8cfa6c774ceeff71d2ae671b07d4122b94100c9))
-    - DBC reasons ([`97ee1eb`](https://github.com/maidsafe/safe_network/commit/97ee1eb5a55a0b4dbea9ea8a512351dd3219a6ed))
 </details>
 
 ## v0.19.0 (2023-02-27)

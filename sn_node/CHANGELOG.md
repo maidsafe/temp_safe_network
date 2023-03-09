@@ -5,17 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.77.14 (2023-03-07)
+## v0.78.2 (2023-03-09)
 
-### Bug Fixes
+### Chore
 
- - <csr-id-854c860aee7ddecfdc829ba2e5810afb64eda612/> relocation_dst is replaced by relocation_trigger
+ - <csr-id-0ff8d0bef0c8c9a4ef38d094337b25070f7e7ac0/> clean up a few things from commit 4097de4
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
  - 1 commit contributed to the release.
+ - 1 day passed between releases.
  - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
@@ -26,10 +27,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Clean up a few things from commit 4097de4 ([`0ff8d0b`](https://github.com/maidsafe/safe_network/commit/0ff8d0bef0c8c9a4ef38d094337b25070f7e7ac0))
+</details>
+
+## v0.77.14 (2023-03-07)
+
+### Chore
+
+ - <csr-id-08ff83803a422aae67373fabe2ebe4d4d5476021/> sn_interface-0.19.8/sn_node-0.77.14
+
+### Bug Fixes
+
+ - <csr-id-854c860aee7ddecfdc829ba2e5810afb64eda612/> relocation_dst is replaced by relocation_trigger
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Sn_interface-0.19.8/sn_node-0.77.14 ([`08ff838`](https://github.com/maidsafe/safe_network/commit/08ff83803a422aae67373fabe2ebe4d4d5476021))
     - Relocation_dst is replaced by relocation_trigger ([`854c860`](https://github.com/maidsafe/safe_network/commit/854c860aee7ddecfdc829ba2e5810afb64eda612))
 </details>
 
 ## v0.77.13 (2023-03-06)
+
+<csr-id-4b8d391f5f9fbdfb4de28e969ad1b1c4f4a13ebf/>
 
 ### Chore
 
@@ -470,6 +502,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  * **Uncategorized**
     - Sn_interface-0.19.2/sn_node-0.77.2 ([`80bae9f`](https://github.com/maidsafe/safe_network/commit/80bae9ffa64e274da520e752cab0df79d5cf419e))
     - Ae updates and affects split into sap and member updates ([`fe2f46b`](https://github.com/maidsafe/safe_network/commit/fe2f46bcb60185a2c2fd28c0dcc3befdeb9851c0))
+</details>
+
+## v0.78.1 (2023-03-08)
+
+### Chore
+
+ - <csr-id-2f99d36a8606dc2bb39ac025adcd358fc48fcb91/> sn_interface-0.20.1/sn_node-0.78.1
+
+### Bug Fixes
+
+ - <csr-id-350b07d6db9c99c210f81b9c0a670687b177581f/> overflow in DKG log
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Sn_interface-0.20.1/sn_node-0.78.1 ([`2f99d36`](https://github.com/maidsafe/safe_network/commit/2f99d36a8606dc2bb39ac025adcd358fc48fcb91))
+    - Feat(rewards): add bls pub key to node - This is the first step to simple dbc tx fees and rewards for Elders. - It allows Elders to check if dbc transactions contain any output for them. ([`a05fa20`](https://github.com/maidsafe/safe_network/commit/a05fa20f371e4a5a84c795f470e24cd5b0c4ec3b))
+    - Overflow in DKG log ([`350b07d`](https://github.com/maidsafe/safe_network/commit/350b07d6db9c99c210f81b9c0a670687b177581f))
+</details>
+
+## v0.78.0 (2023-03-08)
+
+### Chore
+
+ - <csr-id-1e531f807b1c920e61ec9ad2490f6590bf43fdd2/> sn_interface-0.20.0/sn_comms-0.6.0/sn_client-0.82.0/sn_node-0.78.0/sn_api-0.80.0/sn_cli-0.73.0
+
+### New Features
+
+ - <csr-id-fa49b0d05d944f0ab1141b3c18bd61ac345b2fed/> encapsulate Dbc reasons
+
+### New Features (BREAKING)
+
+ - <csr-id-97ee1eb5a55a0b4dbea9ea8a512351dd3219a6ed/> DBC reasons
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Sn_interface-0.20.0/sn_comms-0.6.0/sn_client-0.82.0/sn_node-0.78.0/sn_api-0.80.0/sn_cli-0.73.0 ([`1e531f8`](https://github.com/maidsafe/safe_network/commit/1e531f807b1c920e61ec9ad2490f6590bf43fdd2))
+    - Encapsulate Dbc reasons ([`fa49b0d`](https://github.com/maidsafe/safe_network/commit/fa49b0d05d944f0ab1141b3c18bd61ac345b2fed))
+    - DBC reasons ([`97ee1eb`](https://github.com/maidsafe/safe_network/commit/97ee1eb5a55a0b4dbea9ea8a512351dd3219a6ed))
 </details>
 
 ## v0.77.1 (2023-02-28)
