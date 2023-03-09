@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{
-    flow_ctrl::{cmds::Cmd, RejoinReason},
+    flow_ctrl::{cmds::Cmd, CmdProcessorEvent, RejoinReason},
     Error, MyNode, STANDARD_CHANNEL_SIZE,
 };
 
@@ -42,12 +42,12 @@ impl CmdCtrl {
     }
 
     /// Processes the passed in cmd on a new task
-    pub(crate) async fn process_cmd_job(
+    pub(crate) async fn process_blocking_cmd_job(
         &self,
         node: &mut MyNode,
         cmd: Cmd,
         mut id: Vec<usize>,
-        cmd_process_api: Sender<(Cmd, Vec<usize>)>,
+        cmd_process_api: Sender<CmdProcessorEvent>,
         rejoin_network_sender: Sender<RejoinReason>,
     ) {
         let node_identifier = node.info().name();
@@ -70,9 +70,12 @@ impl CmdCtrl {
             Ok(cmds) => {
                 let _handle = tokio::task::spawn(async move {
                     for (child_nr, cmd) in cmds.into_iter().enumerate() {
+                        // TODO: decide if CmdIds are still worthwhile
                         // zero based, first child of first cmd => [0, 0], second child => [0, 1], first child of second child => [0, 1, 0]
-                        let child_id = [id.clone(), [child_nr].to_vec()].concat();
-                        match cmd_process_api.send((cmd, child_id)).await {
+                        // let child_id = [id.clone(), [child_nr].to_vec()].concat();
+
+                        // match cmd_process_api.send((cmd, child_id)).await {
+                        match cmd_process_api.send(CmdProcessorEvent::Cmd(cmd)).await {
                             Ok(_) => (), // no issues
                             Err(error) => {
                                 let child_id = [id.clone(), [child_nr].to_vec()].concat();

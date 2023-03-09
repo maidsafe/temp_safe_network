@@ -16,7 +16,7 @@ mod periodic_checks;
 pub(crate) mod tests;
 pub(crate) use cmd_ctrl::CmdCtrl;
 
-use super::DataStorage;
+use super::{core::NodeContext, node_starter::CmdChannel, DataStorage, Result};
 use periodic_checks::PeriodicChecksTimestamps;
 
 use crate::node::{
@@ -32,6 +32,7 @@ use sn_comms::{CommEvent, MsgReceived};
 use sn_fault_detection::FaultDetection;
 use sn_interface::{
     messaging::system::{JoinRejectReason, NodeDataCmd, NodeMsg},
+    messaging::{AntiEntropyMsg, NetworkMsg},
     types::{log_markers::LogMarker, DataAddress, NodeId, Participant},
 };
 
@@ -69,10 +70,20 @@ impl RejoinReason {
     }
 }
 
+/// All Cmds should be passed via an event. This determines if to run in blocking
+/// context or no
+#[derive(Debug)]
+pub(crate) enum CmdProcessorEvent {
+    /// Process this cmd, in blocking thread or off-thread where possible
+    Cmd(Cmd),
+    /// Updates the node context passed to off-thread Cmds
+    UpdateContext(NodeContext),
+}
+
 /// Listens for incoming msgs and forms Cmds for each,
 /// Periodically triggers other Cmd Processes (eg health checks, fault detection etc)
 pub(crate) struct FlowCtrl {
-    cmd_sender_channel: Sender<(Cmd, Vec<usize>)>,
+    preprocess_cmd_sender_channel: Sender<CmdProcessorEvent>,
     fault_channels: FaultChannels,
     timestamps: PeriodicChecksTimestamps,
 }
@@ -87,10 +98,15 @@ impl FlowCtrl {
         incoming_msg_events: Receiver<CommEvent>,
         data_replication_receiver: Receiver<(Vec<DataAddress>, NodeId)>,
         fault_cmds_channels: (Sender<FaultsCmd>, Receiver<FaultsCmd>),
-    ) -> (Sender<(Cmd, Vec<usize>)>, Receiver<RejoinReason>) {
+    ) -> (CmdChannel, Receiver<RejoinReason>) {
         let node_context = node.context();
-        let (cmd_sender_channel, mut incoming_cmds_from_apis) = mpsc::channel(CMD_CHANNEL_SIZE);
+        let (blocking_cmd_sender_channel, mut blocking_cmds_receiver) =
+            mpsc::channel(CMD_CHANNEL_SIZE);
         let (rejoin_network_tx, rejoin_network_rx) = mpsc::channel(STANDARD_CHANNEL_SIZE);
+
+        // Our channel to process _all_ cmds. If it can, they are processed off thread with latest context,
+        // otherwise they are sent to the blocking process channel
+        let (process_cmd_sender, process_cmd_event_reciever) = mpsc::channel(STANDARD_CHANNEL_SIZE);
 
         let all_members = node_context
             .network_knowledge
@@ -115,14 +131,27 @@ impl FlowCtrl {
         };
 
         let flow_ctrl = Self {
-            cmd_sender_channel: cmd_sender_channel.clone(),
+            preprocess_cmd_sender_channel: process_cmd_sender.clone(),
             fault_channels,
             timestamps: PeriodicChecksTimestamps::now(),
         };
 
         // first start listening for msgs
-        let cmd_channel_for_msgs = cmd_sender_channel.clone();
-        Self::listen_for_comm_events(incoming_msg_events, cmd_channel_for_msgs);
+        let cmd_channel_for_msgs = blocking_cmd_sender_channel.clone();
+
+        // a clone for sending in updates to context
+        let read_only_event_sender_clone_for_processing = process_cmd_sender.clone();
+
+        Self::convert_incoming_msgs_to_processor_events(
+            incoming_msg_events,
+            process_cmd_sender.clone(),
+        );
+
+        Self::handle_processor_events(
+            node_context.clone(),
+            process_cmd_event_reciever,
+            cmd_channel_for_msgs.clone(),
+        );
 
         // second do this until join
         let node = flow_ctrl
@@ -130,26 +159,27 @@ impl FlowCtrl {
                 node,
                 &mut cmd_ctrl,
                 join_retry_timeout,
-                &mut incoming_cmds_from_apis,
+                &mut blocking_cmds_receiver,
                 &rejoin_network_tx,
             )
             .await;
 
-        let _handle = tokio::task::spawn(flow_ctrl.process_cmds_and_periodic_checks(
+        let _handle = tokio::task::spawn(flow_ctrl.process_blocking_cmds(
             node,
             cmd_ctrl,
-            incoming_cmds_from_apis,
+            blocking_cmds_receiver,
             rejoin_network_tx,
+            read_only_event_sender_clone_for_processing,
         ));
 
         Self::send_out_data_for_replication(
             node_context.data_storage,
             data_replication_receiver,
-            cmd_sender_channel.clone(),
+            blocking_cmd_sender_channel.clone(),
         )
         .await;
 
-        (cmd_sender_channel, rejoin_network_rx)
+        (cmd_channel_for_msgs, rejoin_network_rx)
     }
 
     /// This runs the join process until we detect we are a network node
@@ -159,11 +189,11 @@ impl FlowCtrl {
         mut node: MyNode,
         cmd_ctrl: &mut CmdCtrl,
         join_retry_timeout: Duration,
-        incoming_cmds_from_apis: &mut Receiver<(Cmd, Vec<usize>)>,
+        blocking_cmds_receiver: &mut Receiver<(Cmd, Vec<usize>)>,
         rejoin_network_tx: &Sender<RejoinReason>,
     ) -> MyNode {
         let mut is_member = false;
-        let cmd_channel = self.cmd_sender_channel.clone();
+        let preprocess_cmd_channel = self.preprocess_cmd_sender_channel.clone();
 
         // Fire cmd to join the network
         let mut last_join_attempt = Instant::now();
@@ -171,14 +201,14 @@ impl FlowCtrl {
 
         loop {
             // first do any pending processing
-            while let Ok((cmd, cmd_id)) = incoming_cmds_from_apis.try_recv() {
+            while let Ok((cmd, cmd_id)) = blocking_cmds_receiver.try_recv() {
                 trace!("Taking cmd off stack: {cmd:?}");
                 cmd_ctrl
-                    .process_cmd_job(
+                    .process_blocking_cmd_job(
                         &mut node,
                         cmd,
                         cmd_id,
-                        cmd_channel.clone(),
+                        preprocess_cmd_channel.clone(),
                         rejoin_network_tx.clone(),
                     )
                     .await;
@@ -210,10 +240,10 @@ impl FlowCtrl {
 
     // Helper to send the TryJoinNetwork cmd
     async fn send_join_network_cmd(&self) {
-        let cmd_channel_clone = self.cmd_sender_channel.clone();
+        let cmd_channel_clone = self.preprocess_cmd_sender_channel.clone();
         // send the join message...
         if let Err(error) = cmd_channel_clone
-            .send((Cmd::TryJoinNetwork, vec![]))
+            .send(CmdProcessorEvent::Cmd(Cmd::TryJoinNetwork))
             .await
             .map_err(|e| {
                 error!("Failed join: {:?}", e);
@@ -228,32 +258,41 @@ impl FlowCtrl {
     /// This is a never ending loop as long as the node is live.
     /// This loop processes cmds pushed via the CmdChannel and
     /// runs the periodic events internal to the node.
-    async fn process_cmds_and_periodic_checks(
+    async fn process_blocking_cmds(
         mut self,
         mut node: MyNode,
         cmd_ctrl: CmdCtrl,
         mut incoming_cmds_from_apis: Receiver<(Cmd, Vec<usize>)>,
         rejoin_network_tx: Sender<RejoinReason>,
-    ) {
-        let cmd_channel = self.cmd_sender_channel.clone();
+        cmd_processing: Sender<CmdProcessorEvent>,
+    ) -> Result<()> {
+        // let cmd_channel = self.cmd_sender_channel.clone();
         // first do any pending processing
         while let Some((cmd, cmd_id)) = incoming_cmds_from_apis.recv().await {
             trace!("Taking cmd off stack: {cmd:?}");
 
             cmd_ctrl
-                .process_cmd_job(
+                .process_blocking_cmd_job(
                     &mut node,
                     cmd,
                     cmd_id,
-                    cmd_channel.clone(),
+                    cmd_processing.clone(),
                     rejoin_network_tx.clone(),
                 )
                 .await;
 
-            // also see if we need to do any of thissss
+            // update our context in read only processor with each cmd
+            cmd_processing
+                .send(CmdProcessorEvent::UpdateContext(node.context()))
+                .await
+                .map_err(|e| Error::TokioChannel(format!("cmd_processing send failed {:?}", e)))?;
+
             self.perform_periodic_checks(&mut node).await;
         }
+
+        Ok(())
     }
+
     /// Listens on data_replication_receiver on a new thread, sorts and batches data, generating SendMsg Cmds
     async fn send_out_data_for_replication(
         node_data_storage: DataStorage,
@@ -299,14 +338,20 @@ impl FlowCtrl {
         });
     }
 
-    // starts a new thread to convert comm event to cmds
-    fn listen_for_comm_events(
-        mut incoming_msg_events: Receiver<CommEvent>,
-        cmd_channel_for_msgs: Sender<(Cmd, Vec<usize>)>,
+    /// starts a new thread to convert comm event to cmds
+    fn handle_processor_events(
+        context: NodeContext,
+        mut incoming_msg_events: Receiver<CmdProcessorEvent>,
+        mutating_cmd_channel: CmdChannel,
     ) {
+        // we'll update this as we go
+        let mut context = context;
+
+        // TODO: make this handle cmds itself... and we weither send to modifying loop
+        // or here...
         let _handle = tokio::task::spawn(async move {
             while let Some(event) = incoming_msg_events.recv().await {
-                let capacity = cmd_channel_for_msgs.capacity();
+                let capacity = mutating_cmd_channel.capacity();
 
                 if capacity < 30 {
                     warn!("CmdChannel capacity severely reduced");
@@ -320,6 +365,57 @@ impl FlowCtrl {
                     capacity
                 );
 
+                match event {
+                    CmdProcessorEvent::UpdateContext(new_context) => {
+                        context = new_context;
+                        continue;
+                    }
+                    CmdProcessorEvent::Cmd(incoming_cmd) => {
+                        let context = context.clone();
+                        let mutating_cmd_channel = mutating_cmd_channel.clone();
+
+                        // Go off thread for parsing and handling by default
+                        // we only punt certain cmds back into the mutating channel
+                        let _handle = tokio::spawn(async move {
+                            let results = handle_cmd_process(
+                                incoming_cmd,
+                                context.clone(),
+                                mutating_cmd_channel.clone(),
+                            )
+                            .await?;
+                            let mut offspring = results;
+
+                            while !offspring.is_empty() {
+                                let mut new_cmds = vec![];
+
+                                for cmd in offspring {
+                                    let cmds = handle_cmd_process(
+                                        cmd,
+                                        context.clone(),
+                                        mutating_cmd_channel.clone(),
+                                    )
+                                    .await?;
+                                    new_cmds.extend(cmds);
+                                    // TODO: extract this out into two cmd handler channels
+                                }
+
+                                offspring = new_cmds;
+                            }
+                            Ok::<(), Error>(())
+                        });
+                    }
+                };
+            }
+        });
+    }
+
+    /// simple middleware pipe through of CommEvents - > ReadOnlyProcessingEvent
+    fn convert_incoming_msgs_to_processor_events(
+        mut incoming_msg_events: Receiver<CommEvent>,
+        msg_handler_event_sender_clone: Sender<CmdProcessorEvent>,
+    ) {
+        let _handle = tokio::spawn(async move {
+            while let Some(event) = incoming_msg_events.recv().await {
                 let cmd = match event {
                     CommEvent::Error { node_id, error } => Cmd::HandleCommsError {
                         participant: Participant::from_node(node_id),
@@ -342,13 +438,181 @@ impl FlowCtrl {
                     }
                 };
 
-                // this await prevents us pulling more msgs than the cmd handler can cope with...
-                // feeding back up the channels to qp2p and quinn where congestion control should
-                // help prevent more messages incoming for the time being
-                if let Err(error) = cmd_channel_for_msgs.send((cmd, vec![])).await {
-                    error!("Error sending msg onto cmd channel {error:?}");
-                }
+                // TODO: does this processing need to go off thread
+
+                let msg_handler_event_sender_clone = msg_handler_event_sender_clone.clone();
+
+                let _handle = tokio::spawn(async move {
+                    if let Err(e) = msg_handler_event_sender_clone
+                        .send(CmdProcessorEvent::Cmd(cmd))
+                        .await
+                    {
+                        warn!("MsgHandler event channel send failed: {e:?}");
+                    }
+                });
             }
         });
     }
+}
+
+/// Handles Cmd, either spawn a fresh thread if non blocking, or pass to the blocking processor thread
+async fn handle_cmd_process(
+    cmd: Cmd,
+    context: NodeContext,
+    mutating_cmd_channel: CmdChannel,
+) -> Result<Vec<Cmd>, Error> {
+    let mut new_cmds = vec![];
+
+    match cmd {
+        Cmd::HandleMsg {
+            sender,
+            wire_msg,
+            send_stream,
+        } => new_cmds.extend(MyNode::handle_msg(context, sender, wire_msg, send_stream).await?),
+        Cmd::ProcessClientMsg {
+            msg_id,
+            msg,
+            auth,
+            client_id,
+            send_stream,
+        } => {
+            if let Some(stream) = send_stream {
+                let fresh = MyNode::handle_client_msg_for_us(
+                    context.clone(),
+                    msg_id,
+                    msg,
+                    auth,
+                    client_id,
+                    stream,
+                )
+                .await?;
+                // let fresh = MyNode::process_cmd_with_context(cmd, context.clone()).await?;
+                new_cmds.extend(fresh);
+            } else {
+                debug!("dropping client cmd w/ no response stream")
+            }
+        }
+        Cmd::SendMsg {
+            msg,
+            msg_id,
+            recipients,
+        } => {
+            let recipients = recipients.into_iter().map(NodeId::from).collect();
+
+            MyNode::send_msg(msg, msg_id, recipients, context.clone())?;
+        }
+        Cmd::SendMsgEnqueueAnyResponse {
+            msg,
+            msg_id,
+            recipients,
+        } => {
+            debug!("send msg enque cmd...?");
+            MyNode::send_and_enqueue_any_response(msg, msg_id, context, recipients)?;
+        }
+        Cmd::SendNodeMsgResponse {
+            msg,
+            msg_id,
+            correlation_id,
+            node_id,
+            send_stream,
+        } => {
+            if let Some(cmd) = MyNode::send_node_msg_response(
+                msg,
+                msg_id,
+                correlation_id,
+                node_id,
+                context,
+                send_stream,
+            )
+            .await?
+            {
+                new_cmds.push(cmd)
+            }
+        }
+        Cmd::SendDataResponse {
+            msg,
+            msg_id,
+            correlation_id,
+            send_stream,
+            client_id,
+        } => {
+            if let Some(x) = MyNode::send_data_response(
+                msg,
+                msg_id,
+                correlation_id,
+                send_stream,
+                context.clone(),
+                client_id,
+            )
+            .await?
+            {
+                new_cmds.push(x);
+            }
+        }
+        Cmd::TrackNodeIssue { name, issue } => {
+            context.track_node_issue(name, issue);
+        }
+        Cmd::SendAndForwardResponseToClient {
+            wire_msg,
+            targets,
+            client_stream,
+            client_id,
+        } => {
+            MyNode::send_and_forward_response_to_client(
+                wire_msg,
+                context.clone(),
+                targets,
+                client_stream,
+                client_id,
+            )?;
+        }
+        Cmd::UpdateCaller {
+            caller,
+            correlation_id,
+            kind,
+            section_tree_update,
+        } => {
+            info!("Sending ae response msg for {correlation_id:?}");
+
+            new_cmds.push(Cmd::send_network_msg(
+                NetworkMsg::AntiEntropy(AntiEntropyMsg::AntiEntropy {
+                    section_tree_update,
+                    kind,
+                }),
+                Recipients::Single(Participant::from_node(caller)), // we're doing a mapping again here.. but this is a necessary evil while transitioning to more clarity and type safety, i.e. TO BE FIXED
+            ));
+        }
+        Cmd::UpdateCallerOnStream {
+            caller,
+            msg_id,
+            kind,
+            section_tree_update,
+            correlation_id,
+            stream,
+        } => {
+            if let Some(cmd) = MyNode::send_ae_response(
+                AntiEntropyMsg::AntiEntropy {
+                    kind,
+                    section_tree_update,
+                },
+                msg_id,
+                caller,
+                correlation_id,
+                stream,
+                context,
+            )
+            .await?
+            {
+                new_cmds.push(cmd);
+            }
+        }
+        _ => {
+            debug!("child process not handled in thread: {cmd:?}");
+            if let Err(error) = mutating_cmd_channel.send((cmd, vec![])).await {
+                error!("Error sending msg onto cmd channel {error:?}");
+            }
+        }
+    }
+
+    Ok(new_cmds)
 }

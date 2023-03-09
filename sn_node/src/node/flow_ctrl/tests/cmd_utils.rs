@@ -150,7 +150,7 @@ impl ProcessAndInspectCmds {
                 ..
             })) => {
                 let cmds = MyNode::handle_msg(
-                    node,
+                    node.context(),
                     sn_interface::types::Participant::from_node(node_id),
                     wire_msg,
                     Some(send_stream),

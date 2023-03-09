@@ -23,9 +23,9 @@ impl MyNode {
         let start = Instant::now();
         let cmd_string = format!("{cmd}");
         let result = match cmd {
-            Cmd::TryJoinNetwork => Ok(MyNode::try_join_section(context, None)
+            Cmd::TryJoinNetwork => MyNode::try_join_section(context, None)
                 .into_iter()
-                .collect()),
+                .collect(),
             Cmd::UpdateCaller {
                 caller,
                 correlation_id,
@@ -33,13 +33,13 @@ impl MyNode {
                 section_tree_update,
             } => {
                 info!("Sending ae response msg for {correlation_id:?}");
-                Ok(vec![Cmd::send_network_msg(
+                vec![Cmd::send_network_msg(
                     NetworkMsg::AntiEntropy(AntiEntropyMsg::AntiEntropy {
                         section_tree_update,
                         kind,
                     }),
                     Recipients::Single(Participant::from_node(caller)), // we're doing a mapping again here.. but this is a necessary evil while transitioning to more clarity and type safety, i.e. TO BE FIXED
-                )])
+                )]
             }
             Cmd::UpdateCallerOnStream {
                 caller,
@@ -48,7 +48,7 @@ impl MyNode {
                 section_tree_update,
                 correlation_id,
                 stream,
-            } => Ok(MyNode::send_ae_response(
+            } => MyNode::send_ae_response(
                 AntiEntropyMsg::AntiEntropy {
                     kind,
                     section_tree_update,
@@ -61,7 +61,7 @@ impl MyNode {
             )
             .await?
             .into_iter()
-            .collect()),
+            .collect(),
             Cmd::SendMsg {
                 msg,
                 msg_id,
@@ -69,7 +69,7 @@ impl MyNode {
             } => {
                 let recipients = recipients.into_iter().map(NodeId::from).collect();
                 MyNode::send_msg(msg, msg_id, recipients, context)?;
-                Ok(vec![])
+                vec![]
             }
             Cmd::SendMsgEnqueueAnyResponse {
                 msg,
@@ -78,7 +78,7 @@ impl MyNode {
             } => {
                 debug!("send msg enque cmd...?");
                 MyNode::send_and_enqueue_any_response(msg, msg_id, context, recipients)?;
-                Ok(vec![])
+                vec![]
             }
             Cmd::SendAndForwardResponseToClient {
                 wire_msg,
@@ -93,7 +93,7 @@ impl MyNode {
                     client_stream,
                     client_id,
                 )?;
-                Ok(vec![])
+                vec![]
             }
             Cmd::SendNodeMsgResponse {
                 msg,
@@ -101,7 +101,7 @@ impl MyNode {
                 correlation_id,
                 node_id,
                 send_stream,
-            } => Ok(MyNode::send_node_msg_response(
+            } => MyNode::send_node_msg_response(
                 msg,
                 msg_id,
                 correlation_id,
@@ -111,14 +111,14 @@ impl MyNode {
             )
             .await?
             .into_iter()
-            .collect()),
+            .collect(),
             Cmd::SendDataResponse {
                 msg,
                 msg_id,
                 correlation_id,
                 send_stream,
                 client_id,
-            } => Ok(MyNode::send_data_response(
+            } => MyNode::send_data_response(
                 msg,
                 msg_id,
                 correlation_id,
@@ -128,17 +128,17 @@ impl MyNode {
             )
             .await?
             .into_iter()
-            .collect()),
+            .collect(),
             Cmd::TrackNodeIssue { name, issue } => {
                 context.track_node_issue(name, issue);
-                Ok(vec![])
+                vec![]
             }
             Cmd::ProcessNodeMsg {
                 msg_id,
                 msg,
                 node_id,
                 send_stream,
-            } => MyNode::handle_node_msg(node, context, msg_id, msg, node_id, send_stream).await,
+            } => MyNode::handle_node_msg(node, context, msg_id, msg, node_id, send_stream).await?,
             Cmd::ProcessClientMsg {
                 msg_id,
                 msg,
@@ -154,7 +154,7 @@ impl MyNode {
                         return Err(Error::NoClientResponseStream);
                     };
                 MyNode::handle_client_msg_for_us(context, msg_id, msg, auth, client_id, stream)
-                    .await
+                    .await?
             }
             Cmd::ProcessAeMsg {
                 msg_id,
@@ -164,13 +164,13 @@ impl MyNode {
             } => {
                 trace!("Handling msg: AE from {sender}: {msg_id:?}");
                 MyNode::handle_anti_entropy_msg(node, context, section_tree_update, kind, sender)
-                    .await
+                    .await?
             }
             Cmd::HandleMsg {
                 sender,
                 wire_msg,
                 send_stream,
-            } => MyNode::handle_msg(node, sender, wire_msg, send_stream).await,
+            } => MyNode::handle_msg(node.context(), sender, wire_msg, send_stream).await?,
             Cmd::UpdateNetworkAndHandleValidClientMsg {
                 proof_chain,
                 signed_sap,
@@ -194,16 +194,16 @@ impl MyNode {
                 let context = if updated { node.context() } else { context };
 
                 MyNode::handle_client_msg_for_us(context, msg_id, msg, auth, client_id, send_stream)
-                    .await
+                    .await?
             }
             Cmd::HandleNodeOffAgreement { proposal, sig } => {
-                node.handle_section_decision_agreement(proposal, sig)
+                node.handle_section_decision_agreement(proposal, sig)?
             }
             Cmd::HandleMembershipDecision(decision) => {
-                node.handle_membership_decision(decision).await
+                node.handle_membership_decision(decision).await?
             }
             Cmd::HandleNewEldersAgreement { new_elders, sig } => {
-                node.handle_new_elders_agreement(new_elders, sig).await
+                node.handle_new_elders_agreement(new_elders, sig).await?
             }
             Cmd::HandleNewSectionsAgreement {
                 sap1,
@@ -212,17 +212,17 @@ impl MyNode {
                 sig2,
             } => {
                 node.handle_new_sections_agreement(sap1, sig1, sap2, sig2)
-                    .await
+                    .await?
             }
             Cmd::HandleCommsError { participant, error } => {
                 trace!("Comms error {error}");
                 node.handle_comms_error(participant, error);
-                Ok(vec![])
+                vec![]
             }
             Cmd::HandleDkgOutcome {
                 section_auth,
                 outcome,
-            } => node.handle_dkg_outcome(section_auth, outcome).await,
+            } => node.handle_dkg_outcome(section_auth, outcome).await?,
             Cmd::EnqueueDataForReplication {
                 recipient,
                 data_batch,
@@ -235,23 +235,23 @@ impl MyNode {
                 } else {
                     warn!("No data replication sender set!");
                 }
-                Ok(vec![])
+                vec![]
             }
-            Cmd::ProposeVoteNodesOffline(names) => node.cast_offline_proposals(&names),
+            Cmd::ProposeVoteNodesOffline(names) => node.cast_offline_proposals(&names)?,
             Cmd::SetJoinsAllowed(joins_allowed) => {
                 node.joins_allowed = joins_allowed;
-                Ok(vec![])
+                vec![]
             }
             Cmd::SetJoinsAllowedUntilSplit(joins_allowed_until_split) => {
                 node.joins_allowed = joins_allowed_until_split;
                 node.joins_allowed_until_split = joins_allowed_until_split;
-                Ok(vec![])
+                vec![]
             }
         };
 
         let elapsed = start.elapsed();
         trace!("Cmd took {elapsed:?} {cmd_string:?} ");
 
-        result
+        Ok(result)
     }
 }
