@@ -1113,21 +1113,19 @@ needed, as they keypair itself contains the Arcs we need.
     - Self authentication Example
     - Example to demonstrate Storage API
 
-## v0.81.5 (2023-03-07)
+## v0.82.1 (2023-03-09)
 
-### Refactor
+### New Features
 
- - <csr-id-ecbdd14cfaa963777b903bfba549eb170113e503/> reduce churn interval; retry con
-   The nodes are launched every 5s instead of 30s. The client connection
-   will be retried up to 5 times, with 1.5s delay.
- - <csr-id-311b204dc3413409f89c9dd73cce9e7d6dfa6a95/> disable re-attempts for connect
+ - <csr-id-7789cd503b8f8f1f254d90741950958e678cc420/> adds query to get Elder reward keys
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
- - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 1 commit contributed to the release.
+ - 1 day passed between releases.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -1137,6 +1135,41 @@ needed, as they keypair itself contains the Arcs we need.
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Adds query to get Elder reward keys ([`7789cd5`](https://github.com/maidsafe/safe_network/commit/7789cd503b8f8f1f254d90741950958e678cc420))
+</details>
+
+## v0.81.5 (2023-03-07)
+
+<csr-id-ecbdd14cfaa963777b903bfba549eb170113e503/>
+<csr-id-311b204dc3413409f89c9dd73cce9e7d6dfa6a95/>
+
+### Refactor
+
+ - <csr-id-ecbdd14cfaa963777b903bfba549eb170113e503/> reduce churn interval; retry con
+   The nodes are launched every 5s instead of 30s. The client connection
+   will be retried up to 5 times, with 1.5s delay.
+ - <csr-id-311b204dc3413409f89c9dd73cce9e7d6dfa6a95/> disable re-attempts for connect
+
+### Chore
+
+ - <csr-id-76a1d051b8082bcf2e17a12c605a527d098c176b/> sn_client-0.81.5
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Sn_client-0.81.5 ([`76a1d05`](https://github.com/maidsafe/safe_network/commit/76a1d051b8082bcf2e17a12c605a527d098c176b))
     - Reduce churn interval; retry con ([`ecbdd14`](https://github.com/maidsafe/safe_network/commit/ecbdd14cfaa963777b903bfba549eb170113e503))
     - Disable re-attempts for connect ([`311b204`](https://github.com/maidsafe/safe_network/commit/311b204dc3413409f89c9dd73cce9e7d6dfa6a95))
 </details>
@@ -1146,6 +1179,7 @@ needed, as they keypair itself contains the Arcs we need.
 <csr-id-9251e0dfa08e9a36c9b55fe1709cdfbc38668cd3/>
 <csr-id-87e59a24bcabd0c710fa0c8871bafe1b68c89b5e/>
 <csr-id-5959754ccb70bbb468d4d01265c6e605e9b821b5/>
+<csr-id-c3db5e8ceafcbdff8eafb787d1ad8b80bb470849/>
 
 ### Other
 
@@ -1274,6 +1308,40 @@ needed, as they keypair itself contains the Arcs we need.
  * **Uncategorized**
     - Sn_client-0.81.1 ([`08a24be`](https://github.com/maidsafe/safe_network/commit/08a24be66114afcb8c9878336bb45cb896525778))
     - Use max_backoff_interval when retrying checking replicas ([`87a5634`](https://github.com/maidsafe/safe_network/commit/87a5634612282c189f68293940d85830e8d65400))
+</details>
+
+## v0.82.0 (2023-03-08)
+
+### Chore
+
+ - <csr-id-1e531f807b1c920e61ec9ad2490f6590bf43fdd2/> sn_interface-0.20.0/sn_comms-0.6.0/sn_client-0.82.0/sn_node-0.78.0/sn_api-0.80.0/sn_cli-0.73.0
+
+### New Features
+
+ - <csr-id-fa49b0d05d944f0ab1141b3c18bd61ac345b2fed/> encapsulate Dbc reasons
+
+### New Features (BREAKING)
+
+ - <csr-id-97ee1eb5a55a0b4dbea9ea8a512351dd3219a6ed/> DBC reasons
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Sn_interface-0.20.0/sn_comms-0.6.0/sn_client-0.82.0/sn_node-0.78.0/sn_api-0.80.0/sn_cli-0.73.0 ([`1e531f8`](https://github.com/maidsafe/safe_network/commit/1e531f807b1c920e61ec9ad2490f6590bf43fdd2))
+    - Encapsulate Dbc reasons ([`fa49b0d`](https://github.com/maidsafe/safe_network/commit/fa49b0d05d944f0ab1141b3c18bd61ac345b2fed))
+    - DBC reasons ([`97ee1eb`](https://github.com/maidsafe/safe_network/commit/97ee1eb5a55a0b4dbea9ea8a512351dd3219a6ed))
 </details>
 
 ## v0.81.0 (2023-02-27)

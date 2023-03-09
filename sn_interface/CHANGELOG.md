@@ -6,18 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## v0.20.2 (2023-03-09)
+## v0.20.3 (2023-03-09)
 
-### Chore
+### New Features
 
- - <csr-id-0ff8d0bef0c8c9a4ef38d094337b25070f7e7ac0/> clean up a few things from commit 4097de4
+ - <csr-id-7789cd503b8f8f1f254d90741950958e678cc420/> adds query to get Elder reward keys
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
  - 1 commit contributed to the release.
- - 1 day passed between releases.
  - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
@@ -28,10 +27,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Adds query to get Elder reward keys ([`7789cd5`](https://github.com/maidsafe/safe_network/commit/7789cd503b8f8f1f254d90741950958e678cc420))
+</details>
+
+## v0.20.2 (2023-03-09)
+
+<csr-id-0ff8d0bef0c8c9a4ef38d094337b25070f7e7ac0/>
+
+### Chore
+
+ - <csr-id-0ff8d0bef0c8c9a4ef38d094337b25070f7e7ac0/> clean up a few things from commit 4097de4
+
+### Chore
+
+ - <csr-id-07b4cb75e2b1a1db93b7ef9e7d60ed802520f9c9/> sn_interface-0.20.2/sn_node-0.78.2
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 1 day passed between releases.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Sn_interface-0.20.2/sn_node-0.78.2 ([`07b4cb7`](https://github.com/maidsafe/safe_network/commit/07b4cb75e2b1a1db93b7ef9e7d60ed802520f9c9))
     - Clean up a few things from commit 4097de4 ([`0ff8d0b`](https://github.com/maidsafe/safe_network/commit/0ff8d0bef0c8c9a4ef38d094337b25070f7e7ac0))
 </details>
 
 ## v0.20.1 (2023-03-08)
+
+<csr-id-2f99d36a8606dc2bb39ac025adcd358fc48fcb91/>
 
 ### Chore
 
