@@ -23,7 +23,7 @@ use registers::RegisterStorage;
 use sn_dbc::SpentProofShare;
 use sn_interface::{
     messaging::{
-        data::{DataQuery, Error as MessagingError, RegisterQuery},
+        data::{DataQuery, Error as MessagingError, RegisterQuery, SpendQuery},
         system::NodeQueryResponse,
     },
     types::{
@@ -140,10 +140,10 @@ impl DataStorage {
         match query {
             DataQuery::GetChunk(addr) => self.chunks.get(addr).await,
             DataQuery::Register(read) => self.registers.read(read, requester).await,
-            DataQuery::Spentbook(read) => {
+            DataQuery::Spentbook(SpendQuery::GetSpentProofShares(addr)) => {
                 // TODO: this is temporary till spentbook native data type is implemented,
                 // we read from the Register where we store the spentbook data
-                let reg_addr = RegisterAddress::new(read.dst_name(), SPENTBOOK_TYPE_TAG);
+                let reg_addr = RegisterAddress::new(*addr.name(), SPENTBOOK_TYPE_TAG);
 
                 match self
                     .registers
@@ -151,7 +151,7 @@ impl DataStorage {
                     .await
                 {
                     NodeQueryResponse::GetRegister(Err(MessagingError::DataNotFound(_))) => {
-                        NodeQueryResponse::SpentProofShares(Ok(Vec::new()))
+                        NodeQueryResponse::GetSpentProofShares(Ok(Vec::new()))
                     }
                     NodeQueryResponse::GetRegister(result) => {
                         let proof_shares_result = result.map(|reg| {
@@ -172,7 +172,7 @@ impl DataStorage {
                             proof_shares
                         });
 
-                        NodeQueryResponse::SpentProofShares(proof_shares_result)
+                        NodeQueryResponse::GetSpentProofShares(proof_shares_result)
                     }
                     other => {
                         // TODO: this is temporary till spentbook native data type is implemented,
@@ -181,6 +181,10 @@ impl DataStorage {
                     }
                 }
             }
+            // this should be unreachable
+            DataQuery::Spentbook(SpendQuery::GetFees(addr)) => NodeQueryResponse::GetFees(Err(
+                sn_interface::messaging::data::Error::DataNotFound(DataAddress::Spentbook(*addr)),
+            )),
         }
     }
 

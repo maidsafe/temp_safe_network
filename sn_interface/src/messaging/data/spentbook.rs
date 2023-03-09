@@ -18,11 +18,13 @@ use sn_dbc::{DbcTransaction, PublicKey, SpentProof};
 use std::collections::BTreeSet;
 use xor_name::XorName;
 
-/// Spentbook read operations.
+/// Spend related read operations.
 #[derive(Hash, Eq, PartialEq, PartialOrd, Clone, Serialize, Deserialize, Debug)]
-pub enum SpentbookQuery {
-    /// Query the set of spent proofs if the provided public key has already been spent with a Tx
-    SpentProofShares(SpentbookAddress),
+pub enum SpendQuery {
+    /// Query for the individual reward keys and their respective fee amount for processing a `Spend`.
+    GetFees(SpentbookAddress),
+    /// Query for the set of spent proofs if the provided public key has already been spent with a Tx.
+    GetSpentProofShares(SpentbookAddress),
 }
 
 /// A Spentbook cmd.
@@ -60,19 +62,21 @@ impl SpentbookCmd {
     }
 }
 
-impl SpentbookQuery {
+impl SpendQuery {
     /// Creates a Response containing an error, with the Response variant corresponding to the
     /// Request variant.
     pub fn to_error_response(&self, error: Error) -> QueryResponse {
         match self {
-            Self::SpentProofShares(_) => QueryResponse::SpentProofShares(Err(error)),
+            Self::GetFees(_) => QueryResponse::GetFees(Err(error)),
+            Self::GetSpentProofShares(_) => QueryResponse::GetSpentProofShares(Err(error)),
         }
     }
 
     /// Returns the dst address for the request.
     pub fn dst_address(&self) -> SpentbookAddress {
         match self {
-            Self::SpentProofShares(address) => *address,
+            Self::GetFees(address) => *address,
+            Self::GetSpentProofShares(address) => *address,
         }
     }
 

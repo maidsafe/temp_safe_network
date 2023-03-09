@@ -14,7 +14,7 @@ use sn_dbc::{DbcTransaction, PublicKey, SpentProof, SpentProofShare};
 use sn_interface::{
     dbcs::DbcReason,
     messaging::data::{
-        DataCmd, DataQuery, Error as NetworkDataError, QueryResponse, SpentbookCmd, SpentbookQuery,
+        DataCmd, DataQuery, Error as NetworkDataError, QueryResponse, SpendQuery, SpentbookCmd,
     },
     types::SpentbookAddress,
 };
@@ -103,17 +103,17 @@ impl Client {
     }
 
     //----------------------
-    // Read Spentbook
+    // Spend related reads
     //---------------------
 
     /// Return the set of spent proof shares if the provided DBC's public key is spent
     #[instrument(skip(self), level = "debug")]
     pub async fn spent_proof_shares(&self, public_key: PublicKey) -> Result<Vec<SpentProofShare>> {
         let address = SpentbookAddress::new(XorName::from_content(&public_key.to_bytes()));
-        let query = DataQuery::Spentbook(SpentbookQuery::SpentProofShares(address));
+        let query = DataQuery::Spentbook(SpendQuery::GetSpentProofShares(address));
         let response = self.send_query(query.clone()).await?;
         match response {
-            QueryResponse::SpentProofShares(res) => {
+            QueryResponse::GetSpentProofShares(res) => {
                 res.map_err(|err| Error::ErrorMsg { source: err })
             }
             other => Err(Error::UnexpectedQueryResponse {

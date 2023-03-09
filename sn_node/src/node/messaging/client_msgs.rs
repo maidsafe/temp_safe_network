@@ -15,7 +15,8 @@ use sn_dbc::{
 use sn_interface::{
     dbcs::DbcReason,
     messaging::{
-        data::{ClientMsg, DataCmd, DataQuery, DataResponse, SpentbookCmd},
+        data::{ClientMsg, DataCmd, DataQuery, DataResponse, SpendQuery, SpentbookCmd},
+        system::NodeQueryResponse,
         AuthorityProof, ClientAuth, MsgId,
     },
     network_knowledge::{
@@ -48,10 +49,15 @@ impl MyNode {
         send_stream: SendStream,
         context: NodeContext,
     ) -> Vec<Cmd> {
-        let response = context
-            .data_storage
-            .query(query, User::Key(auth.public_key))
-            .await;
+        let response = if let DataQuery::Spentbook(SpendQuery::GetFees(_)) = query {
+            // We receive this directly from client, as an Elder, since `is_spend` is set to true (that is a very messy/confusing pattern, to be fixed).
+            NodeQueryResponse::GetFees(Ok((context.reward_key, context.store_cost)))
+        } else {
+            context
+                .data_storage
+                .query(query, User::Key(auth.public_key))
+                .await
+        };
 
         trace!("{msg_id:?} data query response at node is: {response:?}");
 
@@ -233,7 +239,7 @@ impl MyNode {
         context: &NodeContext,
     ) -> Result<SpentProofShare> {
         // verify that fee is paid (we are included as output)
-        MyNode::verify_fee(context.reward_key, tx)?;
+        MyNode::verify_fee(context.store_cost, context.reward_key, tx)?;
 
         // verify the spent proofs
         MyNode::verify_spent_proofs(spent_proofs, &context.network_knowledge)?;
@@ -280,8 +286,32 @@ impl MyNode {
         Ok(spent_proof_share)
     }
 
-    fn verify_fee(_our_key: PublicKey, _tx: &DbcTransaction) -> Result<()> {
+    fn verify_fee(
+        _store_cost: sn_dbc::Token,
+        _our_key: PublicKey,
+        _tx: &DbcTransaction,
+    ) -> Result<()> {
         // TODO: check that we have an output to us, and that it is of sufficient value.
+
+        // pseudo code:
+
+        // let paid_to_us = match tx.get(our_key) {
+        //     Some(output) => output.amount(),
+        //     None => {
+        //         return Err(Error::InsufficientFeesPaid {
+        //             min_required: store_cost,
+        //             paid: sn_dbc::Token::zero(),
+        //         })
+        //     }
+        // };
+
+        // if store_cost > paid_to_us {
+        //     return Err(Error::InsufficientFeesPaid {
+        //         min_required: store_cost,
+        //         paid: paid_to_us,
+        //     });
+        // }
+
         Ok(())
     }
 

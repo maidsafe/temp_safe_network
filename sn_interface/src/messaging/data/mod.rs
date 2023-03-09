@@ -22,7 +22,7 @@ pub use self::{
         CreateRegister, EditRegister, RegisterCmd, RegisterQuery, SignedRegisterCreate,
         SignedRegisterEdit,
     },
-    spentbook::{SpentbookCmd, SpentbookQuery},
+    spentbook::{SpendQuery, SpentbookCmd},
 };
 
 use crate::types::{
@@ -140,8 +140,11 @@ pub enum QueryResponse {
     //
     // ===== Spentbook Data =====
     //
-    /// Response to [`SpentbookQuery::SpentProofShares`].
-    SpentProofShares(Result<Vec<SpentProofShare>>),
+    /// Response to [`SpendQuery::GetSpentProofShares`].
+    GetSpentProofShares(Result<Vec<SpentProofShare>>),
+    //
+    /// Response to [`SpendQuery::GetFees`].
+    GetFees(Result<(bls::PublicKey, sn_dbc::Token)>),
 }
 
 impl QueryResponse {
@@ -161,7 +164,7 @@ impl QueryResponse {
                 | GetRegisterPolicy(Err(Error::NoSuchUser(_)))
                 | GetRegisterUserPermissions(Err(Error::DataNotFound(_)))
                 | GetRegisterUserPermissions(Err(Error::NoSuchUser(_)))
-                | SpentProofShares(Err(Error::DataNotFound(_)))
+                | GetSpentProofShares(Err(Error::DataNotFound(_)))
         )
     }
 }
