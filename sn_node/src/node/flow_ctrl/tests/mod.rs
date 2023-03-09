@@ -841,7 +841,7 @@ async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node()
     // At this point, only the genesis key should be in the proof chain on this node.
     let tree = node.network_knowledge().section_tree().clone();
     let proof_chain = tree.get_sections_dag().clone();
-    assert_eq!(proof_chain.keys().into_iter().count(), 1);
+    assert_eq!(proof_chain.keys().count(), 1);
 
     // The key share also needs to be added to the section keys provider, which is stored
     // on the node.
@@ -904,7 +904,7 @@ async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node()
     // Now the proof chain should have the other section key.
     let tree = node.network_knowledge().section_tree().clone();
     let proof_chain = tree.get_sections_dag().clone();
-    assert_eq!(proof_chain.keys().into_iter().count(), 2);
+    assert_eq!(proof_chain.keys().count(), 2);
     let mut proof_chain_iter = proof_chain.keys();
     let genesis_key = genesis_sk_set.public_keys().public_key();
     assert_eq!(
