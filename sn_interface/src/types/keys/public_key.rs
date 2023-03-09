@@ -132,7 +132,7 @@ impl PublicKey {
     }
 }
 
-#[allow(clippy::derive_hash_xor_eq)]
+#[allow(clippy::derived_hash_with_manual_eq)]
 impl Hash for PublicKey {
     fn hash<H: Hasher>(&self, state: &mut H) {
         utils::serialise(&self).unwrap_or_default().hash(state)

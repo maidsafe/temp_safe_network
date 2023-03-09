@@ -102,7 +102,7 @@ pub fn section_decision<P: Proposition>(
     proposal: P,
 ) -> Result<Decision<P>> {
     let n = secret_key_set.threshold() + 1;
-    let mut nodes = Vec::from_iter((1..=n).into_iter().map(|idx| {
+    let mut nodes = Vec::from_iter((1..=n).map(|idx| {
         let secret = (idx as u8, secret_key_set.secret_key_share(idx));
         Consensus::from(secret, secret_key_set.public_keys(), n)
     }));
