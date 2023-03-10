@@ -6,11 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## v0.20.3 (2023-03-09)
+## v0.20.4 (2023-03-10)
 
-### New Features
+### Chore
 
- - <csr-id-7789cd503b8f8f1f254d90741950958e678cc420/> adds query to get Elder reward keys
+ - <csr-id-6d17af24fcaf1e340dc3aec3d40e55ee80b154cf/> make clippy happy for rust 1.68
 
 ### Commit Statistics
 
@@ -27,12 +27,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Make clippy happy for rust 1.68 ([`6d17af2`](https://github.com/maidsafe/safe_network/commit/6d17af24fcaf1e340dc3aec3d40e55ee80b154cf))
+</details>
+
+## v0.20.3 (2023-03-09)
+
+### Chore
+
+ - <csr-id-bad9bc634abd8c12a31bbee0ee71423f727c7397/> sn_interface-0.20.3/sn_client-0.82.1/sn_node-0.78.3
+
+### New Features
+
+ - <csr-id-7789cd503b8f8f1f254d90741950958e678cc420/> adds query to get Elder reward keys
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Sn_interface-0.20.3/sn_client-0.82.1/sn_node-0.78.3 ([`bad9bc6`](https://github.com/maidsafe/safe_network/commit/bad9bc634abd8c12a31bbee0ee71423f727c7397))
     - Adds query to get Elder reward keys ([`7789cd5`](https://github.com/maidsafe/safe_network/commit/7789cd503b8f8f1f254d90741950958e678cc420))
 </details>
 
 ## v0.20.2 (2023-03-09)
 
 <csr-id-0ff8d0bef0c8c9a4ef38d094337b25070f7e7ac0/>
+<csr-id-07b4cb75e2b1a1db93b7ef9e7d60ed802520f9c9/>
 
 ### Chore
 
