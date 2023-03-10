@@ -9,21 +9,17 @@
 //! `sn_node` provides the interface to Safe routing.  The resulting executable is the node
 //! for the Safe network.
 
+use eyre::{eyre, Result};
 use sn_client::Client;
 use sn_interface::types::utils::random_bytes;
-use sn_launch_tool::Launch;
-
-use clap::Parser;
-use dirs_next::home_dir;
-use eyre::{eyre, Context, Result};
 use std::{
     path::PathBuf,
     process::{Command, Stdio},
 };
+use testnet::Testnet;
 use tiny_keccak::{Hasher, Sha3};
-use tokio::fs::create_dir_all;
 use tokio::time::{sleep, Duration};
-use tracing::{debug, info};
+use tracing::info;
 use xor_name::XorName;
 
 #[cfg(not(target_os = "windows"))]
@@ -32,21 +28,22 @@ const SAFE_NODE_EXECUTABLE: &str = "sn_node";
 #[cfg(target_os = "windows")]
 const SAFE_NODE_EXECUTABLE: &str = "sn_node.exe";
 
-const NODES_DIR: &str = "local-test-network";
-const INTERVAL: &str = "5000"; // milliseconds
-const RUST_LOG: &str = "RUST_LOG";
-const ADDITIONAL_NODES_TO_SPLIT: u64 = 15;
+const INTERVAL: u64 = 5000; // milliseconds
+const ADDITIONAL_NODES_TO_SPLIT: usize = 15;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // First lets build the network and testnet launcher, to ensure we're on the latest version
-    let args: Vec<&str> = vec!["build", "--release", "--features=test-utils"];
+    build_node().await?;
+    run_split(std::env::var("NODE_COUNT")?.parse()?).await?;
 
-    println!("Building current sn_node");
+    Ok(())
+}
+
+async fn build_node() -> Result<()> {
+    println!("Building safenode");
+    let args: Vec<&str> = vec!["build", "--release", "--features=test-utils"];
     let _child = Command::new("cargo")
         .args(args.clone())
-        // .env("RUST_LOG", "debug")
-        // .env("RUST_BACKTRACE", "1")
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
         .output()
@@ -57,86 +54,27 @@ async fn main() -> Result<()> {
                 err
             )
         })?;
-
-    println!("sn_node bins built successfully");
-
-    run_split().await?;
-
+    println!("safenode bins built successfully");
     Ok(())
 }
 
-fn get_node_bin_path(node_path: Option<PathBuf>) -> Result<PathBuf> {
-    match node_path {
-        Some(p) => Ok(p),
-        None => {
-            let mut home_dirs =
-                home_dir().ok_or_else(|| eyre!("Failed to obtain user's home path"))?;
-
-            home_dirs.push(".safe");
-            home_dirs.push("node");
-            Ok(home_dirs)
-        }
-    }
-}
-
-/// Uses `sn_launch_tool` to create a local network of nodes
-pub async fn run_split() -> Result<()> {
+pub async fn run_split(node_count: usize) -> Result<()> {
     info!("Starting local network");
-    let node_path = Some(PathBuf::from("./target/release"));
-    let node_path = get_node_bin_path(node_path)?;
-
-    let arg_node_path = node_path.join(SAFE_NODE_EXECUTABLE).display().to_string();
-    debug!("Running node from {}", arg_node_path);
-
-    let base_log_dir = get_node_bin_path(None)?;
-    let node_log_dir = base_log_dir.join(NODES_DIR);
-    if !node_log_dir.exists() {
-        debug!("Creating '{}' folder", node_log_dir.display());
-        create_dir_all(node_log_dir.clone()).await.map_err(|err| {
-            eyre!(
-                "Couldn't create target path to store nodes' generated data: {}",
-                err
-            )
-        })?;
-    }
-    let arg_node_log_dir = node_log_dir.display().to_string();
-    info!("Storing nodes' generated data at {}", arg_node_log_dir);
-
-    // Let's create an args array to pass to the network launcher tool
-    let mut sn_launch_tool_args = vec![
-        "sn_launch_tool",
-        "--node-path",
-        &arg_node_path,
-        "--nodes-dir",
-        &arg_node_log_dir,
-        "--interval",
-        INTERVAL,
-        "--local",
-    ];
-
-    // If RUST_LOG was set we pass it down to the launch tool
-    // so it's set for each of the nodes logs as well.
-    let rust_log = std::env::var(RUST_LOG).unwrap_or_else(|_| "".to_string());
-    if !rust_log.is_empty() {
-        sn_launch_tool_args.push("--rust-log");
-        sn_launch_tool_args.push(&rust_log);
-    }
-
-    let interval_as_int = &INTERVAL
-        .parse::<u64>()
-        .context("Error parsing Interval argument")?;
-
-    debug!("Running testnet with args: {:?}", sn_launch_tool_args);
-
-    // We can now call the tool with the args
-    info!("Launching local Safe network...");
-    Launch::from_iter_safe(&sn_launch_tool_args)
-        .map_err(|error| eyre!(error))
-        .and_then(|launch| launch.run())
-        .wrap_err("Error starting the testnet")?;
+    let node_bin_path = PathBuf::from(".")
+        .join("target")
+        .join("release")
+        .join(SAFE_NODE_EXECUTABLE);
+    let (mut testnet, network_contacts_path) = Testnet::configure()
+        .node_bin_path(node_bin_path)
+        .node_launch_interval(INTERVAL)
+        .clear_nodes_dir()
+        .build()?;
+    testnet.launch_genesis(None, vec![])?;
+    testnet.launch_nodes(node_count, &network_contacts_path, vec![])?;
+    testnet.configure_network_contacts(&network_contacts_path)?;
 
     // leave a longer interval with more nodes to allow for splits if using split amounts
-    let interval_duration = Duration::from_millis(2 * interval_as_int);
+    let interval_duration = Duration::from_millis(2 * INTERVAL);
     sleep(interval_duration).await;
     println!("Done sleeping....");
 
@@ -148,26 +86,11 @@ pub async fn run_split() -> Result<()> {
         all_data_put.push((address, hash));
     }
 
-    // ======================
-    // Now we add more nodes
-    // ======================
-
-    let additional_node_count_str = &ADDITIONAL_NODES_TO_SPLIT.to_string();
-
-    sn_launch_tool_args.push("--add");
-    sn_launch_tool_args.push("-n");
-    sn_launch_tool_args.push(additional_node_count_str);
-    debug!("Adding testnet nodes with args: {:?}", sn_launch_tool_args);
-
-    // We can now call the tool with the args
-    info!("Adding nodes to the local Safe network...");
-    Launch::from_iter_safe(&sn_launch_tool_args)
-        .map_err(|error| eyre!(error))
-        .and_then(|launch| launch.run())
-        .wrap_err("Error adding nodes to the testnet")?;
+    testnet.launch_nodes(ADDITIONAL_NODES_TO_SPLIT, &network_contacts_path, vec![])?;
+    testnet.configure_network_contacts(&network_contacts_path)?;
 
     // leave a longer interval with more nodes to allow for splits if using split amounts
-    let interval_duration = Duration::from_millis(interval_as_int * ADDITIONAL_NODES_TO_SPLIT / 10);
+    let interval_duration = Duration::from_millis(INTERVAL * ADDITIONAL_NODES_TO_SPLIT as u64 / 10);
     sleep(interval_duration).await;
 
     let client = Client::builder().build().await?;
