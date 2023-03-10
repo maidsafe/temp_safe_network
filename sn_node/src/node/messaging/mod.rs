@@ -69,7 +69,7 @@ impl MyNode {
         wire_msg: WireMsg,
         send_stream: Option<SendStream>,
     ) -> Result<Vec<Cmd>> {
-        let is_elder = node.is_elder();
+        let is_elder = context.is_elder;
         let msg_id = wire_msg.msg_id();
         let msg_kind = wire_msg.kind();
 

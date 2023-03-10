@@ -17,13 +17,13 @@ use crate::node::{
 use sn_consensus::{Generation, SignedVote, VoteResponse};
 use sn_interface::{
     messaging::{system::SectionSigned, MsgId, SectionSigShare},
-    network_knowledge::{NodeState, SapCandidate, SectionAuthUtils, SectionAuthorityProvider},
+    network_knowledge::{SapCandidate, SectionAuthUtils, SectionAuthorityProvider},
     types::{log_markers::LogMarker, NodeId, Participant, SectionSig},
 };
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use tracing::warn;
-use xor_name::{Prefix, XorName};
+use xor_name::Prefix;
 
 impl MyNode {
     /// Handle a Handover consensus trigger request by a DKG member
@@ -90,22 +90,10 @@ impl MyNode {
         }
         debug!("Handling section info with prefix: {:?}", sap.prefix());
 
-        // check if at the given memberhip gen, the elders candidates are matching
         let membership_gen = sap.membership_gen();
         let signed_sap = SectionSigned::new(sap, sig);
-        let dkg_sessions_info = self.best_elder_candidates_at_gen(membership_gen);
 
-        let elder_candidates = BTreeSet::from_iter(signed_sap.names());
-        if dkg_sessions_info
-            .iter()
-            .all(|session| !session.elder_names().eq(elder_candidates.iter().copied()))
-        {
-            error!("Elder candidates don't match best elder candidates at given gen in received section agreement, ignoring it.");
-            return Ok(vec![]);
-        };
-
-        // handle regular elder handover (1 to 1)
-        // trigger handover consensus among elders
+        // handle regular elder handover (1 to 1), trigger handover consensus among elders
         if equal_prefix {
             debug!("Propose elder handover to: {:?}", signed_sap.prefix());
             return self.propose_handover_consensus(SapCandidate::ElderHandover(signed_sap));
@@ -309,16 +297,6 @@ impl MyNode {
         Ok(())
     }
 
-    /// get current joined members
-    fn get_current_members(&self) -> Result<BTreeMap<XorName, NodeState>> {
-        Ok(self
-            .network_knowledge
-            .section_members()
-            .iter()
-            .map(|n| (n.name(), n.clone()))
-            .collect())
-    }
-
     fn get_sap_for_prefix(&self, prefix: Prefix) -> Result<SectionAuthorityProvider> {
         self.network_knowledge
             .section_tree()
@@ -329,9 +307,7 @@ impl MyNode {
     fn check_elder_handover_candidates(&self, sap: &SectionAuthorityProvider) -> Result<()> {
         // in regular handover the previous SAP's prefix is the same
         let previous_gen_sap = self.get_sap_for_prefix(sap.prefix())?;
-
-        // use the current members
-        let members = self.get_current_members()?;
+        let members = self.network_knowledge.members_at_gen(sap.membership_gen());
         let received_candidates: BTreeSet<NodeId> = sap.elders().copied().collect();
 
         let expected_candidates: BTreeSet<NodeId> =
@@ -357,7 +333,9 @@ impl MyNode {
         // and the same ancestor prefix
         let prev_prefix = sap1.prefix().popped();
         let previous_gen_sap = self.get_sap_for_prefix(prev_prefix)?;
-        let members = self.get_current_members()?;
+        let members = self
+            .network_knowledge
+            .members_at_gen(previous_gen_sap.membership_gen());
         let dummy_chain_len = 0;
         let dummy_gen = 0;
 

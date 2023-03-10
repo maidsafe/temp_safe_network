@@ -213,8 +213,8 @@ impl MyNode {
                         );
 
                         // If we were relocating finalise it
-                        if let Some(proof) = context.relocation_state.proof() {
-                            node.finalise_relocation(&context, proof.signed_relocation().clone());
+                        if context.relocation_state.proof().is_some() {
+                            node.finalise_relocation(&context, decision);
                         }
 
                         Ok(vec![])

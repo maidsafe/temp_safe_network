@@ -126,13 +126,7 @@ impl SectionMemberHistory {
     ///         - Joined -> Relocated
     ///         - Relocated <--> Left (should not happen, but needed for consistency)
     pub(super) fn update(&mut self, new_decision: Decision<NodeState>) -> Result<bool> {
-        let incoming_generation = match new_decision.generation() {
-            Ok(generation) => generation as usize,
-            Err(err) => {
-                trace!("Failed to get generation from {new_decision:?} with error {err:?}");
-                return Err(Error::Consensus(err));
-            }
-        };
+        let incoming_generation = new_decision.generation as usize;
 
         trace!(
             "incoming_generation {incoming_generation:?} self.decisions.len() {:?}",
