@@ -160,6 +160,10 @@ impl DkgVoter {
         self.last_received_dkg_msg_time = Some(Instant::now());
     }
 
+    pub(crate) fn clear_dkg_msg_timer(&mut self) {
+        self.last_received_dkg_msg_time = None;
+    }
+
     /// Initializes our DKG state and returns our first vote and dkg keys
     /// If we already have a DKG state, this function does nothing
     pub(crate) fn initialize_dkg_state(

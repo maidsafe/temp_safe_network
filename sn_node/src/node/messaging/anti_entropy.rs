@@ -184,8 +184,7 @@ impl MyNode {
             updated_knowledge || updated_members
         };
 
-        // mut here to update comms
-        let mut latest_context = node.context();
+        let latest_context = node.context();
 
         // Only trigger reorganize data when there is a membership change happens.
         if updated {
@@ -208,7 +207,7 @@ impl MyNode {
                     .members()
                     .iter()
                     .map(|m| m.name())
-                    .contains(&node.name),
+                    .contains(&node.name()),
                 latest_context
                     .network_knowledge
                     .members()

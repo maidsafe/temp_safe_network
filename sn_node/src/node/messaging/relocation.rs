@@ -11,6 +11,7 @@ use crate::node::{
     NodeContext, NodeEvent, Result,
 };
 
+use sn_consensus::Decision;
 use sn_interface::{
     elder_count,
     messaging::system::{NodeMsg, SectionSigned},
@@ -185,7 +186,7 @@ impl MyNode {
     pub(crate) fn finalise_relocation(
         &mut self,
         context: &NodeContext,
-        node_state: SectionSigned<NodeState>,
+        decision: Decision<NodeState>,
     ) {
         info!(
             "{} for node: {:?}: Age is: {:?}",
@@ -198,13 +199,24 @@ impl MyNode {
         self.relocation_state = RelocationState::NoRelocation;
 
         // Update our members list making sure we don't exist in it with our old name.
-        let new_state = node_state.value.clone();
-        if self.network_knowledge.update_member(node_state) {
-            trace!(
-                "Section members list updated due to relocation: {new_state:?}. \
-                New members list: {:?}",
+        let new_states: BTreeSet<_> = decision.proposals.keys().cloned().collect();
+        match self.network_knowledge.try_update_member(decision) {
+            Ok(true) => trace!(
+                "Section members list updated due to relocation: {new_states:?}. \
+                    New members list: {:?}",
                 self.network_knowledge.members()
-            );
+            ),
+            Ok(false) => warn!(
+                "Relocation: {new_states:?} doesn't trigger an update \
+                    among current knowledge {:?}",
+                self.network_knowledge.members()
+            ),
+            Err(err) => error!(
+                "Failed to update relocation: {new_states:?} among \
+                    current knowledge {:?} with error {:?}",
+                self.network_knowledge.members(),
+                err
+            ),
         }
     }
 }
@@ -232,7 +244,7 @@ mod tests {
         network_knowledge::{recommended_section_size, MyNodeInfo, NodeState, MIN_ADULT_AGE},
         test_utils::{
             gen_node_id_in_prefix, prefix, section_decision, try_create_relocation_trigger,
-            TestKeys, TestSapBuilder,
+            TestSapBuilder,
         },
     };
 

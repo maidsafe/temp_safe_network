@@ -1120,6 +1120,8 @@ mod tests {
         safe.wallet_deposit(&wallet_xorurl, Some("deposited-dbc-2"), &dbc2, None)
             .await?;
 
+        tokio::time::sleep(tokio::time::Duration::from_millis(5000)).await;
+
         let change_plus_fees = 100;
         let expected_change = change_plus_fees - (2 * FEE_PER_INPUT); // 2 dbc inputs = 2 fees
 
@@ -1174,6 +1176,8 @@ mod tests {
             .amount_secrets_bearer()
             .map_err(|err| anyhow!("Couldn't read balance from output DBC: {:?}", err))?;
         assert_eq!(output_balance.amount(), Token::from_nano(1_000_000_000));
+
+        tokio::time::sleep(tokio::time::Duration::from_millis(5000)).await;
 
         let change_amount = Token::from_nano(dbc_balance.as_nano() - 1_000_000_000 - FEE_PER_INPUT); // 1 dbc input = 1 fee
         let current_balance = safe.wallet_balance(&wallet_xorurl).await?;
@@ -1325,6 +1329,8 @@ mod tests {
         safe.multimap_insert(&wallet_xorurl, entry, BTreeSet::default())
             .await?;
 
+        tokio::time::sleep(tokio::time::Duration::from_millis(5000)).await;
+
         // Now check we can still reissue from the wallet and the corrupted entry is ignored
         let _ = safe
             .wallet_reissue(&wallet_xorurl, "0.4", None, DbcReason::none())
@@ -1356,6 +1362,8 @@ mod tests {
                 DbcReason::none(),
             )
             .await?;
+
+        tokio::time::sleep(tokio::time::Duration::from_millis(10000)).await;
 
         let current_balance = safe.wallet_balance(&wallet_xorurl).await?;
         assert_eq!(current_balance, Token::zero());
@@ -1494,6 +1502,8 @@ mod tests {
             .await?;
         safe.wallet_deposit(&wallet_xorurl, Some("deposited-dbc-2"), &dbc2, None)
             .await?;
+
+        tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
 
         let change_plus_fees = 1000;
         let expected_change = change_plus_fees - (2 * FEE_PER_INPUT); // 2 dbc inputs = 2 fees

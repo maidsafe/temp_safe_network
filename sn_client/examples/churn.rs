@@ -29,7 +29,7 @@ const SAFE_NODE_EXECUTABLE: &str = "safenode";
 #[cfg(target_os = "windows")]
 const SAFE_NODE_EXECUTABLE: &str = "safenode.exe";
 
-const INTERVAL_IN_MS: u64 = 3000;
+const INTERVAL_IN_MS: u64 = 10000;
 const ADDITIONAL_NODE_COUNT: usize = 12;
 const FILES_TO_PUT: i32 = 40;
 const FILE_SIZE_LENGTH: usize = 1024 * 1024 * 10; // 10mb

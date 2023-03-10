@@ -490,6 +490,9 @@ impl MyNode {
                         is_old_gossip = false;
                     }
                     for r in vote_responses {
+                        if let VoteResponse::DkgComplete(..) = r {
+                            self.dkg_voter.clear_dkg_msg_timer();
+                        }
                         let (cmd, ae_cmd) = self.handle_vote_response(
                             session_id,
                             pub_keys.clone(),

@@ -391,7 +391,7 @@ impl FlowCtrl {
                 }
 
                 debug!(
-                    "FlowCtrlCmd received: {cmd:?}. Current capacity on the FlowCtrlCmdChannel: {:?}",
+                    "Current capacity on the FlowCtrlCmdChannel: {:?}; CommEvent FlowCtrlCmd: {cmd:?}.",
                     capacity
                 );
 

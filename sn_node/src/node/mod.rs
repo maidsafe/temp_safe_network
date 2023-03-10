@@ -383,18 +383,7 @@ impl MyNode {
         let chain_len = self.network_knowledge.section_chain_len();
 
         // get members for membership gen
-        let members: BTreeMap<XorName, NodeState> = if let Some(m) = self.membership.as_ref() {
-            m.joined_section_members_at_gen(membership_gen)
-                .unwrap_or_default()
-                .iter()
-                .map(|(n, s)| (*n, s.clone()))
-                .collect()
-        } else {
-            error!(
-                "Attempted to find best elder candidates when we don't have a membership instance"
-            );
-            return vec![];
-        };
+        let members = self.network_knowledge.members_at_gen(membership_gen);
 
         // Try splitting
         info!("{}", LogMarker::SplitAttempt);
@@ -426,7 +415,6 @@ impl MyNode {
 
         // Candidates for elders out of all the nodes in the section, even out of the
         // relocating nodes if there would not be enough instead.
-        let sap = self.network_knowledge.section_auth();
         let elder_candidates = elder_candidates(members.values().cloned(), &sap);
         let current_elders = BTreeSet::from_iter(sap.elders().copied());
 
