@@ -13,6 +13,7 @@ mod data;
 mod file_apis;
 mod queries;
 mod register_apis;
+mod spend_queries;
 mod spentbook_apis;
 
 pub use client_builder::ClientBuilder;

@@ -20,6 +20,7 @@ use sn_dbc::{
     rng, AmountSecrets, Error as DbcError, Hash, Owner, OwnerOnce, PublicKey, SpentProof,
     SpentProofShare, TransactionBuilder,
 };
+use sn_interface::{elder_count, network_knowledge::supermajority};
 
 use bytes::Bytes;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
@@ -356,8 +357,16 @@ impl Safe {
         let (input_dbcs_to_spend, input_dbcs_entries_hash, outputs_owners, change_amount) =
             Self::select_inputs(spendable_dbcs, total_output_amount, outputs_owners)?;
         #[cfg(not(feature = "data-network"))]
-        let (input_dbcs_to_spend, input_dbcs_entries_hash, outputs_owners, change_amount) =
-            Self::select_inputs_with_fees(spendable_dbcs, total_output_amount, outputs_owners)?;
+        let (input_dbcs_to_spend, input_dbcs_entries_hash, outputs_owners, change_amount) = {
+            let client = self.get_safe_client()?;
+            Self::select_inputs_with_fees(
+                client,
+                spendable_dbcs,
+                total_output_amount,
+                outputs_owners,
+            )
+            .await?
+        };
 
         // We can now reissue the output DBCs
         let (output_dbcs, change_dbc) = self
@@ -454,7 +463,8 @@ impl Safe {
 
     ///
     /// NB: Upper layer should validate *estimated* fees against client preferences.
-    fn select_inputs_with_fees(
+    async fn select_inputs_with_fees(
+        client: &Client,
         spendable_dbcs: WalletSpendableDbcs,
         mut total_output_amount: Token,
         mut outputs_owners: Vec<(Token, OwnerOnce)>,
@@ -471,16 +481,14 @@ impl Safe {
             // TODO: Query the network, one section per input, for the current fee.
             // Right now, now fees are added, as a dummy is used instead.
 
-            // let input_key = dbc.as_revealed_input_bearer()?.public_key();
-            // // each mint will have elder_count() instances to pay individually (for now, later they will be more)
-            // let mint_fees: BTreeMap<PublicKey, Token> = client.get_mint_fees(input_key).await?;
-
-            // Dummy, with random pubkeys and hard coded fee.
-            // Until the fee validation has been impl at Elders, this will not affect spend logic,
-            // but it will make the rest of the fee logic in this fn be executed, for it to be covered by tests.
-            let mint_fees: BTreeMap<PublicKey, Token> = (0..7)
-                .map(|_| (bls::SecretKey::random().public_key(), Token::from_nano(1)))
-                .collect();
+            let input_key = dbc.as_revealed_input_bearer()?.public_key();
+            // each mint will have elder_count() instances to pay individually (for now, later they will be more)
+            let mint_fees: BTreeMap<PublicKey, Token> = client.get_mint_fees(input_key).await?;
+            let required_num_mints = supermajority(elder_count());
+            if required_num_mints > mint_fees.len() {
+                warn!("Not enough mints contacted for the section to spend the input. Found: {}, needed: {required_num_mints}", mint_fees.len());
+                continue;
+            }
 
             // Total fee paid to all recipients in the section for this input.
             let fee_per_input = mint_fees
