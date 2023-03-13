@@ -58,6 +58,10 @@ pub(crate) async fn listen_for_msgs(
                 debug!(
                     "New msg arrived over conn_id={conn_id} from {remote_address:?}{stream_info}"
                 );
+
+                let (header, dst, payload) = &msg_bytes.0;
+                let original_bytes_len = header.len() + dst.len() + payload.len();
+
                 let wire_msg = match WireMsg::from(msg_bytes.0) {
                     Ok(wire_msg) => wire_msg,
                     Err(error) => {
@@ -74,8 +78,12 @@ pub(crate) async fn listen_for_msgs(
                     | MsgKind::DataResponse(name) => *name,
                 };
 
-                let src = Participant::new(src_name, remote_address);
                 let msg_id = wire_msg.msg_id();
+                let src = Participant::new(src_name, remote_address);
+                trace!(
+                    "{:?} from {src:?} length {original_bytes_len}",
+                    LogMarker::MsgReceived,
+                );
                 debug!(
                         "Msg {msg_id:?} received, over conn_id={conn_id}, from: {src:?}{stream_info} was: {wire_msg:?}"
                     );
