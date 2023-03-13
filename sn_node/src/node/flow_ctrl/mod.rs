@@ -372,29 +372,16 @@ impl FlowCtrl {
                         // Go off thread for parsing and handling by default
                         // we only punt certain cmds back into the mutating channel
                         let _handle = tokio::spawn(async move {
-                            let mut child_cmds = handle_cmd(
-                                incoming_cmd,
-                                context.clone(),
-                                mutating_cmd_channel.clone(),
-                            )
-                            .await?;
+                            let mut child_cmds = vec![incoming_cmd];
 
-                            while !child_cmds.is_empty() {
-                                let mut new_cmds = vec![];
-
-                                for cmd in child_cmds {
-                                    let cmds = handle_cmd(
-                                        cmd,
-                                        context.clone(),
-                                        mutating_cmd_channel.clone(),
-                                    )
-                                    .await?;
-                                    new_cmds.extend(cmds);
-                                    // TODO: extract this out into two cmd handler channels
-                                }
-
-                                child_cmds = new_cmds;
+                            while let Some(cmd) = child_cmds.pop() {
+                                child_cmds.extend(
+                                    handle_cmd(cmd, context.clone(), mutating_cmd_channel.clone())
+                                        .await?,
+                                );
+                                // TODO: extract this out into two cmd handler channels
                             }
+
                             Ok::<(), Error>(())
                         });
                     }
