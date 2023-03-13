@@ -106,7 +106,7 @@ impl FlowCtrl {
 
         // Our channel to process _all_ cmds. If it can, they are processed off thread with latest context,
         // otherwise they are sent to the blocking process channel
-        let (process_cmd_sender, process_cmd_event_reciever) = mpsc::channel(STANDARD_CHANNEL_SIZE);
+        let (flow_ctrl_cmd_sender, flow_ctrl_cmd_reciever) = mpsc::channel(STANDARD_CHANNEL_SIZE);
 
         let all_members = node_context
             .network_knowledge
@@ -131,7 +131,7 @@ impl FlowCtrl {
         };
 
         let flow_ctrl = Self {
-            preprocess_cmd_sender_channel: process_cmd_sender.clone(),
+            preprocess_cmd_sender_channel: flow_ctrl_cmd_sender.clone(),
             fault_channels,
             timestamps: PeriodicChecksTimestamps::now(),
         };
@@ -139,17 +139,12 @@ impl FlowCtrl {
         // first start listening for msgs
         let cmd_channel_for_msgs = blocking_cmd_sender_channel.clone();
 
-        // a clone for sending in updates to context
-        let read_only_event_sender_clone_for_processing = process_cmd_sender.clone();
+        // incoming events from comms
+        Self::handle_comm_events(incoming_msg_events, flow_ctrl_cmd_sender.clone());
 
-        Self::convert_incoming_msgs_to_processor_events(
-            incoming_msg_events,
-            process_cmd_sender.clone(),
-        );
-
-        Self::handle_processor_events(
+        Self::listen_for_flow_ctrl_cmds(
             node_context.clone(),
-            process_cmd_event_reciever,
+            flow_ctrl_cmd_reciever,
             cmd_channel_for_msgs.clone(),
         );
 
@@ -169,7 +164,7 @@ impl FlowCtrl {
             cmd_ctrl,
             blocking_cmds_receiver,
             rejoin_network_tx,
-            read_only_event_sender_clone_for_processing,
+            flow_ctrl_cmd_sender.clone(), // sending of updates to context
         ));
 
         Self::send_out_data_for_replication(
@@ -338,19 +333,19 @@ impl FlowCtrl {
         });
     }
 
-    /// starts a new thread to convert comm event to cmds
-    fn handle_processor_events(
+    /// Spawns a task to listen for flow ctrl cmds.
+    fn listen_for_flow_ctrl_cmds(
         context: NodeContext,
-        mut incoming_msg_events: Receiver<FlowCtrlCmd>,
+        mut flow_ctrl_cmd_reciever: Receiver<FlowCtrlCmd>,
         mutating_cmd_channel: CmdChannel,
     ) {
         // we'll update this as we go
         let mut context = context;
 
-        // TODO: make this handle cmds itself... and we weither send to modifying loop
+        // TODO: make this handle cmds itself... and we either send to modifying loop
         // or here...
         let _handle = tokio::task::spawn(async move {
-            while let Some(event) = incoming_msg_events.recv().await {
+            while let Some(cmd) = flow_ctrl_cmd_reciever.recv().await {
                 let capacity = mutating_cmd_channel.capacity();
 
                 if capacity < 30 {
@@ -361,11 +356,11 @@ impl FlowCtrl {
                 }
 
                 debug!(
-                    "CommEvent received: {event:?}. Current capacity on the CmdChannel: {:?}",
+                    "FlowCtrlCmd received: {cmd:?}. Current capacity on the CmdChannel: {:?}",
                     capacity
                 );
 
-                match event {
+                match cmd {
                     FlowCtrlCmd::UpdateContext(new_context) => {
                         context = new_context;
                         continue;
@@ -377,18 +372,17 @@ impl FlowCtrl {
                         // Go off thread for parsing and handling by default
                         // we only punt certain cmds back into the mutating channel
                         let _handle = tokio::spawn(async move {
-                            let results = handle_cmd(
+                            let mut child_cmds = handle_cmd(
                                 incoming_cmd,
                                 context.clone(),
                                 mutating_cmd_channel.clone(),
                             )
                             .await?;
-                            let mut offspring = results;
 
-                            while !offspring.is_empty() {
+                            while !child_cmds.is_empty() {
                                 let mut new_cmds = vec![];
 
-                                for cmd in offspring {
+                                for cmd in child_cmds {
                                     let cmds = handle_cmd(
                                         cmd,
                                         context.clone(),
@@ -399,7 +393,7 @@ impl FlowCtrl {
                                     // TODO: extract this out into two cmd handler channels
                                 }
 
-                                offspring = new_cmds;
+                                child_cmds = new_cmds;
                             }
                             Ok::<(), Error>(())
                         });
@@ -409,10 +403,10 @@ impl FlowCtrl {
         });
     }
 
-    /// simple middleware pipe through of CommEvents - > ReadOnlyProcessingEvent
-    fn convert_incoming_msgs_to_processor_events(
+    /// Simple mapping of of CommEvents -> HandleMsg / HandleCommsError.
+    fn handle_comm_events(
         mut incoming_msg_events: Receiver<CommEvent>,
-        msg_handler_event_sender_clone: Sender<FlowCtrlCmd>,
+        flow_ctrl_cmd_sender: Sender<FlowCtrlCmd>,
     ) {
         let _handle = tokio::spawn(async move {
             while let Some(event) = incoming_msg_events.recv().await {
@@ -438,18 +432,9 @@ impl FlowCtrl {
                     }
                 };
 
-                // TODO: does this processing need to go off thread
-
-                let msg_handler_event_sender_clone = msg_handler_event_sender_clone.clone();
-
-                let _handle = tokio::spawn(async move {
-                    if let Err(e) = msg_handler_event_sender_clone
-                        .send(FlowCtrlCmd::Handle(cmd))
-                        .await
-                    {
-                        warn!("MsgHandler event channel send failed: {e:?}");
-                    }
-                });
+                if let Err(e) = flow_ctrl_cmd_sender.send(FlowCtrlCmd::Handle(cmd)).await {
+                    warn!("MsgHandler event channel send failed: {e:?}");
+                }
             }
         });
     }
