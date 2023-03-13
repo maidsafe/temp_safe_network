@@ -5,19 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.79.1 (2023-03-02)
-
-### Chore
-
- - <csr-id-fbd54da151eb26230802e23899997d6a6f66d654/> update to use tracing
+## v0.80.1 (2023-03-13)
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
  - 1 commit contributed to the release.
- - 2 days passed between releases.
- - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 5 days passed between releases.
+ - 0 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -27,10 +23,83 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Feat(payments): add elders to dbc outputs - NB: Adds a symbolic amount to random keys, which will not be usable by anyone, thus effectively a burn. Using actual Elder keys comes in a follow up PR. ([`5b68808`](https://github.com/maidsafe/safe_network/commit/5b688080ca3bd1a26f4dde20020be34171cb94ae))
+</details>
+
+## v0.79.1 (2023-03-02)
+
+<csr-id-fbd54da151eb26230802e23899997d6a6f66d654/>
+
+### Chore
+
+ - <csr-id-fbd54da151eb26230802e23899997d6a6f66d654/> update to use tracing
+
+### Chore
+
+ - <csr-id-c4e289426f9035b3496d687057c7b2919a313b47/> sn_api-0.79.1
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 2 days passed between releases.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Sn_api-0.79.1 ([`c4e2894`](https://github.com/maidsafe/safe_network/commit/c4e289426f9035b3496d687057c7b2919a313b47))
     - Update to use tracing ([`fbd54da`](https://github.com/maidsafe/safe_network/commit/fbd54da151eb26230802e23899997d6a6f66d654))
 </details>
 
+## v0.80.0 (2023-03-08)
+
+### Chore
+
+ - <csr-id-1e531f807b1c920e61ec9ad2490f6590bf43fdd2/> sn_interface-0.20.0/sn_comms-0.6.0/sn_client-0.82.0/sn_node-0.78.0/sn_api-0.80.0/sn_cli-0.73.0
+ - <csr-id-c8cfa6c774ceeff71d2ae671b07d4122b94100c9/> bump sn_dbc version
+
+### New Features
+
+ - <csr-id-642920fedf44b52081ccceb3fec509c1e1acbd19/> use XorName in DbcReason test
+ - <csr-id-fa49b0d05d944f0ab1141b3c18bd61ac345b2fed/> encapsulate Dbc reasons
+
+### New Features (BREAKING)
+
+ - <csr-id-97ee1eb5a55a0b4dbea9ea8a512351dd3219a6ed/> DBC reasons
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 5 commits contributed to the release.
+ - 5 days passed between releases.
+ - 5 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Sn_interface-0.20.0/sn_comms-0.6.0/sn_client-0.82.0/sn_node-0.78.0/sn_api-0.80.0/sn_cli-0.73.0 ([`1e531f8`](https://github.com/maidsafe/safe_network/commit/1e531f807b1c920e61ec9ad2490f6590bf43fdd2))
+    - Use XorName in DbcReason test ([`642920f`](https://github.com/maidsafe/safe_network/commit/642920fedf44b52081ccceb3fec509c1e1acbd19))
+    - Encapsulate Dbc reasons ([`fa49b0d`](https://github.com/maidsafe/safe_network/commit/fa49b0d05d944f0ab1141b3c18bd61ac345b2fed))
+    - Bump sn_dbc version ([`c8cfa6c`](https://github.com/maidsafe/safe_network/commit/c8cfa6c774ceeff71d2ae671b07d4122b94100c9))
+    - DBC reasons ([`97ee1eb`](https://github.com/maidsafe/safe_network/commit/97ee1eb5a55a0b4dbea9ea8a512351dd3219a6ed))
+</details>
+
 ## v0.79.0 (2023-02-27)
+
+<csr-id-7b046d3bf9c2de4d7aea170197ba4f3e2392fe89/>
 
 ### Chore
 
