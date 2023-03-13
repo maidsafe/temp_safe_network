@@ -377,7 +377,7 @@ impl FlowCtrl {
                         // Go off thread for parsing and handling by default
                         // we only punt certain cmds back into the mutating channel
                         let _handle = tokio::spawn(async move {
-                            let results = handle_cmd_process(
+                            let results = handle_cmd(
                                 incoming_cmd,
                                 context.clone(),
                                 mutating_cmd_channel.clone(),
@@ -389,7 +389,7 @@ impl FlowCtrl {
                                 let mut new_cmds = vec![];
 
                                 for cmd in offspring {
-                                    let cmds = handle_cmd_process(
+                                    let cmds = handle_cmd(
                                         cmd,
                                         context.clone(),
                                         mutating_cmd_channel.clone(),
@@ -456,7 +456,7 @@ impl FlowCtrl {
 }
 
 /// Handles Cmd, either spawn a fresh thread if non blocking, or pass to the blocking processor thread
-async fn handle_cmd_process(
+async fn handle_cmd(
     cmd: Cmd,
     context: NodeContext,
     mutating_cmd_channel: CmdChannel,
