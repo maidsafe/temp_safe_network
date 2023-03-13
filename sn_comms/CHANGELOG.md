@@ -5,9 +5,55 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.6.1 (2023-03-13)
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 1 commit contributed to the release.
+ - 5 days passed between releases.
+ - 0 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Chore(msgs): remove unnecessary serializing - The serialization is only for logging and we already have the serialized msg earlier in the flow, so the log can be moved to that place. ([`56be23a`](https://github.com/maidsafe/safe_network/commit/56be23a0343b84f632ab66134e96f78a4afd52ab))
+</details>
+
 ## v0.6.0 (2023-03-08)
 
+### Chore
+
+ - <csr-id-1e531f807b1c920e61ec9ad2490f6590bf43fdd2/> sn_interface-0.20.0/sn_comms-0.6.0/sn_client-0.82.0/sn_node-0.78.0/sn_api-0.80.0/sn_cli-0.73.0
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 1 commit contributed to the release.
+ - 1 day passed between releases.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Sn_interface-0.20.0/sn_comms-0.6.0/sn_client-0.82.0/sn_node-0.78.0/sn_api-0.80.0/sn_cli-0.73.0 ([`1e531f8`](https://github.com/maidsafe/safe_network/commit/1e531f807b1c920e61ec9ad2490f6590bf43fdd2))
+</details>
+
 ## v0.5.1 (2023-03-06)
+
+<csr-id-4b8d391f5f9fbdfb4de28e969ad1b1c4f4a13ebf/>
 
 ### Chore
 

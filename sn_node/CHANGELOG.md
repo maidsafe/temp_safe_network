@@ -5,18 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.78.4 (2023-03-10)
-
-### Chore
-
- - <csr-id-6d17af24fcaf1e340dc3aec3d40e55ee80b154cf/> make clippy happy for rust 1.68
+## v0.78.5 (2023-03-13)
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
  - 1 commit contributed to the release.
- - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 3 days passed between releases.
+ - 0 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -26,10 +23,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Chore(msgs): remove unnecessary serializing - The serialization is only for logging and we already have the serialized msg earlier in the flow, so the log can be moved to that place. ([`56be23a`](https://github.com/maidsafe/safe_network/commit/56be23a0343b84f632ab66134e96f78a4afd52ab))
+</details>
+
+## v0.78.4 (2023-03-10)
+
+<csr-id-6d17af24fcaf1e340dc3aec3d40e55ee80b154cf/>
+
+### Chore
+
+ - <csr-id-6d17af24fcaf1e340dc3aec3d40e55ee80b154cf/> make clippy happy for rust 1.68
+
+### Chore
+
+ - <csr-id-bc33b08ae2a49ec28fdca5cf7fd5bffacc79567f/> sn_interface-0.20.4/sn_node-0.78.4
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Sn_interface-0.20.4/sn_node-0.78.4 ([`bc33b08`](https://github.com/maidsafe/safe_network/commit/bc33b08ae2a49ec28fdca5cf7fd5bffacc79567f))
     - Make clippy happy for rust 1.68 ([`6d17af2`](https://github.com/maidsafe/safe_network/commit/6d17af24fcaf1e340dc3aec3d40e55ee80b154cf))
 </details>
 
 ## v0.78.3 (2023-03-09)
+
+<csr-id-bad9bc634abd8c12a31bbee0ee71423f727c7397/>
 
 ### Chore
 
