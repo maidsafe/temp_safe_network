@@ -330,22 +330,9 @@ impl FlowCtrl {
                         wire_msg,
                         send_stream,
                     }) => {
-                        if let Ok((header, dst, payload)) = wire_msg.serialize() {
-                            let original_bytes_len = header.len() + dst.len() + payload.len();
-                            let span =
-                                trace_span!("handle_message", ?sender, msg_id = ?wire_msg.msg_id());
-                            let _span_guard = span.enter();
-                            trace!(
-                                "{:?} from {sender:?} length {original_bytes_len}",
-                                LogMarker::MsgReceived,
-                            );
-                        } else {
-                            // this should be unreachable
-                            trace!(
-                                "{:?} from {sender:?}, unknown length due to serialization issues.",
-                                LogMarker::MsgReceived,
-                            );
-                        }
+                        let span =
+                            trace_span!("handle_message", ?sender, msg_id = ?wire_msg.msg_id());
+                        let _span_guard = span.enter();
 
                         Cmd::HandleMsg {
                             sender,
