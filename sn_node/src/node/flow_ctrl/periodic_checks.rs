@@ -6,11 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::FlowCtrl;
-
 use crate::node::{
     core::NodeContext,
-    flow_ctrl::{cmds::Cmd, CmdProcessorEvent},
+    flow_ctrl::{cmds::Cmd, FlowCtrl, FlowCtrlCmd},
     membership::Membership,
     MyNode,
 };
@@ -93,10 +91,7 @@ impl FlowCtrl {
         let sender_channel = self.preprocess_cmd_sender_channel.clone();
         let _handle = tokio::spawn(async move {
             for cmd in cmds {
-                if let Err(error) = sender_channel
-                    .send(super::CmdProcessorEvent::Cmd(cmd))
-                    .await
-                {
+                if let Err(error) = sender_channel.send(super::FlowCtrlCmd::Handle(cmd)).await {
                     error!("Error queuing periodic check: {error:?}");
                 }
             }
@@ -349,7 +344,7 @@ impl FlowCtrl {
     }
 
     /// Checks the interval since last dkg vote received
-    fn check_for_missed_dkg_messages(node: &MyNode, sender_channel: Sender<CmdProcessorEvent>) {
+    fn check_for_missed_dkg_messages(node: &MyNode, sender_channel: Sender<FlowCtrlCmd>) {
         info!("Checking for DKG missed messages");
 
         let dkg_voter = &node.dkg_voter;
@@ -365,7 +360,7 @@ impl FlowCtrl {
                 // move cmd spawn off thread to not block
                 let _handle = tokio::spawn(async move {
                     for cmd in cmds {
-                        if let Err(error) = sender_channel.send(CmdProcessorEvent::Cmd(cmd)).await {
+                        if let Err(error) = sender_channel.send(FlowCtrlCmd::Handle(cmd)).await {
                             error!("Error sending DKG gossip msgs {error:?}");
                         }
                     }
