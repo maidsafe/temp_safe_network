@@ -70,12 +70,12 @@ impl RejoinReason {
     }
 }
 
-/// All Cmds should be passed via an event. This determines if to run in blocking
+/// Flow ctrl of node cmds by . This determines if to run in blocking
 /// context or no
 #[derive(Debug)]
-pub(crate) enum CmdProcessorEvent {
+pub(crate) enum FlowCtrlCmd {
     /// Process this cmd, in blocking thread or off-thread where possible
-    Cmd(Cmd),
+    Handle(Cmd),
     /// Updates the node context passed to off-thread Cmds
     UpdateContext(NodeContext),
 }
@@ -83,7 +83,7 @@ pub(crate) enum CmdProcessorEvent {
 /// Listens for incoming msgs and forms Cmds for each,
 /// Periodically triggers other Cmd Processes (eg health checks, fault detection etc)
 pub(crate) struct FlowCtrl {
-    preprocess_cmd_sender_channel: Sender<CmdProcessorEvent>,
+    preprocess_cmd_sender_channel: Sender<FlowCtrlCmd>,
     fault_channels: FaultChannels,
     timestamps: PeriodicChecksTimestamps,
 }
@@ -243,7 +243,7 @@ impl FlowCtrl {
         let cmd_channel_clone = self.preprocess_cmd_sender_channel.clone();
         // send the join message...
         if let Err(error) = cmd_channel_clone
-            .send(CmdProcessorEvent::Cmd(Cmd::TryJoinNetwork))
+            .send(FlowCtrlCmd::Handle(Cmd::TryJoinNetwork))
             .await
             .map_err(|e| {
                 error!("Failed join: {:?}", e);
@@ -264,7 +264,7 @@ impl FlowCtrl {
         cmd_ctrl: CmdCtrl,
         mut incoming_cmds_from_apis: Receiver<(Cmd, Vec<usize>)>,
         rejoin_network_tx: Sender<RejoinReason>,
-        cmd_processing: Sender<CmdProcessorEvent>,
+        cmd_processing: Sender<FlowCtrlCmd>,
     ) -> Result<()> {
         // let cmd_channel = self.cmd_sender_channel.clone();
         // first do any pending processing
@@ -283,7 +283,7 @@ impl FlowCtrl {
 
             // update our context in read only processor with each cmd
             cmd_processing
-                .send(CmdProcessorEvent::UpdateContext(node.context()))
+                .send(FlowCtrlCmd::UpdateContext(node.context()))
                 .await
                 .map_err(|e| Error::TokioChannel(format!("cmd_processing send failed {:?}", e)))?;
 
@@ -341,7 +341,7 @@ impl FlowCtrl {
     /// starts a new thread to convert comm event to cmds
     fn handle_processor_events(
         context: NodeContext,
-        mut incoming_msg_events: Receiver<CmdProcessorEvent>,
+        mut incoming_msg_events: Receiver<FlowCtrlCmd>,
         mutating_cmd_channel: CmdChannel,
     ) {
         // we'll update this as we go
@@ -366,11 +366,11 @@ impl FlowCtrl {
                 );
 
                 match event {
-                    CmdProcessorEvent::UpdateContext(new_context) => {
+                    FlowCtrlCmd::UpdateContext(new_context) => {
                         context = new_context;
                         continue;
                     }
-                    CmdProcessorEvent::Cmd(incoming_cmd) => {
+                    FlowCtrlCmd::Handle(incoming_cmd) => {
                         let context = context.clone();
                         let mutating_cmd_channel = mutating_cmd_channel.clone();
 
@@ -412,7 +412,7 @@ impl FlowCtrl {
     /// simple middleware pipe through of CommEvents - > ReadOnlyProcessingEvent
     fn convert_incoming_msgs_to_processor_events(
         mut incoming_msg_events: Receiver<CommEvent>,
-        msg_handler_event_sender_clone: Sender<CmdProcessorEvent>,
+        msg_handler_event_sender_clone: Sender<FlowCtrlCmd>,
     ) {
         let _handle = tokio::spawn(async move {
             while let Some(event) = incoming_msg_events.recv().await {
@@ -444,7 +444,7 @@ impl FlowCtrl {
 
                 let _handle = tokio::spawn(async move {
                     if let Err(e) = msg_handler_event_sender_clone
-                        .send(CmdProcessorEvent::Cmd(cmd))
+                        .send(FlowCtrlCmd::Handle(cmd))
                         .await
                     {
                         warn!("MsgHandler event channel send failed: {e:?}");

@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{
-    flow_ctrl::{cmds::Cmd, CmdProcessorEvent, RejoinReason},
+    flow_ctrl::{cmds::Cmd, FlowCtrlCmd, RejoinReason},
     Error, MyNode, STANDARD_CHANNEL_SIZE,
 };
 
@@ -47,7 +47,7 @@ impl CmdCtrl {
         node: &mut MyNode,
         cmd: Cmd,
         mut id: Vec<usize>,
-        cmd_process_api: Sender<CmdProcessorEvent>,
+        cmd_process_api: Sender<FlowCtrlCmd>,
         rejoin_network_sender: Sender<RejoinReason>,
     ) {
         let node_identifier = node.info().name();
@@ -75,7 +75,7 @@ impl CmdCtrl {
                         // let child_id = [id.clone(), [child_nr].to_vec()].concat();
 
                         // match cmd_process_api.send((cmd, child_id)).await {
-                        match cmd_process_api.send(CmdProcessorEvent::Cmd(cmd)).await {
+                        match cmd_process_api.send(FlowCtrlCmd::Handle(cmd)).await {
                             Ok(_) => (), // no issues
                             Err(error) => {
                                 let child_id = [id.clone(), [child_nr].to_vec()].concat();
