@@ -477,17 +477,17 @@ async fn handle_cmd_process(
             send_stream,
         } => {
             if let Some(stream) = send_stream {
-                let fresh = MyNode::handle_client_msg_for_us(
-                    context.clone(),
-                    msg_id,
-                    msg,
-                    auth,
-                    client_id,
-                    stream,
-                )
-                .await?;
-                // let fresh = MyNode::process_cmd_with_context(cmd, context.clone()).await?;
-                new_cmds.extend(fresh);
+                new_cmds.extend(
+                    MyNode::handle_client_msg_for_us(
+                        context.clone(),
+                        msg_id,
+                        msg,
+                        auth,
+                        client_id,
+                        stream,
+                    )
+                    .await?,
+                );
             } else {
                 debug!("dropping client cmd w/ no response stream")
             }
@@ -498,7 +498,6 @@ async fn handle_cmd_process(
             recipients,
         } => {
             let recipients = recipients.into_iter().map(NodeId::from).collect();
-
             MyNode::send_msg(msg, msg_id, recipients, context.clone())?;
         }
         Cmd::SendMsgEnqueueAnyResponse {
@@ -516,18 +515,17 @@ async fn handle_cmd_process(
             node_id,
             send_stream,
         } => {
-            if let Some(cmd) = MyNode::send_node_msg_response(
-                msg,
-                msg_id,
-                correlation_id,
-                node_id,
-                context,
-                send_stream,
-            )
-            .await?
-            {
-                new_cmds.push(cmd)
-            }
+            new_cmds.extend(
+                MyNode::send_node_msg_response(
+                    msg,
+                    msg_id,
+                    correlation_id,
+                    node_id,
+                    context,
+                    send_stream,
+                )
+                .await?,
+            );
         }
         Cmd::SendDataResponse {
             msg,
@@ -536,18 +534,17 @@ async fn handle_cmd_process(
             send_stream,
             client_id,
         } => {
-            if let Some(x) = MyNode::send_data_response(
-                msg,
-                msg_id,
-                correlation_id,
-                send_stream,
-                context.clone(),
-                client_id,
-            )
-            .await?
-            {
-                new_cmds.push(x);
-            }
+            new_cmds.extend(
+                MyNode::send_data_response(
+                    msg,
+                    msg_id,
+                    correlation_id,
+                    send_stream,
+                    context.clone(),
+                    client_id,
+                )
+                .await?,
+            );
         }
         Cmd::TrackNodeIssue { name, issue } => {
             context.track_node_issue(name, issue);
@@ -573,7 +570,6 @@ async fn handle_cmd_process(
             section_tree_update,
         } => {
             info!("Sending ae response msg for {correlation_id:?}");
-
             new_cmds.push(Cmd::send_network_msg(
                 NetworkMsg::AntiEntropy(AntiEntropyMsg::AntiEntropy {
                     section_tree_update,
@@ -590,21 +586,20 @@ async fn handle_cmd_process(
             correlation_id,
             stream,
         } => {
-            if let Some(cmd) = MyNode::send_ae_response(
-                AntiEntropyMsg::AntiEntropy {
-                    kind,
-                    section_tree_update,
-                },
-                msg_id,
-                caller,
-                correlation_id,
-                stream,
-                context,
-            )
-            .await?
-            {
-                new_cmds.push(cmd);
-            }
+            new_cmds.extend(
+                MyNode::send_ae_response(
+                    AntiEntropyMsg::AntiEntropy {
+                        kind,
+                        section_tree_update,
+                    },
+                    msg_id,
+                    caller,
+                    correlation_id,
+                    stream,
+                    context,
+                )
+                .await?,
+            );
         }
         _ => {
             debug!("child process not handled in thread: {cmd:?}");
