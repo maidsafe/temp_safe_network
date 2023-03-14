@@ -17,7 +17,7 @@ use crate::network_knowledge::{NodeState, RelocationProof, SapCandidate};
 use crate::SectionAuthorityProvider;
 
 pub use dkg::DkgSessionId;
-pub use join::{JoinRequest, JoinResponse};
+pub use join::JoinResponse;
 pub use node_msgs::{NodeDataCmd, NodeEvent, NodeQueryResponse};
 pub use section_sig::{SectionSig, SectionSigShare, SectionSigned};
 

@@ -12,13 +12,6 @@ use sn_consensus::Decision;
 
 /// Response to a request to join a section
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct JoinRequest {
-    /// The public key of the section to join.
-    pub section_key: bls::PublicKey,
-}
-
-/// Response to a request to join a section
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum JoinResponse {
     /// Message sent to joining node containing the current node's
     /// state as a member of the section.
