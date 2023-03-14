@@ -4024,7 +4024,6 @@ dependencies = [
  "sn_api",
  "sn_cmd_test_utilities",
  "sn_dbc",
- "sn_launch_tool",
  "sn_updater",
  "tempfile",
  "tokio",
@@ -4222,20 +4221,6 @@ dependencies = [
  "tracing-subscriber",
  "uluru",
  "xor_name",
-]
-
-[[package]]
-name = "sn_launch_tool"
-version = "0.13.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "672f61dc617431dac0125777c988d29e0b7f03044d229db7cdebf761db680101"
-dependencies = [
- "clap",
- "color-eyre",
- "dirs-next",
- "eyre",
- "tracing",
- "tracing-subscriber",
 ]
 
 [[package]]

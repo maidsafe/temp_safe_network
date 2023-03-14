@@ -10,13 +10,12 @@
 use crate::subcommands::{dog::dog_commander, files::files_commander, nrs::nrs_commander};
 use crate::{
     operations::auth_and_connect::connect,
-    operations::config::{Config, SnLaunchToolNetworkLauncher},
+    operations::config::Config,
     subcommands::{
         cat::cat_commander,
         config::config_commander,
         keys::key_commander,
         networks::networks_commander,
-        node::node_commander,
         setup::setup_commander,
         update::update_commander,
         wallet::wallet_commander,
@@ -128,10 +127,6 @@ async fn process_commands(mut safe: &mut Safe, args: CmdArgs, config: &mut Confi
                 .map_err(|err| eyre!("Failed to run self update: {:?}", err))?
         }
         SubCommands::Setup(cmd) => setup_commander(cmd, output_fmt),
-        SubCommands::Node { cmd } => {
-            let mut launcher = Box::<SnLaunchToolNetworkLauncher>::default();
-            node_commander(cmd, config, &mut launcher).await
-        }
         SubCommands::Keys(cmd) => key_commander(cmd, output_fmt, config),
         SubCommands::Xorurl {
             cmd,
