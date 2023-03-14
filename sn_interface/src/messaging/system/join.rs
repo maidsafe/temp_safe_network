@@ -9,7 +9,6 @@
 use super::NodeState;
 use serde::{Deserialize, Serialize};
 use sn_consensus::Decision;
-use std::{fmt, net::SocketAddr};
 
 /// Response to a request to join a section
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -24,24 +23,9 @@ pub enum JoinResponse {
     /// Message sent to joining node containing the current node's
     /// state as a member of the section.
     Approved(Decision<NodeState>),
-    /// Join was rejected
-    Rejected(JoinRejectReason),
-    /// Join is being considered
-    UnderConsideration,
-}
-
-/// Reason of a join request being rejected
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub enum JoinRejectReason {
     /// No new nodes are currently accepted for joining
     /// NB: Relocated nodes that try to join, are accepted even if joins are disallowed.
     JoinsDisallowed,
-    /// The requesting node is not externally reachable
-    NodeNotReachable(SocketAddr),
-}
-
-impl fmt::Display for JoinRejectReason {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{self:?}")
-    }
+    /// Join is being considered
+    UnderConsideration,
 }

@@ -203,16 +203,6 @@ fn create_runtime_and_node(config: &Config) -> Result<()> {
                             join_retry_sec = JOIN_DISALLOWED_RETRY_TIME_SEC;
                             continue;
                         }
-                        NodeError::RejoinRequired(NodeNotReachable(addr)) => {
-                            let err = Err(NodeError::RejoinRequired(NodeNotReachable(addr))).suggestion(
-                                "Unfortunately we are unable to establish a connection to your machine through its \
-                                public IP address. This might involve forwarding ports on your router."
-                                    .header("Please ensure your node is externally reachable")
-                            );
-                            println!("{err:?}");
-                            error!("{err:?}");
-                            return err;
-                        }
                         #[cfg(feature = "chaos")]
                         NodeError::ChaoticStartupCrash => {
                             continue;
