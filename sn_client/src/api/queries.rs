@@ -49,8 +49,6 @@ impl Client {
     async fn send_query_with_retry(&self, query: DataQuery, retry: bool) -> Result<QueryResponse> {
         let client_pk = self.public_key();
 
-        // Add jitter so not all clients retry at the same rate. This divider will knock on to the overall retry window
-        // and should help prevent elders from being conseceutively overwhelmed
         trace!("Setting up query retry");
 
         let span = info_span!("Attempting a query");
@@ -77,7 +75,7 @@ impl Client {
             debug!("Attempting {query:?} (node_index #{})", node_index);
 
             // grab up to date destination section from our local network knowledge
-            let (section_pk, elders) = self.session.get_query_elders(dst).await?;
+            let (section_pk, elders) = self.session.get_data_query_elders(dst).await?;
 
             let res = self
                 .send_signed_query_to_section(
@@ -181,7 +179,7 @@ impl Client {
         let dst = query.dst_name();
 
         // grab up to date destination section from our local network knowledge
-        let (section_pk, elders) = self.session.get_query_elders(dst).await?;
+        let (section_pk, elders) = self.session.get_data_query_elders(dst).await?;
 
         // Send queries to the replicas concurrently
         let mut tasks = vec![];
