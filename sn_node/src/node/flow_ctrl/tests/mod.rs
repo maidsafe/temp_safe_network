@@ -7,20 +7,21 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 #![allow(dead_code)]
-pub(crate) mod cmd_utils;
 pub(crate) mod dbc_utils;
 pub(crate) mod network_builder;
+pub(crate) mod test_utils;
 
 use crate::node::{
     core::MyNode,
-    flow_ctrl::tests::network_builder::{TestNetwork, TestNetworkBuilder},
+    flow_ctrl::tests::{
+        network_builder::TestNetworkBuilder,
+        test_utils::{gen_info_with_comm, gen_node_infos_with_comm},
+    },
     messaging::Recipients,
     Cmd, Error,
 };
-use cmd_utils::{handle_online_cmd, ProcessAndInspectCmds};
 
 use sn_comms::{CommEvent, MsgReceived};
-
 use sn_dbc::Hash;
 use sn_interface::{
     dbcs::{gen_genesis_dbc, DbcReason},
@@ -30,7 +31,7 @@ use sn_interface::{
             ClientMsg, CmdResponse, DataCmd, DataResponse, Error as MessagingDataError,
             SpentbookCmd,
         },
-        system::{NodeDataCmd, NodeMsg},
+        system::{JoinResponse, NodeDataCmd, NodeMsg},
         AntiEntropyKind, AntiEntropyMsg, Dst, NetworkMsg, WireMsg,
     },
     network_knowledge::{
@@ -48,6 +49,7 @@ use std::{
     collections::{BTreeSet, HashSet},
     iter,
 };
+use test_utils::ProcessAndInspectCmds;
 use xor_name::{Prefix, XorName};
 
 #[tokio::test]
@@ -57,7 +59,7 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
 
     let prefix = Prefix::default();
     let env = TestNetworkBuilder::new(thread_rng())
-        .sap(prefix, elder_count(), 1, None, None)
+        .sap(TestSapBuilder::new(prefix).adult_count(1))
         .build()?;
 
     let sk_set = env.get_secret_key_set(prefix, None)?;
@@ -114,15 +116,40 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
 async fn handle_agreement_on_online() -> Result<()> {
     let prefix = Prefix::default();
     let env = TestNetworkBuilder::new(thread_rng())
-        .sap(prefix, elder_count(), 0, None, None)
+        .sap(TestSapBuilder::new(prefix))
         .build()?;
     let mut node = env.get_nodes(prefix, 1, 0, None)?.remove(0);
     let sk_set = env.get_secret_key_set(prefix, None)?;
-    let new_node = gen_node_id(MIN_ADULT_AGE);
-    let join_approval_sent = handle_online_cmd(&new_node, &sk_set, &mut node).await?;
-    assert!(join_approval_sent.0);
+    let new_node_id = gen_node_id(MIN_ADULT_AGE);
+    let mut approval_sent = false;
+    let new_node_state = NodeState::joined(new_node_id, None);
 
-    assert!(node.network_knowledge().is_adult(&new_node.name()));
+    let membership_decision = section_decision(&sk_set, new_node_state.clone())?;
+    let mut all_cmds =
+        ProcessAndInspectCmds::new(Cmd::HandleMembershipDecision(membership_decision));
+
+    while let Some(cmd) = all_cmds.next(&mut node).await? {
+        let (msg, recipients) = match cmd {
+            Cmd::SendMsg {
+                recipients,
+                msg: NetworkMsg::Node(msg),
+                ..
+            } => (msg, recipients),
+            _ => continue,
+        };
+
+        match msg {
+            NodeMsg::JoinResponse(JoinResponse::Approved { .. }) => {
+                assert_matches!(recipients, Recipients::Multiple(nodes) => {
+                    assert_eq!(nodes, &BTreeSet::from([new_node_id]));
+                });
+                approval_sent = true;
+            }
+            _ => continue,
+        }
+    }
+    assert!(approval_sent);
+    assert!(node.network_knowledge().is_adult(&new_node_state.name()));
 
     Ok(())
 }
@@ -133,13 +160,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
     // Creates nodes where everybody has age 6 except one has 5.
     let prefix = Prefix::default();
     let env = TestNetworkBuilder::new(thread_rng())
-        .sap(
-            prefix,
-            elder_count(),
-            0,
-            Some(&[MIN_ADULT_AGE, MIN_ADULT_AGE + 1]),
-            None,
-        )
+        .sap(TestSapBuilder::new(prefix).elder_age_pattern(vec![MIN_ADULT_AGE, MIN_ADULT_AGE + 1]))
         .build()?;
     let mut node = env.get_nodes(prefix, 1, 0, None)?.remove(0);
     let node_name = node.name();
@@ -213,7 +234,7 @@ async fn handle_join_request_of_rejoined_node() -> Result<()> {
     init_logger();
     let prefix = Prefix::default();
     let env = TestNetworkBuilder::new(thread_rng())
-        .sap(prefix, elder_count(), 0, None, None)
+        .sap(TestSapBuilder::new(prefix))
         .build()?;
     let mut node = env.get_nodes(prefix, 1, 0, None)?.remove(0);
 
@@ -243,7 +264,7 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
     let _span = tracing::info_span!("handle_agreement_on_offline_of_non_elder").entered();
     let prefix = Prefix::default();
     let env = TestNetworkBuilder::new(thread_rng())
-        .sap(prefix, elder_count(), 1, None, None)
+        .sap(TestSapBuilder::new(prefix).adult_count(1))
         .build()?;
     let mut node = env.get_nodes(prefix, 1, 0, None)?.remove(0);
     let sk_set = env.get_secret_key_set(prefix, None)?;
@@ -270,7 +291,7 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
 async fn handle_agreement_on_offline_of_elder() -> Result<()> {
     let prefix = Prefix::default();
     let env = TestNetworkBuilder::new(thread_rng())
-        .sap(prefix, elder_count(), 0, None, None)
+        .sap(TestSapBuilder::new(prefix))
         .build()?;
     let mut elders = env.get_nodes(prefix, 2, 0, None)?;
     let mut node = elders.remove(0);
@@ -302,8 +323,8 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
     let _span = info_span!("ae_msg_from_the_future_is_handled").entered();
 
     let prefix = Prefix::default();
-    let (elders0, ..) = TestNetwork::gen_node_infos(&prefix, elder_count(), 0, Some(&[6]));
-    let new_elder = TestNetwork::gen_info(MIN_ADULT_AGE, Some(prefix));
+    let (elders0, ..) = gen_node_infos_with_comm(&prefix, elder_count(), 0, Some(&[6]), None);
+    let new_elder = gen_info_with_comm(MIN_ADULT_AGE, Some(prefix));
     let elders1 = elders0
         .clone()
         .into_iter()
@@ -374,7 +395,7 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
 
     let prefix = Prefix::default();
     let env = TestNetworkBuilder::new(thread_rng())
-        .sap(prefix, elder_count(), 0, None, None)
+        .sap(TestSapBuilder::new(prefix))
         .build()?;
     let mut node = env.get_nodes(prefix, 1, 0, None)?.remove(0);
     let section = env.get_network_knowledge(prefix, None)?;
@@ -384,7 +405,7 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
 
     // a valid AE msg but with a non-verifiable SAP...
     let bogus_env = TestNetworkBuilder::new(thread_rng())
-        .sap(prefix, elder_count(), 0, None, None)
+        .sap(TestSapBuilder::new(prefix))
         .build()?;
     let bogus_sap = bogus_env.get_network_knowledge(prefix, None)?.signed_sap();
     let bogus_section_pk = bls::SecretKey::random().public_key();
@@ -436,7 +457,7 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
 async fn msg_to_self() -> Result<()> {
     let prefix = Prefix::default();
     let mut env = TestNetworkBuilder::new(thread_rng())
-        .sap(prefix, 1, 0, None, None)
+        .sap(TestSapBuilder::new(prefix).elder_count(1))
         .build()?;
 
     let mut node = env.get_nodes(prefix, 1, 0, None)?.remove(0);
@@ -479,10 +500,10 @@ async fn handle_elders_update() -> Result<()> {
     let prefix = Prefix::default();
     // Start with section that has `elder_count()` elders with age 6, 1 non-elder with age 5 and one
     // to-be-elder with age 7
-    let (elders0, ..) = TestNetwork::gen_node_infos(&prefix, elder_count(), 1, Some(&[6]));
+    let (elders0, ..) = gen_node_infos_with_comm(&prefix, elder_count(), 1, Some(&[6]), None);
     let mut elders1 = elders0.clone();
     let promoted_node = {
-        let (promoted_node, promoted_comm, _) = TestNetwork::gen_info(MIN_ADULT_AGE + 2, None);
+        let (promoted_node, promoted_comm, _) = gen_info_with_comm(MIN_ADULT_AGE + 2, None);
         (promoted_node, promoted_comm)
     };
     // members list remain the same for the two SAPs
@@ -580,7 +601,7 @@ async fn handle_demote_during_split() -> Result<()> {
     // `nodes_a` + `info` are pre-split elders.
     // `nodes_a` + `node_c` are prefix-0 post-split elders.
     let (mut nodes_a, ..) =
-        TestNetwork::gen_node_infos(&prefix0, elder_count(), 0, Some(&[MIN_ADULT_AGE]));
+        gen_node_infos_with_comm(&prefix0, elder_count(), 0, Some(&[MIN_ADULT_AGE]), None);
 
     let info = nodes_a
         .pop()
@@ -589,10 +610,10 @@ async fn handle_demote_during_split() -> Result<()> {
 
     // `nodes_b` are prefix-1 post-split elders.
     let (nodes_b, ..) =
-        TestNetwork::gen_node_infos(&prefix1, elder_count(), 0, Some(&[MIN_ADULT_AGE]));
+        gen_node_infos_with_comm(&prefix1, elder_count(), 0, Some(&[MIN_ADULT_AGE]), None);
     // `node_c` is a prefix-0 post-split elder.
     let node_c = {
-        let (node_c, comm, _) = TestNetwork::gen_info(MIN_ADULT_AGE, Some(prefix0));
+        let (node_c, comm, _) = gen_info_with_comm(MIN_ADULT_AGE, Some(prefix0));
         (node_c, comm)
     };
     // all members
@@ -687,7 +708,11 @@ async fn spentbook_spend_client_message_should_replicate_to_adults_and_send_ack(
     std::env::set_var("SN_DATA_COPY_COUNT", replication_count.to_string());
 
     let mut env = TestNetworkBuilder::new(thread_rng())
-        .sap(prefix, elder_count(), 6, None, Some(0))
+        .sap(
+            TestSapBuilder::new(prefix)
+                .adult_count(6)
+                .sk_threshold_size(0),
+        )
         .build()?;
     let mut node = env.get_nodes(prefix, 1, 0, None)?.remove(0);
     let sk_set = env.get_secret_key_set(prefix, None)?;
@@ -752,7 +777,11 @@ async fn spentbook_spend_transaction_with_no_inputs_should_return_spentbook_erro
     std::env::set_var("SN_DATA_COPY_COUNT", replication_count.to_string());
 
     let mut env = TestNetworkBuilder::new(thread_rng())
-        .sap(prefix, elder_count(), 6, None, Some(0))
+        .sap(
+            TestSapBuilder::new(prefix)
+                .adult_count(6)
+                .sk_threshold_size(0),
+        )
         .build()?;
     let mut node = env.get_nodes(prefix, 1, 0, None)?.remove(0);
     let section = env.get_network_knowledge(prefix, None)?;
@@ -818,13 +847,14 @@ async fn spentbook_spend_transaction_with_no_inputs_should_return_spentbook_erro
 async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node() -> Result<()> {
     init_logger();
     let replication_count = 5;
+    let prefix0 = prefix("0");
     let prefix1 = prefix("1");
     std::env::set_var("SN_DATA_COPY_COUNT", replication_count.to_string());
 
     let mut env = TestNetworkBuilder::new(thread_rng())
-        .sap(Prefix::default(), elder_count(), 0, None, Some(0))
-        .sap(prefix("0"), elder_count(), 0, None, Some(0))
-        .sap(prefix1, elder_count(), 0, None, Some(0))
+        .sap(TestSapBuilder::new(Prefix::default()).sk_threshold_size(0))
+        .sap(TestSapBuilder::new(prefix0).sk_threshold_size(0))
+        .sap(TestSapBuilder::new(prefix1).sk_threshold_size(0))
         .build()?;
 
     let mut node = env.get_nodes(Prefix::default(), 1, 0, None)?.remove(0);

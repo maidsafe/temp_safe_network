@@ -34,8 +34,10 @@ mod tests {
     use super::*;
     use crate::node::{
         flow_ctrl::tests::{
-            cmd_utils::{get_next_msg, TestMsgTracker, TestNode},
-            network_builder::{TestNetwork, TestNetworkBuilder},
+            network_builder::TestNetworkBuilder,
+            test_utils::{
+                build_a_node_instance, gen_info_with_comm, get_next_msg, TestMsgTracker, TestNode,
+            },
         },
         messaging::Recipients,
         MIN_ADULT_AGE,
@@ -46,6 +48,7 @@ mod tests {
         elder_count, init_logger,
         messaging::{system::JoinResponse, MsgId, NetworkMsg},
         network_knowledge::{MembershipState, NetworkKnowledge},
+        test_utils::TestSapBuilder,
         types::Participant,
     };
 
@@ -69,7 +72,11 @@ mod tests {
         // Test environment setup
         let msg_tracker = Arc::new(RwLock::new(TestMsgTracker::default()));
         let mut env = TestNetworkBuilder::new(thread_rng())
-            .sap(prefix, elder_count, adult_count, None, None)
+            .sap(
+                TestSapBuilder::new(prefix)
+                    .elder_count(elder_count)
+                    .adult_count(adult_count),
+            )
             .build()?;
         let mut node_instances = env
             .get_nodes(prefix, elder_count, adult_count, None)?
@@ -122,15 +129,15 @@ mod tests {
 
         let prefix = Prefix::default();
         let env = TestNetworkBuilder::new(thread_rng())
-            .sap(prefix, 1, 0, None, None)
+            .sap(TestSapBuilder::new(prefix).elder_count(1))
             .build()?;
 
         let network_knowledge = env.get_network_knowledge(prefix, None)?;
 
         let joining_node = {
             let (info, comm, _incoming_msg_receiver) =
-                TestNetwork::gen_info(MIN_ADULT_AGE, Some(prefix));
-            TestNetwork::build_a_node_instance(&info, &comm, &network_knowledge)
+                gen_info_with_comm(MIN_ADULT_AGE, Some(prefix));
+            build_a_node_instance(&info, &comm, &network_knowledge)?
         };
 
         let mut nodes = env.get_nodes(prefix, 1, 0, None)?;
@@ -189,15 +196,15 @@ mod tests {
 
         let prefix = Prefix::default();
         let env = TestNetworkBuilder::new(thread_rng())
-            .sap(prefix, 1, 1, None, None)
+            .sap(TestSapBuilder::new(prefix).elder_count(1).adult_count(1))
             .build()?;
 
         let network_knowledge = env.get_network_knowledge(prefix, None)?;
 
         let joining_node = {
             let (info, comm, _incoming_msg_receiver) =
-                TestNetwork::gen_info(MIN_ADULT_AGE, Some(prefix));
-            TestNetwork::build_a_node_instance(&info, &comm, &network_knowledge)
+                gen_info_with_comm(MIN_ADULT_AGE, Some(prefix));
+            build_a_node_instance(&info, &comm, &network_knowledge)?
         };
 
         let mut nodes = env.get_nodes(prefix, 0, 1, None)?;
@@ -233,15 +240,15 @@ mod tests {
         assert_ne!(section_prefix, wrong_prefix);
 
         let env = TestNetworkBuilder::new(thread_rng())
-            .sap(section_prefix, 1, 0, None, None)
+            .sap(TestSapBuilder::new(section_prefix).elder_count(1))
             .build()?;
 
         let network_knowledge = env.get_network_knowledge(section_prefix, None)?;
 
         let joining_node = {
             let (info, comm, _incoming_msg_receiver) =
-                TestNetwork::gen_info(MIN_ADULT_AGE, Some(wrong_prefix));
-            TestNetwork::build_a_node_instance(&info, &comm, &network_knowledge)
+                gen_info_with_comm(MIN_ADULT_AGE, Some(wrong_prefix));
+            build_a_node_instance(&info, &comm, &network_knowledge)?
         };
 
         let mut nodes = env.get_nodes(section_prefix, 1, 0, None)?;
@@ -273,15 +280,15 @@ mod tests {
         let section_prefix = Prefix::default();
 
         let env = TestNetworkBuilder::new(thread_rng())
-            .sap(section_prefix, 1, 0, None, None)
+            .sap(TestSapBuilder::new(section_prefix).elder_count(1))
             .build()?;
 
         let network_knowledge = env.get_network_knowledge(section_prefix, None)?;
 
         let joining_node = {
             let (info, comm, _incoming_msg_receiver) =
-                TestNetwork::gen_info(MIN_ADULT_AGE + 1, Some(section_prefix));
-            TestNetwork::build_a_node_instance(&info, &comm, &network_knowledge)
+                gen_info_with_comm(MIN_ADULT_AGE + 1, Some(section_prefix));
+            build_a_node_instance(&info, &comm, &network_knowledge)?
         };
 
         let mut nodes = env.get_nodes(section_prefix, 1, 0, None)?;
@@ -313,15 +320,15 @@ mod tests {
         let section_prefix = Prefix::default();
 
         let env = TestNetworkBuilder::new(thread_rng())
-            .sap(section_prefix, 1, 0, None, None)
+            .sap(TestSapBuilder::new(section_prefix).elder_count(1))
             .build()?;
 
         let network_knowledge = env.get_network_knowledge(section_prefix, None)?;
 
         let joining_node = {
             let (info, comm, _incoming_msg_receiver) =
-                TestNetwork::gen_info(MIN_ADULT_AGE, Some(section_prefix));
-            TestNetwork::build_a_node_instance(&info, &comm, &network_knowledge)
+                gen_info_with_comm(MIN_ADULT_AGE, Some(section_prefix));
+            build_a_node_instance(&info, &comm, &network_knowledge)?
         };
 
         let mut nodes = env.get_nodes(section_prefix, 1, 0, None)?;
@@ -373,7 +380,11 @@ mod tests {
         // Test environment setup
         let msg_tracker = Arc::new(RwLock::new(TestMsgTracker::default()));
         let mut env = TestNetworkBuilder::new(thread_rng())
-            .sap(prefix, elder_count, adult_count, None, None)
+            .sap(
+                TestSapBuilder::new(prefix)
+                    .elder_count(elder_count)
+                    .adult_count(adult_count),
+            )
             .build()?;
         let mut node_instances = env
             .get_nodes(prefix, elder_count, adult_count, None)?
@@ -453,9 +464,8 @@ mod tests {
         msg_tracker: Arc<RwLock<TestMsgTracker>>,
     ) -> Result<(XorName, Option<(XorName, JoinHandle<Result<Vec<Cmd>>>)>)> {
         // create the new adult
-        let (info, comm, incoming_msg_receiver) =
-            TestNetwork::gen_info(MIN_ADULT_AGE, Some(prefix));
-        let node = TestNetwork::build_a_node_instance(&info, &comm, network_knowledge);
+        let (info, comm, incoming_msg_receiver) = gen_info_with_comm(MIN_ADULT_AGE, Some(prefix));
+        let node = build_a_node_instance(&info, &comm, network_knowledge)?;
         let name = node.info().name();
         let node = Arc::new(RwLock::new(TestNode::new(node, msg_tracker.clone())));
 

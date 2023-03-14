@@ -468,7 +468,10 @@ impl Membership {
 mod tests {
     use super::Error;
     use crate::node::flow_ctrl::tests::network_builder::TestNetworkBuilder;
-    use sn_interface::{network_knowledge::NodeState, test_utils::gen_node_id};
+    use sn_interface::{
+        network_knowledge::NodeState,
+        test_utils::{gen_node_id, TestSapBuilder},
+    };
 
     use assert_matches::assert_matches;
     use eyre::Result;
@@ -479,7 +482,7 @@ mod tests {
     async fn multiple_proposals_in_a_single_generation_should_not_be_possible() -> Result<()> {
         let prefix = Prefix::default();
         let env = TestNetworkBuilder::new(thread_rng())
-            .sap(prefix, 7, 0, None, None)
+            .sap(TestSapBuilder::new(prefix))
             .build()?;
 
         let mut membership = env

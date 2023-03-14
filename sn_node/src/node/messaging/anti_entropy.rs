@@ -427,10 +427,9 @@ mod tests {
     use super::*;
     use crate::node::{flow_ctrl::tests::network_builder::TestNetworkBuilder, MIN_ADULT_AGE};
     use sn_interface::{
-        elder_count,
         messaging::{AntiEntropyMsg, Dst, MsgId, MsgKind},
         network_knowledge::MyNodeInfo,
-        test_utils::{gen_addr, prefix},
+        test_utils::{gen_addr, prefix, TestSapBuilder},
         types::keys::ed25519,
     };
 
@@ -444,10 +443,10 @@ mod tests {
         let our_prefix = prefix("0");
         let other_prefix = prefix("1");
         let env = TestNetworkBuilder::new(rand::thread_rng())
-            .sap(our_prefix, elder_count(), 0, None, None)
-            .sap(our_prefix, elder_count(), 0, None, None)
-            .sap(our_prefix, elder_count(), 0, None, None)
-            .sap(other_prefix, elder_count(), 0, None, None)
+            .sap(TestSapBuilder::new(our_prefix))
+            .sap(TestSapBuilder::new(our_prefix))
+            .sap(TestSapBuilder::new(our_prefix))
+            .sap(TestSapBuilder::new(other_prefix))
             .build()?;
         // get node from the latest section of our_prefix
         let node = env.get_nodes(our_prefix, 1, 0, None)?.remove(0);
@@ -474,10 +473,10 @@ mod tests {
         let our_prefix = prefix("0");
         let other_prefix = prefix("1");
         let env = TestNetworkBuilder::new(rand::thread_rng())
-            .sap(our_prefix, elder_count(), 0, None, None)
-            .sap(our_prefix, elder_count(), 0, None, None)
-            .sap(our_prefix, elder_count(), 0, None, None)
-            .sap(other_prefix, elder_count(), 0, None, None)
+            .sap(TestSapBuilder::new(our_prefix))
+            .sap(TestSapBuilder::new(our_prefix))
+            .sap(TestSapBuilder::new(our_prefix))
+            .sap(TestSapBuilder::new(other_prefix))
             .build()?;
         let other_section = env.get_network_knowledge(other_prefix, None)?;
         let other_sap = other_section.signed_sap();
@@ -533,10 +532,10 @@ mod tests {
         let our_prefix = prefix("0");
         let other_prefix = prefix("1");
         let env = TestNetworkBuilder::new(rand::thread_rng())
-            .sap(our_prefix, elder_count(), 0, None, None)
-            .sap(our_prefix, elder_count(), 0, None, None)
-            .sap(our_prefix, elder_count(), 0, None, None)
-            .sap(other_prefix, elder_count(), 0, None, None)
+            .sap(TestSapBuilder::new(our_prefix))
+            .sap(TestSapBuilder::new(our_prefix))
+            .sap(TestSapBuilder::new(our_prefix))
+            .sap(TestSapBuilder::new(other_prefix))
             .build()?;
         // get node from the latest section of our_prefix
         let node = env.get_nodes(our_prefix, 1, 0, None)?.remove(0);
@@ -567,10 +566,10 @@ mod tests {
         let our_prefix = prefix("0");
         let other_prefix = prefix("1");
         let env = TestNetworkBuilder::new(rand::thread_rng())
-            .sap(our_prefix, elder_count(), 0, None, None)
-            .sap(our_prefix, elder_count(), 0, None, None)
-            .sap(our_prefix, elder_count(), 0, None, None)
-            .sap(other_prefix, elder_count(), 0, None, None)
+            .sap(TestSapBuilder::new(our_prefix))
+            .sap(TestSapBuilder::new(our_prefix))
+            .sap(TestSapBuilder::new(our_prefix))
+            .sap(TestSapBuilder::new(other_prefix))
             .build()?;
         // get node from the latest section of our_prefix
         let node = env.get_nodes(our_prefix, 1, 0, None)?.remove(0);

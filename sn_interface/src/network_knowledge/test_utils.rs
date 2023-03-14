@@ -6,7 +6,6 @@ use crate::{
     SectionAuthorityProvider,
 };
 use eyre::{eyre, Context, ContextCompat, Result};
-use itertools::Itertools;
 use sn_consensus::{Ballot, Consensus, Decision, Proposition, Vote, VoteResponse};
 use sn_dbc::{
     get_public_commitments_from_transaction, Commitment, Dbc, DbcTransaction, Owner, OwnerOnce,
@@ -55,46 +54,52 @@ pub fn gen_info(age: u8, prefix: Option<Prefix>) -> MyNodeInfo {
     )
 }
 
-/// Create `elder+adult` Nodes sorted by their names.
+/// Creates a set of elder, adult MyNodeInfo
 ///
 /// Optionally provide `age_pattern` to create elders with specific ages.
 /// If None = elder's age is set to `MIN_ADULT_AGE`
 /// If age_pattern.len() == elder, then apply the respective ages to each node
 /// If age_pattern.len() < elder, then the last element's value is taken as the age for the remaining nodes.
 /// If age_pattern.len() > elder, then the extra elements after `count` are ignored.
-pub fn gen_sorted_nodes(
+pub fn gen_node_infos(
     prefix: &Prefix,
-    elder: usize,
-    adult: usize,
+    elders: usize,
+    adults: usize,
     elder_age_pattern: Option<&[u8]>,
-) -> Vec<MyNodeInfo> {
-    let pattern = if let Some(user_pattern) = elder_age_pattern {
-        if user_pattern.is_empty() {
-            None
-        } else if user_pattern.len() < elder {
-            let last_element = user_pattern[user_pattern.len() - 1];
-            let mut pattern = vec![last_element; elder - user_pattern.len()];
-            pattern.extend_from_slice(user_pattern);
-            Some(pattern)
+    adult_age_pattern: Option<&[u8]>,
+) -> (Vec<MyNodeInfo>, Vec<MyNodeInfo>) {
+    let elder_age_pattern = expand_age_pattern(elder_age_pattern, elders);
+    let adult_age_pattern = expand_age_pattern(adult_age_pattern, adults);
+    let elder_nodes = (0..elders)
+        .map(|idx| gen_info(elder_age_pattern[idx], Some(*prefix)))
+        .collect();
+    let adult_nodes = (0..adults)
+        .map(|idx| gen_info(adult_age_pattern[idx], Some(*prefix)))
+        .collect();
+    (elder_nodes, adult_nodes)
+}
+
+/// Helper to expand the provided age_pattern
+///
+/// If age_pattern is None, then the output is set to [MIN_ADULT_AGE; len];
+/// If age_pattern.len() == len, then apply the respective ages to each node
+/// If age_pattern.len() < len, then the last element's value is repeated until we reach `len`
+/// If age_pattern.len() > len, then the extra elements after `len` are ignored.
+pub fn expand_age_pattern(age_pattern: Option<&[u8]>, len: usize) -> Vec<u8> {
+    if let Some(pattern) = age_pattern {
+        if pattern.is_empty() {
+            vec![MIN_ADULT_AGE; len]
+        } else if pattern.len() < len {
+            let last_element = pattern[pattern.len() - 1];
+            let mut op_pattern = vec![last_element; len - pattern.len()];
+            op_pattern.extend_from_slice(pattern);
+            op_pattern
         } else {
-            Some(Vec::from(user_pattern))
+            Vec::from(pattern)
         }
     } else {
-        None
-    };
-    (0..elder)
-        .map(|idx| {
-            let age = if let Some(pattern) = &pattern {
-                pattern[idx]
-            } else {
-                MIN_ADULT_AGE
-            };
-            gen_info(age, Some(*prefix))
-        })
-        .chain((0..adult).map(|_| gen_info(MIN_ADULT_AGE, Some(*prefix))))
-        .sorted_by_key(|node| node.age())
-        .rev()
-        .collect()
+        vec![MIN_ADULT_AGE; len]
+    }
 }
 
 pub fn section_decision<P: Proposition>(
@@ -279,28 +284,44 @@ where
     assert_eq!(vec2.len(), 0);
 }
 
-/// Create a decision for the testing purpose with the given age.
+/// Tries to create a RelocationTrigger for the provided age.
+/// This function should be run in a loop with unique NodeIds until we get the RelocationTrigger
 ///
 /// NOTE: recommended to call this with low `age` (4 or 5), otherwise it might take very long time
 /// to complete because it needs to generate a signature with the number of trailing zeroes equal
 /// to (or greater that) `age`.
+pub fn try_create_relocation_trigger(
+    node_id: NodeId,
+    sk_set: &bls::SecretKeySet,
+    age: u8,
+) -> Result<Option<(RelocationTrigger, Decision<NodeState>)>> {
+    use super::relocation_check;
+
+    let node_state = NodeState::joined(node_id, None);
+    let decision = section_decision(sk_set, node_state)?;
+    let relocation_trigger = RelocationTrigger::new(decision.clone());
+    let churn_id = relocation_trigger.churn_id();
+
+    if relocation_check(age, &churn_id) && !relocation_check(age + 1, &churn_id) {
+        Ok(Some((relocation_trigger, decision)))
+    } else {
+        Ok(None)
+    }
+}
+
+/// Creates a RelocationTrigger for the provided age
 ///
-// TODO: Rename it to create_test_relocation_trigger.
+/// NOTE: recommended to call this with low `age` (4 or 5), otherwise it might take very long time
+/// to complete because it needs to generate a signature with the number of trailing zeroes equal
+/// to (or greater that) `age`.
 pub fn create_relocation_trigger(
     sk_set: &bls::SecretKeySet,
     age: u8,
 ) -> Result<(RelocationTrigger, Decision<NodeState>)> {
-    use super::relocation_check;
-
     loop {
-        let node_state =
-            NodeState::joined(gen_node_id(MIN_ADULT_AGE), Some(xor_name::rand::random()));
-        let decision = section_decision(sk_set, node_state.clone())?;
-        let relocation_trigger = RelocationTrigger::new(decision.clone());
-        let churn_id = relocation_trigger.churn_id();
-
-        if relocation_check(age, &churn_id) && !relocation_check(age + 1, &churn_id) {
-            return Ok((relocation_trigger, decision));
+        let node_id = gen_node_id(MIN_ADULT_AGE);
+        if let Some((trigger, decision)) = try_create_relocation_trigger(node_id, sk_set, age)? {
+            return Ok((trigger, decision));
         }
     }
 }
