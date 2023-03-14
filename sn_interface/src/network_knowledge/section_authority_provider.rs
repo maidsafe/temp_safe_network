@@ -238,7 +238,7 @@ pub mod test_utils {
     use crate::{
         elder_count,
         network_knowledge::{supermajority, MyNodeInfo, NodeState, SectionAuthorityProvider},
-        test_utils::gen_sorted_nodes,
+        test_utils::gen_node_infos,
     };
     use rand::{thread_rng, RngCore};
     use xor_name::Prefix;
@@ -258,21 +258,28 @@ pub mod test_utils {
     }
 
     /// Builder to generate a `SectionAuthorityProvider`
+    /// Calling `TestSapBuilder::new()` will set the following defaults
+    ///
+    /// elder_count = elder_count()
+    /// adult_count = 0
+    /// membership_gen = 0
     pub struct TestSapBuilder {
-        prefix: Prefix,
-        elder_count: usize,
-        adult_count: usize,
-        membership_gen: usize,
-        elder_nodes: Option<Vec<MyNodeInfo>>,
-        adult_nodes: Option<Vec<MyNodeInfo>>,
-        sk_set: Option<bls::SecretKeySet>,
-        sk_threshold_size: Option<usize>,
-        elder_age_pattern: Option<Vec<u8>>,
+        pub prefix: Prefix,
+        pub elder_count: usize,
+        pub adult_count: usize,
+        pub membership_gen: usize,
+        pub sk_set: Option<bls::SecretKeySet>,
+        pub sk_threshold_size: Option<usize>,
+        pub elder_age_pattern: Option<Vec<u8>>,
+        pub adult_age_pattern: Option<Vec<u8>>,
     }
 
     impl TestSapBuilder {
-        /// Set the `Prefix` of the SAP. Also initiates the SAP builder by providing default values
-        /// to the configs.
+        /// Set the `Prefix` of the SAP. Also initiates the SAP builder with the following
+        /// defaults,
+        /// elder_count = elder_count()
+        /// adult_count = 0
+        /// membership_gen = 0
         pub fn new(prefix: Prefix) -> Self {
             Self {
                 prefix,
@@ -280,10 +287,9 @@ pub mod test_utils {
                 adult_count: 0,
                 membership_gen: 0,
                 sk_threshold_size: None,
-                elder_nodes: None,
-                adult_nodes: None,
                 sk_set: None,
                 elder_age_pattern: None,
+                adult_age_pattern: None,
             }
         }
 
@@ -310,20 +316,6 @@ pub mod test_utils {
             self
         }
 
-        /// Use the provided set of nodes as elders
-        pub fn elder_nodes(mut self, nodes: Vec<MyNodeInfo>) -> Self {
-            self.elder_count = nodes.len();
-            self.elder_nodes = Some(nodes);
-            self
-        }
-
-        /// Use the provided set of nodes as adults
-        pub fn adult_nodes(mut self, nodes: Vec<MyNodeInfo>) -> Self {
-            self.adult_count = nodes.len();
-            self.adult_nodes = Some(nodes);
-            self
-        }
-
         /// Use custom `SecretKeySet` for the SAP
         pub fn sk_set(mut self, sk_set: &bls::SecretKeySet) -> Self {
             self.sk_set = Some(sk_set.clone());
@@ -338,16 +330,28 @@ pub mod test_utils {
             self.sk_threshold_size = Some(sk_threshold_size);
             self
         }
-        /// Provide `age_pattern` to create elders with specific ages. Will be overriden if you
-        /// provide pre crafted elder nodes.
+
+        /// Provide `age_pattern` to create elders with specific ages.
         /// e.g., vec![10, 20] will generate elders with the following age (10, 20, 20, 20...)
         ///
         /// If None = elder's age is set to `MIN_ADULT_AGE`
-        /// If age_pattern.len() == elder, then apply the respective ages to each node
-        /// If age_pattern.len() < elder, then the last element's value is taken as the age for the remaining nodes.
-        /// If age_pattern.len() > elder, then the extra elements after `count` are ignored.
+        /// If age_pattern.len() == elders, then apply the respective ages to each node
+        /// If age_pattern.len() < elders, then the last element's value is taken as the age for the remaining nodes.
+        /// If age_pattern.len() > elders, then the extra elements after `count` are ignored.
         pub fn elder_age_pattern(mut self, pattern: Vec<u8>) -> Self {
             self.elder_age_pattern = Some(pattern);
+            self
+        }
+
+        /// Provide `age_pattern` to create adults with specific ages.
+        /// e.g., vec![10, 20] will generate adults with the following age (10, 20, 20, 20...)
+        ///
+        /// If None = adults's age is set to `MIN_ADULT_AGE`
+        /// If age_pattern.len() == adults, then apply the respective ages to each node
+        /// If age_pattern.len() < adults, then the last element's value is taken as the age for the remaining nodes.
+        /// If age_pattern.len() > adults, then the extra elements after `count` are ignored.
+        pub fn adult_age_pattern(mut self, pattern: Vec<u8>) -> Self {
+            self.adult_age_pattern = Some(pattern);
             self
         }
 
@@ -366,22 +370,13 @@ pub mod test_utils {
         ) {
             // Todo: use custom rng to generate the random nodes. `gen_keypair` requires `rand-0.7`
             // version and `SecretKeySet` requires `rand-0.8`; wait for the other one to be bumped.
-            let members = gen_sorted_nodes(
+            let (elder_nodes, adult_nodes) = gen_node_infos(
                 &self.prefix,
                 self.elder_count,
                 self.adult_count,
                 self.elder_age_pattern.as_deref(),
+                self.adult_age_pattern.as_deref(),
             );
-            let elder_nodes = if let Some(elders) = self.elder_nodes {
-                elders
-            } else {
-                members.iter().take(self.elder_count).cloned().collect()
-            };
-            let adult_nodes = if let Some(adults) = self.adult_nodes {
-                adults
-            } else {
-                members.iter().skip(self.elder_count).cloned().collect()
-            };
             let members = elder_nodes
                 .iter()
                 .chain(adult_nodes.iter())

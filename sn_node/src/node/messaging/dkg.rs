@@ -850,8 +850,8 @@ mod tests {
     use crate::node::flow_ctrl::{
         cmds::Cmd,
         tests::{
-            cmd_utils::{get_next_msg, TestMsgTracker, TestNode},
             network_builder::TestNetworkBuilder,
+            test_utils::{get_next_msg, TestMsgTracker, TestNode},
         },
     };
 
@@ -864,6 +864,7 @@ mod tests {
             NetworkMsg, SectionSigShare,
         },
         network_knowledge::{supermajority, NodeState, SectionKeyShare},
+        test_utils::TestSapBuilder,
         types::NodeId,
     };
 
@@ -1098,7 +1099,7 @@ mod tests {
         SecretKeySet,
     )> {
         let mut env = TestNetworkBuilder::new(rng)
-            .sap(Prefix::default(), elder_count, 0, None, None)
+            .sap(TestSapBuilder::new(Prefix::default()).elder_count(elder_count))
             .build()
             .wrap_err("Failed to build TestEnv")?;
         let sk_set = env.get_secret_key_set(Prefix::default(), None)?;

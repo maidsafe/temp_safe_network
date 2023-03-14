@@ -6,20 +6,20 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{messaging::Recipients, Cmd, MyNode};
-use sn_comms::{CommEvent, MsgReceived};
+use crate::{
+    node::{cfg::create_test_capacity_and_root_storage, messaging::Recipients, Cmd, MyNode},
+    UsedSpace,
+};
+use sn_comms::{Comm, CommEvent, MsgReceived};
 use sn_interface::{
     messaging::{
-        data::ClientMsg,
-        serialisation::WireMsg,
-        system::{JoinResponse, NodeMsg},
-        AuthorityProof, ClientAuth, Dst, MsgId, MsgKind, NetworkMsg,
+        data::ClientMsg, serialisation::WireMsg, AuthorityProof, ClientAuth, Dst, MsgId, MsgKind,
     },
-    network_knowledge::{test_utils::*, NodeState},
-    types::{Keypair, NodeId},
+    network_knowledge::{MyNodeInfo, NetworkKnowledge},
+    test_utils::expand_age_pattern,
+    types::{keys::ed25519::gen_keypair, Keypair},
 };
 
-use assert_matches::assert_matches;
 use bytes::Bytes;
 use eyre::{eyre, Context, Result};
 use qp2p::Endpoint;
@@ -29,49 +29,12 @@ use std::{
     sync::Arc,
 };
 use tokio::sync::{
-    mpsc::{error::TryRecvError, Receiver},
+    mpsc::{self, error::TryRecvError, Receiver},
     RwLock,
 };
-use xor_name::XorName;
+use xor_name::{Prefix, XorName};
 
-pub(crate) struct JoinApprovalSent(pub(crate) bool);
-
-pub(crate) async fn handle_online_cmd(
-    node_id: &NodeId,
-    sk_set: &bls::SecretKeySet,
-    node: &mut MyNode,
-) -> Result<JoinApprovalSent> {
-    let node_state = NodeState::joined(*node_id, None);
-    let membership_decision = section_decision(sk_set, node_state)?;
-
-    let mut all_cmds =
-        ProcessAndInspectCmds::new(Cmd::HandleMembershipDecision(membership_decision));
-
-    let mut approval_sent = JoinApprovalSent(false);
-
-    while let Some(cmd) = all_cmds.next(node).await? {
-        let (msg, recipients) = match cmd {
-            Cmd::SendMsg {
-                recipients,
-                msg: NetworkMsg::Node(msg),
-                ..
-            } => (msg, recipients),
-            _ => continue,
-        };
-
-        match msg {
-            NodeMsg::JoinResponse(JoinResponse::Approved { .. }) => {
-                assert_matches!(recipients, Recipients::Multiple(nodes) => {
-                    assert_eq!(nodes, &BTreeSet::from([*node_id]));
-                });
-                approval_sent.0 = true;
-            }
-            _ => continue,
-        }
-    }
-
-    Ok(approval_sent)
-}
+use super::network_builder::TestCommRx;
 
 // Process commands, allowing the user to inspect each and all of the intermediate
 // commands that are being returned by the Cmd node.
@@ -399,4 +362,77 @@ pub(crate) async fn get_next_msg(comm_rx: &mut Receiver<CommEvent>) -> Option<Ms
         Err(TryRecvError::Empty) => None,
         Err(TryRecvError::Disconnected) => panic!("the comm_rx channel is closed"),
     }
+}
+
+/// Create set of elder, adults nodes
+///
+/// Optionally provide `age_pattern` to create elders with specific ages.
+/// If None = elder's age is set to `MIN_ADULT_AGE`
+/// If age_pattern.len() == elder, then apply the respective ages to each node
+/// If age_pattern.len() < elder, then the last element's value is taken as the age for the remaining nodes.
+/// If age_pattern.len() > elder, then the extra elements after `count` are ignored.
+#[allow(clippy::type_complexity)]
+pub(crate) fn gen_node_infos_with_comm(
+    prefix: &Prefix,
+    elders: usize,
+    adults: usize,
+    elder_age_pattern: Option<&[u8]>,
+    adult_age_pattern: Option<&[u8]>,
+) -> (Vec<(MyNodeInfo, Comm)>, Vec<(MyNodeInfo, Comm)>, TestCommRx) {
+    let elder_age_pattern = expand_age_pattern(elder_age_pattern, elders);
+    let adult_age_pattern = expand_age_pattern(adult_age_pattern, adults);
+    let mut comm_rx = BTreeMap::new();
+    let elder_nodes = (0..elders)
+        .map(|idx| {
+            let (node, comm, rx) = gen_info_with_comm(elder_age_pattern[idx], Some(*prefix));
+            let _ = comm_rx.insert(node.public_key(), Some(rx));
+            (node, comm)
+        })
+        .collect();
+    let adult_nodes = (0..adults)
+        .map(|idx| {
+            let (node, comm, rx) = gen_info_with_comm(adult_age_pattern[idx], Some(*prefix));
+            let _ = comm_rx.insert(node.public_key(), Some(rx));
+            (node, comm)
+        })
+        .collect();
+    (elder_nodes, adult_nodes, comm_rx)
+}
+
+/// Generate `MyNodeInfo` and `Comm`
+pub(crate) fn gen_info_with_comm(
+    age: u8,
+    prefix: Option<Prefix>,
+) -> (MyNodeInfo, Comm, Receiver<CommEvent>) {
+    let socket_addr: SocketAddr = (Ipv4Addr::LOCALHOST, 0).into();
+    let (comm, rx) = Comm::new(socket_addr, None).expect("failed  to create comm");
+    let info = MyNodeInfo::new(
+        gen_keypair(&prefix.unwrap_or_default().range_inclusive(), age),
+        comm.socket_addr(),
+    );
+    (info, comm, rx)
+}
+
+/// Creates a single `MyNode` instance
+pub(crate) fn build_a_node_instance(
+    info: &MyNodeInfo,
+    comm: &Comm,
+    network_knowledge: &NetworkKnowledge,
+) -> Result<MyNode> {
+    // enter the current tokio runtime
+    let (min_capacity, max_capacity, root_storage_dir) =
+        create_test_capacity_and_root_storage().wrap_err("Failed to create root storage")?;
+
+    let node = MyNode::new(
+        comm.clone(),
+        info.keypair.clone(),
+        bls::SecretKey::random().public_key(),
+        network_knowledge.clone(),
+        None,
+        UsedSpace::new(min_capacity, max_capacity),
+        root_storage_dir,
+        mpsc::channel(10).0,
+    )
+    .wrap_err("Failed to create MyNode")?;
+    Ok(node)
 }

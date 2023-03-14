@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use super::test_utils::gen_node_infos_with_comm;
 use crate::{
     node::{cfg::create_test_capacity_and_root_storage, core::MyNode},
     UsedSpace,
@@ -13,15 +14,13 @@ use crate::{
 
 use sn_comms::{Comm, CommEvent};
 use sn_interface::{
-    elder_count,
     messaging::system::SectionSigned,
     network_knowledge::{
-        supermajority, MyNodeInfo, NetworkKnowledge, NodeState, SectionAuthorityProvider,
-        SectionKeyShare, SectionKeysProvider, SectionTree, SectionTreeUpdate, SectionsDAG,
-        MIN_ADULT_AGE,
+        MyNodeInfo, NetworkKnowledge, NodeState, SectionAuthorityProvider, SectionKeyShare,
+        SectionKeysProvider, SectionTree, SectionTreeUpdate, SectionsDAG,
     },
     test_utils::*,
-    types::{keys::ed25519::gen_keypair, NodeId, PublicKey},
+    types::{NodeId, PublicKey},
 };
 
 use bls::SecretKeySet;
@@ -30,12 +29,8 @@ use rand::RngCore;
 use std::{
     collections::{btree_map::Entry, BTreeMap, BTreeSet},
     iter,
-    net::{Ipv4Addr, SocketAddr},
 };
-use tokio::{
-    runtime::Handle,
-    sync::mpsc::{self, Receiver},
-};
+use tokio::sync::mpsc::{self, Receiver};
 use xor_name::Prefix;
 
 // The default elder age pattern
@@ -81,88 +76,32 @@ impl<R: RngCore> TestNetworkBuilder<R> {
         self
     }
 
-    /// Provide values to create a `SectionAuthorityProvider` for a given Prefix. If multiple SAPs
+    /// Add a SAP to the network by providing values to a `TestSapBuilder`. If multiple SAPs
     /// are provided for the same Prefix, they are considered to have gone through churns in the
     /// order they are provided.
     ///
-    /// The total number of members in the SAP will be `elder_count` + `adult_count`. A lot of
-    /// tests don't require adults in the SAP, so zero is an acceptable value for
-    /// `adult_count`.
+    /// Calling `TestSapBuilder::new()` will set the following defaults
     ///
-    /// Optionally provide `age_pattern` to create elders with specific ages.
-    /// If None = use ELDER_AGE_PATTERN
-    /// If age_pattern.len() == elder, then apply the respective ages to each node
-    /// If age_pattern.len() < elder, then the last element's value is taken as the age for the remaining nodes.
-    /// If age_pattern.len() > elder, then the extra elements after `count` are ignored.
-    ///
-    /// The default threshold_size for the `SecretKeySet` is set to be `supermajority(elder_count)-1`
-    /// This can be overridden by using `sk_threshold_size` since some tests need low thresholds.
-    pub(crate) fn sap(
-        mut self,
-        prefix: Prefix,
-        elder_count: usize,
-        adult_count: usize,
-        elder_age_pattern: Option<&[u8]>,
-        sk_threshold_size: Option<usize>,
-    ) -> TestNetworkBuilder<R> {
-        let mut elder_age_pattern = elder_age_pattern;
+    /// elder_count = elder_count()
+    /// adult_count = 0
+    /// membership_gen = 0
+    pub(crate) fn sap(mut self, mut sap_builder: TestSapBuilder) -> TestNetworkBuilder<R> {
         // provide default age pattern if nothing is provided
-        if elder_age_pattern.is_none() {
-            elder_age_pattern = Some(ELDER_AGE_PATTERN);
+        if sap_builder.elder_age_pattern.is_none() {
+            sap_builder.elder_age_pattern = Some(Vec::from(ELDER_AGE_PATTERN));
         }
 
-        let (sap, nodes, sk_set, comm_rx) = self.build_sap(
-            prefix,
-            elder_count,
-            adult_count,
-            elder_age_pattern,
-            sk_threshold_size,
-        );
+        let (sap, nodes, sk_set, comm_rx) = self.build_sap(sap_builder);
 
         self.sections.push((sap, nodes, sk_set));
         self.receivers.extend(comm_rx.into_iter());
         self
     }
 
-    /// Provide pre-built SAPs to be used inside the `TestNetwork`
-    /// Note: The `SocketAddr` will be replaced for the nodes. Else use `.sap_with_members()`
-    /// if you want to preserve the `SocketAddr`
-    pub(crate) fn sap_pre_built(
-        mut self,
-        sap: &SectionAuthorityProvider,
-        node_infos: &[MyNodeInfo],
-        secret_key_set: &SecretKeySet,
-    ) -> TestNetworkBuilder<R> {
-        let handle = Handle::current();
-        let _ = handle.enter();
-
-        let mut nodes = Vec::new();
-        for node in node_infos {
-            // check MemberType
-            let memb_type = if sap.elders_set().contains(&node.id()) {
-                TestMemberType::Elder
-            } else {
-                TestMemberType::Adult
-            };
-
-            let socket_addr: SocketAddr = (Ipv4Addr::LOCALHOST, 0).into();
-            let (comm, rx) = Comm::new(socket_addr, None).expect("failed to create Comm");
-            let mut node = node.clone();
-            node.addr = comm.socket_addr();
-
-            // insert the commRx
-            let _ = self.receivers.insert(node.public_key(), Some(rx));
-            nodes.push((node, comm, memb_type));
-        }
-        self.sections
-            .push((sap.clone(), nodes, secret_key_set.clone()));
-        self
-    }
-
     /// Create a new SAP with the provided set of members for the given Prefix. This is useful if
     /// you want to retain some of the members from a previous churn.
     ///
-    /// Use `TestNetwork::build_node_infos()` to build the nodes;
+    /// Use `build_node_infos_with_comm()` to build the nodes;
     /// Note: The `mpsc::Receiver` for the nodes are assumed to be held by the caller. Hence trying
     /// to retrieve it from `TestNetwork.get_receivers()` will cause a panic
     pub(crate) fn sap_with_members<E, M>(
@@ -319,11 +258,7 @@ impl<R: RngCore> TestNetworkBuilder<R> {
             for _ in 0..n_churns_each_section {
                 // infos are sorted by age
                 let (sap, infos, sk_set, comm_rx) = self.build_sap(
-                    prefix,
-                    elder_count(),
-                    0,
-                    Some(ELDER_AGE_PATTERN),
-                    Some(supermajority(elder_count())),
+                    TestSapBuilder::new(prefix).elder_age_pattern(Vec::from(ELDER_AGE_PATTERN)),
                 );
                 let sap = TestKeys::get_section_signed(&sk_set.secret_key(), sap)?;
                 // the CommRx for the user provided SAPs prior to calling `build`. Hence we just
@@ -444,28 +379,14 @@ impl<R: RngCore> TestNetworkBuilder<R> {
 
     fn build_sap(
         &mut self,
-        prefix: Prefix,
-        elder_count: usize,
-        adult_count: usize,
-        elder_age_pattern: Option<&[u8]>,
-        sk_threshold_size: Option<usize>,
+        sap_builder: TestSapBuilder,
     ) -> (
         SectionAuthorityProvider,
         Vec<(MyNodeInfo, Comm, TestMemberType)>,
         SecretKeySet,
         TestCommRx,
     ) {
-        let (elders, adults, comm_rx) =
-            TestNetwork::gen_node_infos(&prefix, elder_count, adult_count, elder_age_pattern);
-        let elders_for_sap = elders.iter().map(|(node, _)| node.id());
-        let members = adults
-            .iter()
-            .map(|(node, _)| node.id())
-            .chain(elders_for_sap.clone())
-            .map(|node_id| NodeState::joined(node_id, None));
-        let sk_set = gen_sk_set(&mut self.rng, elder_count, sk_threshold_size);
-        let sap =
-            SectionAuthorityProvider::new(elders_for_sap, prefix, members, sk_set.public_keys(), 0);
+        let (sap, sk_set, elders, adults, comm_rx) = sap_builder.build_with_comm(&mut self.rng);
 
         let nodes = elders
             .into_iter()
@@ -721,99 +642,6 @@ impl TestNetwork {
             .signed_sap())
     }
 
-    /// Create set of elder, adults nodes
-    ///
-    /// Optionally provide `age_pattern` to create elders with specific ages.
-    /// If None = elder's age is set to `MIN_ADULT_AGE`
-    /// If age_pattern.len() == elder, then apply the respective ages to each node
-    /// If age_pattern.len() < elder, then the last element's value is taken as the age for the remaining nodes.
-    /// If age_pattern.len() > elder, then the extra elements after `count` are ignored.
-    #[allow(clippy::type_complexity)]
-    pub(crate) fn gen_node_infos(
-        prefix: &Prefix,
-        elder: usize,
-        adult: usize,
-        elder_age_pattern: Option<&[u8]>,
-    ) -> (Vec<(MyNodeInfo, Comm)>, Vec<(MyNodeInfo, Comm)>, TestCommRx) {
-        let pattern = if let Some(user_pattern) = elder_age_pattern {
-            if user_pattern.is_empty() {
-                None
-            } else if user_pattern.len() < elder {
-                let last_element = user_pattern[user_pattern.len() - 1];
-                let mut pattern = vec![last_element; elder - user_pattern.len()];
-                pattern.extend_from_slice(user_pattern);
-                Some(pattern)
-            } else {
-                Some(Vec::from(user_pattern))
-            }
-        } else {
-            None
-        };
-        let mut comm_rx = BTreeMap::new();
-        let elders = (0..elder)
-            .map(|idx| {
-                let age = if let Some(pattern) = &pattern {
-                    pattern[idx]
-                } else {
-                    MIN_ADULT_AGE
-                };
-                let (node, comm, rx) = Self::gen_info(age, Some(*prefix));
-                let _ = comm_rx.insert(node.public_key(), Some(rx));
-                (node, comm)
-            })
-            .collect();
-        let adults = (0..adult)
-            .map(|_| {
-                let (node, comm, rx) = Self::gen_info(MIN_ADULT_AGE, Some(*prefix));
-                let _ = comm_rx.insert(node.public_key(), Some(rx));
-                (node, comm)
-            })
-            .collect();
-        (elders, adults, comm_rx)
-    }
-
-    /// Generate `MyNodeInfo` and `Comm`
-    pub(crate) fn gen_info(
-        age: u8,
-        prefix: Option<Prefix>,
-    ) -> (MyNodeInfo, Comm, Receiver<CommEvent>) {
-        let handle = Handle::current();
-        let _ = handle.enter();
-        let socket_addr: SocketAddr = (Ipv4Addr::LOCALHOST, 0).into();
-        let (comm, rx) = Comm::new(socket_addr, None).expect("failed  to create comm");
-        let info = MyNodeInfo::new(
-            gen_keypair(&prefix.unwrap_or_default().range_inclusive(), age),
-            comm.socket_addr(),
-        );
-        (info, comm, rx)
-    }
-
-    /// Creates a single `MyNode` instance
-    pub(crate) fn build_a_node_instance(
-        info: &MyNodeInfo,
-        comm: &Comm,
-        network_knowledge: &NetworkKnowledge,
-    ) -> MyNode {
-        // enter the current tokio runtime
-        let handle = Handle::current();
-        let _ = handle.enter();
-
-        let (min_capacity, max_capacity, root_storage_dir) =
-            create_test_capacity_and_root_storage().expect("Failed to create root storage");
-
-        MyNode::new(
-            comm.clone(),
-            info.keypair.clone(),
-            bls::SecretKey::random().public_key(),
-            network_knowledge.clone(),
-            None,
-            UsedSpace::new(min_capacity, max_capacity),
-            root_storage_dir,
-            mpsc::channel(10).0,
-        )
-        .expect("Failed to create MyNode")
-    }
-
     // Creates a single `MyNode` instance
     fn build_my_node_instance(
         &self,
@@ -824,10 +652,6 @@ impl TestNetwork {
         comm: &Comm,
         sk_share: &Option<SectionKeyShare>,
     ) -> Result<MyNode> {
-        // enter the current tokio runtime
-        let handle = Handle::current();
-        let _ = handle.enter();
-
         let (min_capacity, max_capacity, root_storage_dir) =
             create_test_capacity_and_root_storage().wrap_err("Failed to create root storage")?;
         let mut my_node = MyNode::new(
@@ -983,5 +807,63 @@ impl TestNetwork {
         self.nodes
             .get(&prefix)
             .ok_or_else(|| eyre!("Nodes not found for {prefix:?}"))
+    }
+}
+
+/// Expand TestSapBuilder to support `Comms`
+trait WithComms {
+    #[allow(clippy::type_complexity)]
+    fn build_with_comm(
+        self,
+        rng: impl RngCore,
+    ) -> (
+        SectionAuthorityProvider,
+        SecretKeySet,
+        Vec<(MyNodeInfo, Comm)>,
+        Vec<(MyNodeInfo, Comm)>,
+        TestCommRx,
+    );
+}
+impl WithComms for TestSapBuilder {
+    /// Build the final SAP with the provided rng. Also returns the `SecretKeySet` used by the SAP along with the
+    /// set of elder, adult nodes.
+    fn build_with_comm(
+        self,
+        rng: impl RngCore,
+    ) -> (
+        SectionAuthorityProvider,
+        SecretKeySet,
+        Vec<(MyNodeInfo, Comm)>,
+        Vec<(MyNodeInfo, Comm)>,
+        TestCommRx,
+    ) {
+        // Todo: use custom rng to generate the random nodes. `gen_keypair` requires `rand-0.7`
+        // version and `SecretKeySet` requires `rand-0.8`; wait for the other one to be bumped.
+        let (elder_nodes, adult_nodes, comm_rx) = gen_node_infos_with_comm(
+            &self.prefix,
+            self.elder_count,
+            self.adult_count,
+            self.elder_age_pattern.as_deref(),
+            self.adult_age_pattern.as_deref(),
+        );
+        let members = elder_nodes
+            .iter()
+            .chain(adult_nodes.iter())
+            .map(|i| NodeState::joined(i.0.id(), None));
+
+        let sk_set = if let Some(sk) = self.sk_set {
+            sk
+        } else {
+            gen_sk_set(rng, self.elder_count, self.sk_threshold_size)
+        };
+
+        let sap = SectionAuthorityProvider::new(
+            elder_nodes.iter().map(|i| i.0.id()),
+            self.prefix,
+            members,
+            sk_set.public_keys(),
+            self.membership_gen as u64,
+        );
+        (sap, sk_set, elder_nodes, adult_nodes, comm_rx)
     }
 }
