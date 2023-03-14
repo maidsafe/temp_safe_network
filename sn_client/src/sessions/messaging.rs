@@ -313,6 +313,60 @@ impl Session {
         })
     }
 
+    // ------------------------------
+    //   -------- Queries ---------
+    // ------------------------------
+
+    #[instrument(
+        skip(self, auth, payload),
+        level = "debug",
+        name = "session send single query"
+    )]
+    #[allow(clippy::too_many_arguments)]
+    /// Send a `DataQuery` to a single node in the network, awaiting the response.
+    pub(crate) async fn send_single_query(
+        &self,
+        query: DataQuery,
+        auth: ClientAuth,
+        payload: Bytes,
+        dst_section: bls::PublicKey,
+        recipient: NodeId,
+    ) -> Result<QueryResponse> {
+        let endpoint = self.endpoint.clone();
+
+        let chunk_addr = if let DataQuery::GetChunk(address) = query {
+            Some(address)
+        } else {
+            None
+        };
+
+        let wire_msg = WireMsg::new_msg(
+            MsgId::new(),
+            payload,
+            MsgKind::Client {
+                auth,
+                is_spend: matches!(query, DataQuery::Spentbook(SpendQuery::GetFees(_))),
+                query_index: None,
+            },
+            Dst {
+                name: query.dst_name(),
+                section_key: dst_section,
+            },
+        );
+
+        debug!(
+            "Sending query {:?}, from {}, {query:?} to \
+            node {recipient} in section {dst_section:?}",
+            wire_msg.msg_id(),
+            endpoint.local_addr(),
+        );
+
+        let msg_id = wire_msg.msg_id();
+        let send_query_tasks = self.send_msg(vec![recipient], wire_msg).await?;
+        self.check_query_responses(msg_id, vec![recipient], chunk_addr, send_query_tasks)
+            .await
+    }
+
     #[instrument(
         skip(self, auth, payload),
         level = "debug",
@@ -341,7 +395,7 @@ impl Session {
         let (section_pk, elders) = if let Some(section_info) = dst_section_info {
             section_info
         } else {
-            self.get_query_elders(dst).await?
+            self.get_data_query_elders(dst).await?
         };
 
         let elders_len = elders.len();
@@ -514,18 +568,24 @@ impl Session {
         }
     }
 
-    /// Get DataSection elders details. Resort to own section if DataSection is not available.
-    /// Takes a random subset (NUM_OF_ELDERS_SUBSET_FOR_QUERIES) of the avialable elders as targets
-    pub(crate) async fn get_query_elders(
+    /// Get all dst section elders details. Resort to own section if dst section is not available.
+    pub(crate) async fn get_all_elders_of_dst(
         &self,
         dst: XorName,
     ) -> Result<(bls::PublicKey, Vec<NodeId>)> {
-        let sap = self.network.read().await.closest(&dst, None).cloned();
-        let (section_pk, mut elders) = if let Some(sap) = &sap {
-            (sap.section_key(), sap.elders_vec())
-        } else {
-            return Err(Error::NoNetworkKnowledge(dst));
-        };
+        match self.network.read().await.closest(&dst, None) {
+            Some(sap) => Ok((sap.section_key(), sap.elders_vec())),
+            None => Err(Error::NoNetworkKnowledge(dst)),
+        }
+    }
+
+    /// Get DataSection elders details. Resort to own section if DataSection is not available.
+    /// Takes a random subset (NUM_OF_ELDERS_SUBSET_FOR_QUERIES) of the avialable elders as targets
+    pub(crate) async fn get_data_query_elders(
+        &self,
+        dst: XorName,
+    ) -> Result<(bls::PublicKey, Vec<NodeId>)> {
+        let (section_pk, mut elders) = self.get_all_elders_of_dst(dst).await?;
 
         elders.shuffle(&mut OsRng);
 

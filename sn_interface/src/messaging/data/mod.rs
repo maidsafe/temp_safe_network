@@ -148,6 +148,22 @@ pub enum QueryResponse {
 }
 
 impl QueryResponse {
+    /// Returns true if the result returned is an error.
+    pub fn is_error(&self) -> bool {
+        use QueryResponse::*;
+        match self {
+            GetChunk(r) => r.is_err(),
+            GetRegister(r) => r.is_err(),
+            GetRegisterEntry(r) => r.is_err(),
+            GetRegisterOwner(r) => r.is_err(),
+            ReadRegister(r) => r.is_err(),
+            GetRegisterPolicy(r) => r.is_err(),
+            GetRegisterUserPermissions(r) => r.is_err(),
+            GetSpentProofShares(r) => r.is_err(),
+            GetFees(r) => r.is_err(),
+        }
+    }
+
     /// Returns true if the result returned is DataNotFound
     pub fn is_data_not_found(&self) -> bool {
         use QueryResponse::*;
