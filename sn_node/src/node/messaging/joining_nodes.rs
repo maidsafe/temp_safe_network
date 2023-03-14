@@ -13,7 +13,7 @@ use crate::node::{
 use qp2p::SendStream;
 use sn_interface::{
     messaging::{
-        system::{JoinRejectReason, JoinResponse, NodeMsg},
+        system::{JoinResponse, NodeMsg},
         MsgId,
     },
     network_knowledge::{NodeState, RelocationProof, MIN_ADULT_AGE},
@@ -77,9 +77,7 @@ impl MyNode {
 
             if !context.joins_allowed {
                 trace!("Rejecting join request from {node_id} - joins currently not allowed.");
-                let msg = NodeMsg::JoinResponse(JoinResponse::Rejected(
-                    JoinRejectReason::JoinsDisallowed,
-                ));
+                let msg = NodeMsg::JoinResponse(JoinResponse::JoinsDisallowed);
                 trace!("{}", LogMarker::SendJoinRejected);
                 trace!("Sending {msg:?} to {node_id}");
 

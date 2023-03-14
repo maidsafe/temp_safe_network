@@ -188,9 +188,9 @@ impl MyNode {
                 }
 
                 match join_response {
-                    JoinResponse::Rejected(reason) => Err(super::Error::RejoinRequired(
-                        RejoinReason::from_reject_reason(reason),
-                    )),
+                    JoinResponse::JoinsDisallowed => {
+                        Err(super::Error::RejoinRequired(RejoinReason::JoinsDisallowed))
+                    }
                     JoinResponse::Approved(decision) => {
                         info!("{}", LogMarker::ReceivedJoinApproval);
                         let target_sap = context.network_knowledge.signed_sap();

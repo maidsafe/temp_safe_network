@@ -44,10 +44,7 @@ mod tests {
     use sn_comms::CommEvent;
     use sn_interface::{
         elder_count, init_logger,
-        messaging::{
-            system::{JoinRejectReason, JoinResponse},
-            MsgId, NetworkMsg,
-        },
+        messaging::{system::JoinResponse, MsgId, NetworkMsg},
         network_knowledge::{MembershipState, NetworkKnowledge},
         types::Participant,
     };
@@ -356,7 +353,7 @@ mod tests {
             ..
         }) => {
             // the msg should be a rejection for joins disallowed
-            assert_matches!(msg, NodeMsg::JoinResponse(JoinResponse::Rejected(JoinRejectReason::JoinsDisallowed)));
+            assert_matches!(msg, NodeMsg::JoinResponse(JoinResponse::JoinsDisallowed));
             // the recipient should be the joining node
             assert_matches!(recipients, Recipients::Single(recipient) => {
                 assert_eq!(recipient, &Participant::from_node(joiner_node_id));

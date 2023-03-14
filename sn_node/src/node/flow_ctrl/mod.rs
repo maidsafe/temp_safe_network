@@ -31,14 +31,13 @@ use crate::node::{
 use sn_comms::{CommEvent, MsgReceived};
 use sn_fault_detection::FaultDetection;
 use sn_interface::{
-    messaging::system::{JoinRejectReason, NodeDataCmd, NodeMsg},
+    messaging::system::{NodeDataCmd, NodeMsg},
     messaging::{AntiEntropyMsg, NetworkMsg},
     types::{log_markers::LogMarker, DataAddress, NodeId, Participant},
 };
 
 use std::{
     collections::BTreeSet,
-    net::SocketAddr,
     time::{Duration, Instant},
 };
 use tokio::sync::mpsc::{self, Receiver, Sender};
@@ -56,18 +55,6 @@ pub enum RejoinReason {
     JoinsDisallowed,
     /// Happens when already part of the network; we need to start from scratch.
     RemovedFromSection,
-    /// Unrecoverable error, requires node operator network config.
-    NodeNotReachable(SocketAddr),
-}
-
-impl RejoinReason {
-    pub(crate) fn from_reject_reason(reason: JoinRejectReason) -> RejoinReason {
-        use JoinRejectReason::*;
-        match reason {
-            JoinsDisallowed => RejoinReason::JoinsDisallowed,
-            NodeNotReachable(add) => RejoinReason::NodeNotReachable(add),
-        }
-    }
 }
 
 /// Flow ctrl of node cmds by . This determines if to run in blocking
