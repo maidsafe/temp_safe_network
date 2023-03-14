@@ -122,7 +122,7 @@ async fn start_node(
         data_replication_receiver,
         (fault_cmds_sender, fault_cmds_receiver),
     )
-    .await;
+    .await?;
 
     info!("Node {:?} join has been accepted.", node_name);
     let root_dir_buf = config.root_dir()?;

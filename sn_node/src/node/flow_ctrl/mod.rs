@@ -98,7 +98,7 @@ impl FlowCtrl {
         incoming_msg_events: Receiver<CommEvent>,
         data_replication_receiver: Receiver<(Vec<DataAddress>, NodeId)>,
         fault_cmds_channels: (Sender<FaultsCmd>, Receiver<FaultsCmd>),
-    ) -> (CmdChannel, Receiver<RejoinReason>) {
+    ) -> Result<(CmdChannel, Receiver<RejoinReason>)> {
         let node_context = node.context();
         let (blocking_cmd_sender_channel, mut blocking_cmds_receiver) =
             mpsc::channel(CMD_CHANNEL_SIZE);
@@ -154,10 +154,11 @@ impl FlowCtrl {
                 node,
                 &mut cmd_ctrl,
                 join_retry_timeout,
+                flow_ctrl_cmd_sender.clone(), // sending of updates to context
                 &mut blocking_cmds_receiver,
                 &rejoin_network_tx,
             )
-            .await;
+            .await?;
 
         let _handle = tokio::task::spawn(flow_ctrl.process_blocking_cmds(
             node,
@@ -174,7 +175,7 @@ impl FlowCtrl {
         )
         .await;
 
-        (cmd_channel_for_msgs, rejoin_network_rx)
+        Ok((cmd_channel_for_msgs, rejoin_network_rx))
     }
 
     /// This runs the join process until we detect we are a network node
@@ -184,9 +185,10 @@ impl FlowCtrl {
         mut node: MyNode,
         cmd_ctrl: &mut CmdCtrl,
         join_retry_timeout: Duration,
+        flow_ctrl_cmd_processing: Sender<FlowCtrlCmd>,
         blocking_cmds_receiver: &mut Receiver<(Cmd, Vec<usize>)>,
         rejoin_network_tx: &Sender<RejoinReason>,
-    ) -> MyNode {
+    ) -> Result<MyNode> {
         let mut is_member = false;
         let preprocess_cmd_channel = self.preprocess_cmd_sender_channel.clone();
 
@@ -207,6 +209,14 @@ impl FlowCtrl {
                         rejoin_network_tx.clone(),
                     )
                     .await;
+
+                // update our context in flow ctrl cmd processor with each cmd
+                flow_ctrl_cmd_processing
+                    .send(FlowCtrlCmd::UpdateContext(node.context()))
+                    .await
+                    .map_err(|e| {
+                        Error::TokioChannel(format!("cmd_processing send failed {:?}", e))
+                    })?;
             }
 
             if is_member {
@@ -230,7 +240,7 @@ impl FlowCtrl {
             tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
         }
 
-        node
+        Ok(node)
     }
 
     // Helper to send the TryJoinNetwork cmd
