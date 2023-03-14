@@ -9,8 +9,7 @@
 use crate::subcommands::OutputFmt;
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
-use clap::Parser;
-use color_eyre::{eyre::bail, eyre::eyre, eyre::WrapErr, Help, Report, Result};
+use color_eyre::{eyre::bail, eyre::eyre, eyre::WrapErr, Help, Result};
 use comfy_table::Table;
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
@@ -22,8 +21,6 @@ use std::{
     fmt,
     io::Write,
     path::{Path, PathBuf},
-    thread,
-    time::Duration,
 };
 use tempfile::NamedTempFile;
 use tokio::fs;
@@ -31,49 +28,6 @@ use tracing::debug;
 use url::Url;
 
 const REMOTE_RETRY_COUNT: usize = 3;
-
-/// Provides an interface for calling a launcher tool for launching and joining the network.
-///
-/// There will only be 2 implementations of this: one that uses the `sn_launch_tool` and another
-/// that uses a fake launch tool for use in unit tests.
-///
-/// The only reason the trait exists is for enabling unit testing.
-pub trait NetworkLauncher {
-    fn launch(&mut self, args: Vec<String>, interval: u64) -> Result<(), Report>;
-    fn join(&mut self, args: Vec<String>) -> Result<(), Report>;
-}
-
-/// A network launcher based on the `sn_launch_tool`, which provides an implementation of a
-/// `NetworkLauncher`.
-///
-/// This is just a thin wrapper around the launch tool.
-#[derive(Default)]
-pub struct SnLaunchToolNetworkLauncher {}
-impl NetworkLauncher for SnLaunchToolNetworkLauncher {
-    fn launch(&mut self, args: Vec<String>, interval: u64) -> Result<(), Report> {
-        debug!("Running network launch tool with args: {:?}", args);
-        println!("Starting nodes to join the Safe network...");
-        sn_launch_tool::Launch::from_iter_safe(&args)
-            .map_err(|e| eyre!(e))
-            .and_then(|launch| launch.run())
-            .wrap_err("Error launching node")?;
-
-        let interval_duration = Duration::from_secs(interval * 15);
-        thread::sleep(interval_duration);
-
-        Ok(())
-    }
-
-    fn join(&mut self, args: Vec<String>) -> Result<(), Report> {
-        debug!("Running network launch tool with args: {:?}", args);
-        println!("Starting a node to join a Safe network...");
-        sn_launch_tool::Join::from_iter_safe(&args)
-            .map_err(|e| eyre!(e))
-            .and_then(|launch| launch.run())
-            .wrap_err("Error launching node")?;
-        Ok(())
-    }
-}
 
 #[derive(Deserialize, Debug, Serialize, Clone)]
 pub enum NetworkInfo {

@@ -389,7 +389,7 @@ mod test {
         assert_eq!(testnet.node_bin_path, PathBuf::from("safenode"));
         assert_eq!(testnet.node_launch_interval, 30000);
         assert_eq!(testnet.nodes_dir_path, PathBuf::from("local-test-network"));
-        assert_eq!(testnet.flamegraph_mode, false);
+        assert!(testnet.flamegraph_mode);
         assert_eq!(testnet.node_count, 0);
 
         Ok(())
@@ -420,7 +420,7 @@ mod test {
         assert_eq!(testnet.node_bin_path, PathBuf::from("safenode"));
         assert_eq!(testnet.node_launch_interval, 30000);
         assert_eq!(testnet.nodes_dir_path, nodes_dir.to_path_buf());
-        assert_eq!(testnet.flamegraph_mode, false);
+        assert!(testnet.flamegraph_mode);
         assert_eq!(testnet.node_count, 20);
 
         Ok(())
@@ -454,7 +454,7 @@ mod test {
         assert_eq!(testnet.node_bin_path, PathBuf::from("safenode"));
         assert_eq!(testnet.node_launch_interval, 30000);
         assert_eq!(testnet.nodes_dir_path, nodes_dir.to_path_buf());
-        assert_eq!(testnet.flamegraph_mode, false);
+        assert!(testnet.flamegraph_mode);
         assert_eq!(testnet.node_count, 20);
 
         Ok(())

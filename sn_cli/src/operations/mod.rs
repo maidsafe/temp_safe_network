@@ -7,7 +7,4 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 pub mod auth_and_connect;
-// pub mod auth_daemon;
 pub mod config;
-pub mod helpers;
-pub mod node;

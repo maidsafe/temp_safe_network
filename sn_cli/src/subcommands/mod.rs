@@ -14,7 +14,6 @@ pub mod dog;
 pub mod files;
 pub mod keys;
 pub mod networks;
-pub mod node;
 pub mod nrs;
 pub mod safe_id;
 pub mod setup;
@@ -121,12 +120,5 @@ pub enum SubCommands {
         /// Do not prompt to confirm the update
         #[clap(short = 'y', long = "no-confirm")]
         no_confirm: bool,
-    },
-    #[clap(name = "node", global_settings(&[AppSettings::DisableVersion]))]
-    /// Commands to manage Safe Network Nodes
-    Node {
-        /// subcommands
-        #[clap(subcommand)]
-        cmd: Option<node::NodeSubCommands>,
     },
 }
