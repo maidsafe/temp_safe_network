@@ -29,20 +29,15 @@
 
 use clap::Parser;
 use color_eyre::{eyre::eyre, Help, Result};
-use std::path::PathBuf;
-use std::process::{Command, Stdio};
-use testnet::Testnet;
+use std::{
+    path::PathBuf,
+    process::{Command, Stdio},
+};
+use testnet::{Testnet, DEFAULT_NODE_LAUNCH_INTERVAL, SAFENODE_BIN_NAME};
 use tracing::{debug, info};
 use tracing_subscriber::EnvFilter;
 
-#[cfg(not(target_os = "windows"))]
-const SAFE_NODE_EXECUTABLE: &str = "safenode";
-
-#[cfg(target_os = "windows")]
-const SAFE_NODE_EXECUTABLE: &str = "safenode.exe";
-
 const BASE_TRACING_DIRECTIVES: &str = "testnet=debug";
-const DEFAULT_NODE_LAUNCH_INTERVAL: u64 = 5000;
 const DEFAULT_NODE_COUNT: u32 = 30;
 
 #[derive(Debug, clap::StructOpt)]
@@ -119,9 +114,9 @@ async fn main() -> Result<()> {
         build_node().await?;
         node_bin_path.push("target");
         node_bin_path.push("release");
-        node_bin_path.push(SAFE_NODE_EXECUTABLE);
+        node_bin_path.push(SAFENODE_BIN_NAME);
     } else {
-        node_bin_path.push(SAFE_NODE_EXECUTABLE);
+        node_bin_path.push(SAFENODE_BIN_NAME);
     }
 
     if args.join_network {

@@ -13,6 +13,14 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use tracing::{debug, info};
 
+pub const DEFAULT_NODE_LAUNCH_INTERVAL: u64 = 5000;
+#[cfg(not(target_os = "windows"))]
+pub const SAFENODE_BIN_NAME: &str = "safenode";
+#[cfg(target_os = "windows")]
+pub const SAFENODE_BIN_NAME: &str = "safenode.exe";
+const GENESIS_NODE_DIR_NAME: &str = "sn-node-genesis";
+const TESTNET_DIR_NAME: &str = "local-test-network";
+
 /// This trait exists for unit testing.
 ///
 /// It enables us to test that nodes are launched with the correct arguments without actually
@@ -96,7 +104,7 @@ impl TestnetBuilder {
             .ok_or_else(|| eyre!("Failed to obtain user's home path"))?
             .join(".safe")
             .join("node")
-            .join("local-test-network");
+            .join(TESTNET_DIR_NAME);
         let nodes_dir_path = self
             .nodes_dir_path
             .as_ref()
@@ -110,14 +118,17 @@ impl TestnetBuilder {
         let testnet = Testnet::new(
             self.node_bin_path
                 .as_ref()
-                .unwrap_or(&PathBuf::from("safenode"))
+                .unwrap_or(&PathBuf::from(SAFENODE_BIN_NAME))
                 .clone(),
-            self.node_launch_interval.unwrap_or(5000),
+            self.node_launch_interval
+                .unwrap_or(DEFAULT_NODE_LAUNCH_INTERVAL),
             nodes_dir_path.clone(),
             self.flamegraph_mode,
             Box::new(node_launcher),
         )?;
-        let network_contacts_path = nodes_dir_path.join("sn-node-genesis").join("section_tree");
+        let network_contacts_path = nodes_dir_path
+            .join(GENESIS_NODE_DIR_NAME)
+            .join("section_tree");
         Ok((testnet, network_contacts_path))
     }
 }
@@ -155,7 +166,7 @@ impl Testnet {
                         .ok_or_else(|| eyre!("Failed to obtain dir name"))?;
                     // This excludes any directories the user may have created under the network
                     // data directory path, either intentionally or unintentionally.
-                    if dir_name.starts_with("sn-node-") && dir_name != "sn-node-genesis" {
+                    if dir_name.starts_with("sn-node-") && dir_name != GENESIS_NODE_DIR_NAME {
                         node_count += 1;
                     }
                 }
@@ -379,17 +390,17 @@ mod test {
         node_launcher.expect_launch().returning(|_, _| Ok(()));
 
         let testnet = Testnet::new(
-            PathBuf::from("safenode"),
+            PathBuf::from(SAFENODE_BIN_NAME),
             30000,
-            PathBuf::from("local-test-network"),
+            PathBuf::from(TESTNET_DIR_NAME),
             false,
             Box::new(node_launcher),
         )?;
 
-        assert_eq!(testnet.node_bin_path, PathBuf::from("safenode"));
+        assert_eq!(testnet.node_bin_path, PathBuf::from(SAFENODE_BIN_NAME));
         assert_eq!(testnet.node_launch_interval, 30000);
-        assert_eq!(testnet.nodes_dir_path, PathBuf::from("local-test-network"));
-        assert!(testnet.flamegraph_mode);
+        assert_eq!(testnet.nodes_dir_path, PathBuf::from(TESTNET_DIR_NAME));
+        assert!(!testnet.flamegraph_mode);
         assert_eq!(testnet.node_count, 0);
 
         Ok(())
@@ -399,7 +410,7 @@ mod test {
     fn new_should_create_a_testnet_with_twenty_nodes_when_a_previous_network_exists() -> Result<()>
     {
         let tmp_data_dir = assert_fs::TempDir::new()?;
-        let nodes_dir = tmp_data_dir.child("local-test-network");
+        let nodes_dir = tmp_data_dir.child(TESTNET_DIR_NAME);
         let genesis_data_dir = nodes_dir.child("sn-node-genesis");
         genesis_data_dir.create_dir_all()?;
         for i in 1..=20 {
@@ -410,17 +421,17 @@ mod test {
         let mut node_launcher = MockNodeLauncher::new();
         node_launcher.expect_launch().returning(|_, _| Ok(()));
         let testnet = Testnet::new(
-            PathBuf::from("safenode"),
+            PathBuf::from(SAFENODE_BIN_NAME),
             30000,
             nodes_dir.to_path_buf(),
             false,
             Box::new(node_launcher),
         )?;
 
-        assert_eq!(testnet.node_bin_path, PathBuf::from("safenode"));
+        assert_eq!(testnet.node_bin_path, PathBuf::from(SAFENODE_BIN_NAME));
         assert_eq!(testnet.node_launch_interval, 30000);
         assert_eq!(testnet.nodes_dir_path, nodes_dir.to_path_buf());
-        assert!(testnet.flamegraph_mode);
+        assert!(!testnet.flamegraph_mode);
         assert_eq!(testnet.node_count, 20);
 
         Ok(())
@@ -430,7 +441,7 @@ mod test {
     fn new_should_create_a_testnet_ignoring_random_directories_in_the_node_data_dir() -> Result<()>
     {
         let tmp_data_dir = assert_fs::TempDir::new()?;
-        let nodes_dir = tmp_data_dir.child("local-test-network");
+        let nodes_dir = tmp_data_dir.child(TESTNET_DIR_NAME);
         let genesis_data_dir = nodes_dir.child("sn-node-genesis");
         genesis_data_dir.create_dir_all()?;
         for i in 1..=20 {
@@ -444,17 +455,17 @@ mod test {
         node_launcher.expect_launch().returning(|_, _| Ok(()));
 
         let testnet = Testnet::new(
-            PathBuf::from("safenode"),
+            PathBuf::from(SAFENODE_BIN_NAME),
             30000,
             nodes_dir.to_path_buf(),
             false,
             Box::new(node_launcher),
         )?;
 
-        assert_eq!(testnet.node_bin_path, PathBuf::from("safenode"));
+        assert_eq!(testnet.node_bin_path, PathBuf::from(SAFENODE_BIN_NAME));
         assert_eq!(testnet.node_launch_interval, 30000);
         assert_eq!(testnet.nodes_dir_path, nodes_dir.to_path_buf());
-        assert!(testnet.flamegraph_mode);
+        assert!(!testnet.flamegraph_mode);
         assert_eq!(testnet.node_count, 20);
 
         Ok(())
@@ -463,12 +474,12 @@ mod test {
     #[test]
     fn launch_genesis_should_launch_the_genesis_node() -> Result<()> {
         let tmp_data_dir = assert_fs::TempDir::new()?;
-        let node_bin_path = tmp_data_dir.child("safenode");
+        let node_bin_path = tmp_data_dir.child(SAFENODE_BIN_NAME);
         node_bin_path.write_binary(b"fake safenode code")?;
-        let nodes_dir = tmp_data_dir.child("local-test-network");
+        let nodes_dir = tmp_data_dir.child(TESTNET_DIR_NAME);
         nodes_dir.create_dir_all()?;
         let genesis_data_dir = nodes_dir
-            .child("sn-node-genesis")
+            .child(GENESIS_NODE_DIR_NAME)
             .to_str()
             .ok_or_else(|| eyre!("Unable to obtain path"))?
             .to_string();
@@ -512,12 +523,12 @@ mod test {
     #[test]
     fn launch_genesis_should_launch_the_genesis_node_as_a_local_network() -> Result<()> {
         let tmp_data_dir = assert_fs::TempDir::new()?;
-        let node_bin_path = tmp_data_dir.child("safenode");
+        let node_bin_path = tmp_data_dir.child(SAFENODE_BIN_NAME);
         node_bin_path.write_binary(b"fake safenode code")?;
-        let nodes_dir = tmp_data_dir.child("local-test-network");
+        let nodes_dir = tmp_data_dir.child(TESTNET_DIR_NAME);
         nodes_dir.create_dir_all()?;
         let genesis_data_dir = nodes_dir
-            .child("sn-node-genesis")
+            .child(GENESIS_NODE_DIR_NAME)
             .to_str()
             .ok_or_else(|| eyre!("Unable to obtain path"))?
             .to_string();
@@ -558,9 +569,9 @@ mod test {
     #[test]
     fn launch_genesis_should_create_the_genesis_data_directory() -> Result<()> {
         let tmp_data_dir = assert_fs::TempDir::new()?;
-        let node_bin_path = tmp_data_dir.child("safenode");
+        let node_bin_path = tmp_data_dir.child(SAFENODE_BIN_NAME);
         node_bin_path.write_binary(b"fake safenode code")?;
-        let nodes_dir = tmp_data_dir.child("local-test-network");
+        let nodes_dir = tmp_data_dir.child(TESTNET_DIR_NAME);
         nodes_dir.create_dir_all()?;
 
         let mut node_launcher = MockNodeLauncher::new();
@@ -578,7 +589,7 @@ mod test {
         );
 
         assert!(result.is_ok());
-        let genesis_data_dir = nodes_dir.child("sn-node-genesis");
+        let genesis_data_dir = nodes_dir.child(GENESIS_NODE_DIR_NAME);
         genesis_data_dir.assert(predicates::path::is_dir());
         Ok(())
     }
@@ -587,9 +598,9 @@ mod test {
     fn launch_genesis_should_create_the_genesis_data_directory_when_parents_are_missing(
     ) -> Result<()> {
         let tmp_data_dir = assert_fs::TempDir::new()?;
-        let node_bin_path = tmp_data_dir.child("safenode");
+        let node_bin_path = tmp_data_dir.child(SAFENODE_BIN_NAME);
         node_bin_path.write_binary(b"fake safenode code")?;
-        let nodes_dir = tmp_data_dir.child("local-test-network");
+        let nodes_dir = tmp_data_dir.child(TESTNET_DIR_NAME);
 
         let mut node_launcher = MockNodeLauncher::new();
         node_launcher.expect_launch().returning(|_, _| Ok(()));
@@ -606,7 +617,7 @@ mod test {
         );
 
         assert!(result.is_ok());
-        let genesis_data_dir = nodes_dir.child("sn-node-genesis");
+        let genesis_data_dir = nodes_dir.child(GENESIS_NODE_DIR_NAME);
         genesis_data_dir.assert(predicates::path::is_dir());
         Ok(())
     }
@@ -614,14 +625,15 @@ mod test {
     #[test]
     fn launch_genesis_with_flamegraph_mode_should_launch_the_genesis_node() -> Result<()> {
         let tmp_data_dir = assert_fs::TempDir::new()?;
-        let node_bin_path = tmp_data_dir.child("safenode");
+        let node_bin_path = tmp_data_dir.child(SAFENODE_BIN_NAME);
         node_bin_path.write_binary(b"fake safenode code")?;
-        let nodes_dir = tmp_data_dir.child("local-test-network");
+        let nodes_dir = tmp_data_dir.child(TESTNET_DIR_NAME);
         nodes_dir.create_dir_all()?;
-        let genesis_data_dir = nodes_dir.child("sn-node-genesis");
-        let graph_output_file = genesis_data_dir.child("sn-node-genesis-flame.svg");
+        let genesis_data_dir = nodes_dir.child(GENESIS_NODE_DIR_NAME);
+        let graph_output_file =
+            genesis_data_dir.child(format!("{GENESIS_NODE_DIR_NAME}-flame.svg"));
         let genesis_data_dir_str = nodes_dir
-            .child("sn-node-genesis")
+            .child(GENESIS_NODE_DIR_NAME)
             .to_str()
             .ok_or_else(|| eyre!("Unable to obtain path"))?
             .to_string();
@@ -642,7 +654,7 @@ mod test {
                         .to_string(),
                     "--root".to_string(),
                     "--bin".to_string(),
-                    "safenode".to_string(),
+                    SAFENODE_BIN_NAME.to_string(),
                     "--".to_string(),
                     "--first".to_string(),
                     "10.0.0.1:12000".to_string(),
@@ -676,10 +688,10 @@ mod test {
     #[test]
     fn launch_genesis_should_return_error_if_we_are_using_an_existing_network() -> Result<()> {
         let tmp_data_dir = assert_fs::TempDir::new()?;
-        let node_bin_path = tmp_data_dir.child("safenode");
+        let node_bin_path = tmp_data_dir.child(SAFENODE_BIN_NAME);
         node_bin_path.write_binary(b"fake safenode code")?;
-        let nodes_dir = tmp_data_dir.child("local-test-network");
-        let genesis_data_dir = nodes_dir.child("sn-node-genesis");
+        let nodes_dir = tmp_data_dir.child(TESTNET_DIR_NAME);
+        let genesis_data_dir = nodes_dir.child(GENESIS_NODE_DIR_NAME);
         genesis_data_dir.create_dir_all()?;
         for i in 1..=20 {
             let node_dir = nodes_dir.child(format!("sn-node-{i}"));
@@ -716,9 +728,9 @@ mod test {
     #[test]
     fn launch_nodes_should_launch_the_specified_number_of_nodes() -> Result<()> {
         let tmp_data_dir = assert_fs::TempDir::new()?;
-        let node_bin_path = tmp_data_dir.child("safenode");
+        let node_bin_path = tmp_data_dir.child(SAFENODE_BIN_NAME);
         node_bin_path.write_binary(b"fake safenode code")?;
-        let nodes_dir = tmp_data_dir.child("local-test-network");
+        let nodes_dir = tmp_data_dir.child(TESTNET_DIR_NAME);
         nodes_dir.create_dir_all()?;
         let network_contacts_file = tmp_data_dir.child("network-contacts");
         network_contacts_file.write_str("section tree content")?;
@@ -769,9 +781,9 @@ mod test {
     #[test]
     fn launch_nodes_should_create_directories_for_each_node() -> Result<()> {
         let tmp_data_dir = assert_fs::TempDir::new()?;
-        let node_bin_path = tmp_data_dir.child("safenode");
+        let node_bin_path = tmp_data_dir.child(SAFENODE_BIN_NAME);
         node_bin_path.write_binary(b"fake safenode code")?;
-        let nodes_dir = tmp_data_dir.child("local-test-network");
+        let nodes_dir = tmp_data_dir.child(TESTNET_DIR_NAME);
         nodes_dir.create_dir_all()?;
         let network_contacts_file = tmp_data_dir.child("network-contacts");
         network_contacts_file.write_str("section tree content")?;
@@ -803,9 +815,9 @@ mod test {
     #[test]
     fn launch_nodes_should_create_directories_when_parents_are_missing() -> Result<()> {
         let tmp_data_dir = assert_fs::TempDir::new()?;
-        let node_bin_path = tmp_data_dir.child("safenode");
+        let node_bin_path = tmp_data_dir.child(SAFENODE_BIN_NAME);
         node_bin_path.write_binary(b"fake safenode code")?;
-        let nodes_dir = tmp_data_dir.child("local-test-network");
+        let nodes_dir = tmp_data_dir.child(TESTNET_DIR_NAME);
         let network_contacts_file = tmp_data_dir.child("network-contacts");
         network_contacts_file.write_str("section tree content")?;
 
@@ -836,9 +848,9 @@ mod test {
     #[test]
     fn launch_nodes_with_flamegraph_should_launch_the_specified_number_of_nodes() -> Result<()> {
         let tmp_data_dir = assert_fs::TempDir::new()?;
-        let node_bin_path = tmp_data_dir.child("safenode");
+        let node_bin_path = tmp_data_dir.child(SAFENODE_BIN_NAME);
         node_bin_path.write_binary(b"fake safenode code")?;
-        let nodes_dir = tmp_data_dir.child("local-test-network");
+        let nodes_dir = tmp_data_dir.child(TESTNET_DIR_NAME);
         nodes_dir.create_dir_all()?;
         let network_contacts_file = tmp_data_dir.child("network-contacts");
         network_contacts_file.write_str("section tree content")?;
@@ -866,7 +878,7 @@ mod test {
                         graph_output_file_path,
                         "--root".to_string(),
                         "--bin".to_string(),
-                        "safenode".to_string(),
+                        SAFENODE_BIN_NAME.to_string(),
                         "--".to_string(),
                         "--network-contacts-file".to_string(),
                         network_contacts_file.path().to_str().unwrap().to_string(),
@@ -900,9 +912,9 @@ mod test {
     #[test]
     fn launch_nodes_should_launch_the_specified_number_of_additional_nodes() -> Result<()> {
         let tmp_data_dir = assert_fs::TempDir::new()?;
-        let node_bin_path = tmp_data_dir.child("safenode");
+        let node_bin_path = tmp_data_dir.child(SAFENODE_BIN_NAME);
         node_bin_path.write_binary(b"fake safenode code")?;
-        let nodes_dir = tmp_data_dir.child("local-test-network");
+        let nodes_dir = tmp_data_dir.child(TESTNET_DIR_NAME);
         nodes_dir.create_dir_all()?;
         let network_contacts_file = tmp_data_dir.child("network-contacts");
         network_contacts_file.write_str("section tree content")?;
