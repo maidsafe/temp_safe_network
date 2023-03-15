@@ -195,7 +195,7 @@ impl MyNode {
                         info!("{}", LogMarker::ReceivedJoinApproval);
                         let target_sap = context.network_knowledge.signed_sap();
 
-                        if let Err(e) = decision.validate(&target_sap.public_key_set()) {
+                        if let Err(e) = decision.validate(&target_sap.section_key()) {
                             error!("Failed to validate with {target_sap:?}, dropping invalid join decision: {e:?}");
                             return Ok(vec![]);
                         }

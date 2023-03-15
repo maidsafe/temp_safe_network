@@ -162,7 +162,7 @@ fn section_signed_to_decision(section_signed: SectionSigned<NodeState>) -> Decis
     let mut proposals = BTreeMap::new();
     let _ = proposals.insert(section_signed.value, section_signed.sig.signature);
     Decision {
-        generation: 0, // TODO
+        generation: 0,
         proposals,
     }
 }

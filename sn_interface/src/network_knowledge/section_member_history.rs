@@ -361,7 +361,7 @@ mod tests {
         let mut proposals = BTreeMap::new();
         let _ = proposals.insert(section_signed.value, section_signed.sig.signature);
         Decision {
-            generation: 0, // TODO: hack
+            generation: 0,
             proposals,
         }
     }
