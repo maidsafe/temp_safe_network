@@ -43,7 +43,7 @@ use uluru::LRUCache;
 pub const DEFAULT_NETWORK_CONTACTS_FILE_NAME: &str = "default";
 
 // Maximum amount of Chunks to keep in our local Chunks cache.
-// Each Chunk is maximum types::MAX_CHUNK_SIZE_IN_BYTES, i.e. ~1MB
+// Each Chunk is at most self_encryption::MAX_CHUNK_SIZE.
 const CHUNK_CACHE_SIZE: usize = 50;
 
 // LRU cache to keep the Chunks we retrieve.
