@@ -4129,9 +4129,9 @@ dependencies = [
 
 [[package]]
 name = "sn_consensus"
-version = "3.3.2"
+version = "3.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "989b4a38a64c9f33a184286aa5861e7645af655446901470ee745b90cfb56ee8"
+checksum = "68aa5487b98437f08e4ccb0aeebdc700b816fe8fcbea817996603b1678e762d5"
 dependencies = [
  "bincode",
  "blsttc",

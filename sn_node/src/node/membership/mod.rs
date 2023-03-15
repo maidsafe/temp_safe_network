@@ -325,10 +325,10 @@ impl Membership {
             .history
             .iter() // history is a BTreeSet, .iter() is ordered by generation
             .filter(|(gen, _)| **gen >= from_gen)
-            .map(|(gen, (decision, c))| {
+            .map(|(gen, (_, c))| {
                 Ok(c.build_super_majority_vote(
-                    decision.votes.clone(),
-                    decision.faults.clone(),
+                    c.votes.values().cloned().collect(),
+                    c.faults.values().cloned().collect(),
                     *gen,
                 )?)
             })
