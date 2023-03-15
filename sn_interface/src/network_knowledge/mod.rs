@@ -161,10 +161,9 @@ pub struct NetworkKnowledge {
 fn section_signed_to_decision(section_signed: SectionSigned<NodeState>) -> Decision<NodeState> {
     let mut proposals = BTreeMap::new();
     let _ = proposals.insert(section_signed.value, section_signed.sig.signature);
-    Decision::<NodeState> {
-        votes: BTreeSet::new(),
+    Decision {
+        generation: 0, // TODO
         proposals,
-        faults: BTreeSet::new(),
     }
 }
 

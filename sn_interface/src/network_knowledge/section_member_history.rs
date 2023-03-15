@@ -158,7 +158,7 @@ mod tests {
     use eyre::Result;
     use rand::thread_rng;
     use sn_consensus::Decision;
-    use std::collections::{BTreeMap, BTreeSet};
+    use std::collections::BTreeMap;
     use xor_name::XorName;
 
     #[test]
@@ -355,14 +355,14 @@ mod tests {
         Ok(decisions)
     }
 
+    // TODO: remove this function
     // Convert SectionSigned to Decision
     fn section_signed_to_decision(section_signed: SectionSigned<NodeState>) -> Decision<NodeState> {
         let mut proposals = BTreeMap::new();
         let _ = proposals.insert(section_signed.value, section_signed.sig.signature);
-        Decision::<NodeState> {
-            votes: BTreeSet::new(),
+        Decision {
+            generation: 0, // TODO: hack
             proposals,
-            faults: BTreeSet::new(),
         }
     }
 }

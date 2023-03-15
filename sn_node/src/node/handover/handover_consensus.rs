@@ -68,10 +68,10 @@ impl Handover {
             .failed_consensus_rounds
             .iter()
             .filter(|(gen, _)| **gen >= from_gen)
-            .map(|(gen, (consensus, decision))| {
+            .map(|(gen, (consensus, _))| {
                 Ok(consensus.build_super_majority_vote(
-                    decision.votes.clone(),
-                    decision.faults.clone(),
+                    consensus.votes.values().cloned().collect(),
+                    consensus.faults.values().cloned().collect(),
                     *gen,
                 )?)
             })
@@ -184,7 +184,6 @@ mod tests {
     use super::*;
     use bls::SecretKeySet;
     use rand::{prelude::StdRng, SeedableRng};
-    use std::collections::BTreeSet;
 
     #[test]
     fn test_handle_empty_set_decision() {
@@ -203,9 +202,8 @@ mod tests {
         // section agrees on empty set
         let _ = nodes_handover_state.iter_mut().map(|state| {
             state.consensus.decision = Some(Decision {
-                votes: BTreeSet::new(),
+                generation: 0,
                 proposals: BTreeMap::new(),
-                faults: BTreeSet::new(),
             });
         });
 
