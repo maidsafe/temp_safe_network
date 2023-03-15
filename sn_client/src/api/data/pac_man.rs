@@ -12,7 +12,7 @@ use sn_interface::types::Chunk;
 use bincode::serialize;
 use bytes::Bytes;
 use rayon::prelude::*;
-use self_encryption::{DataMap, EncryptedChunk};
+use self_encryption::{DataMap, EncryptedChunk, MAX_CHUNK_SIZE};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use xor_name::XorName;
@@ -57,8 +57,8 @@ pub(crate) fn pack(
 
     let (address, additional_chunks) = loop {
         let chunk = to_chunk(chunk_content);
-        // If datamap chunk is less that 1MB return it so it can be directly sent to the network
-        if chunk.validate_size() {
+        // If datamap chunk is less than `MAX_CHUNK_SIZE` return it so it can be directly sent to the network
+        if MAX_CHUNK_SIZE >= chunk.serialised_size() {
             let name = *chunk.name();
             chunks.reverse();
             chunks.push(chunk);

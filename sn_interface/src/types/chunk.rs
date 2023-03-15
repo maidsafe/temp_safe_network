@@ -10,9 +10,6 @@ use super::{ChunkAddress, XorName};
 use bytes::Bytes;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-/// Maximum allowed size for a serialised Chunk to grow to.
-pub const MAX_CHUNK_SIZE_IN_BYTES: usize = 1024 * 1024 + 10 * 1024;
-
 /// Chunk, an immutable chunk of data
 #[derive(Hash, Eq, PartialEq, PartialOrd, Ord, Clone, custom_debug::Debug)]
 pub struct Chunk {
@@ -56,11 +53,6 @@ impl Chunk {
     /// Returns size of this chunk after serialisation.
     pub fn serialised_size(&self) -> usize {
         self.value.len()
-    }
-
-    /// Returns `true` if the size is valid.
-    pub fn validate_size(&self) -> bool {
-        self.serialised_size() <= MAX_CHUNK_SIZE_IN_BYTES
     }
 }
 

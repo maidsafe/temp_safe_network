@@ -30,7 +30,7 @@ pub use crate::messaging::{
 
 pub use address::{ChunkAddress, DataAddress, RegisterAddress, SpentbookAddress};
 pub use cache::Cache;
-pub use chunk::{Chunk, MAX_CHUNK_SIZE_IN_BYTES};
+pub use chunk::Chunk;
 pub use errors::{Error, Result};
 pub use identities::{ClientId, NodeId, Participant};
 pub use keys::{
