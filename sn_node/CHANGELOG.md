@@ -5,7 +5,49 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.80.0 (2023-03-16)
+
+### Refactor (BREAKING)
+
+ - <csr-id-4dca7700c0a017dbdeb53a0387f895c0dabd00cc/> improving sn_node public API and exposing NodeEvents
+   - Removing unnecessary `sn_node::core` mod.
+   - Moving `NodeContext` def to its own file separated from `MyNode` def.
+   - Replacing the channel which reports rejoin reasons on the public API
+   with a channel where NodeEvents are broadcasted, including a rejoin-required event type.
+   - An initial set of `NodeEvents` is defined and broadcasted by the sn_node flows.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 1 commit contributed to the release.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Improving sn_node public API and exposing NodeEvents ([`4dca770`](https://github.com/maidsafe/safe_network/commit/4dca7700c0a017dbdeb53a0387f895c0dabd00cc))
+</details>
+
 ## v0.79.0 (2023-03-16)
+
+<csr-id-71b6777db94fe696977c6cb7c8707f4c52b05156/>
+<csr-id-554e98fcd2bdb515a30fb502b12dd485c0750ca8/>
+<csr-id-f7e129c7b8908cbcac9da70117e0791f717da45a/>
+<csr-id-585ecad3f01fb26fbcb940ffeabe07ca50af3229/>
+<csr-id-48d01c8ed53f55e4c0a9e94f715c3964c505ed34/>
+<csr-id-5d7dec941b0514b46c2b627c0732be0763990422/>
+<csr-id-6319281e5021bce3d9e3d1f0aad6e413749a4ca5/>
+<csr-id-f19698e3726fb848ac40fb7cb4308c0bd5f9cc2a/>
+<csr-id-414670a541cd9392b07d998fd546a783c81133a4/>
+<csr-id-847703ef5c87db2b22fc21cd6252dcf9dd4a26e9/>
+<csr-id-807d69ef609decfe94230e2086144afc5cc56d7b/>
+<csr-id-1a8b9c9ba5b98c0f1176a0ccbce53d4acea8c84c/>
 
 ### Chore
 
@@ -22,6 +64,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-807d69ef609decfe94230e2086144afc5cc56d7b/> sn_interface-0.20.6/sn_comms-0.6.3/sn_client-0.82.3/sn_node-0.79.0/sn_cli-0.74.1
  - <csr-id-1a8b9c9ba5b98c0f1176a0ccbce53d4acea8c84c/> safenode renaming
 
+### Chore
+
+ - <csr-id-50f6ede2104025bd79de8922ca7f27c742cf52bb/> sn_interface-0.20.6/sn_comms-0.6.3/sn_client-0.82.3/sn_node-0.79.0/sn_cli-0.74.1
+
 ### New Features (BREAKING)
 
  - <csr-id-09dfed876b47ff6bfeb6e20ba6623bbbdc8af0f5/> sn_node -> safenode rename
@@ -30,8 +76,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 14 commits contributed to the release.
- - 13 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 15 commits contributed to the release.
+ - 14 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -41,6 +87,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Sn_interface-0.20.6/sn_comms-0.6.3/sn_client-0.82.3/sn_node-0.79.0/sn_cli-0.74.1 ([`50f6ede`](https://github.com/maidsafe/safe_network/commit/50f6ede2104025bd79de8922ca7f27c742cf52bb))
     - Revert "chore(release): sn_interface-0.20.6/sn_comms-0.6.3/sn_client-0.82.3/sn_node-0.79.0/sn_cli-0.74.1" ([`a24dca6`](https://github.com/maidsafe/safe_network/commit/a24dca63d1fde8c5e13fa7bbfadf71cda15af5c5))
     - Log duration for off-thread cmd handling ([`71b6777`](https://github.com/maidsafe/safe_network/commit/71b6777db94fe696977c6cb7c8707f4c52b05156))
     - Allow membership AE to happen off thread ([`554e98f`](https://github.com/maidsafe/safe_network/commit/554e98fcd2bdb515a30fb502b12dd485c0750ca8))
@@ -58,6 +105,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.78.6 (2023-03-16)
+
+<csr-id-ed26bc19831a28e2e13f63c77d26e0cd086cf85c/>
+<csr-id-57539fec4288cdd20672186dcfa49f7f6c9f686f/>
+<csr-id-907d2c67e5ce946ece0fd74509e7f5acf4f37673/>
+<csr-id-58ec99e9ed258c6e3f3a503e2cb78e31fb7e368b/>
+<csr-id-48bece3ca34640b98b9c28ea4006bfbeb236575f/>
+<csr-id-59bd1b1592ecad1af72c0a7182eea524f1ee841a/>
+<csr-id-5c19f7e9e9472c616de88d16ad244de0fa638bef/>
 
 ### Chore
 
@@ -128,6 +183,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.78.5 (2023-03-13)
+
+<csr-id-b85b03ba610d2457d521885d32824bee727ccdba/>
 
 ### Chore
 
