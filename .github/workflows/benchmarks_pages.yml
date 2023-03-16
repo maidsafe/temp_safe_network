@@ -52,7 +52,7 @@ jobs:
         timeout-minutes: 60
 
       - name: Start the network
-        run: ./target/release/testnet --interval 30000
+        run: ./target/release/testnet --node-path ./target/release/safenode --interval 30000
         id: section-startup
         env:
           RUST_LOG: "sn_node=trace"
