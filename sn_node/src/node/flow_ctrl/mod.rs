@@ -620,11 +620,15 @@ async fn handle_cmd(
                         new_cmds.push(cmd);
                     }
                 }
-                // NodeMsg::MembershipAE(gen) => {
-                //     if let Some(cmd) = MyNode::handle_membership_anti_entropy_request(membership, node_id, gen) {
-                //         new_cmds.push(cmd);
-                //     }
-                // }
+                NodeMsg::MembershipAE(gen) => {
+                    if let Some(cmd) = MyNode::handle_membership_anti_entropy_request(
+                        &context.membership,
+                        node_id,
+                        gen,
+                    ) {
+                        new_cmds.push(cmd);
+                    }
+                }
                 msg => {
                     trace!("Node msg not handled off thread, sending to blocking channel: {msg:?}");
                     if let Err(error) = mutating_cmd_channel
