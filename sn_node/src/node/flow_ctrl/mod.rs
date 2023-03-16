@@ -33,7 +33,7 @@ use sn_fault_detection::FaultDetection;
 use sn_interface::{
     messaging::system::{NodeDataCmd, NodeMsg},
     messaging::{AntiEntropyMsg, NetworkMsg},
-    types::{log_markers::LogMarker, DataAddress, NodeId, Participant},
+    types::{log_markers::LogMarker, ClientId, DataAddress, NodeId, Participant},
 };
 
 use std::{
@@ -570,8 +570,80 @@ async fn handle_cmd(
                 .await?,
             );
         }
+        Cmd::ProcessNodeMsg {
+            msg_id,
+            msg,
+            node_id,
+            send_stream,
+        } => {
+            match msg {
+                NodeMsg::NodeDataCmd(NodeDataCmd::StoreData(data)) => {
+                    // NB: We would only reach here if this is a Spentbook cmd.
+                    trace!(
+                        "Attempting to store data locally (off-thread): {:?}",
+                        data.address()
+                    );
+                    // TODO: proper err
+                    let Some(stream) = send_stream else {
+                        return Ok(())
+                    };
+                    // NB!! `sender` is actually a node here and should not be casted to ClientId! But since we are reusing the
+                    // `store_data_and_respond` fn which is used when a forwarded client cmd comes in, we have to cast to ClientId here.. TO BE FIXED.
+                    let sender = ClientId::from(Participant::from_node(node_id));
+                    // store data and respond w/ack on the response stream
+                    let cmds =
+                        MyNode::store_data_and_respond(&context, data, stream, sender, msg_id)
+                            .await?;
+                    new_cmds.extend(cmds);
+                }
+                NodeMsg::NodeDataCmd(NodeDataCmd::ReplicateDataBatch(data_collection)) => {
+                    info!("ReplicateDataBatch MsgId: {:?}", msg_id);
+                    let cmds =
+                        MyNode::replicate_data_batch(&context, node_id, data_collection).await?;
+                    new_cmds.extend(cmds);
+                }
+                NodeMsg::NodeDataCmd(NodeDataCmd::SendAnyMissingRelevantData(
+                    known_data_addresses,
+                )) => {
+                    info!(
+                        "{:?} MsgId: {:?}",
+                        LogMarker::RequestForAnyMissingData,
+                        msg_id
+                    );
+
+                    if let Some(cmd) =
+                        MyNode::get_missing_data_for_node(&context, node_id, known_data_addresses)
+                            .await
+                    {
+                        new_cmds.push(cmd);
+                    }
+                }
+                // NodeMsg::MembershipAE(gen) => {
+                //     if let Some(cmd) = MyNode::handle_membership_anti_entropy_request(membership, node_id, gen) {
+                //         new_cmds.push(cmd);
+                //     }
+                // }
+                msg => {
+                    trace!("Node msg not handled off thread, sending to blocking channel: {msg:?}");
+                    if let Err(error) = mutating_cmd_channel
+                        .send((
+                            Cmd::ProcessNodeMsg {
+                                msg_id,
+                                msg,
+                                node_id,
+                                send_stream,
+                            },
+                            vec![],
+                        ))
+                        .await
+                    {
+                        error!("Error sending node msg cmd onto cmd channel {error:?}");
+                    }
+                }
+            }
+        }
         _ => {
-            debug!("child process not handled in thread: {cmd:?}");
+            debug!("process cannot be handled off thread: {cmd:?}");
             if let Err(error) = mutating_cmd_channel.send((cmd, vec![])).await {
                 error!("Error sending msg onto cmd channel {error:?}");
             }

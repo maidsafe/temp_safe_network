@@ -185,9 +185,16 @@ impl MyNode {
 
         // Only trigger reorganize data when there is a membership change happens.
         if updated {
-            MyNode::update_comm_target_list(&latest_context);
+            MyNode::update_comm_target_list(
+                &node.comm,
+                &node.network_knowledge.archived_members(),
+                node.network_knowledge().members(),
+            );
             // write latest section tree before potential rejoin of network
-            MyNode::write_section_tree(&latest_context);
+            MyNode::write_section_tree(
+                node.network_knowledge.section_tree().clone(),
+                &node.root_storage_dir,
+            );
             let prefix = sap.prefix();
             info!("SectionTree written to disk with update for prefix {prefix:?}");
 
@@ -197,13 +204,13 @@ impl MyNode {
                 .members()
                 .iter()
                 .map(|m| m.name())
-                .contains(&latest_context.name)
-                && !latest_context
+                .contains(&node.name())
+                && !node
                     .network_knowledge
                     .members()
                     .iter()
                     .map(|m| m.name())
-                    .contains(&latest_context.name)
+                    .contains(&node.name())
             {
                 error!("We've been removed from the section");
                 return Err(Error::RejoinRequired(RejoinReason::RemovedFromSection));
@@ -219,11 +226,8 @@ impl MyNode {
         let (bounced_msg, recipient) = match kind {
             AntiEntropyKind::Update { .. } => {
                 // log the msg as received. Elders track this for other elders in fault detection
-                if latest_context
-                    .network_knowledge
-                    .is_section_member(&sender.name())
-                {
-                    latest_context.untrack_node_issue(sender.name(), IssueType::AeProbeMsg);
+                if node.network_knowledge.is_section_member(&sender.name()) {
+                    node.untrack_node_issue(sender.name(), IssueType::AeProbeMsg);
                 }
                 return Ok(cmds);
             } // Nope, bail early

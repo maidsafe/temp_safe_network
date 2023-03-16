@@ -293,7 +293,7 @@ impl MyNode {
             }
             NodeMsg::DkgAE(session_id) => {
                 trace!("Handling msg: DkgAE s{} from {}", session_id.sh(), node_id);
-                node.handle_dkg_anti_entropy(session_id, node_id)
+                node.handle_dkg_anti_entropy_request(session_id, node_id)
             }
             NodeMsg::NodeEvent(NodeEvent::CouldNotStoreData {
                 node_id,
