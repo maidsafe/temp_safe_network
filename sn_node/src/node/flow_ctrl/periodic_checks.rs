@@ -145,7 +145,7 @@ impl FlowCtrl {
                         "Periodic check: sending request to join the section as a relocated node"
                     );
                     cmds.push(MyNode::send_to_elders_await_responses(
-                        context.clone(),
+                        context.network_knowledge.section_auth(),
                         NodeMsg::TryJoin(Some(proof.clone())),
                     ));
                 } else {

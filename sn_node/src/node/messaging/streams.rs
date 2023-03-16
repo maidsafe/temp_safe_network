@@ -7,7 +7,9 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{core::NodeContext, Cmd, Error, MyNode, Result};
+use sn_comms::Comm;
 
+use bls::PublicKey;
 use sn_interface::{
     messaging::{
         data::DataResponse, system::NodeMsg, AntiEntropyMsg, Dst, MsgId, MsgKind, WireMsg,
@@ -72,17 +74,18 @@ impl MyNode {
         msg_id: MsgId,
         correlation_id: MsgId,
         send_stream: SendStream,
-        context: NodeContext,
+        our_name: XorName,
+        our_section_key: PublicKey,
         client_id: ClientId,
     ) -> Result<Option<Cmd>> {
         info!("Sending client response msg for {correlation_id:?}");
         send_msg_on_stream(
             msg_id,
-            MsgKind::DataResponse(context.name),
+            MsgKind::DataResponse(our_name),
             WireMsg::serialize_msg_payload(&msg)?,
             Participant::from_client(client_id),
             correlation_id,
-            context.network_knowledge.section_key(),
+            our_section_key,
             send_stream,
         )
         .await
@@ -123,7 +126,8 @@ impl MyNode {
     /// Send out msg and await response to forward on to client
     pub(crate) fn send_and_forward_response_to_client(
         wire_msg: WireMsg,
-        context: NodeContext,
+        comm: Comm,
+        our_section_key: PublicKey,
         targets: BTreeSet<NodeId>,
         client_stream: SendStream,
         client_id: ClientId,
@@ -140,7 +144,7 @@ impl MyNode {
             .filter_map(|target| {
                 let dst = Dst {
                     name: target.name(),
-                    section_key: context.network_knowledge.section_key(),
+                    section_key: our_section_key,
                 };
                 match wire_msg.serialize_with_new_dst(&dst) {
                     Ok(bytes_to_node) => Some((target, bytes_to_node)),
@@ -155,14 +159,12 @@ impl MyNode {
         let dst_stream = (
             Dst {
                 name: client_id.name(),
-                section_key: context.network_knowledge.section_key(),
+                section_key: our_section_key,
             },
             client_stream,
         );
 
-        context
-            .comm
-            .send_and_respond_on_stream(msg_id, node_bytes, targets_len, dst_stream);
+        comm.send_and_respond_on_stream(msg_id, node_bytes, targets_len, dst_stream);
 
         Ok(())
     }
@@ -175,7 +177,7 @@ async fn send_msg_on_stream(
     payload: Bytes,
     recipient: Participant,
     correlation_id: MsgId,
-    section_key: bls::PublicKey,
+    section_key: PublicKey,
     mut send_stream: SendStream,
 ) -> Result<Option<Cmd>> {
     let dst = Dst {

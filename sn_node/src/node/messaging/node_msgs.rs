@@ -13,6 +13,7 @@ use crate::{
     },
     storage::{Error as StorageError, StorageLevel},
 };
+use sn_comms::Comm;
 
 use qp2p::{SendStream, UsrMsgBytes};
 use sn_fault_detection::IssueType;
@@ -26,6 +27,7 @@ use sn_interface::{
     types::{
         log_markers::LogMarker, ClientId, Keypair, NodeId, Participant, PublicKey, ReplicatedData,
     },
+    SectionAuthorityProvider,
 };
 use std::collections::BTreeSet;
 use xor_name::XorName;
@@ -39,19 +41,15 @@ impl MyNode {
         msg: NetworkMsg,
         msg_id: MsgId,
         recipients: BTreeSet<NodeId>,
-        context: NodeContext,
+        our_name: XorName,
+        network_knowledge: NetworkKnowledge,
+        comm: Comm,
     ) -> Result<()> {
         debug!("Sending msg: {msg_id:?}");
-        let msgs = into_msg_bytes(
-            &context.network_knowledge,
-            context.name,
-            msg,
-            msg_id,
-            recipients,
-        )?;
+        let msgs = into_msg_bytes(&network_knowledge, our_name, msg, msg_id, recipients)?;
 
         msgs.into_iter()
-            .for_each(|(node_id, msg)| context.comm.send_out_bytes(node_id, msg_id, msg));
+            .for_each(|(node_id, msg)| comm.send_out_bytes(node_id, msg_id, msg));
 
         Ok(())
     }
@@ -64,8 +62,10 @@ impl MyNode {
     }
 
     /// Send a (`NodeMsg`) message to all Elders in our section, await all responses & enqueue
-    pub(crate) fn send_to_elders_await_responses(context: NodeContext, msg: NodeMsg) -> Cmd {
-        let sap = context.network_knowledge.section_auth();
+    pub(crate) fn send_to_elders_await_responses(
+        sap: SectionAuthorityProvider,
+        msg: NodeMsg,
+    ) -> Cmd {
         let recipients = sap.elders_set();
         Cmd::SendMsgEnqueueAnyResponse {
             msg,

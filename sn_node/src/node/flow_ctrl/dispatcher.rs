@@ -68,7 +68,14 @@ impl MyNode {
                 recipients, // NB: SendMsg only calls out via comms, so it should be possible to make this a set of node ids!
             } => {
                 let recipients = recipients.into_iter().map(NodeId::from).collect();
-                MyNode::send_msg(msg, msg_id, recipients, context)?;
+                MyNode::send_msg(
+                    msg,
+                    msg_id,
+                    recipients,
+                    context.name,
+                    context.network_knowledge,
+                    context.comm.clone(),
+                )?;
                 vec![]
             }
             Cmd::SendMsgEnqueueAnyResponse {
@@ -88,7 +95,8 @@ impl MyNode {
             } => {
                 MyNode::send_and_forward_response_to_client(
                     wire_msg,
-                    context,
+                    context.comm.clone(),
+                    context.network_knowledge.section_key(),
                     targets,
                     client_stream,
                     client_id,
@@ -123,7 +131,8 @@ impl MyNode {
                 msg_id,
                 correlation_id,
                 send_stream,
-                context,
+                context.name,
+                context.network_knowledge.section_key(),
                 client_id,
             )
             .await?
