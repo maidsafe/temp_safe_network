@@ -43,9 +43,6 @@ use std::{
 use tokio::sync::mpsc::{self, Receiver, Sender};
 use xor_name::XorName;
 
-/// Keep this as 1 so we properly feedback if we're not popping things out of the channel fast enough
-const CMD_CHANNEL_SIZE: usize = 100;
-
 /// Sent via the rejoin_network_tx to restart the join process.
 /// This would only occur when joins are not allowed, or non-recoverable states.
 #[derive(Debug)]
@@ -88,12 +85,12 @@ impl FlowCtrl {
     ) -> Result<(CmdChannel, Receiver<RejoinReason>)> {
         let node_context = node.context();
         let (blocking_cmd_sender_channel, mut blocking_cmds_receiver) =
-            mpsc::channel(CMD_CHANNEL_SIZE);
+            mpsc::channel(STANDARD_CHANNEL_SIZE);
         let (rejoin_network_tx, rejoin_network_rx) = mpsc::channel(STANDARD_CHANNEL_SIZE);
 
         // Our channel to process _all_ cmds. If it can, they are processed off thread with latest context,
         // otherwise they are sent to the blocking process channel
-        let (flow_ctrl_cmd_sender, flow_ctrl_cmd_reciever) = mpsc::channel(CMD_CHANNEL_SIZE);
+        let (flow_ctrl_cmd_sender, flow_ctrl_cmd_reciever) = mpsc::channel(STANDARD_CHANNEL_SIZE);
 
         let all_members = node_context
             .network_knowledge
@@ -373,8 +370,13 @@ impl FlowCtrl {
                         // we only punt certain cmds back into the mutating channel
                         // child cmds are sent back to the main flow ctrl cmd channel for processing.
                         let _handle = tokio::spawn(async move {
-                            handle_cmd(incoming_cmd, context.clone(), flow_ctrl_cmd_sender.clone(), mutating_cmd_channel.clone())
-                                .await?;
+                            handle_cmd(
+                                incoming_cmd,
+                                context.clone(),
+                                flow_ctrl_cmd_sender.clone(),
+                                mutating_cmd_channel.clone(),
+                            )
+                            .await?;
 
                             Ok::<(), Error>(())
                         });
@@ -577,7 +579,12 @@ async fn handle_cmd(
     }
 
     for cmd in new_cmds {
-        flow_ctrl_cmd_sender.send(FlowCtrlCmd::Handle(cmd)).await.map_err(|_| Error::TokioChannel("Putting fresh cmds in FlowCtrlCmd sender failed".to_string()))?;
+        flow_ctrl_cmd_sender
+            .send(FlowCtrlCmd::Handle(cmd))
+            .await
+            .map_err(|_| {
+                Error::TokioChannel("Putting fresh cmds in FlowCtrlCmd sender failed".to_string())
+            })?;
     }
     Ok(())
 }
