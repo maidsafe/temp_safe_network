@@ -372,7 +372,7 @@ impl FlowCtrl {
                         let _handle = tokio::spawn(async move {
                             handle_cmd(
                                 incoming_cmd,
-                                context.clone(),
+                                context,
                                 flow_ctrl_cmd_sender.clone(),
                                 mutating_cmd_channel.clone(),
                             )
@@ -447,15 +447,8 @@ async fn handle_cmd(
         } => {
             if let Some(stream) = send_stream {
                 new_cmds.extend(
-                    MyNode::handle_client_msg_for_us(
-                        context.clone(),
-                        msg_id,
-                        msg,
-                        auth,
-                        client_id,
-                        stream,
-                    )
-                    .await?,
+                    MyNode::handle_client_msg_for_us(context, msg_id, msg, auth, client_id, stream)
+                        .await?,
                 );
             } else {
                 debug!("dropping client cmd w/ no response stream")
@@ -467,7 +460,14 @@ async fn handle_cmd(
             recipients,
         } => {
             let recipients = recipients.into_iter().map(NodeId::from).collect();
-            MyNode::send_msg(msg, msg_id, recipients, context.clone())?;
+            MyNode::send_msg(
+                msg,
+                msg_id,
+                recipients,
+                context.name,
+                context.network_knowledge,
+                context.comm.clone(),
+            )?;
         }
         Cmd::SendMsgEnqueueAnyResponse {
             msg,
@@ -509,7 +509,8 @@ async fn handle_cmd(
                     msg_id,
                     correlation_id,
                     send_stream,
-                    context.clone(),
+                    context.name,
+                    context.network_knowledge.section_key(),
                     client_id,
                 )
                 .await?,
@@ -526,7 +527,8 @@ async fn handle_cmd(
         } => {
             MyNode::send_and_forward_response_to_client(
                 wire_msg,
-                context.clone(),
+                context.comm.clone(),
+                context.network_knowledge.section_key(),
                 targets,
                 client_stream,
                 client_id,

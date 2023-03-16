@@ -22,7 +22,7 @@ impl MyNode {
             None
         } else {
             Some(MyNode::send_to_elders_await_responses(
-                context,
+                context.network_knowledge.section_auth(),
                 NodeMsg::TryJoin(relocation),
             ))
         }
