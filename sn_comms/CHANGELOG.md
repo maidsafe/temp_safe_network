@@ -5,15 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.6.1 (2023-03-13)
+## v0.6.2 (2023-03-16)
+
+### Chore
+
+ - <csr-id-ed26bc19831a28e2e13f63c77d26e0cd086cf85c/> manually bump sn_interface and sn_node
+   These crates already have published versions at 0.20.6 and 0.78.6, so reverting the commits didn't
+   work correctly for these.
+   
+   Also temporarily disabling the release and merge workflows again because I don't want to trigger a
+   release before I tag these manually.
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
  - 1 commit contributed to the release.
- - 5 days passed between releases.
- - 0 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 2 days passed between releases.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -23,10 +32,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Manually bump sn_interface and sn_node ([`ed26bc1`](https://github.com/maidsafe/safe_network/commit/ed26bc19831a28e2e13f63c77d26e0cd086cf85c))
+</details>
+
+## v0.6.1 (2023-03-13)
+
+### Chore
+
+ - <csr-id-b85b03ba610d2457d521885d32824bee727ccdba/> sn_comms-0.6.1/sn_node-0.78.5
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 5 days passed between releases.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Sn_comms-0.6.1/sn_node-0.78.5 ([`b85b03b`](https://github.com/maidsafe/safe_network/commit/b85b03ba610d2457d521885d32824bee727ccdba))
     - Chore(msgs): remove unnecessary serializing - The serialization is only for logging and we already have the serialized msg earlier in the flow, so the log can be moved to that place. ([`56be23a`](https://github.com/maidsafe/safe_network/commit/56be23a0343b84f632ab66134e96f78a4afd52ab))
 </details>
 
 ## v0.6.0 (2023-03-08)
+
+<csr-id-1e531f807b1c920e61ec9ad2490f6590bf43fdd2/>
 
 ### Chore
 

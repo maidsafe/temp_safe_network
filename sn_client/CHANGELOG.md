@@ -1113,19 +1113,59 @@ needed, as they keypair itself contains the Arcs we need.
     - Self authentication Example
     - Example to demonstrate Storage API
 
-## v0.82.1 (2023-03-09)
+## v0.82.2 (2023-03-16)
+
+### Chore
+
+ - <csr-id-ed26bc19831a28e2e13f63c77d26e0cd086cf85c/> manually bump sn_interface and sn_node
+   These crates already have published versions at 0.20.6 and 0.78.6, so reverting the commits didn't
+   work correctly for these.
+   
+   Also temporarily disabling the release and merge workflows again because I don't want to trigger a
+   release before I tag these manually.
+ - <csr-id-4f04bd1a5d1c747bfc6b5d39824dd108f8546b7b/> rename testnet crate to sn_testnet
+   Even though the `testnet` crate name is not taken on crates.io, I think it makes sense to prefix
+   this crate with `sn_`, as per our other crates. The name of the binary does not change. This crate
+   needs to be published because `sn_client` has a dependency on it.
+   
+   This also provides a README for the crate, which was necessary to have it published.
+ - <csr-id-57539fec4288cdd20672186dcfa49f7f6c9f686f/> sn_interface-0.20.5/sn_client-0.82.2/sn_node-0.78.6/sn_api-0.80.2/sn_cli-0.74.0
 
 ### New Features
 
- - <csr-id-7789cd503b8f8f1f254d90741950958e678cc420/> adds query to get Elder reward keys
+ - <csr-id-2740c6dc5272334106dda5846d1aaf9fadf8119b/> reworked version of testnet binary
+   The `testnet` binary was reworked to remove its dependency on `sn_launch_tool`. Since it will now be
+   used as a replacement for the `node run-baby-fleming` command, the interface was updated to make it
+   a bit more usable. Now it does not attempt to build the node by default: the `--build-node` flag is
+   used for that. The other arguments that were added should be fairly self explanatory and can be seen
+   on the diff.
+   
+   All the support from the original binary is retained in this rework, including the use of flamegraph
+   and joining an existing network.
+   
+   There is a module in the crate that exposes a couple of structs that can be used for launching a
+   testnet: `TestnetBuilder` and `Testnet`. The functions on `Testnet` should have almost full code
+   coverage, but since the builder is a simple utility, I didn't bother putting tedious tests around
+   it. Since the bulk of the work has been unit tested I also haven't added any integration tests for
+   testing the code in the `main` module for the binary, since it's pretty simple and doesn't really
+   seem worth the additional testing infrastructure.
+   
+   The merge CI workflow was updated to use the reworked version of the binary. Since we already build
+   the node in the previous step, we just pass the path to it, rather than attempt to rebuild.
+   
+   The script for verifying node joins was modified to check for IPs matching "0.0.0.0" in addition to
+   "127.0.0.1", which was being caused by the use of the `--local-addr` argument. It also now considers
+   the total number of nodes to be the genesis node plus the number of non-genesis nodes. In addition,
+   the script was updated to split long commands over multiple lines, use newer-style Bash syntax and
+   consistent indentation size.
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 1 commit contributed to the release.
- - 1 day passed between releases.
- - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 7 commits contributed to the release over the course of 1 calendar day.
+ - 6 days passed between releases.
+ - 4 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -1135,13 +1175,86 @@ needed, as they keypair itself contains the Arcs we need.
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Manually bump sn_interface and sn_node ([`ed26bc1`](https://github.com/maidsafe/safe_network/commit/ed26bc19831a28e2e13f63c77d26e0cd086cf85c))
+    - Revert "chore(release): sn_interface-0.20.5/sn_client-0.82.2/sn_node-0.78.6/sn_api-0.80.2/sn_cli-0.74.0" ([`9dc0fe9`](https://github.com/maidsafe/safe_network/commit/9dc0fe938e1b1c43ca1292fa8640b7ced22aa39b))
+    - Rename testnet crate to sn_testnet ([`4f04bd1`](https://github.com/maidsafe/safe_network/commit/4f04bd1a5d1c747bfc6b5d39824dd108f8546b7b))
+    - Sn_interface-0.20.5/sn_client-0.82.2/sn_node-0.78.6/sn_api-0.80.2/sn_cli-0.74.0 ([`57539fe`](https://github.com/maidsafe/safe_network/commit/57539fec4288cdd20672186dcfa49f7f6c9f686f))
+    - Reworked version of testnet binary ([`2740c6d`](https://github.com/maidsafe/safe_network/commit/2740c6dc5272334106dda5846d1aaf9fadf8119b))
+    - Fix: use max self_encryption chunk size - The used value was not linked to actual self_encryption value. ([`260e00d`](https://github.com/maidsafe/safe_network/commit/260e00d224ceb72c8889fa3b4eba3591c75b656b))
+    - Feat(rewards): send fee query to elders - Adds concurrent querying of each elder for their respective reward key and fee. - Replaces the dummy fee with the result from the implemented query. ([`698127a`](https://github.com/maidsafe/safe_network/commit/698127a6339729ca812ec95bf5062f4e059c5700))
+</details>
+
+## v0.82.1 (2023-03-09)
+
+### Chore
+
+ - <csr-id-bad9bc634abd8c12a31bbee0ee71423f727c7397/> sn_interface-0.20.3/sn_client-0.82.1/sn_node-0.78.3
+
+### New Features
+
+ - <csr-id-7789cd503b8f8f1f254d90741950958e678cc420/> adds query to get Elder reward keys
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 1 day passed between releases.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Sn_interface-0.20.3/sn_client-0.82.1/sn_node-0.78.3 ([`bad9bc6`](https://github.com/maidsafe/safe_network/commit/bad9bc634abd8c12a31bbee0ee71423f727c7397))
     - Adds query to get Elder reward keys ([`7789cd5`](https://github.com/maidsafe/safe_network/commit/7789cd503b8f8f1f254d90741950958e678cc420))
+</details>
+
+## v0.82.0 (2023-03-08)
+
+<csr-id-1e531f807b1c920e61ec9ad2490f6590bf43fdd2/>
+
+### Chore
+
+ - <csr-id-1e531f807b1c920e61ec9ad2490f6590bf43fdd2/> sn_interface-0.20.0/sn_comms-0.6.0/sn_client-0.82.0/sn_node-0.78.0/sn_api-0.80.0/sn_cli-0.73.0
+
+### New Features
+
+ - <csr-id-fa49b0d05d944f0ab1141b3c18bd61ac345b2fed/> encapsulate Dbc reasons
+
+### New Features (BREAKING)
+
+ - <csr-id-97ee1eb5a55a0b4dbea9ea8a512351dd3219a6ed/> DBC reasons
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Sn_interface-0.20.0/sn_comms-0.6.0/sn_client-0.82.0/sn_node-0.78.0/sn_api-0.80.0/sn_cli-0.73.0 ([`1e531f8`](https://github.com/maidsafe/safe_network/commit/1e531f807b1c920e61ec9ad2490f6590bf43fdd2))
+    - Encapsulate Dbc reasons ([`fa49b0d`](https://github.com/maidsafe/safe_network/commit/fa49b0d05d944f0ab1141b3c18bd61ac345b2fed))
+    - DBC reasons ([`97ee1eb`](https://github.com/maidsafe/safe_network/commit/97ee1eb5a55a0b4dbea9ea8a512351dd3219a6ed))
 </details>
 
 ## v0.81.5 (2023-03-07)
 
 <csr-id-ecbdd14cfaa963777b903bfba549eb170113e503/>
 <csr-id-311b204dc3413409f89c9dd73cce9e7d6dfa6a95/>
+<csr-id-76a1d051b8082bcf2e17a12c605a527d098c176b/>
 
 ### Refactor
 
@@ -1308,40 +1421,6 @@ needed, as they keypair itself contains the Arcs we need.
  * **Uncategorized**
     - Sn_client-0.81.1 ([`08a24be`](https://github.com/maidsafe/safe_network/commit/08a24be66114afcb8c9878336bb45cb896525778))
     - Use max_backoff_interval when retrying checking replicas ([`87a5634`](https://github.com/maidsafe/safe_network/commit/87a5634612282c189f68293940d85830e8d65400))
-</details>
-
-## v0.82.0 (2023-03-08)
-
-### Chore
-
- - <csr-id-1e531f807b1c920e61ec9ad2490f6590bf43fdd2/> sn_interface-0.20.0/sn_comms-0.6.0/sn_client-0.82.0/sn_node-0.78.0/sn_api-0.80.0/sn_cli-0.73.0
-
-### New Features
-
- - <csr-id-fa49b0d05d944f0ab1141b3c18bd61ac345b2fed/> encapsulate Dbc reasons
-
-### New Features (BREAKING)
-
- - <csr-id-97ee1eb5a55a0b4dbea9ea8a512351dd3219a6ed/> DBC reasons
-
-### Commit Statistics
-
-<csr-read-only-do-not-edit/>
-
- - 3 commits contributed to the release.
- - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' were seen in commit messages
-
-### Commit Details
-
-<csr-read-only-do-not-edit/>
-
-<details><summary>view details</summary>
-
- * **Uncategorized**
-    - Sn_interface-0.20.0/sn_comms-0.6.0/sn_client-0.82.0/sn_node-0.78.0/sn_api-0.80.0/sn_cli-0.73.0 ([`1e531f8`](https://github.com/maidsafe/safe_network/commit/1e531f807b1c920e61ec9ad2490f6590bf43fdd2))
-    - Encapsulate Dbc reasons ([`fa49b0d`](https://github.com/maidsafe/safe_network/commit/fa49b0d05d944f0ab1141b3c18bd61ac345b2fed))
-    - DBC reasons ([`97ee1eb`](https://github.com/maidsafe/safe_network/commit/97ee1eb5a55a0b4dbea9ea8a512351dd3219a6ed))
 </details>
 
 ## v0.81.0 (2023-02-27)
