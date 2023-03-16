@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{core::NodeContext, flow_ctrl::cmds::Cmd, Error, MyNode, Result};
+use crate::node::{flow_ctrl::cmds::Cmd, Error, MyNode, NodeContext, Result};
 
 use sn_dbc::{
     get_public_commitments_from_transaction, Commitment, DbcTransaction, PublicKey, SpentProof,

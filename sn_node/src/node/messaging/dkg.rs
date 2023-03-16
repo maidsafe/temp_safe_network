@@ -7,11 +7,10 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{
-    core::DkgSessionInfo,
     dkg::{check_ephemeral_dkg_key, DkgPubKeys},
     flow_ctrl::cmds::Cmd,
     messaging::Recipients,
-    Error, MyNode, Result,
+    DkgSessionInfo, Error, MyNode, Result,
 };
 
 use sn_interface::{

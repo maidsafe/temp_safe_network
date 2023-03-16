@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{
-    core::NodeContext, flow_ctrl::cmds::Cmd, messaging::Recipients, Error, MyNode, Result,
+    flow_ctrl::cmds::Cmd, messaging::Recipients, Error, MyNode, NodeContext, Result,
 };
 
 use qp2p::SendStream;

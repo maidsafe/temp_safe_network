@@ -8,8 +8,7 @@
 
 use crate::{
     node::{
-        core::NodeContext, flow_ctrl::cmds::Cmd, messaging::Recipients, MyNode, RejoinReason,
-        Result,
+        flow_ctrl::cmds::Cmd, messaging::Recipients, MyNode, NodeContext, RejoinReason, Result,
     },
     storage::{Error as StorageError, StorageLevel},
 };

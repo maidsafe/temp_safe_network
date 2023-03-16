@@ -8,9 +8,9 @@
 
 use crate::node::{
     cfg::keypair_storage::{get_reward_pk, store_network_keypair, store_new_reward_keypair},
-    flow_ctrl::{cmds::Cmd, fault_detection::FaultsCmd, CmdCtrl, FlowCtrl, RejoinReason},
+    flow_ctrl::{fault_detection::FaultsCmd, CmdCtrl, FlowCtrl},
     logging::log_system_details,
-    Config, Error, MyNode, Result, STANDARD_CHANNEL_SIZE,
+    CmdChannel, Config, Error, MyNode, NodeEventsChannel, Result, STANDARD_CHANNEL_SIZE,
 };
 use crate::UsedSpace;
 
@@ -21,10 +21,7 @@ use sn_interface::{
 };
 
 use std::{path::Path, sync::Arc, time::Duration};
-use tokio::{
-    fs,
-    sync::{mpsc, RwLock},
-};
+use tokio::{fs, sync::mpsc};
 use xor_name::Prefix;
 
 // Filename for storing the content of the genesis DBC.
@@ -36,24 +33,18 @@ use xor_name::Prefix;
 // set to GENESIS_DBC_AMOUNT (currently 4,525,524,120 * 10^9) individual units.
 const GENESIS_DBC_FILENAME: &str = "genesis_dbc";
 
-pub(crate) type CmdChannel = mpsc::Sender<(Cmd, Vec<usize>)>;
-
-/// A reference held to the node to keep it running.
-///
-/// Meant to be held while looping over the event receiver
-/// that transports events from the node.
-#[allow(missing_debug_implementations, dead_code)]
-pub(crate) struct NodeRef {
-    node: Arc<RwLock<MyNode>>,
+/// A reference to data structures to receive node's events,
+/// and submit commands to be processed by it.
+#[allow(missing_debug_implementations)]
+pub struct NodeRef {
     /// Sender which can be used to add a Cmd to the Node's CmdQueue
-    cmd_channel: CmdChannel,
+    pub cmd_channel: CmdChannel,
+    /// Channel to subscribe in order to receive node events
+    pub events_channel: NodeEventsChannel,
 }
 
 /// Start a new node.
-pub async fn new_node(
-    config: &Config,
-    join_retry_timeout: Duration,
-) -> Result<(CmdChannel, mpsc::Receiver<RejoinReason>)> {
+pub async fn new_node(config: &Config, join_retry_timeout: Duration) -> Result<NodeRef> {
     let root_dir_buf = config.root_dir()?;
     let root_dir = root_dir_buf.as_path();
     fs::create_dir_all(root_dir).await?;
@@ -70,10 +61,7 @@ pub async fn new_node(
 
     let used_space = UsedSpace::new(config.min_capacity(), config.max_capacity());
 
-    let (cmd_channel, rejoin_network_rx) =
-        start_node(config, used_space, root_dir, reward_key, join_retry_timeout).await?;
-
-    Ok((cmd_channel, rejoin_network_rx))
+    start_node(config, used_space, root_dir, reward_key, join_retry_timeout).await
 }
 
 // Private helper to create a new node using the given config and bootstraps it to the network.
@@ -83,10 +71,11 @@ async fn start_node(
     root_storage_dir: &Path,
     reward_key: bls::PublicKey,
     join_retry_timeout: Duration,
-) -> Result<(CmdChannel, mpsc::Receiver<RejoinReason>)> {
+) -> Result<NodeRef> {
     let (fault_cmds_sender, fault_cmds_receiver) =
         mpsc::channel::<FaultsCmd>(STANDARD_CHANNEL_SIZE);
 
+    let node_events_channel = NodeEventsChannel::default();
     let (comm, incoming_msg_receiver) = Comm::new(config.local_addr(), config.first())?;
 
     let node = if config.first().is_some() {
@@ -96,25 +85,29 @@ async fn start_node(
             root_storage_dir,
             reward_key,
             fault_cmds_sender.clone(),
+            node_events_channel.clone(),
         )
         .await?
     } else {
-        start_normal_node(
+        let node = start_normal_node(
             config,
             comm,
             used_space,
             root_storage_dir,
             reward_key,
             fault_cmds_sender.clone(),
+            node_events_channel.clone(),
         )
-        .await?
+        .await?;
+        info!("Node {:?} join has been accepted.", node.name());
+        node
     };
 
     let node_name = node.name();
     let context = node.context();
 
     let (cmd_ctrl, data_replication_receiver) = CmdCtrl::new();
-    let (cmd_channel, rejoin_network_rx) = FlowCtrl::start(
+    let cmd_channel = FlowCtrl::start(
         node,
         cmd_ctrl,
         join_retry_timeout,
@@ -124,7 +117,6 @@ async fn start_node(
     )
     .await?;
 
-    info!("Node {:?} join has been accepted.", node_name);
     let root_dir_buf = config.root_dir()?;
     let root_dir = root_dir_buf.as_path();
 
@@ -134,23 +126,21 @@ async fn start_node(
 
     let our_pid = std::process::id();
     let node_prefix = context.network_knowledge.prefix();
-    let node_name = context.name;
     let node_age = context.info.age();
     let our_conn_info = context.info.addr;
-    let our_conn_info_json = serde_json::to_string(&our_conn_info)
-        .unwrap_or_else(|_| "Failed to serialize connection info".into());
-    println!(
-        "Node PID: {our_pid:?}, prefix: {node_prefix:?}, \
-            name: {node_name:?}, age: {node_age}, connection info:\n{our_conn_info_json}",
+    let info_msg = format!(
+        "Node PID: {our_pid:?}, prefix: {node_prefix:?}, name: {node_name:?}, \
+        age: {node_age}, connection info: {our_conn_info}",
     );
-    info!(
-        "Node PID: {:?}, prefix: {:?}, name: {:?}, age: {}, connection info: {}",
-        our_pid, node_prefix, node_name, node_age, our_conn_info_json,
-    );
+    println!("{info_msg}");
+    info!("{info_msg}");
 
     log_system_details(node_prefix);
 
-    Ok((cmd_channel, rejoin_network_rx))
+    Ok(NodeRef {
+        cmd_channel,
+        events_channel: node_events_channel,
+    })
 }
 
 async fn start_genesis_node(
@@ -159,6 +149,7 @@ async fn start_genesis_node(
     root_storage_dir: &Path,
     reward_key: bls::PublicKey,
     fault_cmds_sender: mpsc::Sender<FaultsCmd>,
+    node_events_sender: NodeEventsChannel,
 ) -> Result<MyNode> {
     // Genesis node having a fix age of 255.
     let keypair = ed25519::gen_keypair(&Prefix::default().range_inclusive(), 255);
@@ -181,6 +172,7 @@ async fn start_genesis_node(
         root_storage_dir.to_path_buf(),
         genesis_sk_set,
         fault_cmds_sender,
+        node_events_sender,
     )?;
 
     // Write the genesis DBC to disk
@@ -208,6 +200,7 @@ async fn start_normal_node(
     root_storage_dir: &Path,
     reward_key: bls::PublicKey,
     fault_cmds_sender: mpsc::Sender<FaultsCmd>,
+    node_events_sender: NodeEventsChannel,
 ) -> Result<MyNode> {
     let keypair = ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE);
     let node_name = ed25519::name(&keypair.public);
@@ -236,6 +229,7 @@ async fn start_normal_node(
         used_space.clone(),
         root_storage_dir.to_path_buf(),
         fault_cmds_sender,
+        node_events_sender,
     )?;
 
     info!("Node {} started.", node.info().name());

@@ -7,11 +7,10 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{
-    core::NodeContext,
     flow_ctrl::cmds::Cmd,
     membership::{self, Membership},
     messaging::Recipients,
-    MyNode, Result,
+    MyNode, NodeContext, Result,
 };
 
 use bls::Signature;

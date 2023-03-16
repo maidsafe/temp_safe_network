@@ -7,10 +7,9 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{
-    core::NodeContext,
     flow_ctrl::{cmds::Cmd, RejoinReason},
     messaging::Recipients,
-    Error, MyNode, Result,
+    Error, MyNode, NodeContext, Result,
 };
 
 use sn_fault_detection::IssueType;

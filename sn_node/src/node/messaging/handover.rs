@@ -7,12 +7,11 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{
-    core::NodeContext,
     flow_ctrl::cmds::Cmd,
     handover::{Error as HandoverError, Handover},
     membership::{elder_candidates, try_split_dkg},
     messaging::Recipients,
-    Error, MyNode, NodeMsg, Result,
+    Error, MyNode, NodeContext, NodeMsg, Result,
 };
 
 use sn_consensus::{Generation, SignedVote, VoteResponse};

@@ -7,8 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{
-    core::NodeContext, flow_ctrl::fault_detection::FaultsCmd, messaging::Recipients, Cmd, Error,
-    MyNode, Result,
+    flow_ctrl::fault_detection::FaultsCmd, messaging::Recipients, Cmd, Error, MyNode, NodeContext,
+    Result,
 };
 use crate::storage::{Error as StorageError, StorageLevel};
 
