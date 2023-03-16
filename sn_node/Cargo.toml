@@ -12,7 +12,7 @@ version = "0.78.6"
 
 [[bin]]
 name = "safenode"
-path = "src/bin/sn_node/main.rs"
+path = "src/bin/safenode/main.rs"
 
 [[bench]]
 name = "data_storage"
