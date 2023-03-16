@@ -135,6 +135,8 @@ mod core {
         pub(crate) section_keys_provider: SectionKeysProvider,
         #[debug(skip)]
         pub(crate) comm: Comm,
+        #[debug(skip)]
+        pub(crate) membership: Option<Membership>,
         pub(crate) joins_allowed: bool,
         pub(crate) joins_allowed_until_split: bool,
         #[debug(skip)]
@@ -169,6 +171,7 @@ mod core {
                 name: self.name(),
                 info: self.info(),
                 keypair: self.keypair.clone(),
+                membership: self.membership.clone(),
                 reward_key: self.reward_key,
                 store_cost: sn_dbc::Token::from_nano(1), // hard coded for now
                 network_knowledge: self.network_knowledge().clone(),
