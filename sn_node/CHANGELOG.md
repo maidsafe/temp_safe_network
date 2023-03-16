@@ -5,118 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.79.0 (2023-03-16)
-
-### Chore
-
- - <csr-id-1a8b9c9ba5b98c0f1176a0ccbce53d4acea8c84c/> safenode renaming
-
-### New Features (BREAKING)
-
- - <csr-id-09dfed876b47ff6bfeb6e20ba6623bbbdc8af0f5/> sn_node -> safenode rename
-
-### Commit Statistics
-
-<csr-read-only-do-not-edit/>
-
- - 2 commits contributed to the release.
- - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' were seen in commit messages
-
-### Commit Details
-
-<csr-read-only-do-not-edit/>
-
-<details><summary>view details</summary>
-
- * **Uncategorized**
-    - Sn_node -> safenode rename ([`09dfed8`](https://github.com/maidsafe/safe_network/commit/09dfed876b47ff6bfeb6e20ba6623bbbdc8af0f5))
-    - Safenode renaming ([`1a8b9c9`](https://github.com/maidsafe/safe_network/commit/1a8b9c9ba5b98c0f1176a0ccbce53d4acea8c84c))
-</details>
-
-## v0.78.6 (2023-03-16)
-
-### Chore
-
- - <csr-id-ed26bc19831a28e2e13f63c77d26e0cd086cf85c/> manually bump sn_interface and sn_node
-   These crates already have published versions at 0.20.6 and 0.78.6, so reverting the commits didn't
-   work correctly for these.
-   
-   Also temporarily disabling the release and merge workflows again because I don't want to trigger a
-   release before I tag these manually.
- - <csr-id-57539fec4288cdd20672186dcfa49f7f6c9f686f/> sn_interface-0.20.5/sn_client-0.82.2/sn_node-0.78.6/sn_api-0.80.2/sn_cli-0.74.0
- - <csr-id-907d2c67e5ce946ece0fd74509e7f5acf4f37673/> rename `sn_node` binary to `safenode`
-   This also updates the CI and release processes to refer to `safenode` rather than `sn_node`.
-   
-   The assets being attached to the release are also now being renamed from `sn_cli` and `sn_node` to
-   `safe` and `safenode`, respectively.
- - <csr-id-58ec99e9ed258c6e3f3a503e2cb78e31fb7e368b/> simplify cmd handling loop
- - <csr-id-48bece3ca34640b98b9c28ea4006bfbeb236575f/> rename variables
- - <csr-id-59bd1b1592ecad1af72c0a7182eea524f1ee841a/> uniformly use extend
-
-### New Features
-
- - <csr-id-cfbf8f7cca02328a6b1f669644f116e305f5e4e5/> push non-blocking Cmds off thread
-   Moves heaps of non critical Cmds out of the blocking mut MyNode context.
-   Allows them to run w/ latest context; only pushing a subset of Cmds into
-   the blocking process loop
-
-### Bug Fixes
-
- - <csr-id-35a925fa24d6578a18b15b02030fdd264fc73d9b/> update flowctrlcmd NodeContext during join
-
-### Refactor
-
- - <csr-id-5c19f7e9e9472c616de88d16ad244de0fa638bef/> remove unused join response
-   The join response about the node not being reachable is something we
-   will never get or send. This is because we do not check specifically for
-   reachability anymore.
-
-### Commit Statistics
-
-<csr-read-only-do-not-edit/>
-
- - 14 commits contributed to the release over the course of 1 calendar day.
- - 2 days passed between releases.
- - 9 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' were seen in commit messages
-
-### Commit Details
-
-<csr-read-only-do-not-edit/>
-
-<details><summary>view details</summary>
-
- * **Uncategorized**
-    - Manually bump sn_interface and sn_node ([`ed26bc1`](https://github.com/maidsafe/safe_network/commit/ed26bc19831a28e2e13f63c77d26e0cd086cf85c))
-    - Revert "chore(release): sn_interface-0.20.5/sn_client-0.82.2/sn_node-0.78.6/sn_api-0.80.2/sn_cli-0.74.0" ([`9dc0fe9`](https://github.com/maidsafe/safe_network/commit/9dc0fe938e1b1c43ca1292fa8640b7ced22aa39b))
-    - Sn_interface-0.20.5/sn_client-0.82.2/sn_node-0.78.6/sn_api-0.80.2/sn_cli-0.74.0 ([`57539fe`](https://github.com/maidsafe/safe_network/commit/57539fec4288cdd20672186dcfa49f7f6c9f686f))
-    - Rename `sn_node` binary to `safenode` ([`907d2c6`](https://github.com/maidsafe/safe_network/commit/907d2c67e5ce946ece0fd74509e7f5acf4f37673))
-    - Fix(test): trigger relocation on membership change - Previously the relocation was triggered manually without using any   ChurnId. - Now the relocation is triggerd by a membership change which is similar   to the real-world and tests the entire relocation flow ([`a9b7f3a`](https://github.com/maidsafe/safe_network/commit/a9b7f3ac6b3ffb810ce760e5f6b106d6f4095a77))
-    - Feat(test_utils): simplify SAP construction within `TestNetworkBuilder` - Use the `TestSapBuilder` to pass in the configs to construct the SAP ([`6962a2e`](https://github.com/maidsafe/safe_network/commit/6962a2e9a474151f7943bb27fabcb100e7e1a6ec))
-    - Remove unused join response ([`5c19f7e`](https://github.com/maidsafe/safe_network/commit/5c19f7e9e9472c616de88d16ad244de0fa638bef))
-    - Update flowctrlcmd NodeContext during join ([`35a925f`](https://github.com/maidsafe/safe_network/commit/35a925fa24d6578a18b15b02030fdd264fc73d9b))
-    - Simplify cmd handling loop ([`58ec99e`](https://github.com/maidsafe/safe_network/commit/58ec99e9ed258c6e3f3a503e2cb78e31fb7e368b))
-    - Rename variables ([`48bece3`](https://github.com/maidsafe/safe_network/commit/48bece3ca34640b98b9c28ea4006bfbeb236575f))
-    - Chore(flowctrl): remove redundant suffix - We handle the cmd. ([`b8dec79`](https://github.com/maidsafe/safe_network/commit/b8dec79d24090c34b5c95299fd9541180af9ba5e))
-    - Chore(flowctrl): name enum according to verb form - Imperative verbs denote cmds, while past tense verbs denote events. ([`68c987b`](https://github.com/maidsafe/safe_network/commit/68c987b5bfd9d8bb088480e680fd9272fdb65947))
-    - Uniformly use extend ([`59bd1b1`](https://github.com/maidsafe/safe_network/commit/59bd1b1592ecad1af72c0a7182eea524f1ee841a))
-    - Push non-blocking Cmds off thread ([`cfbf8f7`](https://github.com/maidsafe/safe_network/commit/cfbf8f7cca02328a6b1f669644f116e305f5e4e5))
-</details>
-
 ## v0.78.5 (2023-03-13)
 
-### Chore
-
- - <csr-id-b85b03ba610d2457d521885d32824bee727ccdba/> sn_comms-0.6.1/sn_node-0.78.5
-
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
+ - 1 commit contributed to the release.
  - 3 days passed between releases.
- - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 0 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -126,14 +23,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
-    - Sn_comms-0.6.1/sn_node-0.78.5 ([`b85b03b`](https://github.com/maidsafe/safe_network/commit/b85b03ba610d2457d521885d32824bee727ccdba))
     - Chore(msgs): remove unnecessary serializing - The serialization is only for logging and we already have the serialized msg earlier in the flow, so the log can be moved to that place. ([`56be23a`](https://github.com/maidsafe/safe_network/commit/56be23a0343b84f632ab66134e96f78a4afd52ab))
 </details>
 
 ## v0.78.4 (2023-03-10)
 
 <csr-id-6d17af24fcaf1e340dc3aec3d40e55ee80b154cf/>
-<csr-id-bc33b08ae2a49ec28fdca5cf7fd5bffacc79567f/>
 
 ### Chore
 

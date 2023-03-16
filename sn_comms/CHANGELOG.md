@@ -5,33 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.6.3 (2023-03-16)
-
-### Chore
-
- - <csr-id-1a8b9c9ba5b98c0f1176a0ccbce53d4acea8c84c/> safenode renaming
-
-### Commit Statistics
-
-<csr-read-only-do-not-edit/>
-
- - 1 commit contributed to the release.
- - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' were seen in commit messages
-
-### Commit Details
-
-<csr-read-only-do-not-edit/>
-
-<details><summary>view details</summary>
-
- * **Uncategorized**
-    - Safenode renaming ([`1a8b9c9`](https://github.com/maidsafe/safe_network/commit/1a8b9c9ba5b98c0f1176a0ccbce53d4acea8c84c))
-</details>
-
 ## v0.6.2 (2023-03-16)
-
-<csr-id-ed26bc19831a28e2e13f63c77d26e0cd086cf85c/>
 
 ### Chore
 
@@ -42,17 +16,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    Also temporarily disabling the release and merge workflows again because I don't want to trigger a
    release before I tag these manually.
 
-### Chore
-
- - <csr-id-88d3403ea11f877e1ffa23fe15beafeb9d68111f/> sn_comms-0.6.2/sn_client-0.82.2/sn_api-0.80.2/sn_cli-0.74.0
-
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
+ - 1 commit contributed to the release.
  - 2 days passed between releases.
- - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -62,13 +32,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
-    - Sn_comms-0.6.2/sn_client-0.82.2/sn_api-0.80.2/sn_cli-0.74.0 ([`88d3403`](https://github.com/maidsafe/safe_network/commit/88d3403ea11f877e1ffa23fe15beafeb9d68111f))
     - Manually bump sn_interface and sn_node ([`ed26bc1`](https://github.com/maidsafe/safe_network/commit/ed26bc19831a28e2e13f63c77d26e0cd086cf85c))
 </details>
 
 ## v0.6.1 (2023-03-13)
-
-<csr-id-b85b03ba610d2457d521885d32824bee727ccdba/>
 
 ### Chore
 
