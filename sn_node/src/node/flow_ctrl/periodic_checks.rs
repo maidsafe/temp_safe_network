@@ -7,10 +7,9 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{
-    core::NodeContext,
     flow_ctrl::{cmds::Cmd, FlowCtrl, FlowCtrlCmd},
     membership::Membership,
-    MyNode,
+    MyNode, NodeContext, NodeEvent,
 };
 
 use sn_interface::{
@@ -149,6 +148,7 @@ impl FlowCtrl {
                         NodeMsg::TryJoin(Some(proof.clone())),
                     ));
                 } else {
+                    node.node_events_sender.broadcast(NodeEvent::RelocateEnd);
                     info!(
                         "{} for previous node: {:?} of age: {:?}: The new name is: {:?}, and new age is: {:?} (and pass in context age: {:?})",
                         LogMarker::RelocateEnd,

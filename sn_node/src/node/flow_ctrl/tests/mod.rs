@@ -12,13 +12,12 @@ pub(crate) mod network_builder;
 pub(crate) mod test_utils;
 
 use crate::node::{
-    core::MyNode,
     flow_ctrl::tests::{
         network_builder::TestNetworkBuilder,
         test_utils::{gen_info_with_comm, gen_node_infos_with_comm},
     },
     messaging::Recipients,
-    Cmd, Error,
+    Cmd, Error, MyNode,
 };
 
 use sn_comms::{CommEvent, MsgReceived};

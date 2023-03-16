@@ -16,16 +16,17 @@ mod periodic_checks;
 pub(crate) mod tests;
 pub(crate) use cmd_ctrl::CmdCtrl;
 
-use super::{core::NodeContext, node_starter::CmdChannel, DataStorage, Result};
+use super::{DataStorage, Result};
 use periodic_checks::PeriodicChecksTimestamps;
 
 use crate::node::{
+    api::NodeEvent,
     flow_ctrl::{
         cmds::Cmd,
         fault_detection::{FaultChannels, FaultsCmd},
     },
     messaging::Recipients,
-    Error, MyNode, STANDARD_CHANNEL_SIZE,
+    CmdChannel, Error, MyNode, NodeContext, NodeEventsChannel, STANDARD_CHANNEL_SIZE,
 };
 
 use sn_comms::{CommEvent, MsgReceived};
@@ -45,7 +46,7 @@ use xor_name::XorName;
 
 /// Sent via the rejoin_network_tx to restart the join process.
 /// This would only occur when joins are not allowed, or non-recoverable states.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum RejoinReason {
     /// Happens when trying to join; we will wait a moment and then try again.
     /// NB: Relocated nodes that try to join, are accepted even if joins are disallowed.
@@ -82,11 +83,10 @@ impl FlowCtrl {
         incoming_msg_events: Receiver<CommEvent>,
         data_replication_receiver: Receiver<(Vec<DataAddress>, NodeId)>,
         fault_cmds_channels: (Sender<FaultsCmd>, Receiver<FaultsCmd>),
-    ) -> Result<(CmdChannel, Receiver<RejoinReason>)> {
+    ) -> Result<CmdChannel> {
         let node_context = node.context();
         let (blocking_cmd_sender_channel, mut blocking_cmds_receiver) =
             mpsc::channel(STANDARD_CHANNEL_SIZE);
-        let (rejoin_network_tx, rejoin_network_rx) = mpsc::channel(STANDARD_CHANNEL_SIZE);
 
         // Our channel to process _all_ cmds. If it can, they are processed off thread with latest context,
         // otherwise they are sent to the blocking process channel
@@ -131,6 +131,7 @@ impl FlowCtrl {
             flow_ctrl_cmd_sender.clone(),
             flow_ctrl_cmd_reciever,
             cmd_channel_for_msgs.clone(),
+            node.node_events_sender.clone(),
         );
 
         // second do this until join
@@ -141,7 +142,6 @@ impl FlowCtrl {
                 join_retry_timeout,
                 flow_ctrl_cmd_sender.clone(), // sending of updates to context
                 &mut blocking_cmds_receiver,
-                &rejoin_network_tx,
             )
             .await?;
 
@@ -149,7 +149,6 @@ impl FlowCtrl {
             node,
             cmd_ctrl,
             blocking_cmds_receiver,
-            rejoin_network_tx,
             flow_ctrl_cmd_sender.clone(), // sending of updates to context
         ));
 
@@ -160,7 +159,7 @@ impl FlowCtrl {
         )
         .await;
 
-        Ok((cmd_channel_for_msgs, rejoin_network_rx))
+        Ok(cmd_channel_for_msgs)
     }
 
     /// This runs the join process until we detect we are a network node
@@ -172,7 +171,6 @@ impl FlowCtrl {
         join_retry_timeout: Duration,
         flow_ctrl_cmd_processing: Sender<FlowCtrlCmd>,
         blocking_cmds_receiver: &mut Receiver<(Cmd, Vec<usize>)>,
-        rejoin_network_tx: &Sender<RejoinReason>,
     ) -> Result<MyNode> {
         let mut is_member = false;
         let preprocess_cmd_channel = self.preprocess_cmd_sender_channel.clone();
@@ -191,7 +189,6 @@ impl FlowCtrl {
                         cmd,
                         cmd_id,
                         preprocess_cmd_channel.clone(),
-                        rejoin_network_tx.clone(),
                     )
                     .await;
 
@@ -253,7 +250,6 @@ impl FlowCtrl {
         mut node: MyNode,
         cmd_ctrl: CmdCtrl,
         mut incoming_cmds_from_apis: Receiver<(Cmd, Vec<usize>)>,
-        rejoin_network_tx: Sender<RejoinReason>,
         cmd_processing: Sender<FlowCtrlCmd>,
     ) -> Result<()> {
         // let cmd_channel = self.cmd_sender_channel.clone();
@@ -262,13 +258,7 @@ impl FlowCtrl {
             trace!("Taking cmd off stack: {cmd:?}");
 
             cmd_ctrl
-                .process_blocking_cmd_job(
-                    &mut node,
-                    cmd,
-                    cmd_id,
-                    cmd_processing.clone(),
-                    rejoin_network_tx.clone(),
-                )
+                .process_blocking_cmd_job(&mut node, cmd, cmd_id, cmd_processing.clone())
                 .await;
 
             // update our context in read only processor with each cmd
@@ -334,6 +324,7 @@ impl FlowCtrl {
         flow_ctrl_cmd_sender: Sender<FlowCtrlCmd>,
         mut flow_ctrl_cmd_reciever: Receiver<FlowCtrlCmd>,
         mutating_cmd_channel: CmdChannel,
+        node_events_sender: NodeEventsChannel,
     ) {
         // we'll update this as we go
         let mut context = context;
@@ -358,6 +349,8 @@ impl FlowCtrl {
 
                 match cmd {
                     FlowCtrlCmd::UpdateContext(new_context) => {
+                        node_events_sender
+                            .broadcast(NodeEvent::ContextUpdated(new_context.clone()));
                         context = new_context;
                         continue;
                     }

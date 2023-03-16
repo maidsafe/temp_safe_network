@@ -7,8 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{
-    flow_ctrl::{cmds::Cmd, FlowCtrlCmd, RejoinReason},
-    Error, MyNode, STANDARD_CHANNEL_SIZE,
+    flow_ctrl::{cmds::Cmd, FlowCtrlCmd},
+    Error, MyNode, NodeEvent, STANDARD_CHANNEL_SIZE,
 };
 
 use sn_interface::types::{DataAddress, NodeId};
@@ -48,7 +48,6 @@ impl CmdCtrl {
         cmd: Cmd,
         mut id: Vec<usize>,
         cmd_process_api: Sender<FlowCtrlCmd>,
-        rejoin_network_sender: Sender<RejoinReason>,
     ) {
         let node_identifier = node.info().name();
 
@@ -87,14 +86,11 @@ impl CmdCtrl {
                     }
                 });
             }
-            Err(error) => {
-                warn!("Error when processing cmd: {:?}", error);
-                if let Error::RejoinRequired(reason) = error {
-                    if rejoin_network_sender.send(reason).await.is_err() {
-                        error!("Could not send rejoin reason through channel.");
-                    }
-                }
+            Err(Error::RejoinRequired(reason)) => {
+                node.node_events_sender
+                    .broadcast(NodeEvent::RejoinRequired(reason));
             }
+            Err(error) => warn!("Error when processing cmd: {:?}", error),
         }
 
         #[cfg(feature = "statemap")]

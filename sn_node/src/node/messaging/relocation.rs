@@ -7,7 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{
-    flow_ctrl::cmds::Cmd, messaging::Recipients, relocation::find_nodes_to_relocate, MyNode, Result,
+    flow_ctrl::cmds::Cmd, messaging::Recipients, relocation::find_nodes_to_relocate, MyNode,
+    NodeEvent, Result,
 };
 
 use sn_interface::{
@@ -79,6 +80,7 @@ impl MyNode {
             return vec![];
         }
 
+        self.node_events_sender.broadcast(NodeEvent::RelocateStart);
         info!("{}", LogMarker::RelocateStart);
         info!(
             "Sending request to relocate our node. (on churn of {})",

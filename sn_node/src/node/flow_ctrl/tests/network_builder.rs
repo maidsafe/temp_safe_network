@@ -8,7 +8,7 @@
 
 use super::test_utils::gen_node_infos_with_comm;
 use crate::{
-    node::{cfg::create_test_capacity_and_root_storage, core::MyNode},
+    node::{cfg::create_test_capacity_and_root_storage, MyNode, NodeEventsChannel},
     UsedSpace,
 };
 
@@ -663,6 +663,7 @@ impl TestNetwork {
             UsedSpace::new(min_capacity, max_capacity),
             root_storage_dir,
             mpsc::channel(10).0,
+            NodeEventsChannel::default(),
         )
         .wrap_err("Failed to create MyNode")?;
 

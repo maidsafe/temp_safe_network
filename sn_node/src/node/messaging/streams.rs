@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{core::NodeContext, Cmd, Error, MyNode, Result};
+use crate::node::{Cmd, Error, MyNode, NodeContext, Result};
 use sn_comms::Comm;
 
 use bls::PublicKey;

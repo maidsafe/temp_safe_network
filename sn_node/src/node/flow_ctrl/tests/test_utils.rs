@@ -7,7 +7,10 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
-    node::{cfg::create_test_capacity_and_root_storage, messaging::Recipients, Cmd, MyNode},
+    node::{
+        cfg::create_test_capacity_and_root_storage, messaging::Recipients, Cmd, MyNode,
+        NodeEventsChannel,
+    },
     UsedSpace,
 };
 use sn_comms::{Comm, CommEvent, MsgReceived};
@@ -432,6 +435,7 @@ pub(crate) fn build_a_node_instance(
         UsedSpace::new(min_capacity, max_capacity),
         root_storage_dir,
         mpsc::channel(10).0,
+        NodeEventsChannel::default(),
     )
     .wrap_err("Failed to create MyNode")?;
     Ok(node)
