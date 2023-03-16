@@ -4240,7 +4240,7 @@ dependencies = [
 
 [[package]]
 name = "sn_node"
-version = "0.79.0"
+version = "0.80.0"
 dependencies = [
  "assert_matches",
  "base64 0.13.1",
@@ -4328,7 +4328,7 @@ dependencies = [
 
 [[package]]
 name = "sn_testnet"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "assert_fs",
  "clap",
