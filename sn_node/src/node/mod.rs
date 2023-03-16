@@ -65,7 +65,7 @@ mod core {
         },
         network_knowledge::{
             supermajority, MyNodeInfo, NetworkKnowledge, NodeState, RelocationState,
-            SectionAuthorityProvider, SectionKeyShare, SectionKeysProvider,
+            SectionAuthorityProvider, SectionKeyShare, SectionKeysProvider, SectionTree,
         },
         types::{keys::ed25519::Digest256, log_markers::LogMarker},
         types::{DataAddress, NodeId},
@@ -76,7 +76,7 @@ mod core {
     use std::{
         collections::{BTreeMap, BTreeSet, HashMap},
         net::SocketAddr,
-        path::PathBuf,
+        path::{Path, PathBuf},
         sync::Arc,
     };
 
@@ -93,7 +93,7 @@ mod core {
     pub(crate) struct MyNode {
         pub(crate) comm: Comm,
         pub(crate) addr: SocketAddr, // does this change? if so... when? only at node start atm?
-        root_storage_dir: PathBuf,
+        pub(crate) root_storage_dir: PathBuf,
         pub(crate) data_storage: DataStorage, // Adult only before cache
         pub(crate) keypair: Arc<Keypair>,
         pub(crate) reward_key: PublicKey,
@@ -124,7 +124,6 @@ mod core {
 
     #[derive(custom_debug::Debug, Clone)]
     pub(crate) struct NodeContext {
-        pub(crate) root_storage_dir: PathBuf,
         pub(crate) is_elder: bool,
         pub(crate) data_storage: DataStorage,
         pub(crate) name: XorName,
@@ -158,23 +157,6 @@ mod core {
                 }
             });
         }
-
-        /// Sends `FaultsCmd::UntrackIssue` cmd
-        /// Spawns a process to send this incase the channel may be full, we don't hold up
-        /// processing around this (as this can be called during dkg eg)
-        pub(crate) fn untrack_node_issue(&self, name: XorName, issue: IssueType) {
-            debug!("UnTracking issue {issue:?} in fault detection for {name}");
-            let fault_sender = self.fault_cmds_sender.clone();
-            // TODO: do we need to kill the node if we fail tracking faults?
-            let _handle = tokio::spawn(async move {
-                if let Err(error) = fault_sender
-                    .send(FaultsCmd::UntrackIssue(name, issue))
-                    .await
-                {
-                    warn!("Could not send FaultsCmd through fault_cmds_tx: {error}");
-                }
-            });
-        }
     }
 
     impl MyNode {
@@ -183,7 +165,6 @@ mod core {
         /// read locks eg.
         pub(crate) fn context(&self) -> NodeContext {
             NodeContext {
-                root_storage_dir: self.root_storage_dir.clone(),
                 is_elder: self.is_elder(),
                 name: self.name(),
                 info: self.info(),
@@ -247,14 +228,17 @@ mod core {
                 None
             };
 
+            // Write the section tree to this node's root storage directory
+            MyNode::write_section_tree(network_knowledge.section_tree().clone(), &root_storage_dir);
+
             let node = Self {
                 comm,
                 addr,
+                root_storage_dir,
                 keypair,
                 reward_key,
                 network_knowledge,
                 section_keys_provider,
-                root_storage_dir,
                 dkg_sessions_info: HashMap::default(),
                 pending_split_sections: Default::default(),
                 relocation_state: None,
@@ -271,11 +255,6 @@ mod core {
                 section_proposal_aggregator: SignatureAggregator::default(),
                 data_replication_sender: None,
             };
-
-            let context = &node.context();
-
-            // Write the section tree to this node's root storage directory
-            MyNode::write_section_tree(context);
 
             Ok(node)
         }
@@ -773,12 +752,8 @@ mod core {
             };
         }
 
-        pub(crate) fn write_section_tree(context: &NodeContext) {
-            let section_tree = context.network_knowledge.section_tree().clone();
-            let path = context
-                .root_storage_dir
-                .clone()
-                .join(SECTION_TREE_FILE_NAME);
+        pub(crate) fn write_section_tree(section_tree: SectionTree, root_storage_dir: &Path) {
+            let path = root_storage_dir.to_path_buf().join(SECTION_TREE_FILE_NAME);
 
             let _handle = tokio::spawn(async move {
                 if let Err(err) = section_tree.write_to_disk(&path).await {
@@ -794,22 +769,21 @@ mod core {
         // Updates comm with new members and removes connections that are not from our members
         // Also retains the connections for the nodes undergoing relocation in our current section
         // `MyNode::Comm.sessions` should be updated as it is behind an `Arc`
-        pub(crate) fn update_comm_target_list(context: &NodeContext) {
-            let relocated_members = context
-                .network_knowledge
-                .archived_members()
-                .into_iter()
-                .filter_map(|state| {
-                    // TODO: figure out how to retain the section sign key info within Decsion
-                    if state.is_relocated() {
-                        Some(*state.node_id())
-                    } else {
-                        None
-                    }
-                });
-            let mut members = context.network_knowledge.members();
-            members.extend(relocated_members);
-            context.comm.set_comm_targets(members);
+        pub(crate) fn update_comm_target_list(
+            comm: &Comm,
+            archived_members: &BTreeSet<NodeState>,
+            mut current_members: BTreeSet<NodeId>,
+        ) {
+            let relocated_members = archived_members.iter().filter_map(|state| {
+                // TODO: figure out how to retain the section sign key info within Decsion
+                if state.is_relocated() {
+                    Some(*state.node_id())
+                } else {
+                    None
+                }
+            });
+            current_members.extend(relocated_members);
+            comm.set_comm_targets(current_members);
         }
     }
 }

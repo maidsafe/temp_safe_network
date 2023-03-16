@@ -263,7 +263,11 @@ impl MyNode {
         self.log_section_stats();
         self.log_network_stats();
 
-        MyNode::update_comm_target_list(&self.context());
+        MyNode::update_comm_target_list(
+            &self.comm,
+            &self.network_knowledge.archived_members(),
+            self.network_knowledge().members(),
+        );
 
         // lets check that we have the correct data now we're changing membership
         cmds.push(MyNode::ask_for_any_new_data_from_whole_section(&self.context()).await);

@@ -193,11 +193,17 @@ impl MyNode {
             .network_knowledge
             .update_sap_knowledge_if_valid(section_tree_update, &self.name())?;
         if updated {
-            let context = self.context();
             info!("Updated our network knowledge for {:?}", their_prefix);
             info!("Writing updated knowledge to disk");
-            MyNode::write_section_tree(&context);
-            MyNode::update_comm_target_list(&context);
+            MyNode::write_section_tree(
+                self.network_knowledge.section_tree().clone(),
+                &self.root_storage_dir,
+            );
+            MyNode::update_comm_target_list(
+                &self.comm,
+                &self.network_knowledge.archived_members(),
+                self.network_knowledge().members(),
+            );
         }
         Ok(cmds)
     }
@@ -234,16 +240,21 @@ impl MyNode {
 
         if updated {
             let cmds = self.update_on_sap_change(&old_context).await;
-
-            let latest_context = self.context();
             info!("Updated our network knowledge for {:?}", prefix);
             info!("Writing updated knowledge to disk");
-            MyNode::write_section_tree(&latest_context);
-            MyNode::update_comm_target_list(&latest_context);
+            MyNode::write_section_tree(
+                self.network_knowledge.section_tree().clone(),
+                &self.root_storage_dir,
+            );
+            MyNode::update_comm_target_list(
+                &self.comm,
+                &self.network_knowledge.archived_members(),
+                self.network_knowledge().members(),
+            );
 
             info!(
                 "Prefixes we know about: {:?}",
-                latest_context.network_knowledge.section_tree()
+                self.network_knowledge.section_tree()
             );
             cmds
         } else {

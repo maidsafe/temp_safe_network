@@ -562,7 +562,7 @@ impl MyNode {
         }
     }
 
-    pub(crate) fn handle_dkg_anti_entropy(
+    pub(crate) fn handle_dkg_anti_entropy_request(
         &self,
         session_id: DkgSessionId,
         sender: NodeId,
