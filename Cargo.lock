@@ -3984,7 +3984,7 @@ dependencies = [
 
 [[package]]
 name = "sn_cli"
-version = "0.74.0"
+version = "0.74.1"
 dependencies = [
  "ansi_term",
  "assert_cmd",
@@ -4036,7 +4036,7 @@ dependencies = [
 
 [[package]]
 name = "sn_client"
-version = "0.82.2"
+version = "0.82.3"
 dependencies = [
  "assert_matches",
  "backoff",
@@ -4110,7 +4110,7 @@ dependencies = [
 
 [[package]]
 name = "sn_comms"
-version = "0.6.2"
+version = "0.6.3"
 dependencies = [
  "assert_matches",
  "blsttc",
@@ -4176,7 +4176,7 @@ dependencies = [
 
 [[package]]
 name = "sn_interface"
-version = "0.20.5"
+version = "0.20.6"
 dependencies = [
  "base64 0.13.1",
  "bincode",
@@ -4225,7 +4225,7 @@ dependencies = [
 
 [[package]]
 name = "sn_node"
-version = "0.78.6"
+version = "0.79.0"
 dependencies = [
  "assert_matches",
  "base64 0.13.1",
@@ -4313,7 +4313,7 @@ dependencies = [
 
 [[package]]
 name = "sn_testnet"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "assert_fs",
  "clap",

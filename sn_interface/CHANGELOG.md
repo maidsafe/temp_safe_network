@@ -6,11 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## v0.20.4 (2023-03-10)
+## v0.20.6 (2023-03-16)
 
 ### Chore
 
- - <csr-id-6d17af24fcaf1e340dc3aec3d40e55ee80b154cf/> make clippy happy for rust 1.68
+ - <csr-id-1a8b9c9ba5b98c0f1176a0ccbce53d4acea8c84c/> safenode renaming
 
 ### Commit Statistics
 
@@ -27,10 +27,89 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Safenode renaming ([`1a8b9c9`](https://github.com/maidsafe/safe_network/commit/1a8b9c9ba5b98c0f1176a0ccbce53d4acea8c84c))
+</details>
+
+## v0.20.5 (2023-03-16)
+
+### Chore
+
+ - <csr-id-ed26bc19831a28e2e13f63c77d26e0cd086cf85c/> manually bump sn_interface and sn_node
+   These crates already have published versions at 0.20.6 and 0.78.6, so reverting the commits didn't
+   work correctly for these.
+   
+   Also temporarily disabling the release and merge workflows again because I don't want to trigger a
+   release before I tag these manually.
+ - <csr-id-57539fec4288cdd20672186dcfa49f7f6c9f686f/> sn_interface-0.20.5/sn_client-0.82.2/sn_node-0.78.6/sn_api-0.80.2/sn_cli-0.74.0
+
+### Refactor
+
+ - <csr-id-7ec944309e26c7428f5ebd55efc266cb2594da29/> remove unused join request type
+ - <csr-id-5c19f7e9e9472c616de88d16ad244de0fa638bef/> remove unused join response
+   The join response about the node not being reachable is something we
+   will never get or send. This is because we do not check specifically for
+   reachability anymore.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 8 commits contributed to the release over the course of 1 calendar day.
+ - 6 days passed between releases.
+ - 4 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Manually bump sn_interface and sn_node ([`ed26bc1`](https://github.com/maidsafe/safe_network/commit/ed26bc19831a28e2e13f63c77d26e0cd086cf85c))
+    - Revert "chore(release): sn_interface-0.20.5/sn_client-0.82.2/sn_node-0.78.6/sn_api-0.80.2/sn_cli-0.74.0" ([`9dc0fe9`](https://github.com/maidsafe/safe_network/commit/9dc0fe938e1b1c43ca1292fa8640b7ced22aa39b))
+    - Sn_interface-0.20.5/sn_client-0.82.2/sn_node-0.78.6/sn_api-0.80.2/sn_cli-0.74.0 ([`57539fe`](https://github.com/maidsafe/safe_network/commit/57539fec4288cdd20672186dcfa49f7f6c9f686f))
+    - Fix: use max self_encryption chunk size - The used value was not linked to actual self_encryption value. ([`260e00d`](https://github.com/maidsafe/safe_network/commit/260e00d224ceb72c8889fa3b4eba3591c75b656b))
+    - Feat(test_utils): simplify SAP construction within `TestNetworkBuilder` - Use the `TestSapBuilder` to pass in the configs to construct the SAP ([`6962a2e`](https://github.com/maidsafe/safe_network/commit/6962a2e9a474151f7943bb27fabcb100e7e1a6ec))
+    - Remove unused join request type ([`7ec9443`](https://github.com/maidsafe/safe_network/commit/7ec944309e26c7428f5ebd55efc266cb2594da29))
+    - Remove unused join response ([`5c19f7e`](https://github.com/maidsafe/safe_network/commit/5c19f7e9e9472c616de88d16ad244de0fa638bef))
+    - Feat(rewards): send fee query to elders - Adds concurrent querying of each elder for their respective reward key and fee. - Replaces the dummy fee with the result from the implemented query. ([`698127a`](https://github.com/maidsafe/safe_network/commit/698127a6339729ca812ec95bf5062f4e059c5700))
+</details>
+
+## v0.20.4 (2023-03-10)
+
+<csr-id-6d17af24fcaf1e340dc3aec3d40e55ee80b154cf/>
+
+### Chore
+
+ - <csr-id-6d17af24fcaf1e340dc3aec3d40e55ee80b154cf/> make clippy happy for rust 1.68
+
+### Chore
+
+ - <csr-id-bc33b08ae2a49ec28fdca5cf7fd5bffacc79567f/> sn_interface-0.20.4/sn_node-0.78.4
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Sn_interface-0.20.4/sn_node-0.78.4 ([`bc33b08`](https://github.com/maidsafe/safe_network/commit/bc33b08ae2a49ec28fdca5cf7fd5bffacc79567f))
     - Make clippy happy for rust 1.68 ([`6d17af2`](https://github.com/maidsafe/safe_network/commit/6d17af24fcaf1e340dc3aec3d40e55ee80b154cf))
 </details>
 
 ## v0.20.3 (2023-03-09)
+
+<csr-id-bad9bc634abd8c12a31bbee0ee71423f727c7397/>
 
 ### Chore
 

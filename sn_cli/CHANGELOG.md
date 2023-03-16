@@ -4,23 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
-## v0.74.0 (2023-03-16)
+## v0.74.1 (2023-03-16)
 
 ### Chore
 
- - <csr-id-57539fec4288cdd20672186dcfa49f7f6c9f686f/> sn_interface-0.20.5/sn_client-0.82.2/sn_node-0.78.6/sn_api-0.80.2/sn_cli-0.74.0
-
-### Chore (BREAKING)
-
- - <csr-id-d3d328db75c83e7a71c3fe6eff036c16120b6251/> remove the `node` command from `safe`
+ - <csr-id-1a8b9c9ba5b98c0f1176a0ccbce53d4acea8c84c/> safenode renaming
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 3 commits contributed to the release.
- - 7 days passed between releases.
- - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 1 commit contributed to the release.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -30,12 +25,99 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Safenode renaming ([`1a8b9c9`](https://github.com/maidsafe/safe_network/commit/1a8b9c9ba5b98c0f1176a0ccbce53d4acea8c84c))
+</details>
+
+## v0.74.0 (2023-03-16)
+
+<csr-id-57539fec4288cdd20672186dcfa49f7f6c9f686f/>
+<csr-id-d3d328db75c83e7a71c3fe6eff036c16120b6251/>
+
+### Chore
+
+ - <csr-id-57539fec4288cdd20672186dcfa49f7f6c9f686f/> sn_interface-0.20.5/sn_client-0.82.2/sn_node-0.78.6/sn_api-0.80.2/sn_cli-0.74.0
+
+### Chore
+
+ - <csr-id-88d3403ea11f877e1ffa23fe15beafeb9d68111f/> sn_comms-0.6.2/sn_client-0.82.2/sn_api-0.80.2/sn_cli-0.74.0
+
+### Chore (BREAKING)
+
+ - <csr-id-d3d328db75c83e7a71c3fe6eff036c16120b6251/> remove the `node` command from `safe`
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 4 commits contributed to the release.
+ - 7 days passed between releases.
+ - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Sn_comms-0.6.2/sn_client-0.82.2/sn_api-0.80.2/sn_cli-0.74.0 ([`88d3403`](https://github.com/maidsafe/safe_network/commit/88d3403ea11f877e1ffa23fe15beafeb9d68111f))
     - Revert "chore(release): sn_interface-0.20.5/sn_client-0.82.2/sn_node-0.78.6/sn_api-0.80.2/sn_cli-0.74.0" ([`9dc0fe9`](https://github.com/maidsafe/safe_network/commit/9dc0fe938e1b1c43ca1292fa8640b7ced22aa39b))
     - Sn_interface-0.20.5/sn_client-0.82.2/sn_node-0.78.6/sn_api-0.80.2/sn_cli-0.74.0 ([`57539fe`](https://github.com/maidsafe/safe_network/commit/57539fec4288cdd20672186dcfa49f7f6c9f686f))
     - Remove the `node` command from `safe` ([`d3d328d`](https://github.com/maidsafe/safe_network/commit/d3d328db75c83e7a71c3fe6eff036c16120b6251))
 </details>
 
+## v0.73.0 (2023-03-08)
+
+<csr-id-1e531f807b1c920e61ec9ad2490f6590bf43fdd2/>
+<csr-id-0da345d4875484dd4e4172b10049c72fc3feb74e/>
+<csr-id-c8cfa6c774ceeff71d2ae671b07d4122b94100c9/>
+
+### Chore
+
+ - <csr-id-1e531f807b1c920e61ec9ad2490f6590bf43fdd2/> sn_interface-0.20.0/sn_comms-0.6.0/sn_client-0.82.0/sn_node-0.78.0/sn_api-0.80.0/sn_cli-0.73.0
+ - <csr-id-0da345d4875484dd4e4172b10049c72fc3feb74e/> tidying up
+ - <csr-id-c8cfa6c774ceeff71d2ae671b07d4122b94100c9/> bump sn_dbc version
+
+### New Features
+
+ - <csr-id-fa49b0d05d944f0ab1141b3c18bd61ac345b2fed/> encapsulate Dbc reasons
+
+### Bug Fixes
+
+ - <csr-id-6db31037cb17a3d9d355c317ea1e4fb8642ab581/> cli wallet reason option
+
+### New Features (BREAKING)
+
+ - <csr-id-97ee1eb5a55a0b4dbea9ea8a512351dd3219a6ed/> DBC reasons
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 6 commits contributed to the release.
+ - 1 day passed between releases.
+ - 6 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Sn_interface-0.20.0/sn_comms-0.6.0/sn_client-0.82.0/sn_node-0.78.0/sn_api-0.80.0/sn_cli-0.73.0 ([`1e531f8`](https://github.com/maidsafe/safe_network/commit/1e531f807b1c920e61ec9ad2490f6590bf43fdd2))
+    - Tidying up ([`0da345d`](https://github.com/maidsafe/safe_network/commit/0da345d4875484dd4e4172b10049c72fc3feb74e))
+    - Cli wallet reason option ([`6db3103`](https://github.com/maidsafe/safe_network/commit/6db31037cb17a3d9d355c317ea1e4fb8642ab581))
+    - Encapsulate Dbc reasons ([`fa49b0d`](https://github.com/maidsafe/safe_network/commit/fa49b0d05d944f0ab1141b3c18bd61ac345b2fed))
+    - Bump sn_dbc version ([`c8cfa6c`](https://github.com/maidsafe/safe_network/commit/c8cfa6c774ceeff71d2ae671b07d4122b94100c9))
+    - DBC reasons ([`97ee1eb`](https://github.com/maidsafe/safe_network/commit/97ee1eb5a55a0b4dbea9ea8a512351dd3219a6ed))
+</details>
+
 ## v0.72.3 (2023-03-06)
+
+<csr-id-4b8d391f5f9fbdfb4de28e969ad1b1c4f4a13ebf/>
 
 ### Chore
 
@@ -124,50 +206,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
  * **Uncategorized**
     - Sn_interface-0.19.1/sn_fault_detection-0.15.5/sn_node-0.77.1/sn_cli-0.72.1 ([`558061d`](https://github.com/maidsafe/safe_network/commit/558061d5eea7bc1f0feac310afb91ef9ca7c681e))
     - Fix clippy lints; fmt ([`5fcb670`](https://github.com/maidsafe/safe_network/commit/5fcb6700fa26c0825191feb87c8d4a4653e50eef))
-</details>
-
-## v0.73.0 (2023-03-08)
-
-### Chore
-
- - <csr-id-1e531f807b1c920e61ec9ad2490f6590bf43fdd2/> sn_interface-0.20.0/sn_comms-0.6.0/sn_client-0.82.0/sn_node-0.78.0/sn_api-0.80.0/sn_cli-0.73.0
- - <csr-id-0da345d4875484dd4e4172b10049c72fc3feb74e/> tidying up
- - <csr-id-c8cfa6c774ceeff71d2ae671b07d4122b94100c9/> bump sn_dbc version
-
-### New Features
-
- - <csr-id-fa49b0d05d944f0ab1141b3c18bd61ac345b2fed/> encapsulate Dbc reasons
-
-### Bug Fixes
-
- - <csr-id-6db31037cb17a3d9d355c317ea1e4fb8642ab581/> cli wallet reason option
-
-### New Features (BREAKING)
-
- - <csr-id-97ee1eb5a55a0b4dbea9ea8a512351dd3219a6ed/> DBC reasons
-
-### Commit Statistics
-
-<csr-read-only-do-not-edit/>
-
- - 6 commits contributed to the release.
- - 1 day passed between releases.
- - 6 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' were seen in commit messages
-
-### Commit Details
-
-<csr-read-only-do-not-edit/>
-
-<details><summary>view details</summary>
-
- * **Uncategorized**
-    - Sn_interface-0.20.0/sn_comms-0.6.0/sn_client-0.82.0/sn_node-0.78.0/sn_api-0.80.0/sn_cli-0.73.0 ([`1e531f8`](https://github.com/maidsafe/safe_network/commit/1e531f807b1c920e61ec9ad2490f6590bf43fdd2))
-    - Tidying up ([`0da345d`](https://github.com/maidsafe/safe_network/commit/0da345d4875484dd4e4172b10049c72fc3feb74e))
-    - Cli wallet reason option ([`6db3103`](https://github.com/maidsafe/safe_network/commit/6db31037cb17a3d9d355c317ea1e4fb8642ab581))
-    - Encapsulate Dbc reasons ([`fa49b0d`](https://github.com/maidsafe/safe_network/commit/fa49b0d05d944f0ab1141b3c18bd61ac345b2fed))
-    - Bump sn_dbc version ([`c8cfa6c`](https://github.com/maidsafe/safe_network/commit/c8cfa6c774ceeff71d2ae671b07d4122b94100c9))
-    - DBC reasons ([`97ee1eb`](https://github.com/maidsafe/safe_network/commit/97ee1eb5a55a0b4dbea9ea8a512351dd3219a6ed))
 </details>
 
 ## v0.72.0 (2023-02-27)
