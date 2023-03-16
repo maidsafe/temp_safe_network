@@ -431,7 +431,8 @@ async fn handle_cmd(
     mutating_cmd_channel: CmdChannel,
 ) -> Result<(), Error> {
     let mut new_cmds = vec![];
-
+    let start = Instant::now();
+    let cmd_string = format!("{:?}", cmd);
     match cmd {
         Cmd::HandleMsg {
             sender,
@@ -653,9 +654,16 @@ async fn handle_cmd(
             if let Err(error) = mutating_cmd_channel.send((cmd, vec![])).await {
                 error!("Error sending msg onto cmd channel {error:?}");
             }
+
+            // early exit, no cmds produced here...
+            return Ok(());
         }
     }
 
+    debug!(
+        "Off-thread handling of Cmd took {:?}: {cmd_string:?}",
+        start.elapsed()
+    );
     for cmd in new_cmds {
         flow_ctrl_cmd_sender
             .send(FlowCtrlCmd::Handle(cmd))
