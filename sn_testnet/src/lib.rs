@@ -18,7 +18,7 @@ pub const DEFAULT_NODE_LAUNCH_INTERVAL: u64 = 5000;
 pub const SAFENODE_BIN_NAME: &str = "safenode";
 #[cfg(target_os = "windows")]
 pub const SAFENODE_BIN_NAME: &str = "safenode.exe";
-const GENESIS_NODE_DIR_NAME: &str = "sn-node-genesis";
+const GENESIS_NODE_DIR_NAME: &str = "safenode-genesis";
 const TESTNET_DIR_NAME: &str = "local-test-network";
 
 /// This trait exists for unit testing.
@@ -166,7 +166,7 @@ impl Testnet {
                         .ok_or_else(|| eyre!("Failed to obtain dir name"))?;
                     // This excludes any directories the user may have created under the network
                     // data directory path, either intentionally or unintentionally.
-                    if dir_name.starts_with("sn-node-") && dir_name != GENESIS_NODE_DIR_NAME {
+                    if dir_name.starts_with("safenode-") && dir_name != GENESIS_NODE_DIR_NAME {
                         node_count += 1;
                     }
                 }
@@ -216,12 +216,12 @@ impl Testnet {
         let address = address.unwrap_or("127.0.0.1:12000".parse()?);
         info!("Launching genesis node using address {address}...");
         let launch_args = self.get_launch_args(
-            "sn-node-genesis".to_string(),
+            "safenode-genesis".to_string(),
             Some(address),
             None,
             node_args,
         )?;
-        let node_data_dir_path = self.nodes_dir_path.join("sn-node-genesis");
+        let node_data_dir_path = self.nodes_dir_path.join("safenode-genesis");
         std::fs::create_dir_all(node_data_dir_path)?;
 
         let launch_bin = self.get_launch_bin();
@@ -259,14 +259,14 @@ impl Testnet {
             info!("Launching node {i} of {end}...");
             let node_data_dir_path = self
                 .nodes_dir_path
-                .join(format!("sn-node-{i}"))
+                .join(format!("safenode-{i}"))
                 .to_str()
                 .ok_or_else(|| eyre!("Unable to obtain node data directory path"))?
                 .to_string();
             std::fs::create_dir_all(&node_data_dir_path)?;
 
             let launch_args = self.get_launch_args(
-                format!("sn-node-{i}"),
+                format!("safenode-{i}"),
                 None,
                 Some(network_contacts_path),
                 node_args.clone(),
@@ -333,7 +333,7 @@ impl Testnet {
             launch_args.push("--".to_string());
         }
 
-        if node_name == "sn-node-genesis" {
+        if node_name == "safenode-genesis" {
             let address =
                 address.ok_or_else(|| eyre!("An address must be present for the genesis node"))?;
             launch_args.push("--first".to_string());
@@ -411,10 +411,10 @@ mod test {
     {
         let tmp_data_dir = assert_fs::TempDir::new()?;
         let nodes_dir = tmp_data_dir.child(TESTNET_DIR_NAME);
-        let genesis_data_dir = nodes_dir.child("sn-node-genesis");
+        let genesis_data_dir = nodes_dir.child("safenode-genesis");
         genesis_data_dir.create_dir_all()?;
         for i in 1..=20 {
-            let node_dir = nodes_dir.child(format!("sn-node-{i}"));
+            let node_dir = nodes_dir.child(format!("safenode-{i}"));
             node_dir.create_dir_all()?;
         }
 
@@ -442,10 +442,10 @@ mod test {
     {
         let tmp_data_dir = assert_fs::TempDir::new()?;
         let nodes_dir = tmp_data_dir.child(TESTNET_DIR_NAME);
-        let genesis_data_dir = nodes_dir.child("sn-node-genesis");
+        let genesis_data_dir = nodes_dir.child("safenode-genesis");
         genesis_data_dir.create_dir_all()?;
         for i in 1..=20 {
-            let node_dir = nodes_dir.child(format!("sn-node-{i}"));
+            let node_dir = nodes_dir.child(format!("safenode-{i}"));
             node_dir.create_dir_all()?;
         }
         let random_dir = nodes_dir.child("user-created-random-dir");
@@ -694,7 +694,7 @@ mod test {
         let genesis_data_dir = nodes_dir.child(GENESIS_NODE_DIR_NAME);
         genesis_data_dir.create_dir_all()?;
         for i in 1..=20 {
-            let node_dir = nodes_dir.child(format!("sn-node-{i}"));
+            let node_dir = nodes_dir.child(format!("safenode-{i}"));
             node_dir.create_dir_all()?;
         }
 
@@ -738,7 +738,7 @@ mod test {
         let mut node_launcher = MockNodeLauncher::new();
         for i in 1..=20 {
             let node_data_dir = nodes_dir
-                .join(&format!("sn-node-{i}"))
+                .join(&format!("safenode-{i}"))
                 .to_str()
                 .ok_or_else(|| eyre!("Unable to obtain path"))?
                 .to_string();
@@ -805,7 +805,7 @@ mod test {
 
         assert!(result.is_ok());
         for i in 1..=20 {
-            let node_dir = nodes_dir.child(format!("sn-node-{i}"));
+            let node_dir = nodes_dir.child(format!("safenode-{i}"));
             node_dir.assert(predicates::path::is_dir());
         }
 
@@ -838,7 +838,7 @@ mod test {
 
         assert!(result.is_ok());
         for i in 2..=20 {
-            let node_dir = nodes_dir.child(format!("sn-node-{i}"));
+            let node_dir = nodes_dir.child(format!("safenode-{i}"));
             node_dir.assert(predicates::path::is_dir());
         }
 
@@ -857,9 +857,9 @@ mod test {
 
         let mut node_launcher = MockNodeLauncher::new();
         for i in 1..=20 {
-            let node_data_dir = nodes_dir.join(&format!("sn-node-{i}"));
+            let node_data_dir = nodes_dir.join(&format!("safenode-{i}"));
             let graph_output_file_path = node_data_dir
-                .join(format!("sn-node-{i}-flame.svg"))
+                .join(format!("safenode-{i}-flame.svg"))
                 .to_str()
                 .ok_or_else(|| eyre!("Unable to obtain path"))?
                 .to_string();
@@ -922,7 +922,7 @@ mod test {
         let mut node_launcher = MockNodeLauncher::new();
         for i in 1..=30 {
             let node_data_dir = nodes_dir
-                .join(&format!("sn-node-{i}"))
+                .join(&format!("safenode-{i}"))
                 .to_str()
                 .ok_or_else(|| eyre!("Unable to obtain path"))?
                 .to_string();
@@ -967,7 +967,7 @@ mod test {
         assert!(result.is_ok());
         assert_eq!(testnet.node_count, 30);
         for i in 1..=30 {
-            let node_dir = nodes_dir.child(format!("sn-node-{i}"));
+            let node_dir = nodes_dir.child(format!("safenode-{i}"));
             node_dir.assert(predicates::path::is_dir());
         }
         Ok(())

@@ -210,35 +210,35 @@ A local network is bootstrapped by running several nodes which automatically int
 $ safe node run-baby-fleming
 Storing nodes' generated data at /home/chris/.safe/node/baby-fleming-nodes
 Starting a node to join a Safe network...
-Starting logging to file: "/home/chris/.safe/node/baby-fleming-nodes/sn-node-genesis"
+Starting logging to file: "/home/chris/.safe/node/baby-fleming-nodes/safenode-genesis"
 Node PID: 1025110, prefix: Prefix(), name: 799ac7(01111001).., age: 255, connection info:
 "127.0.0.1:41904"
-Starting logging to file: "/home/chris/.safe/node/baby-fleming-nodes/sn-node-2"
+Starting logging to file: "/home/chris/.safe/node/baby-fleming-nodes/safenode-2"
 Node PID: 1025149, prefix: Prefix(), name: 8e9b93(10001110).., age: 98, connection info:
 "127.0.0.1:49538"
-Starting logging to file: "/home/chris/.safe/node/baby-fleming-nodes/sn-node-3"
+Starting logging to file: "/home/chris/.safe/node/baby-fleming-nodes/safenode-3"
 Node PID: 1025186, prefix: Prefix(), name: 0c9ce6(00001100).., age: 96, connection info:
 "127.0.0.1:40617"
-Starting logging to file: "/home/chris/.safe/node/baby-fleming-nodes/sn-node-4"
+Starting logging to file: "/home/chris/.safe/node/baby-fleming-nodes/safenode-4"
 Node PID: 1025224, prefix: Prefix(), name: f7a2ff(11110111).., age: 94, connection info:
 "127.0.0.1:57710"
-Starting logging to file: "/home/chris/.safe/node/baby-fleming-nodes/sn-node-5"
+Starting logging to file: "/home/chris/.safe/node/baby-fleming-nodes/safenode-5"
 Node PID: 1025261, prefix: Prefix(), name: 75a2c1(01110101).., age: 92, connection info:
 "127.0.0.1:49860"
-Starting logging to file: "/home/chris/.safe/node/baby-fleming-nodes/sn-node-6"
+Starting logging to file: "/home/chris/.safe/node/baby-fleming-nodes/safenode-6"
 Node PID: 1025299, prefix: Prefix(), name: b6f79c(10110110).., age: 90, connection info:
 "127.0.0.1:32819"
-Starting logging to file: "/home/chris/.safe/node/baby-fleming-nodes/sn-node-7"
+Starting logging to file: "/home/chris/.safe/node/baby-fleming-nodes/safenode-7"
 Node PID: 1025336, prefix: Prefix(), name: 3444f0(00110100).., age: 88, connection info:
 "127.0.0.1:51381"
-Starting logging to file: "/home/chris/.safe/node/baby-fleming-nodes/sn-node-8"
-Starting logging to file: "/home/chris/.safe/node/baby-fleming-nodes/sn-node-9"
+Starting logging to file: "/home/chris/.safe/node/baby-fleming-nodes/safenode-8"
+Starting logging to file: "/home/chris/.safe/node/baby-fleming-nodes/safenode-9"
 Node PID: 1025379, prefix: Prefix(), name: 653f38(01100101).., age: 76, connection info:
 "127.0.0.1:60200"
-Starting logging to file: "/home/chris/.safe/node/baby-fleming-nodes/sn-node-10"
+Starting logging to file: "/home/chris/.safe/node/baby-fleming-nodes/safenode-10"
 Node PID: 1025399, prefix: Prefix(), name: a76137(10100111).., age: 74, connection info:
 "127.0.0.1:52562"
-Starting logging to file: "/home/chris/.safe/node/baby-fleming-nodes/sn-node-11"
+Starting logging to file: "/home/chris/.safe/node/baby-fleming-nodes/safenode-11"
 Node PID: 1025437, prefix: Prefix(), name: 260ca3(00100110).., age: 72, connection info:
 "127.0.0.1:48606"
 Node PID: 1025475, prefix: Prefix(), name: c5feb4(11000101).., age: 70, connection info:

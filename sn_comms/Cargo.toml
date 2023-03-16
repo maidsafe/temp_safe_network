@@ -1,7 +1,7 @@
 [package]
 authors = ["MaidSafe Developers <dev@maidsafe.net>"]
 description = "The Safe Network Node Comms."
-documentation = "https://docs.rs/sn_node"
+documentation = "https://docs.rs/safenode"
 edition = "2021"
 homepage = "https://maidsafe.net"
 license = "GPL-3.0"

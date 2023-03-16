@@ -101,7 +101,7 @@ impl SectionKeysProvider {
 
 /// Builds a spent proof share based on the given inputs.
 ///
-/// This code is shared between `sn_node` and `sn_client`. The node needs it both for validating a
+/// This code is shared between `safenode` and `sn_client`. The node needs it both for validating a
 /// spend request and for test setup, and the client needs it for test setup. This is not a perfect
 /// location for it, but since it makes use of the section key provider I thought it could sit
 /// alongside it.
