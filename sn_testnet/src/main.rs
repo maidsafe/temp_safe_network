@@ -54,7 +54,7 @@ struct Cmd {
     /// machine in your local network and have them join an existing testnet on the same network.
     ///
     /// If the value is not supplied, we will use the default location for the contacts file, which
-    /// will be at <node-data-dir>/local-test-network/sn-genesis-node/section_tree.
+    /// will be at node-data-dir/local-test-network/sn-genesis-node/section_tree.
     #[clap(long = "network-contacts-path", short = 'n', value_name = "FILE_PATH")]
     network_contacts_path: Option<PathBuf>,
 
