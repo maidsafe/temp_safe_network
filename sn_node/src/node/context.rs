@@ -16,7 +16,7 @@ use sn_interface::network_knowledge::{
 
 use bls::PublicKey;
 use ed25519_dalek::Keypair;
-use std::sync::Arc;
+use std::{net::SocketAddr, sync::Arc};
 use tokio::sync::mpsc::Sender;
 use xor_name::XorName;
 
@@ -44,6 +44,30 @@ pub struct NodeContext {
 }
 
 impl NodeContext {
+    /************ Public API methods ********************/
+
+    /// The socket address of our node.
+    pub fn socket_addr(&self) -> SocketAddr {
+        self.comm.socket_addr()
+    }
+
+    /// The name of our node.
+    pub fn name(&self) -> XorName {
+        self.name
+    }
+
+    /// Wether the node is an Elder in its section.
+    pub fn is_elder(&self) -> bool {
+        self.is_elder
+    }
+
+    /// Current node's network knowledge.
+    pub fn network_knowledge(&self) -> &NetworkKnowledge {
+        &self.network_knowledge
+    }
+
+    /************ END OF Public API methods **************/
+
     /// Log an issue in dysfunction
     /// Spawns a process to send this incase the channel may be full, we don't hold up
     /// processing around this (as this can be called during dkg eg)

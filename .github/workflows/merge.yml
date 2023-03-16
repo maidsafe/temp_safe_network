@@ -23,18 +23,33 @@ jobs:
 
   pre_job:
     # continue-on-error: true # Uncomment once integration is finished
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
     # Map a step output to a job output
     outputs:
       should_skip: ${{ steps.skip_check.outputs.should_skip }}
     steps:
       - id: skip_check
         uses: fkirc/skip-duplicate-actions@v5
+        if: matrix.os == 'ubuntu-latest'
         with:
           # All of these options are optional, so you can remove them if you are happy with the defaults
           concurrent_skipping: 'never'
           skip_after_successful_duplicate: 'true'
           do_not_skip: '["pull_request", "workflow_dispatch", "schedule"]'
+      - name: Install Protocol Buffer compiler Ubuntu
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt install -y protobuf-compiler libprotobuf-dev
+
+      - name: Install Protocol Buffer compiler Mac
+        if: matrix.os == 'macos-latest'
+        run: brew install protobuf
+
+      - name: Install Protocol Buffer compiler Windows
+        if: matrix.os == 'windows-latest'
+        run: choco install protobuf
 
   cargo-udeps:
     if: "!startsWith(github.event.head_commit.message, 'chore(release):')"

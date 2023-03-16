@@ -1,0 +1,69 @@
+// Copyright 2023 MaidSafe.net limited.
+//
+// This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
+// Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
+// under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied. Please review the Licences for the specific language governing
+// permissions and limitations relating to use of the SAFE Network Software.
+
+// Protocol buffer for the RPC interface exposed by a SAFE node to be used
+// for administration, infrastructure, and support purposes. This interface
+// is completely isolated and different from the node-to-node and client-to-node
+// messaging protocol defined by SAFE for network management and data storage/transfers.
+
+// Version of protocol buffer used
+syntax = "proto3";
+
+// Package name
+package safenode;
+
+
+// Service exposed by a SAFE node for
+service SafeNode {
+  //
+  rpc NodeInfo (NodeInfoRequest) returns (NodeInfoResponse);
+
+  //
+  rpc SectionMembers (SectionMembersRequest) returns (SectionMembersResponse);
+
+  //
+  rpc NodeEvents (NodeEventsRequest) returns (stream NodeEvent);
+
+  //
+  rpc Stop (StopRequest) returns (StopResponse);
+
+  //
+  rpc Restart (RestartRequest) returns (RestartResponse);
+}
+
+message NodeInfoRequest {}
+
+message NodeInfoResponse {
+  bytes node_name = 1;
+  bool is_elder = 2;
+  string log_dir = 3;
+}
+
+message SectionMembersRequest {}
+
+message SectionMembersResponse {
+  repeated Peer peers = 1;
+}
+
+message Peer {
+  bytes node_name = 1;
+  bool is_elder = 2;
+  string addr = 3;
+}
+
+message NodeEventsRequest {}
+
+message NodeEvent {
+  string event = 1;
+}
+
+message StopRequest {}
+message StopResponse {}
+
+message RestartRequest {}
+message RestartResponse {}

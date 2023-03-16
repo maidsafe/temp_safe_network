@@ -10,7 +10,8 @@ use crate::node::{
     cfg::keypair_storage::{get_reward_pk, store_network_keypair, store_new_reward_keypair},
     flow_ctrl::{fault_detection::FaultsCmd, CmdCtrl, FlowCtrl},
     logging::log_system_details,
-    CmdChannel, Config, Error, MyNode, NodeEventsChannel, Result, STANDARD_CHANNEL_SIZE,
+    CmdChannel, Config, Error, MyNode, NodeContext, NodeEventsChannel, Result,
+    STANDARD_CHANNEL_SIZE,
 };
 use crate::UsedSpace;
 
@@ -41,6 +42,8 @@ pub struct NodeRef {
     pub cmd_channel: CmdChannel,
     /// Channel to subscribe in order to receive node events
     pub events_channel: NodeEventsChannel,
+    /// Snapshot of node's state
+    pub context: NodeContext,
 }
 
 /// Start a new node.
@@ -75,7 +78,7 @@ async fn start_node(
     let (fault_cmds_sender, fault_cmds_receiver) =
         mpsc::channel::<FaultsCmd>(STANDARD_CHANNEL_SIZE);
 
-    let node_events_channel = NodeEventsChannel::default();
+    let events_channel = NodeEventsChannel::default();
     let (comm, incoming_msg_receiver) = Comm::new(config.local_addr(), config.first())?;
 
     let node = if config.first().is_some() {
@@ -85,7 +88,7 @@ async fn start_node(
             root_storage_dir,
             reward_key,
             fault_cmds_sender.clone(),
-            node_events_channel.clone(),
+            events_channel.clone(),
         )
         .await?
     } else {
@@ -96,7 +99,7 @@ async fn start_node(
             root_storage_dir,
             reward_key,
             fault_cmds_sender.clone(),
-            node_events_channel.clone(),
+            events_channel.clone(),
         )
         .await?;
         info!("Node {:?} join has been accepted.", node.name());
@@ -139,7 +142,8 @@ async fn start_node(
 
     Ok(NodeRef {
         cmd_channel,
-        events_channel: node_events_channel,
+        events_channel,
+        context,
     })
 }
 
