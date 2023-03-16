@@ -29,15 +29,15 @@
 
 use clap::Parser;
 use color_eyre::{eyre::eyre, Help, Result};
+use sn_testnet::{Testnet, DEFAULT_NODE_LAUNCH_INTERVAL, SAFENODE_BIN_NAME};
 use std::{
     path::PathBuf,
     process::{Command, Stdio},
 };
-use testnet::{Testnet, DEFAULT_NODE_LAUNCH_INTERVAL, SAFENODE_BIN_NAME};
 use tracing::{debug, info};
 use tracing_subscriber::EnvFilter;
 
-const BASE_TRACING_DIRECTIVES: &str = "testnet=debug";
+const BASE_TRACING_DIRECTIVES: &str = "sn_testnet=debug";
 const DEFAULT_NODE_COUNT: u32 = 30;
 
 #[derive(Debug, clap::StructOpt)]
