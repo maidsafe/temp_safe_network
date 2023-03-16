@@ -15,7 +15,7 @@ use std::{env, fs::read_to_string, path::PathBuf, time::Duration};
 
 const TEST_ENV_GENESIS_DBC_PATH: &str = "TEST_ENV_GENESIS_DBC_PATH";
 const DEFAULT_TEST_GENESIS_DBC_PATH: &str =
-    ".safe/node/local-test-network/sn-node-genesis/genesis_dbc";
+    ".safe/node/local-test-network/safenode-genesis/genesis_dbc";
 
 /// Create a test client without providing any specific keypair,
 /// DBC owner, `bootstrap_config`, or timeout.

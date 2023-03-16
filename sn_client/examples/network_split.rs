@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-//! `sn_node` provides the interface to Safe routing.  The resulting executable is the node
+//! `safenode` provides the interface to Safe routing.  The resulting executable is the node
 //! for the Safe network.
 
 use eyre::{eyre, Result};
@@ -23,10 +23,10 @@ use tracing::info;
 use xor_name::XorName;
 
 #[cfg(not(target_os = "windows"))]
-const SAFE_NODE_EXECUTABLE: &str = "sn_node";
+const SAFE_NODE_EXECUTABLE: &str = "safenode";
 
 #[cfg(target_os = "windows")]
-const SAFE_NODE_EXECUTABLE: &str = "sn_node.exe";
+const SAFE_NODE_EXECUTABLE: &str = "safenode.exe";
 
 const INTERVAL: u64 = 5000; // milliseconds
 const ADDITIONAL_NODES_TO_SPLIT: usize = 15;

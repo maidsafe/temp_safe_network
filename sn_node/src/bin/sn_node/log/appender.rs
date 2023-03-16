@@ -32,7 +32,7 @@ pub fn file_rotater(
     };
     let file_appender = FileRotateAppender::make_rotate_appender(
         dir,
-        "sn_node.log",
+        "safenode.log",
         AppendTimestamp::default(FileLimit::MaxFiles(logs_retained)),
         content_limit,
         Compression::OnRotate(uncompressed_files),
