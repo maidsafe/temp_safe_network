@@ -155,7 +155,7 @@ impl FlowCtrl {
         Self::send_out_data_for_replication(
             node_context.data_storage,
             data_replication_receiver,
-            blocking_cmd_sender_channel.clone(),
+            flow_ctrl_cmd_sender.clone(),
         )
         .await;
 
@@ -277,14 +277,14 @@ impl FlowCtrl {
     async fn send_out_data_for_replication(
         node_data_storage: DataStorage,
         mut data_replication_receiver: Receiver<(Vec<DataAddress>, NodeId)>,
-        cmd_channel: Sender<(Cmd, Vec<usize>)>,
+        flow_ctrl_cmd_channel: Sender<FlowCtrlCmd>,
     ) {
         // start a new thread to kick off data replication
         let _handle = tokio::task::spawn(async move {
             // is there a simple way to dedupe common data going to many nodes?
             // is any overhead reduction worth the increased complexity?
             while let Some((data_addresses, node_id)) = data_replication_receiver.recv().await {
-                let send_cmd_channel = cmd_channel.clone();
+                let flow_ctrl_cmd_channel = flow_ctrl_cmd_channel.clone();
                 let data_storage = node_data_storage.clone();
                 // move replication off thread so we don't block the receiver
                 let _handle = tokio::task::spawn(async move {
@@ -310,7 +310,7 @@ impl FlowCtrl {
 
                     let cmd =
                         Cmd::send_msg(msg, Recipients::Single(Participant::from_node(node_id)));
-                    if let Err(error) = send_cmd_channel.send((cmd, vec![])).await {
+                    if let Err(error) = flow_ctrl_cmd_channel.send(FlowCtrlCmd::Handle(cmd)).await {
                         error!("Failed to enqueue send msg command for replication of data batch to {node_id:?}: {error:?}");
                     }
                 });
