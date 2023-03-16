@@ -475,7 +475,7 @@ jobs:
     name: E2E Churn test
     runs-on: ubuntu-latest
     env:
-      RUST_LOG: testnet,safenode,sn_node,sn_fault_detection,sn_comms,sn_interface=trace
+      RUST_LOG: sn_testnet,safenode,sn_node,sn_fault_detection,sn_comms,sn_interface=trace
     steps:
       - uses: actions/checkout@v2
 

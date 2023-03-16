@@ -4073,11 +4073,11 @@ dependencies = [
  "signature",
  "sn_dbc",
  "sn_interface",
+ "sn_testnet",
  "strum",
  "strum_macros",
  "tempfile",
  "termcolor",
- "testnet",
  "thiserror",
  "tiny-keccak",
  "tokio",
@@ -4312,6 +4312,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "sn_testnet"
+version = "0.1.0"
+dependencies = [
+ "assert_fs",
+ "clap",
+ "color-eyre",
+ "dirs-next",
+ "eyre",
+ "mockall",
+ "predicates",
+ "tokio",
+ "tracing",
+ "tracing-core",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "sn_updater"
 version = "0.1.0"
 dependencies = [
@@ -4485,23 +4502,6 @@ name = "termtree"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "95059e91184749cb66be6dc994f67f182b6d897cb3df74a5bf66b5e709295fd8"
-
-[[package]]
-name = "testnet"
-version = "0.1.0"
-dependencies = [
- "assert_fs",
- "clap",
- "color-eyre",
- "dirs-next",
- "eyre",
- "mockall",
- "predicates",
- "tokio",
- "tracing",
- "tracing-core",
- "tracing-subscriber",
-]
 
 [[package]]
 name = "textwrap"

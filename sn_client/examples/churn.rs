@@ -13,11 +13,11 @@ use sn_client::Client;
 use sn_interface::types::utils::random_bytes;
 
 use eyre::{eyre, Result};
+use sn_testnet::Testnet;
 use std::{
     path::PathBuf,
     process::{Command, Stdio},
 };
-use testnet::Testnet;
 use tiny_keccak::{Hasher, Sha3};
 use tokio::time::{sleep, Duration};
 use tracing::info;

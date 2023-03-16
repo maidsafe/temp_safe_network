@@ -10,5 +10,5 @@ members = [
     "sn_cmd_test_utilities",
     "log_cmds_inspector",
     "sn_interface",
-    "testnet"
+    "sn_testnet"
 ]
