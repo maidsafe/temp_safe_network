@@ -8,8 +8,6 @@ on:
   push:
     branches:
       - main
-    paths-ignore:
-      - '**'
 
 env:
   WORKFLOW_URL: https://github.com/maidsafe/safe_network/actions/runs
