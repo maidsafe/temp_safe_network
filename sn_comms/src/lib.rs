@@ -269,6 +269,8 @@ fn process_cmds(
                             let _ = links.insert(*node_id, link);
                         }
                     });
+
+                    debug!("CommLinks stored #{:?}", links.len());
                 }
                 CommCmd::Send {
                     msg_id,

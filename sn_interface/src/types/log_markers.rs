@@ -45,9 +45,6 @@ pub enum LogMarker {
     MembershipSendingAeUpdateRequest,
     MembershipAeRequestReceived,
     GossippingMembershipVotes,
-    // Data
-    DataStoreReceivedAtElder,
-    DataQueryReceviedAtElder,
     // Chunks
     StoringChunk,
     StoredNewChunk,

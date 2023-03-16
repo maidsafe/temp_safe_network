@@ -47,9 +47,6 @@ impl MyNode {
         // We accept that we might be sending a WireMsg to ourselves.
         // The extra load is not that big. But we can optimize this later if necessary.
 
-        // We generate the operation id to track the response from the node
-        // by using the query msg id, which shall be unique per query.
-
         let target_addr = wire_msg.dst().name;
 
         let kind = wire_msg.kind();
@@ -86,6 +83,7 @@ impl MyNode {
             );
         }
 
+        // error out if a query and the index does not exist
         if let Some(index) = query_index {
             // could not find our desired index
             if targets.is_empty() {
