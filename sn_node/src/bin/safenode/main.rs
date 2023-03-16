@@ -40,8 +40,11 @@ use std::{io::Write, process::exit};
 use tokio::{runtime::Runtime, time::Duration};
 use tracing::{self, error, info, warn};
 
-const JOIN_TIMEOUT_SEC: u64 = 60;
-const JOIN_TIMEOUT_RETRY_TIME_SEC: u64 = 30;
+// Time we allow a node ot keep attempting to join
+const JOIN_ATTEMPT_TIMEOUT_SEC: u64 = 30;
+// Time between retry attempts after fail to join
+const JOIN_TIMEOUT_WAIT_BEFORE_RETRY_TIME_SEC: u64 = 30;
+// Time to wait before trying to join again when joins are not allowed
 const JOIN_DISALLOWED_RETRY_TIME_SEC: u64 = 60;
 
 fn main() -> Result<()> {
@@ -98,7 +101,7 @@ fn create_runtime_and_node(config: &Config) -> Result<()> {
     config.validate()?;
 
     let our_pid = std::process::id();
-    let join_timeout = Duration::from_secs(JOIN_TIMEOUT_SEC);
+    let join_timeout = Duration::from_secs(JOIN_ATTEMPT_TIMEOUT_SEC);
     let mut join_retry_sec = JOIN_DISALLOWED_RETRY_TIME_SEC;
     let log_path = if let Some(path) = config.log_dir() {
         format!("{}", path.display())
@@ -123,7 +126,7 @@ fn create_runtime_and_node(config: &Config) -> Result<()> {
             let node_ref = match new_node(config, join_timeout).await {
                 Ok(node_ref) => node_ref,
                 Err(NodeError::JoinTimeout) => {
-                    join_retry_sec = JOIN_TIMEOUT_RETRY_TIME_SEC;
+                    join_retry_sec = JOIN_TIMEOUT_WAIT_BEFORE_RETRY_TIME_SEC;
                     let message = format!("(PID: {our_pid}): Encountered a timeout while trying to join the network. Retrying after {join_retry_sec} seconds.");
                     println!("{message} Node log path: {log_path}");
                     error!("{message}");

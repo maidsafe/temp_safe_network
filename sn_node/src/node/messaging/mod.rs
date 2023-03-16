@@ -24,7 +24,6 @@ mod streams;
 mod update_section;
 
 use crate::node::{flow_ctrl::cmds::Cmd, Error, MyNode, NodeContext, Result};
-
 use sn_interface::{
     messaging::{AntiEntropyMsg, MsgKind, NetworkMsg, WireMsg},
     types::{log_markers::LogMarker, ClientId, NodeId, Participant},
@@ -78,11 +77,18 @@ impl MyNode {
         // alternatively we could flag in msg kind for this...
         // todo: this sender is actually client + forwarder ip....
 
-        // we've forwaded it to ourselves as we're the holder. This prevents a loop.
-        // TODO: cut that wee loop down
+        // It's been forwarded, by ourself. This prevents repeatdly
+        // forwarding client msgs
         let is_from_us = sender.addr() == context.info.addr;
+
+        debug!("{msg_id:?} is from us {is_from_us}");
         let is_for_us =
             is_from_us || wire_msg.dst().name == context.name || msg_kind.is_client_spend();
+        debug!(
+            "{msg_id:?} is for us? {is_for_us}: wiremsg dst name: {:?} vs our name: {:?}",
+            wire_msg.dst().name,
+            context.name
+        );
 
         // 1. is_from_us happens when we as an Elder forwarded a data msg to ourselves as data holder.
         // 2. client msg directly to us, only exists for

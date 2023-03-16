@@ -120,9 +120,6 @@ impl FlowCtrl {
             timestamps: PeriodicChecksTimestamps::now(),
         };
 
-        // first start listening for msgs
-        let cmd_channel_for_msgs = blocking_cmd_sender_channel.clone();
-
         // incoming events from comms
         Self::handle_comm_events(incoming_msg_events, flow_ctrl_cmd_sender.clone());
 
@@ -130,7 +127,7 @@ impl FlowCtrl {
             node_context.clone(),
             flow_ctrl_cmd_sender.clone(),
             flow_ctrl_cmd_reciever,
-            cmd_channel_for_msgs.clone(),
+            blocking_cmd_sender_channel.clone(),
             node.node_events_sender.clone(),
         );
 
@@ -159,7 +156,7 @@ impl FlowCtrl {
         )
         .await;
 
-        Ok(cmd_channel_for_msgs)
+        Ok(blocking_cmd_sender_channel)
     }
 
     /// This runs the join process until we detect we are a network node
@@ -323,7 +320,7 @@ impl FlowCtrl {
         context: NodeContext,
         flow_ctrl_cmd_sender: Sender<FlowCtrlCmd>,
         mut flow_ctrl_cmd_reciever: Receiver<FlowCtrlCmd>,
-        mutating_cmd_channel: CmdChannel,
+        blocking_cmd_channel: CmdChannel,
         node_events_sender: NodeEventsChannel,
     ) {
         // we'll update this as we go
@@ -356,7 +353,7 @@ impl FlowCtrl {
                     }
                     FlowCtrlCmd::Handle(incoming_cmd) => {
                         let context = context.clone();
-                        let mutating_cmd_channel = mutating_cmd_channel.clone();
+                        let blocking_cmd_channel = blocking_cmd_channel.clone();
                         let flow_ctrl_cmd_sender = flow_ctrl_cmd_sender.clone();
 
                         // Go off thread for parsing and handling by default
@@ -367,7 +364,7 @@ impl FlowCtrl {
                                 incoming_cmd,
                                 context,
                                 flow_ctrl_cmd_sender.clone(),
-                                mutating_cmd_channel.clone(),
+                                blocking_cmd_channel.clone(),
                             )
                             .await?;
 
@@ -421,7 +418,7 @@ async fn handle_cmd(
     cmd: Cmd,
     context: NodeContext,
     flow_ctrl_cmd_sender: Sender<FlowCtrlCmd>,
-    mutating_cmd_channel: CmdChannel,
+    blocking_cmd_channel: CmdChannel,
 ) -> Result<(), Error> {
     let mut new_cmds = vec![];
     let start = Instant::now();
@@ -625,7 +622,7 @@ async fn handle_cmd(
                 }
                 msg => {
                     trace!("Node msg not handled off thread, sending to blocking channel: {msg:?}");
-                    if let Err(error) = mutating_cmd_channel
+                    if let Err(error) = blocking_cmd_channel
                         .send((
                             Cmd::ProcessNodeMsg {
                                 msg_id,
@@ -644,7 +641,7 @@ async fn handle_cmd(
         }
         _ => {
             debug!("process cannot be handled off thread: {cmd:?}");
-            if let Err(error) = mutating_cmd_channel.send((cmd, vec![])).await {
+            if let Err(error) = blocking_cmd_channel.send((cmd, vec![])).await {
                 error!("Error sending msg onto cmd channel {error:?}");
             }
 
