@@ -132,8 +132,8 @@ safe-package-version-artifacts-for-release:
 
 	for arch in "$${architectures[@]}" ; do \
 		if [[ $$arch == *"windows"* ]]; then bin_name="safe.exe"; else bin_name="safe"; fi; \
-		zip -j sn_cli-${SAFE_VERSION}-$$arch.zip artifacts/prod/$$arch/release/$$bin_name; \
-		tar -C artifacts/prod/$$arch/release -zcvf sn_cli-${SAFE_VERSION}-$$arch.tar.gz $$bin_name; \
+		zip -j safe-${SAFE_VERSION}-$$arch.zip artifacts/prod/$$arch/release/$$bin_name; \
+		tar -C artifacts/prod/$$arch/release -zcvf safe-${SAFE_VERSION}-$$arch.tar.gz $$bin_name; \
 	done
 
 	mv *.tar.gz ${DEPLOY_PROD_PATH}/safe
