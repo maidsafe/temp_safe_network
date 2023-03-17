@@ -205,8 +205,8 @@ mod tests {
                 public_key,
                 tx.clone(),
                 DbcReason::none(),
-                genesis_dbc.spent_proofs,
-                genesis_dbc.spent_transactions,
+                genesis_dbc.inputs_spent_proofs,
+                genesis_dbc.inputs_spent_transactions,
             )
             .await?;
 
@@ -234,7 +234,7 @@ mod tests {
         // insert the invalid pk to proofs
         let invalid_pk = bls::SecretKey::random().public_key();
         let invalid_spent_proofs = genesis_dbc
-            .spent_proofs
+            .inputs_spent_proofs
             .into_iter()
             .map(|mut proof| {
                 proof.spentbook_pub_key = invalid_pk;
@@ -249,7 +249,7 @@ mod tests {
                 tx.clone(),
                 DbcReason::none(),
                 invalid_spent_proofs,
-                genesis_dbc.spent_transactions,
+                genesis_dbc.inputs_spent_transactions,
             )
             .await;
 
@@ -294,8 +294,8 @@ mod tests {
                 public_key,
                 tx.clone(),
                 DbcReason::none(),
-                genesis_dbc.spent_proofs,
-                genesis_dbc.spent_transactions,
+                genesis_dbc.inputs_spent_proofs,
+                genesis_dbc.inputs_spent_transactions,
             )
             .await;
 
@@ -344,9 +344,7 @@ mod tests {
 
         let (output_dbc_1, _output_owneronce_1, _amount_secrects_1) = output_dbcs_1[0].clone();
 
-        let pk = output_dbc_1
-            .public_key_bearer()
-            .expect("unexpectedly failed to get DBC public key");
+        let pk = output_dbc_1.public_key();
         let spend_amount_2 = 5;
         let recipient_owneronce_2 =
             OwnerOnce::from_owner_base(client.dbc_owner().clone(), &mut rng::thread_rng());
@@ -370,8 +368,8 @@ mod tests {
                 output_owneronce_2.as_owner().public_key(),
                 output_dbc_2.transaction.clone(),
                 DbcReason::none(),
-                genesis_dbc.spent_proofs.clone(),
-                genesis_dbc.spent_transactions,
+                genesis_dbc.inputs_spent_proofs.clone(),
+                genesis_dbc.inputs_spent_transactions,
             )
             .await;
 
@@ -417,8 +415,8 @@ mod tests {
                 random_public_key,
                 tx.clone(),
                 DbcReason::none(),
-                genesis_dbc.spent_proofs.clone(),
-                genesis_dbc.spent_transactions,
+                genesis_dbc.inputs_spent_proofs.clone(),
+                genesis_dbc.inputs_spent_transactions,
             )
             .await;
 
@@ -461,7 +459,7 @@ mod tests {
         let dbc_owner = genesis_dbc.owner_base().clone();
         let client = create_test_client_with(None, Some(dbc_owner.clone()), None).await?;
 
-        let genesis_public_key = genesis_dbc.public_key_bearer()?;
+        let genesis_public_key = genesis_dbc.public_key();
 
         let output_owner = OwnerOnce::from_owner_base(dbc_owner, &mut rng::thread_rng());
         let dbc_builder = TransactionBuilder::default().add_input_dbc_bearer(&genesis_dbc)?;
@@ -508,12 +506,12 @@ mod tests {
 
         let spent_proofs: BTreeSet<sn_dbc::SpentProof> = input_dbcs
             .iter()
-            .flat_map(|dbc| dbc.spent_proofs.clone())
+            .flat_map(|dbc| dbc.inputs_spent_proofs.clone())
             .collect();
 
         let spent_transactions: BTreeSet<DbcTransaction> = input_dbcs
             .iter()
-            .flat_map(|dbc| dbc.spent_transactions.clone())
+            .flat_map(|dbc| dbc.inputs_spent_transactions.clone())
             .collect();
 
         let proof_key_verifier = SpentProofKeyVerifier { client };

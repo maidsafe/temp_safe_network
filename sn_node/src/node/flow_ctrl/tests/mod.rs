@@ -806,8 +806,8 @@ async fn spentbook_spend_transaction_with_no_inputs_should_return_spentbook_erro
             public_key: new_dbc2_sk.public_key(),
             tx: new_dbc2.transaction,
             reason: DbcReason::none(),
-            spent_proofs: new_dbc.spent_proofs.clone(),
-            spent_transactions: new_dbc.spent_transactions,
+            spent_proofs: new_dbc.inputs_spent_proofs.clone(),
+            spent_transactions: new_dbc.inputs_spent_transactions,
             network_knowledge: None,
         })),
         &mut node,
@@ -887,7 +887,7 @@ async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node()
     let new_dbc = reissue_dbc(&genesis_dbc, 10, &bls::SecretKey::random(), &sap, &skp)?;
     let new_dbc2 = reissue_dbc(&new_dbc, 5, &bls::SecretKey::random(), &sap, &skp)?;
     let new_dbc2_spent_proof = new_dbc2
-        .spent_proofs
+        .inputs_spent_proofs
         .iter()
         .next()
         .ok_or_else(|| eyre!("This DBC should have been reissued with a spent proof"))?;
@@ -910,8 +910,8 @@ async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node()
             public_key,
             tx,
             reason: DbcReason::none(),
-            spent_proofs: new_dbc2.spent_proofs,
-            spent_transactions: new_dbc2.spent_transactions,
+            spent_proofs: new_dbc2.inputs_spent_proofs,
+            spent_transactions: new_dbc2.inputs_spent_transactions,
             network_knowledge: Some((proof_chain, sap)),
         })),
         &mut node,
