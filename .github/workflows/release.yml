@@ -56,13 +56,73 @@ jobs:
           SLACK_MESSAGE: "Please check the logs for the run at ${{ env.WORKFLOW_URL }}/${{ github.run_id }}"
           SLACK_TITLE: "Release Failed"
 
+  publish:
+    name: publish
+    runs-on: ubuntu-latest
+    needs: [build]
+    if: |
+      github.repository_owner == 'maidsafe' &&
+      startsWith(github.event.head_commit.message, 'chore(release):')
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: "0"
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - name: cargo login
+        run: cargo login ${{ secrets.CRATES_IO_TOKEN }}
+      - name: publish sn_updater
+        run: |
+          commit_message="${{ github.event.head_commit.message }}"
+          if [[ $commit_message == *"sn_updater"* ]]; then cd sn_updater && cargo publish; fi
+      - name: publish sn_interface
+        run: |
+          commit_message="${{ github.event.head_commit.message }}"
+          if [[ $commit_message == *"sn_interface"* ]]; then cd sn_interface && cargo publish; fi
+      - name: publish sn_fault_detection
+        run: |
+          commit_message="${{ github.event.head_commit.message }}"
+          if [[ $commit_message == *"sn_fault_detection"* ]]; then
+            cd sn_fault_detection && cargo publish
+          fi
+      - name: publish sn_comms
+        run: |
+          commit_message="${{ github.event.head_commit.message }}"
+          if [[ $commit_message == *"sn_comms"* ]]; then cd sn_comms && cargo publish; fi
+      - name: publish sn_node
+        run: |
+          commit_message="${{ github.event.head_commit.message }}"
+          if [[ $commit_message == *"sn_node"* ]]; then cd sn_node && cargo publish; fi
+      - name: publish sn_client
+        run: |
+          commit_message="${{ github.event.head_commit.message }}"
+          if [[ $commit_message == *"sn_client-"* ]]; then cd sn_client && cargo publish; fi
+      - name: publish sn_api
+        run: |
+          commit_message="${{ github.event.head_commit.message }}"
+          if [[ $commit_message == *"sn_api"* ]]; then cd sn_api && cargo publish; fi
+      - name: publish sn_cli
+        run: |
+          commit_message="${{ github.event.head_commit.message }}"
+          if [[ $commit_message == *"sn_cli-"* ]]; then cd sn_cli && cargo publish; fi
+      - name: post notification to slack on failure
+        if: ${{ failure() }}
+        uses: bryannice/gitactions-slack-notification@2.0.0
+        env:
+          SLACK_INCOMING_WEBHOOK: ${{ secrets.SLACK_GH_ACTIONS_WEBHOOK_URL }}
+          SLACK_MESSAGE: "Please check the logs for the run at ${{ env.WORKFLOW_URL }}/${{ github.run_id }}"
+          SLACK_TITLE: "Release Failed"
+
   gh_release:
     if: |
       github.repository_owner == 'maidsafe' &&
       startsWith(github.event.head_commit.message, 'chore(release):')
     name: create github release
     runs-on: ubuntu-latest
-    needs: [build]
+    needs: [publish]
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
@@ -189,86 +249,6 @@ jobs:
           aws_bucket: sn-cli
           source_dir: deploy/prod/safe
           destination_dir: ""
-      - name: post notification to slack on failure
-        if: ${{ failure() }}
-        uses: bryannice/gitactions-slack-notification@2.0.0
-        env:
-          SLACK_INCOMING_WEBHOOK: ${{ secrets.SLACK_GH_ACTIONS_WEBHOOK_URL }}
-          SLACK_MESSAGE: "Please check the logs for the run at ${{ env.WORKFLOW_URL }}/${{ github.run_id }}"
-          SLACK_TITLE: "Release Failed"
-
-  publish:
-    name: publish
-    runs-on: ubuntu-latest
-    needs: [gh_release]
-    if: |
-      github.repository_owner == 'maidsafe' &&
-      startsWith(github.event.head_commit.message, 'chore(release):')
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          fetch-depth: "0"
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-      - shell: bash
-        id: versioning
-        run: |
-          ./resources/scripts/output_versioning_info.sh
-      - name: cargo login
-        run: cargo login ${{ secrets.CRATES_IO_TOKEN }}
-      - name: publish sn_updater
-        run: |
-          commit_message="${{ github.event.head_commit.message }}"
-          if [[ $commit_message == *"sn_updater"* ]]; then
-            # The sn_updater crate doesn't have any dependencies so we can go ahead and publish.
-            cd sn_updater && cargo publish --allow-dirty
-          fi
-      - name: publish sn_interface
-        run: |
-          commit_message="${{ github.event.head_commit.message }}"
-          if [[ $commit_message == *"sn_interface"* ]]; then
-            # The sn_interface crate doesn't have any dependencies so we can go ahead and publish.
-            cd sn_interface && cargo publish --allow-dirty
-          fi
-      - name: publish sn_fault_detection
-        run: |
-          commit_message="${{ github.event.head_commit.message }}"
-          if [[ $commit_message == *"sn_fault_detection"* ]]; then
-            ./resources/scripts/publish_crate_with_retries.sh "sn_fault_detection"
-          fi
-      - name: publish sn_comms
-        run: |
-          commit_message="${{ github.event.head_commit.message }}"
-          if [[ $commit_message == *"sn_comms"* ]]; then
-            ./resources/scripts/publish_crate_with_retries.sh "sn_comms"
-          fi
-      - name: publish sn_node
-        run: |
-          commit_message="${{ github.event.head_commit.message }}"
-          if [[ $commit_message == *"sn_node"* ]]; then
-            ./resources/scripts/publish_crate_with_retries.sh "sn_node"
-          fi
-      - name: publish sn_client
-        run: |
-          commit_message="${{ github.event.head_commit.message }}"
-          if [[ $commit_message == *"sn_client-"* ]]; then
-            ./resources/scripts/publish_crate_with_retries.sh "sn_client"
-          fi
-      - name: publish sn_api
-        run: |
-          commit_message="${{ github.event.head_commit.message }}"
-          if [[ $commit_message == *"sn_api"* ]]; then
-            ./resources/scripts/publish_crate_with_retries.sh "sn_api"
-          fi
-      - name: publish sn_cli
-        run: |
-          commit_message="${{ github.event.head_commit.message }}"
-          if [[ $commit_message == *"sn_cli-"* ]]; then
-            ./resources/scripts/publish_crate_with_retries.sh "sn_cli"
-          fi
       - name: post notification to slack on failure
         if: ${{ failure() }}
         uses: bryannice/gitactions-slack-notification@2.0.0
