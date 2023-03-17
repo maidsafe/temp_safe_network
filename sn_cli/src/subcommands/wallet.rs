@@ -145,12 +145,12 @@ pub async fn wallet_commander(
             };
 
             let (sk, public_key) = if dbc.is_bearer() {
-                (None, dbc.public_key_bearer()?)
+                (None, dbc.public_key())
             } else if let Some(sk_hex) = secret_key_hex {
                 // This is an owned DBC and its secret key has been supplied
                 let sk = SecretKey::from_hex(&sk_hex)?;
                 let public_key = dbc
-                    .public_key(&sk)
+                    .public_key_from_base(&sk)
                     .map_err(|e| map_invalid_sk_error(e.into()))?;
                 (Some(sk), public_key)
             } else {
@@ -167,7 +167,7 @@ pub async fn wallet_commander(
                         .to_string(),
                 )?;
                 let public_key = dbc
-                    .public_key(&sk)
+                    .public_key_from_base(&sk)
                     .map_err(|e| map_invalid_sk_error(e.into()))?;
                 (Some(sk), public_key)
             };

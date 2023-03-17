@@ -628,14 +628,14 @@ impl Safe {
             tx_builder = tx_builder.add_output_by_amount(change_amount, change_owneronce.clone());
         }
 
-        let spent_proofs: BTreeSet<SpentProof> = input_dbcs
+        let inputs_spent_proofs: BTreeSet<SpentProof> = input_dbcs
             .iter()
-            .flat_map(|dbc| dbc.spent_proofs.clone())
+            .flat_map(|dbc| dbc.inputs_spent_proofs.clone())
             .collect();
 
-        let spent_transactions: BTreeSet<DbcTransaction> = input_dbcs
+        let inputs_spent_transactions: BTreeSet<DbcTransaction> = input_dbcs
             .iter()
-            .flat_map(|dbc| dbc.spent_transactions.clone())
+            .flat_map(|dbc| dbc.inputs_spent_transactions.clone())
             .collect();
 
         let proof_key_verifier = SpentProofKeyVerifier { client };
@@ -655,8 +655,8 @@ impl Safe {
                         public_key,
                         tx.clone(),
                         reason,
-                        spent_proofs.clone(),
-                        spent_transactions.clone(),
+                        inputs_spent_proofs.clone(),
+                        inputs_spent_transactions.clone(),
                     )
                     .await?;
 
@@ -1395,8 +1395,8 @@ mod tests {
 
         // let's corrupt the pub key of the SpentProofs
         let random_pk = bls::SecretKey::random().public_key();
-        dbc.spent_proofs = dbc
-            .spent_proofs
+        dbc.inputs_spent_proofs = dbc
+            .inputs_spent_proofs
             .into_iter()
             .map(|mut proof| {
                 proof.spentbook_pub_key = random_pk;
@@ -1421,8 +1421,8 @@ mod tests {
 
         // let's corrupt the pub key of the SpentProofs
         let random_pk = bls::SecretKey::random().public_key();
-        dbc.spent_proofs = dbc
-            .spent_proofs
+        dbc.inputs_spent_proofs = dbc
+            .inputs_spent_proofs
             .into_iter()
             .map(|mut proof| {
                 proof.spentbook_pub_key = random_pk;
@@ -1467,7 +1467,7 @@ mod tests {
         let safe = new_safe_instance().await?;
 
         // the api shall confirm the genesis DBC's public_key has been spent
-        let is_genesis_spent = safe.is_dbc_spent(GENESIS_DBC.public_key_bearer()?).await?;
+        let is_genesis_spent = safe.is_dbc_spent(GENESIS_DBC.public_key()).await?;
         assert!(is_genesis_spent);
 
         Ok(())
@@ -1478,7 +1478,7 @@ mod tests {
         let (safe, unspent_dbc, _) = new_safe_instance_with_dbc().await?;
 
         // confirm the DBC's public_key has not been spent yet
-        let is_unspent_dbc_spent = safe.is_dbc_spent(unspent_dbc.public_key_bearer()?).await?;
+        let is_unspent_dbc_spent = safe.is_dbc_spent(unspent_dbc.public_key()).await?;
         assert!(!is_unspent_dbc_spent);
 
         Ok(())

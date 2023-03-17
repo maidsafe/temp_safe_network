@@ -199,8 +199,8 @@ pub fn reissue_dbc(
     for (public_key, tx) in dbc_builder.inputs() {
         let public_commitments = get_public_commitments_from_transaction(
             &tx,
-            &input.spent_proofs,
-            &input.spent_transactions,
+            &input.inputs_spent_proofs,
+            &input.inputs_spent_transactions,
         )?;
         let public_commitment: Commitment = public_commitments
             .into_iter()

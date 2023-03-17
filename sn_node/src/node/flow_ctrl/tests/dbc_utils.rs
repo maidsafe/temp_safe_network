@@ -62,8 +62,8 @@ pub(crate) fn get_genesis_dbc_spend_info(
     Ok((
         *public_key,
         tx.clone(),
-        genesis_dbc.spent_proofs.clone(),
-        genesis_dbc.spent_transactions,
+        genesis_dbc.inputs_spent_proofs.clone(),
+        genesis_dbc.inputs_spent_transactions,
     ))
 }
 
