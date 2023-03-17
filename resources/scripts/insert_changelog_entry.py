@@ -38,9 +38,9 @@ def main(
     sn_fault_detection_version,
     sn_comms_version,
     sn_client_version,
-    sn_node_version,
+    safenode_version,
     sn_api_version,
-    sn_cli_version,
+    safe_version,
 ):
     if sn_updater_version:
         changelog_entry = get_changelog_entry(
@@ -65,17 +65,17 @@ def main(
             "sn_client/CHANGELOG.md", sn_client_version
         )
         insert_changelog_entry(changelog_entry, "__SN_CLIENT_CHANGELOG_TEXT__")
-    if sn_node_version:
-        changelog_entry = get_changelog_entry("sn_node/CHANGELOG.md", sn_node_version)
-        insert_changelog_entry(changelog_entry, "__SN_NODE_CHANGELOG_TEXT__")
+    if safenode_version:
+        changelog_entry = get_changelog_entry("sn_node/CHANGELOG.md", safenode_version)
+        insert_changelog_entry(changelog_entry, "__SAFENODE_CHANGELOG_TEXT__")
     if sn_api_version:
         changelog_entry = get_changelog_entry("sn_api/CHANGELOG.md", sn_api_version)
         insert_changelog_entry(changelog_entry, "__SN_API_CHANGELOG_TEXT__")
-    if sn_cli_version:
-        sn_cli_changelog_entry = get_changelog_entry(
-            "sn_cli/CHANGELOG.md", sn_cli_version
+    if safe_version:
+        changelog_entry = get_changelog_entry(
+            "sn_cli/CHANGELOG.md", safe_version
         )
-        insert_changelog_entry(sn_cli_changelog_entry, "__SN_CLI_CHANGELOG_TEXT__")
+        insert_changelog_entry(changelog_entry, "__SAFE_CHANGELOG_TEXT__")
 
 
 if __name__ == "__main__":
@@ -84,16 +84,16 @@ if __name__ == "__main__":
     sn_fault_detection_version = get_crate_version("sn_fault_detection")
     sn_comms_version = get_crate_version("sn_comms")
     sn_client_version = get_crate_version("sn_client")
-    sn_node_version = get_crate_version("sn_node")
+    safenode_version = get_crate_version("sn_node")
     sn_api_version = get_crate_version("sn_api")
-    sn_cli_version = get_crate_version("sn_client")
+    safe_version = get_crate_version("sn_cli")
     main(
         sn_updater_version,
         sn_interface_version,
         sn_fault_detection_version,
         sn_comms_version,
         sn_client_version,
-        sn_node_version,
+        safenode_version,
         sn_api_version,
-        sn_cli_version,
+        safe_version,
     )
