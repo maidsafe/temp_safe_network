@@ -236,7 +236,11 @@ impl Safe {
 
         // Let's get the list of balances from the Wallet
         let balances = self.wallet_get(wallet_url).await?;
-        debug!("Spendable balances to check: {:?}", balances);
+        let key_hashes: Vec<_> = balances
+            .iter()
+            .map(|(key, (_, hash))| (key, hash))
+            .collect();
+        debug!("Spendable balances to check: {key_hashes:?}");
 
         // Iterate through the DBCs adding up the amounts
         let mut total_balance = Token::from_nano(0);
@@ -748,11 +752,6 @@ mod tests {
     use anyhow::{anyhow, Result};
     use xor_name::XorName;
 
-    #[cfg(feature = "data-network")]
-    const FEE_PER_INPUT: u64 = 0;
-    #[cfg(not(feature = "data-network"))]
-    const FEE_PER_INPUT: u64 = DEFAULT_ELDER_COUNT as u64;
-
     #[tokio::test]
     async fn test_wallet_create() -> Result<()> {
         let safe = new_safe_instance().await?;
@@ -1120,8 +1119,14 @@ mod tests {
         safe.wallet_deposit(&wallet_xorurl, Some("deposited-dbc-2"), &dbc2, None)
             .await?;
 
-        let change_plus_fees = 100;
-        let expected_change = change_plus_fees - (2 * FEE_PER_INPUT); // 2 dbc inputs = 2 fees
+        // 2 dbc inputs = 2 fees
+        let fee_1 = get_spend_fee(&safe, &dbc1).await?;
+        let fee_2 = get_spend_fee(&safe, &dbc1).await?;
+        let total_fee = fee_1.as_nano() + fee_2.as_nano();
+
+        // we arbitrarily expect a change as big as the fees here
+        let expected_change = total_fee;
+        let change_plus_fees = 2 * total_fee;
 
         let amount_to_reissue =
             Token::from_nano(dbc1_balance.as_nano() + dbc2_balance.as_nano() - change_plus_fees);
@@ -1166,6 +1171,9 @@ mod tests {
         safe.wallet_deposit(&wallet_xorurl, Some("deposited-dbc-1"), &dbc, None)
             .await?;
 
+        // 1 input dbc = 1 fee
+        let fee = get_spend_fee(&safe, &dbc).await?;
+
         let output_dbc = safe
             .wallet_reissue(&wallet_xorurl, "1", None, DbcReason::none())
             .await?;
@@ -1175,7 +1183,7 @@ mod tests {
             .map_err(|err| anyhow!("Couldn't read balance from output DBC: {:?}", err))?;
         assert_eq!(output_balance.amount(), Token::from_nano(1_000_000_000));
 
-        let change_amount = Token::from_nano(dbc_balance.as_nano() - 1_000_000_000 - FEE_PER_INPUT); // 1 dbc input = 1 fee
+        let change_amount = Token::from_nano(dbc_balance.as_nano() - 1_000_000_000 - fee.as_nano()); // 1 dbc input = 1 fee
         let current_balance = safe.wallet_balance(&wallet_xorurl).await?;
 
         assert_eq!(current_balance, change_amount);
@@ -1325,6 +1333,9 @@ mod tests {
         safe.multimap_insert(&wallet_xorurl, entry, BTreeSet::default())
             .await?;
 
+        // 1 input dbc = 1 fee
+        let fee = get_spend_fee(&safe, &dbc).await?;
+
         // Now check we can still reissue from the wallet and the corrupted entry is ignored
         let _ = safe
             .wallet_reissue(&wallet_xorurl, "0.4", None, DbcReason::none())
@@ -1332,7 +1343,7 @@ mod tests {
         let current_balance = safe.wallet_balance(&wallet_xorurl).await?;
         assert_eq!(
             current_balance,
-            Token::from_nano(dbc_balance.as_nano() - 400_000_000 - FEE_PER_INPUT) // 1 input dbc = 1 fee
+            Token::from_nano(dbc_balance.as_nano() - 400_000_000 - fee.as_nano())
         );
 
         Ok(())
@@ -1346,12 +1357,14 @@ mod tests {
         safe.wallet_deposit(&wallet_xorurl, Some("my-first-dbc"), &dbc, None)
             .await?;
 
+        let fee = get_spend_fee(&safe, &dbc).await?;
+
         // Now check that after reissuing with the total balance,
         // there is no change deposited in the wallet, i.e. wallet is empty with 0 balance
         let _ = safe
             .wallet_reissue(
                 &wallet_xorurl,
-                &Token::from_nano(dbc_balance.as_nano() - FEE_PER_INPUT).to_string(), // send all, leave enough to pay the fee amount
+                &Token::from_nano(dbc_balance.as_nano() - fee.as_nano()).to_string(), // send all, leave enough to pay the fee amount
                 None,
                 DbcReason::none(),
             )
@@ -1495,15 +1508,22 @@ mod tests {
         safe.wallet_deposit(&wallet_xorurl, Some("deposited-dbc-2"), &dbc2, None)
             .await?;
 
-        let change_plus_fees = 1000;
-        let expected_change = change_plus_fees - (2 * FEE_PER_INPUT); // 2 dbc inputs = 2 fees
+        // 2 dbc inputs = 2 fees
+        let fee_1 = get_spend_fee(&safe, &dbc1).await?;
+        let fee_2 = get_spend_fee(&safe, &dbc1).await?;
+        let total_fee = fee_1.as_nano() + fee_2.as_nano();
+
+        let expected_change = 1000;
+        let change_plus_fees = 1000 + total_fee;
 
         let amount_to_reissue =
             Token::from_nano(dbc1_balance.as_nano() + dbc2_balance.as_nano() - change_plus_fees);
         // let's partition the total amount to reissue in a few amounts
+        // We subtract `total_fee` + `expected_change` + the sum of the four last outputs (400) from our total available.
+        // That ensures that we will reissue all we have except for `expected_change` and `total_fee`.
         let output_amounts = vec![
-            dbc1_balance.as_nano() - 700,
-            dbc2_balance.as_nano() - 700,
+            dbc1_balance.as_nano() - total_fee,
+            dbc2_balance.as_nano() - (expected_change + 400),
             150,
             100,
             60,
@@ -1523,9 +1543,14 @@ mod tests {
             .wallet_reissue_many(&wallet_xorurl, outputs_owners, DbcReason::none())
             .await?;
 
+        #[cfg(feature = "data-network")]
+        let expected_fee_outputs = 0; // currently, no transfer fee in data-network
+        #[cfg(not(feature = "data-network"))]
+        let expected_fee_outputs = 2 * DEFAULT_ELDER_COUNT; // 2 fees = 2 * elder_count outputs
+
         assert_eq!(
             output_dbcs.len(),
-            output_amounts.len() + (2 * FEE_PER_INPUT) as usize
+            output_amounts.len() + expected_fee_outputs
         );
 
         let mut num_fee_outputs = 0;
@@ -1536,7 +1561,7 @@ mod tests {
                 num_fee_outputs += 1;
             }
         }
-        assert_eq!(num_fee_outputs, 2 * FEE_PER_INPUT);
+        assert_eq!(num_fee_outputs, expected_fee_outputs);
 
         let current_balance = safe.wallet_balance(&wallet_xorurl).await?;
         assert_eq!(current_balance, Token::from_nano(expected_change));
@@ -1555,5 +1580,23 @@ mod tests {
         assert_eq!(change.amount(), Token::from_nano(expected_change));
 
         Ok(())
+    }
+
+    async fn get_spend_fee(safe: &Safe, dbc: &Dbc) -> Result<Token> {
+        let input_key = dbc.as_revealed_input_bearer()?.public_key();
+        let client = safe.get_safe_client()?;
+        let mint_fees: BTreeMap<PublicKey, Token> = client.get_mint_fees(input_key).await?;
+
+        let fee_per_input = mint_fees
+            .values()
+            .fold(Some(Token::zero()), |total, fee| {
+                total.and_then(|t| t.checked_add(*fee))
+            })
+            .ok_or_else(|| Error::DbcReissueError(
+                "Overflow occurred while summing the individual Elder's fees in order to calculate the total amount for the output DBCs."
+                    .to_string(),
+            ))?;
+
+        Ok(fee_per_input)
     }
 }

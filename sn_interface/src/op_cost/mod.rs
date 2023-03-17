@@ -15,11 +15,9 @@ const TOKEN_TO_RAW_CONVERSION: u64 = 1_000_000_000;
 /// The maximum supply of SNT, also the larges value that can be represented by a single `Token`.
 const MAX_SUPPLY: u64 = (u32::max_value() as u64 + 1) * TOKEN_TO_RAW_CONVERSION;
 
-/// Calculation of required tokens for writes.
-
-/// Calculates the required tokens of write operations,
-/// as a number of tokens to be paid for a certain number of bytes,
-/// given the current section prefix its number of storage nodes, and percent filled.
+/// Calculates the required tokens of write operations, for a certain number of bytes,
+/// given the network size (current section prefix length), the number of storage
+/// nodes in our section, and percent filled.
 ///
 /// This uses an algorithm to calculate a fee with supply/demand adjusting properties
 /// (although indirect and therefore arguably sluggish) based on:
