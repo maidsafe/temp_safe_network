@@ -2,6 +2,7 @@
 
 dry_run_output=""
 commit_message=""
+sn_testnet=""
 sn_updater=""
 sn_fault_detection_version=""
 sn_interface_version=""
@@ -28,6 +29,7 @@ function perform_smart_release_dry_run() {
     --no-changelog-preview \
     --allow-fully-generated-changelogs \
     --no-changelog-github-release \
+    "sn_testnet" \
     "sn_updater" \
     "sn_fault_detection" "sn_interface" "sn_comms" "sn_node" "sn_client" "sn_api" "sn_cli" 2>&1)
   echo "Dry run output for smart-release:"
@@ -46,6 +48,12 @@ function crate_has_changes() {
 
 function determine_which_crates_have_changes() {
   local has_changes
+  has_changes=$(crate_has_changes "sn_testnet")
+  if [[ $has_changes == "true" ]]; then
+    echo "smart-release has determined sn_testnet crate has changes"
+    sn_testnet_has_changes="true"
+  fi
+
   has_changes=$(crate_has_changes "sn_updater")
   if [[ $has_changes == "true" ]]; then
     echo "smart-release has determined sn_updater crate has changes"
@@ -94,7 +102,8 @@ function determine_which_crates_have_changes() {
     sn_cli_has_changes="true"
   fi
 
-  if [[ $sn_updater_has_changes == "false" ]] && \
+  if [[ $sn_testnet_has_changes == "false" ]] && \
+     [[ $sn_updater_has_changes == "false" ]] && \
      [[ $sn_fault_detection_has_changes == "false" ]] && \
      [[ $sn_interface_has_changes == "false" ]] && \
      [[ $sn_comms_has_changes == "false" ]] && \
@@ -117,6 +126,7 @@ function generate_version_bump_commit() {
     --allow-fully-generated-changelogs \
     --no-changelog-github-release \
     --execute \
+    "sn_testnet" \
     "sn_updater" \
     "sn_fault_detection" "sn_interface" "sn_comms" "sn_node" "sn_client" "sn_api" "sn_cli"
   exit_code=$?
@@ -127,6 +137,8 @@ function generate_version_bump_commit() {
 }
 
 function generate_new_commit_message() {
+  sn_testnet_version=$( \
+    grep "^version" < sn_testnet/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
   sn_updater_version=$( \
     grep "^version" < sn_updater/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
   sn_interface_version=$( \
@@ -140,6 +152,9 @@ function generate_new_commit_message() {
   sn_cli_version=$(grep "^version" < sn_cli/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
   commit_message="chore(release): "
 
+  if [[ $sn_testnet_has_changes == "true" ]]; then
+    commit_message="${commit_message}sn_testnet-${sn_testnet_version}/"
+  fi
   if [[ $sn_updater_has_changes == "true" ]]; then
     commit_message="${commit_message}sn_updater-${sn_updater_version}/"
   fi
@@ -175,6 +190,9 @@ function amend_version_bump_commit() {
 }
 
 function amend_tags() {
+  if [[ $sn_testnet_has_changes == "true" ]]; then
+    git tag "sn_testnet-v${sn_updater_version}" -f
+  fi
   if [[ $sn_updater_has_changes == "true" ]]; then
     git tag "sn_updater-v${sn_updater_version}" -f
   fi
