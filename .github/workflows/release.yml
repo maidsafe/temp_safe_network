@@ -4,8 +4,6 @@ on:
   push:
     branches:
       - main
-    paths-ignore:
-      - '**'
 
 env:
   WORKFLOW_URL: https://github.com/maidsafe/safe_network/actions/runs
@@ -41,7 +39,9 @@ jobs:
           toolchain: stable
           override: true
       - shell: bash
-        run: make gha-build-${{ matrix.target }}
+        run: cargo install just
+      - shell: bash
+        run: just build-release-artifacts "${{ matrix.target }}"
       - uses: actions/upload-artifact@main
         with:
           name: safe_network-${{ matrix.target }}
@@ -72,42 +72,12 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
-      - name: cargo login
-        run: cargo login ${{ secrets.CRATES_IO_TOKEN }}
-      - name: publish sn_updater
+      - shell: bash
+        name: publish crates
         run: |
-          commit_message="${{ github.event.head_commit.message }}"
-          if [[ $commit_message == *"sn_updater"* ]]; then cd sn_updater && cargo publish; fi
-      - name: publish sn_interface
-        run: |
-          commit_message="${{ github.event.head_commit.message }}"
-          if [[ $commit_message == *"sn_interface"* ]]; then cd sn_interface && cargo publish; fi
-      - name: publish sn_fault_detection
-        run: |
-          commit_message="${{ github.event.head_commit.message }}"
-          if [[ $commit_message == *"sn_fault_detection"* ]]; then
-            cd sn_fault_detection && cargo publish
-          fi
-      - name: publish sn_comms
-        run: |
-          commit_message="${{ github.event.head_commit.message }}"
-          if [[ $commit_message == *"sn_comms"* ]]; then cd sn_comms && cargo publish; fi
-      - name: publish sn_node
-        run: |
-          commit_message="${{ github.event.head_commit.message }}"
-          if [[ $commit_message == *"sn_node"* ]]; then cd sn_node && cargo publish; fi
-      - name: publish sn_client
-        run: |
-          commit_message="${{ github.event.head_commit.message }}"
-          if [[ $commit_message == *"sn_client-"* ]]; then cd sn_client && cargo publish; fi
-      - name: publish sn_api
-        run: |
-          commit_message="${{ github.event.head_commit.message }}"
-          if [[ $commit_message == *"sn_api"* ]]; then cd sn_api && cargo publish; fi
-      - name: publish sn_cli
-        run: |
-          commit_message="${{ github.event.head_commit.message }}"
-          if [[ $commit_message == *"sn_cli-"* ]]; then cd sn_cli && cargo publish; fi
+          cargo login ${{ secrets.CRATES_IO_TOKEN }}
+          cargo install just
+          just publish-crates
       - name: post notification to slack on failure
         if: ${{ failure() }}
         uses: bryannice/gitactions-slack-notification@2.0.0
@@ -151,104 +121,43 @@ jobs:
         with:
           name: safe_network-aarch64-unknown-linux-musl
           path: artifacts/prod/aarch64-unknown-linux-musl/release
-
+      - uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@v1
+        id: toolchain
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
       - shell: bash
-        name: package artifacts for release
+        name: install prerequisites
         run: |
-          make prepare-deploy
-          make safenode-package-version-artifacts-for-release
-          make safe-package-version-artifacts-for-release
-
-      - shell: bash
-        id: versioning
-        run: |
-          ./resources/scripts/output_versioning_info.sh
-
-      - name: generate release description first pass
-        shell: bash
-        run: |
-          ./resources/scripts/get_release_description.sh > release_description.md
-
-      # The second pass uses Python to extract the changelog entries for this version.
-      # Python can easily do a string replace and avoid all the pain with newlines you get in Bash.
-      # The script operates on the release_description.md that was generated in the previous step.
-      - name: generate release description second pass
-        shell: bash
-        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y awscli
           pip install toml
-          ./resources/scripts/insert_changelog_entry.py
+          cargo install just
 
-      - name: create github release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ steps.versioning.outputs.gh_release_tag_name }}
-          release_name: ${{ steps.versioning.outputs.gh_release_name }}
-          draft: false
-          prerelease: false
-          body_path: release_description.md
-
-      # There's an action you can use for uploading an asset to a release, but because there are so
-      # many assets, using the 'gh' CLI is much more concise. The 'gh' tool should be on an Actions
-      # build agent by default.
-      - name: upload artifacts as assets
-        shell: bash
-        run: |
-          (
-            cd deploy/prod/safenode
-            ls | xargs gh release upload ${{ steps.versioning.outputs.gh_release_tag_name }}
-          )
-          (
-            cd deploy/prod/safe
-            ls | xargs gh release upload ${{ steps.versioning.outputs.gh_release_tag_name }}
-          )
-
-      - uses: shallwefootball/s3-upload-action@master
-        name: upload sn_node artifacts to s3
-        with:
-          aws_key_id: ${{ secrets.S3_DEPLOY_AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.S3_DEPLOY_AWS_SECRET_ACCESS_KEY }}
-          aws_bucket: sn-node
-          source_dir: deploy/prod/safenode
-          destination_dir: ""
-
-      - uses: shallwefootball/s3-upload-action@master
-        name: upload safe artifacts to s3
-        with:
-          aws_key_id: ${{ secrets.S3_DEPLOY_AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.S3_DEPLOY_AWS_SECRET_ACCESS_KEY }}
-          aws_bucket: sn-cli
-          source_dir: deploy/prod/safe
-          destination_dir: ""
-
-      # Now repackage and upload the artifacts using 'latest' for the version.
       - shell: bash
-        name: package artifacts for release
+        name: perform the release
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.S3_DEPLOY_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.S3_DEPLOY_AWS_SECRET_ACCESS_KEY }}
         run: |
-          make prepare-deploy
-          make safenode-package-version-artifacts-for-release \
-            SAFENODE_VERSION=latest DEPLOY_PATH=deploy
-          make safe-package-version-artifacts-for-release SAFE_VERSION=latest DEPLOY_PATH=deploy
+          just package-release-assets "safe"
+          just package-release-assets "safenode"
+          just package-release-assets "testnet"
+          just generate-release-description
+          just create-github-release
+          just upload-release-assets-to-s3 "safe"
+          just upload-release-assets-to-s3 "safenode"
+          just upload-release-assets-to-s3 "testnet"
 
-      - uses: shallwefootball/s3-upload-action@master
-        name: upload sn_node artifacts to s3
-        with:
-          aws_key_id: ${{ secrets.S3_DEPLOY_AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.S3_DEPLOY_AWS_SECRET_ACCESS_KEY }}
-          aws_bucket: sn-node
-          source_dir: deploy/prod/safenode
-          destination_dir: ""
-
-      - uses: shallwefootball/s3-upload-action@master
-        name: upload safe artifacts to s3
-        with:
-          aws_key_id: ${{ secrets.S3_DEPLOY_AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.S3_DEPLOY_AWS_SECRET_ACCESS_KEY }}
-          aws_bucket: sn-cli
-          source_dir: deploy/prod/safe
-          destination_dir: ""
+          # Now repackage and upload the artifacts to S3 using 'latest' for the version.
+          just package-release-assets "safe" "latest"
+          just package-release-assets "safenode" "latest"
+          just package-release-assets "testnet" "latest"
+          just upload-release-assets-to-s3 "safe"
+          just upload-release-assets-to-s3 "safenode"
+          just upload-release-assets-to-s3 "testnet"
       - name: post notification to slack on failure
         if: ${{ failure() }}
         uses: bryannice/gitactions-slack-notification@2.0.0

@@ -4,6 +4,8 @@
 # put that into the release description. This gets very painful in Bash because the entry
 # contains newline characters.
 
+import argparse
+import sys
 import toml
 
 
@@ -32,68 +34,83 @@ def insert_changelog_entry(entry, pattern):
         file.write(release_description)
 
 
-def main(
-    sn_updater_version,
-    sn_interface_version,
-    sn_fault_detection_version,
-    sn_comms_version,
-    sn_client_version,
-    safenode_version,
-    sn_api_version,
-    safe_version,
-):
-    if sn_updater_version:
-        changelog_entry = get_changelog_entry(
-            "sn_updater/CHANGELOG.md", sn_updater_version
-        )
+def get_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--sn-updater", action="store_true", help="Generate changelog for sn_updater"
+    )
+    parser.add_argument(
+        "--sn-interface",
+        action="store_true",
+        help="Generate changelog for sn_interface",
+    )
+    parser.add_argument(
+        "--sn-fault-detection",
+        action="store_true",
+        help="Generate changelog for sn_fault_detection",
+    )
+    parser.add_argument(
+        "--sn-comms", action="store_true", help="Generate changelog for sn_comms"
+    )
+    parser.add_argument(
+        "--sn-client", action="store_true", help="Generate changelog for sn_client"
+    )
+    parser.add_argument(
+        "--sn-api", action="store_true", help="Generate changelog for sn_api"
+    )
+    parser.add_argument(
+        "--safenode", action="store_true", help="Generate changelog for safenode"
+    )
+    parser.add_argument(
+        "--safe", action="store_true", help="Generate changelog for safe"
+    )
+    parser.add_argument(
+        "--testnet", action="store_true", help="Generate changelog for testnet"
+    )
+    return parser.parse_args()
+
+
+def main():
+    args = get_args()
+    if args.sn_updater:
+        version = get_crate_version("sn_updater")
+        changelog_entry = get_changelog_entry("sn_updater/CHANGELOG.md", version)
         insert_changelog_entry(changelog_entry, "__SN_UPDATER_CHANGELOG_TEXT__")
-    if sn_interface_version:
-        changelog_entry = get_changelog_entry(
-            "sn_interface/CHANGELOG.md", sn_interface_version
-        )
+    if args.sn_interface:
+        version = get_crate_version("sn_interface")
+        changelog_entry = get_changelog_entry("sn_interface/CHANGELOG.md", version)
         insert_changelog_entry(changelog_entry, "__SN_INTERFACE_CHANGELOG_TEXT__")
-    if sn_comms_version:
-        changelog_entry = get_changelog_entry("sn_comms/CHANGELOG.md", sn_comms_version)
+    if args.sn_comms:
+        version = get_crate_version("sn_comms")
+        changelog_entry = get_changelog_entry("sn_comms/CHANGELOG.md", version)
         insert_changelog_entry(changelog_entry, "__SN_COMMS_CHANGELOG_TEXT__")
-    if sn_fault_detection_version:
+    if args.sn_fault_detection:
+        version = get_crate_version("sn_fault_detection")
         changelog_entry = get_changelog_entry(
-            "sn_fault_detection/CHANGELOG.md", sn_fault_detection_version
+            "sn_fault_detection/CHANGELOG.md", version
         )
         insert_changelog_entry(changelog_entry, "__SN_FAULT_DETECTION_CHANGELOG_TEXT__")
-    if sn_client_version:
-        changelog_entry = get_changelog_entry(
-            "sn_client/CHANGELOG.md", sn_client_version
-        )
+    if args.sn_client:
+        version = get_crate_version("sn_client")
+        changelog_entry = get_changelog_entry("sn_client/CHANGELOG.md", version)
         insert_changelog_entry(changelog_entry, "__SN_CLIENT_CHANGELOG_TEXT__")
-    if safenode_version:
-        changelog_entry = get_changelog_entry("sn_node/CHANGELOG.md", safenode_version)
+    if args.safenode:
+        version = get_crate_version("sn_node")
+        changelog_entry = get_changelog_entry("sn_node/CHANGELOG.md", version)
         insert_changelog_entry(changelog_entry, "__SAFENODE_CHANGELOG_TEXT__")
-    if sn_api_version:
-        changelog_entry = get_changelog_entry("sn_api/CHANGELOG.md", sn_api_version)
+    if args.sn_api:
+        version = get_crate_version("sn_api")
+        changelog_entry = get_changelog_entry("sn_api/CHANGELOG.md", version)
         insert_changelog_entry(changelog_entry, "__SN_API_CHANGELOG_TEXT__")
-    if safe_version:
-        changelog_entry = get_changelog_entry(
-            "sn_cli/CHANGELOG.md", safe_version
-        )
+    if args.safe:
+        version = get_crate_version("sn_cli")
+        changelog_entry = get_changelog_entry("sn_cli/CHANGELOG.md", version)
         insert_changelog_entry(changelog_entry, "__SAFE_CHANGELOG_TEXT__")
+    if args.testnet:
+        version = get_crate_version("sn_testnet")
+        changelog_entry = get_changelog_entry("sn_testnet/CHANGELOG.md", version)
+        insert_changelog_entry(changelog_entry, "__TESTNET_CHANGELOG_TEXT__")
 
 
 if __name__ == "__main__":
-    sn_updater_version = get_crate_version("sn_updater")
-    sn_interface_version = get_crate_version("sn_interface")
-    sn_fault_detection_version = get_crate_version("sn_fault_detection")
-    sn_comms_version = get_crate_version("sn_comms")
-    sn_client_version = get_crate_version("sn_client")
-    safenode_version = get_crate_version("sn_node")
-    sn_api_version = get_crate_version("sn_api")
-    safe_version = get_crate_version("sn_cli")
-    main(
-        sn_updater_version,
-        sn_interface_version,
-        sn_fault_detection_version,
-        sn_comms_version,
-        sn_client_version,
-        safenode_version,
-        sn_api_version,
-        safe_version,
-    )
+    sys.exit(main())

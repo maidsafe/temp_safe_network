@@ -130,7 +130,9 @@ jobs:
           toolchain: stable
           override: true
       - shell: bash
-        run: make gha-build-${{ matrix.target }}
+        run: cargo install just
+      - shell: bash
+        run: just build-release-artifacts "${{ matrix.target }}"
       - uses: actions/upload-artifact@main
         with:
           name: safe_network-${{ matrix.target }}
