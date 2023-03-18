@@ -27,9 +27,10 @@
     unused_results
 )]
 
+use sn_testnet::{Testnet, DEFAULT_NODE_LAUNCH_INTERVAL, SAFENODE_BIN_NAME};
+
 use clap::Parser;
 use color_eyre::{eyre::eyre, Help, Result};
-use sn_testnet::{Testnet, DEFAULT_NODE_LAUNCH_INTERVAL, SAFENODE_BIN_NAME};
 use std::{
     path::PathBuf,
     process::{Command, Stdio},
@@ -103,8 +104,12 @@ async fn main() -> Result<()> {
     init_tracing()?;
 
     let args = Cmd::from_args();
+
     if args.flame {
+        #[cfg(not(target_os = "windows"))]
         check_flamegraph_prerequisites().await?;
+        #[cfg(target_os = "windows")]
+        return Err(eyre!("Flamegraph cannot be used on Windows"));
     }
 
     let mut node_bin_path = PathBuf::new();
@@ -149,12 +154,8 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
+#[cfg(not(target_os = "windows"))]
 async fn check_flamegraph_prerequisites() -> Result<()> {
-    #[cfg(target_os = "windows")]
-    {
-        return Err(eyre!("Flamegraph cannot be used on Windows"));
-    }
-
     let output = Command::new("cargo")
         .arg("install")
         .arg("--list")
