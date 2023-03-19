@@ -63,6 +63,7 @@ features = ["fs", "io-util", "macros", "rt", "rt-multi-thread", "sync"]
 rand = { version = "~0.8.5", features = ["small_rng"] }
 rand_xorshift = "~0.2.0"
 proptest = { version = "1.0.0" }
+assert_matches = "1.3"
 
 [dev-dependencies.cargo-husky]
 version = "1.5.0"
