@@ -64,6 +64,8 @@ pub enum Error {
     InvalidMessage,
     #[error("A signature share is invalid.")]
     InvalidSignatureShare,
+    #[error("The transfer fee is missing.")]
+    MissingFee,
     #[error("The secret key share is missing for public key {0:?}")]
     MissingSecretKeyShare(bls::PublicKey),
     #[error("Messaging protocol error: {0}")]

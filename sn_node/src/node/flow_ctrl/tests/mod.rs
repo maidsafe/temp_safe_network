@@ -769,7 +769,7 @@ async fn spentbook_spend_client_message_should_replicate_to_adults_and_send_ack(
 }
 
 #[tokio::test]
-async fn spentbook_spend_transaction_with_no_inputs_should_return_spentbook_error() -> Result<()> {
+async fn spentbook_spend_transaction_with_no_inputs_should_return_error() -> Result<()> {
     init_logger();
     let prefix = prefix("1");
     let replication_count = 5;
@@ -825,6 +825,13 @@ async fn spentbook_spend_transaction_with_no_inputs_should_return_spentbook_erro
             ..
         } = cmd
         {
+            #[cfg(not(feature = "data-network"))]
+            assert_eq!(
+                error,
+                &MessagingDataError::from(Error::MissingFee),
+                "A different error was expected for this case: {error:?}"
+            );
+            #[cfg(feature = "data-network")]
             assert_eq!(
                 error,
                 &MessagingDataError::from(Error::SpentbookError(

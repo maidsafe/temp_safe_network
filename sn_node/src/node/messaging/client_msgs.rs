@@ -239,7 +239,8 @@ impl MyNode {
         context: &NodeContext,
     ) -> Result<SpentProofShare> {
         // verify that fee is paid (we are included as output)
-        MyNode::verify_fee(context.store_cost, context.reward_key, tx)?;
+        #[cfg(not(feature = "data-network"))]
+        MyNode::verify_fee(context.store_cost, &context.reward_key, tx)?;
 
         // verify the spent proofs
         MyNode::verify_spent_proofs(spent_proofs, &context.network_knowledge)?;
@@ -286,12 +287,19 @@ impl MyNode {
         Ok(spent_proof_share)
     }
 
+    #[cfg(not(feature = "data-network"))]
     fn verify_fee(
         _store_cost: sn_dbc::Token,
-        _our_key: PublicKey,
-        _tx: &DbcTransaction,
+        our_key: &PublicKey,
+        tx: &DbcTransaction,
     ) -> Result<()> {
-        // TODO: check that we have an output to us, and that it is of sufficient value.
+        if tx.outputs.iter().any(|proof| proof.public_key() == our_key) {
+            Ok(())
+        } else {
+            Err(Error::MissingFee)
+        }
+
+        // TODO: check that the output is of sufficient value.
 
         // pseudo code:
 
@@ -312,7 +320,7 @@ impl MyNode {
         //     });
         // }
 
-        Ok(())
+        // Ok(())
     }
 
     // Verify spent proof signatures are valid, and each spent proof is signed by a known section key.
