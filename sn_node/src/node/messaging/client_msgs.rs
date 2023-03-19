@@ -22,7 +22,7 @@ use sn_interface::{
     network_knowledge::{
         section_keys::build_spent_proof_share, NetworkKnowledge, SectionTreeUpdate,
     },
-    types::{log_markers::LogMarker, register::User, ClientId, ReplicatedData},
+    types::{log_markers::LogMarker, payments::Invoice, register::User, ClientId, ReplicatedData},
 };
 
 use qp2p::SendStream;
@@ -49,9 +49,10 @@ impl MyNode {
         send_stream: SendStream,
         context: NodeContext,
     ) -> Vec<Cmd> {
-        let response = if let DataQuery::Spentbook(SpendQuery::GetFees(_)) = query {
+        let response = if let DataQuery::Spentbook(SpendQuery::GetFees { buyer, .. }) = query {
             // We receive this directly from client, as an Elder, since `is_spend` is set to true (that is a very messy/confusing pattern, to be fixed).
-            NodeQueryResponse::GetFees(Ok((context.reward_key, context.store_cost)))
+            let invoice = Invoice::new(context.store_cost, buyer, &context.reward_secret_key);
+            NodeQueryResponse::GetFees(Ok(invoice))
         } else {
             context
                 .data_storage
@@ -239,7 +240,7 @@ impl MyNode {
         context: &NodeContext,
     ) -> Result<SpentProofShare> {
         // verify that fee is paid (we are included as output)
-        MyNode::verify_fee(context.store_cost, context.reward_key, tx)?;
+        MyNode::verify_fee(context.store_cost, context.reward_secret_key.as_ref(), tx)?;
 
         // verify the spent proofs
         MyNode::verify_spent_proofs(spent_proofs, &context.network_knowledge)?;
@@ -288,7 +289,7 @@ impl MyNode {
 
     fn verify_fee(
         _store_cost: sn_dbc::Token,
-        _our_key: PublicKey,
+        _our_key: &bls::SecretKey,
         _tx: &DbcTransaction,
     ) -> Result<()> {
         // TODO: check that we have an output to us, and that it is of sufficient value.

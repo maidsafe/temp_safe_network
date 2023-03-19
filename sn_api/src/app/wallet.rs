@@ -481,19 +481,48 @@ impl Safe {
             // TODO: Query the network, one section per input, for the current fee.
             // Right now, now fees are added, as a dummy is used instead.
 
-            let input_key = dbc.as_revealed_input_bearer()?.public_key();
+            let revealed_bearer = dbc.as_revealed_input_bearer()?;
+            let input_key = revealed_bearer.public_key();
             // each mint will have elder_count() instances to pay individually (for now, later they will be more)
-            let mint_fees: BTreeMap<PublicKey, Token> = client.get_mint_fees(input_key).await?;
+            let mint_fees = client.get_mint_fees(input_key).await?;
+            let responses = mint_fees.len();
             let required_num_mints = supermajority(elder_count());
             if required_num_mints > mint_fees.len() {
-                warn!("Not enough mints contacted for the section to spend the input. Found: {}, needed: {required_num_mints}", mint_fees.len());
+                warn!("Not enough mints contacted for the section to spend the input. Got: {responses}, needed: {required_num_mints}");
+                continue;
+            }
+
+            // Fees that were not encrypted to us.
+            let mut invalid_fees = BTreeSet::new();
+            // As the mints encrypt the amount to our public key, we need to decrypt it.
+            let mut decrypted_mint_fees = vec![];
+
+            for invoice in mint_fees {
+                match AmountSecrets::try_from((
+                    &revealed_bearer.secret_key,
+                    &invoice.content.amount_secrets_cipher,
+                )) {
+                    Ok(amount) => {
+                        let fee = amount.amount();
+                        decrypted_mint_fees.push((invoice, fee));
+                    }
+                    Err(_) => {
+                        let _ = invalid_fees.insert(invoice.content.seller_public_key);
+                    }
+                }
+            }
+
+            let max_invalid_fees = elder_count() - required_num_mints;
+            if invalid_fees.len() > max_invalid_fees {
+                let valid_responses = responses - invalid_fees.len();
+                warn!("Not enough valid fees received from the section to spend the input. Found: {valid_responses}, needed: {required_num_mints}", );
                 continue;
             }
 
             // Total fee paid to all recipients in the section for this input.
-            let fee_per_input = mint_fees
-                .values()
-                .fold(Some(Token::zero()), |total, fee| {
+            let fee_per_input = decrypted_mint_fees
+                .iter()
+                .fold(Some(Token::zero()), |total, (_, fee)| {
                     total.and_then(|t| t.checked_add(*fee))
                 })
                 .ok_or_else(|| Error::DbcReissueError(
@@ -502,11 +531,13 @@ impl Safe {
                 ))?;
 
             // Add mints to outputs.
-            mint_fees.into_iter().for_each(|(pk, fee)| {
-                let owner = Owner::from(pk);
+            decrypted_mint_fees.iter().for_each(|(invoice, fee)| {
+                let owner = Owner::from(invoice.content.seller_public_key);
                 let owner_once = OwnerOnce::from_owner_base(owner, &mut rng::thread_rng());
-                outputs_owners.push((fee, owner_once));
+                outputs_owners.push((*fee, owner_once));
             });
+
+            // NB: We are not yet using the commitment sent by Elders. TBD.
 
             let dbc_balance = match dbc.amount_secrets_bearer() {
                 Ok(amount_secrets) => amount_secrets.amount(),

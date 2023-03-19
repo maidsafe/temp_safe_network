@@ -8,7 +8,7 @@
 
 use crate::node::{Error, Result};
 
-use sn_interface::types::bls_from_hex;
+use sn_interface::types::bls_secret_from_hex;
 
 use ed25519_dalek::{Keypair, KEYPAIR_LENGTH};
 use hex::{decode, encode};
@@ -73,23 +73,23 @@ pub(crate) async fn store_new_reward_keypair(
     Ok(())
 }
 
-/// Returns Some(bls::PublicKey) or None if file doesn't exist. It assumes it's hex-encoded.
-pub(crate) async fn get_reward_pk(root_dir: &Path) -> Result<Option<bls::PublicKey>> {
-    let path = root_dir.join(REWARD_PUBLIC_KEY_FILENAME);
+/// Returns Some(bls::SecretKey) or None if file doesn't exist. It assumes it's hex-encoded.
+pub(crate) async fn get_reward_secret_key(root_dir: &Path) -> Result<Option<bls::SecretKey>> {
+    let path = root_dir.join(REWARD_SECRET_KEY_FILENAME);
     if !path.is_file() {
         return Ok(None);
     }
 
-    let pk_hex_bytes = fs::read(&path).await?;
-    let pk = bls_from_hex(pk_hex_bytes)?;
+    let secret_hex_bytes = fs::read(&path).await?;
+    let secret = bls_secret_from_hex(secret_hex_bytes)?;
 
-    Ok(Some(pk))
+    Ok(Some(secret))
 }
 
 #[cfg(test)]
 mod test {
     use super::{
-        get_network_keypair, get_reward_pk, store_network_keypair, store_new_reward_keypair,
+        get_network_keypair, get_reward_secret_key, store_network_keypair, store_new_reward_keypair,
     };
     use eyre::{eyre, Result};
     use rand_07::rngs::OsRng;
@@ -101,8 +101,8 @@ mod test {
         let root = create_temp_root()?;
         let root_dir = root.path();
         store_new_reward_keypair(root_dir, &secret_key).await?;
-        let pk_result = get_reward_pk(root_dir).await?;
-        assert_eq!(pk_result, Some(secret_key.public_key()));
+        let secret_result = get_reward_secret_key(root_dir).await?;
+        assert_eq!(secret_result, Some(secret_key));
         Ok(())
     }
 

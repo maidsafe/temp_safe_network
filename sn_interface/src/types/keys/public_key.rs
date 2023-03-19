@@ -217,7 +217,7 @@ impl UpperHex for PublicKey {
 /// Construct a BLS public key from a hex-encoded string.
 ///
 /// It is often useful to parse such raw strings in user-facing apps like CLI.
-pub fn bls_from_hex<T: AsRef<[u8]>>(hex: T) -> Result<bls::PublicKey> {
+fn bls_from_hex<T: AsRef<[u8]>>(hex: T) -> Result<bls::PublicKey> {
     let bytes = hex::decode(hex).map_err(|err| {
         Error::FailedToParse(format!(
             "Couldn't parse BLS public key bytes from hex: {err}",

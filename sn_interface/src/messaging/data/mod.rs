@@ -26,6 +26,7 @@ pub use self::{
 };
 
 use crate::types::{
+    payments::Invoice,
     register::{Entry, EntryHash, Permissions, Policy, Register, User},
     Chunk,
 };
@@ -113,6 +114,7 @@ impl Display for DataResponse {
 }
 
 /// The response to a query, containing the query result.
+#[allow(clippy::large_enum_variant)]
 #[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
 pub enum QueryResponse {
     //
@@ -144,7 +146,7 @@ pub enum QueryResponse {
     GetSpentProofShares(Result<Vec<SpentProofShare>>),
     //
     /// Response to [`SpendQuery::GetFees`].
-    GetFees(Result<(bls::PublicKey, sn_dbc::Token)>),
+    GetFees(Result<Invoice>),
 }
 
 impl QueryResponse {

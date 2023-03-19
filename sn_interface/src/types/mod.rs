@@ -6,12 +6,14 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-//! SAFE network data types.
+//! Shared types of the repository.
 
 /// public key types (ed25519)
 pub mod keys;
 /// Standardised log markers for various events
 pub mod log_markers;
+// Payments.
+pub mod payments;
 /// Register data type
 pub mod register;
 /// Encoding utils
@@ -35,8 +37,8 @@ pub use errors::{Error, Result};
 pub use identities::{ClientId, NodeId, Participant};
 pub use keys::{
     keypair::{BlsKeypairShare, Encryption, Keypair, OwnerType, Signing},
-    public_key::{bls_from_hex, PublicKey},
-    secret_key::SecretKey,
+    public_key::PublicKey,
+    secret_key::{bls_secret_from_hex, SecretKey},
     signature::{Signature, SignatureShare},
 };
 

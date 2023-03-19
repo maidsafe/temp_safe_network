@@ -22,7 +22,10 @@ use xor_name::XorName;
 #[derive(Hash, Eq, PartialEq, PartialOrd, Clone, Serialize, Deserialize, Debug)]
 pub enum SpendQuery {
     /// Query for the individual reward keys and their respective fee amount for processing a `Spend`.
-    GetFees(SpentbookAddress),
+    GetFees {
+        buyer: PublicKey,
+        address: SpentbookAddress,
+    },
     /// Query for the set of spent proofs if the provided public key has already been spent with a Tx.
     GetSpentProofShares(SpentbookAddress),
 }
@@ -67,7 +70,7 @@ impl SpendQuery {
     /// Request variant.
     pub fn to_error_response(&self, error: Error) -> QueryResponse {
         match self {
-            Self::GetFees(_) => QueryResponse::GetFees(Err(error)),
+            Self::GetFees { .. } => QueryResponse::GetFees(Err(error)),
             Self::GetSpentProofShares(_) => QueryResponse::GetSpentProofShares(Err(error)),
         }
     }
@@ -75,7 +78,7 @@ impl SpendQuery {
     /// Returns the dst address for the request.
     pub fn dst_address(&self) -> SpentbookAddress {
         match self {
-            Self::GetFees(address) => *address,
+            Self::GetFees { address, .. } => *address,
             Self::GetSpentProofShares(address) => *address,
         }
     }

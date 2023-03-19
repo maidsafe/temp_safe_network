@@ -10,7 +10,6 @@ use super::{
     dkg::DkgVoter, flow_ctrl::fault_detection::FaultsCmd, DataStorage, DkgSessionInfo, Membership,
 };
 
-use bls::PublicKey;
 use ed25519_dalek::Keypair;
 use sn_comms::Comm;
 use sn_fault_detection::IssueType;
@@ -30,7 +29,7 @@ pub struct NodeContext {
     pub(crate) name: XorName,
     pub(crate) info: MyNodeInfo,
     pub(crate) keypair: Arc<Keypair>,
-    pub(crate) reward_key: PublicKey,
+    pub(crate) reward_secret_key: Arc<bls::SecretKey>,
     pub(crate) store_cost: sn_dbc::Token,
     pub(crate) network_knowledge: NetworkKnowledge,
     pub(crate) section_keys_provider: SectionKeysProvider,
