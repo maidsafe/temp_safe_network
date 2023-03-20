@@ -31,6 +31,8 @@ use xor_name::XorName;
 pub(crate) type DkgPubKeys = BTreeMap<XorName, (BlsPublicKey, Signature)>;
 
 /// Ephemeral bls keys used for a single DKG session
+#[derive(Clone)]
+
 pub(crate) struct DkgEphemeralKeys {
     /// our own generated secret key
     secret_key: BlsSecretKey,
@@ -38,7 +40,7 @@ pub(crate) struct DkgEphemeralKeys {
     pub_keys: DkgPubKeys,
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub(crate) struct DkgVoter {
     /// Ephemeral keys used by participants for each DKG session
     /// keyed by DkgSessionId hash
