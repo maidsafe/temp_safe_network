@@ -10,7 +10,7 @@ use crate::node::{
     dkg::{check_ephemeral_dkg_key, DkgPubKeys, DkgVoter},
     flow_ctrl::cmds::Cmd,
     messaging::Recipients,
-    DkgSessionInfo, Error, MyNode, Result,
+    DkgSessionInfo, Error, MyNode, NodeContext, Result,
 };
 
 use sn_interface::{
@@ -19,13 +19,13 @@ use sn_interface::{
         AuthorityProof, MsgId, SectionSig,
     },
     network_knowledge::{SectionAuthorityProvider, SectionKeyShare},
-    types::{self, log_markers::LogMarker, NodeId, Participant},
+    types::{self, keys::ed25519::Digest256, log_markers::LogMarker, NodeId, Participant},
 };
 
 use bls::{PublicKey as BlsPublicKey, PublicKeySet, SecretKeyShare};
 use ed25519::Signature;
 use sn_sdkg::{DkgSignedVote, VoteResponse};
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 use xor_name::XorName;
 
 /// Helper to get our DKG nodes (excluding us)
@@ -137,7 +137,6 @@ impl MyNode {
     }
 
     fn broadcast_dkg_votes(
-        &self,
         session_id: &DkgSessionId,
         pub_keys: DkgPubKeys,
         participant_index: usize,
@@ -396,7 +395,7 @@ impl MyNode {
             LogMarker::DkgBroadcastFirstVote,
             session_id.sh()
         );
-        let cmd = self.broadcast_dkg_votes(session_id, pub_keys, our_id, vec![vote]);
+        let cmd = MyNode::broadcast_dkg_votes(session_id, pub_keys, our_id, vec![vote]);
         Ok(vec![cmd])
     }
 
@@ -415,9 +414,12 @@ impl MyNode {
             VoteResponse::RequestAntiEntropy => {
                 ae_cmds.push(self.request_dkg_ae(session_id, sender))
             }
-            VoteResponse::BroadcastVote(vote) => {
-                cmds.push(self.broadcast_dkg_votes(session_id, pub_keys, our_id, vec![*vote]))
-            }
+            VoteResponse::BroadcastVote(vote) => cmds.push(MyNode::broadcast_dkg_votes(
+                session_id,
+                pub_keys,
+                our_id,
+                vec![*vote],
+            )),
             VoteResponse::DkgComplete(new_pubs, new_sec) => {
                 trace!(
                     "{} s{:?} {:?}: {} elders: {:?}",
@@ -461,7 +463,7 @@ impl MyNode {
         let mut cmds = Vec::new();
         if just_completed {
             let (first_vote, _) = self.dkg_voter.initialize_dkg_state(session_id, our_id)?;
-            cmds.push(self.broadcast_dkg_votes(
+            cmds.push(MyNode::broadcast_dkg_votes(
                 session_id,
                 pub_keys.clone(),
                 our_id,
@@ -584,12 +586,12 @@ impl MyNode {
 
     // broadcasts our current known votes
     fn gossip_votes(
-        &self,
+        dkg_voter: &DkgVoter,
         session_id: DkgSessionId,
         votes: Vec<DkgSignedVote>,
         our_id: usize,
     ) -> Vec<Cmd> {
-        let pub_keys = match self.dkg_voter.get_dkg_keys(&session_id) {
+        let pub_keys = match dkg_voter.get_dkg_keys(&session_id) {
             Ok(k) => k,
             Err(_) => {
                 warn!(
@@ -604,19 +606,20 @@ impl MyNode {
             LogMarker::DkgBroadcastVote,
             session_id.sh()
         );
-        let cmd = self.broadcast_dkg_votes(&session_id, pub_keys, our_id, votes);
+        let cmd = MyNode::broadcast_dkg_votes(&session_id, pub_keys, our_id, votes);
         vec![cmd]
     }
 
     // broadcasts our ephemeral key
     fn gossip_our_key(
-        &self,
+        dkg_voter: &DkgVoter,
+        dkg_sessions_info: &HashMap<Digest256, DkgSessionInfo>,
         session_id: DkgSessionId,
         our_name: XorName,
         our_id: usize,
     ) -> Vec<Cmd> {
         // get the keys
-        let dkg_keys = match self.dkg_voter.get_dkg_keys(&session_id) {
+        let dkg_keys = match dkg_voter.get_dkg_keys(&session_id) {
             Ok(k) => k,
             Err(_) => {
                 warn!(
@@ -638,7 +641,7 @@ impl MyNode {
         };
 
         // get original auth (as proof for those who missed the original DkgStart msg)
-        let section_info = match self.dkg_sessions_info.get(&session_id.hash()) {
+        let section_info = match dkg_sessions_info.get(&session_id.hash()) {
             Some(auth) => auth,
             None => {
                 warn!(
@@ -668,12 +671,11 @@ impl MyNode {
         vec![cmd]
     }
 
-    pub(crate) fn had_sap_change_since(&self, session_id: &DkgSessionId) -> bool {
-        self.network_knowledge.section_chain_len() != session_id.section_chain_len
-    }
-
-    pub(crate) fn gossip_handover_trigger(&self, session_id: &DkgSessionId) -> Vec<Cmd> {
-        match self.dkg_voter.outcome(session_id) {
+    pub(crate) fn gossip_handover_trigger(
+        dkg_voter: &DkgVoter,
+        session_id: &DkgSessionId,
+    ) -> Vec<Cmd> {
+        match dkg_voter.outcome(session_id) {
             Ok(Some((our_id, new_pubs, new_sec))) => {
                 trace!(
                     "Gossiping DKG outcome for s{} as we didn't notice SAP change",
@@ -751,11 +753,11 @@ impl MyNode {
 
     /// For all the ongoing DKG sessions, sends out all the current known votes to all DKG
     /// participants if we don't have any votes yet, sends out our ephemeral key
-    pub(crate) fn dkg_gossip_msgs(&self) -> Vec<Cmd> {
+    pub(crate) fn dkg_gossip_msgs(context: &NodeContext) -> Vec<Cmd> {
         let mut cmds = vec![];
-        for (_hash, session_info) in self.dkg_sessions_info.iter() {
+        for (_hash, session_info) in context.dkg_sessions_info.iter() {
             // get our id
-            let name = types::keys::ed25519::name(&self.keypair.public);
+            let name = types::keys::ed25519::name(&context.keypair.public);
             let our_id = if let Some(index) = session_info.session_id.elder_index(name) {
                 index
             } else {
@@ -767,15 +769,24 @@ impl MyNode {
             };
 
             // skip if we already reached termination
-            match self.dkg_voter.reached_termination(&session_info.session_id) {
+            match context
+                .dkg_voter
+                .reached_termination(&session_info.session_id)
+            {
                 Ok(true) => {
                     trace!(
                         "Skipping DKG gossip for s{} as we have reached termination",
                         session_info.session_id.sh()
                     );
 
-                    if !self.had_sap_change_since(&session_info.session_id) {
-                        cmds.extend(self.gossip_handover_trigger(&session_info.session_id));
+                    let had_sap_change_since = context.network_knowledge.section_chain_len()
+                        != session_info.session_id.section_chain_len;
+
+                    if !had_sap_change_since {
+                        cmds.extend(MyNode::gossip_handover_trigger(
+                            &context.dkg_voter,
+                            &session_info.session_id,
+                        ));
                     }
 
                     continue;
@@ -791,10 +802,21 @@ impl MyNode {
             }
 
             // gossip votes else gossip our key
-            if let Ok(votes) = self.dkg_voter.get_all_votes(&session_info.session_id) {
-                cmds.extend(self.gossip_votes(session_info.session_id.clone(), votes, our_id));
+            if let Ok(votes) = context.dkg_voter.get_all_votes(&session_info.session_id) {
+                cmds.extend(MyNode::gossip_votes(
+                    &context.dkg_voter,
+                    session_info.session_id.clone(),
+                    votes,
+                    our_id,
+                ));
             } else {
-                cmds.extend(self.gossip_our_key(session_info.session_id.clone(), name, our_id));
+                cmds.extend(MyNode::gossip_our_key(
+                    &context.dkg_voter,
+                    &context.dkg_sessions_info,
+                    session_info.session_id.clone(),
+                    name,
+                    our_id,
+                ));
             }
         }
         cmds

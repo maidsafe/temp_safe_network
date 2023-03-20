@@ -55,11 +55,8 @@ impl MyNode {
     /// Get our latest vote if any at this generation, and get cmds to resend to all elders
     /// (which should in turn trigger them to resend their votes)
     #[instrument(skip_all)]
-    pub(crate) fn membership_gossip_votes(
-        context: &NodeContext,
-        membership_context: &Option<Membership>,
-    ) -> Option<Cmd> {
-        if let Some(membership) = membership_context {
+    pub(crate) fn membership_gossip_votes(context: &NodeContext) -> Option<Cmd> {
+        if let Some(membership) = &context.membership {
             trace!("{}", LogMarker::GossippingMembershipVotes);
             if let Ok(ae_votes) = membership.anti_entropy(membership.generation()) {
                 let cmd = MyNode::send_to_elders(context, NodeMsg::MembershipVotes(ae_votes));
