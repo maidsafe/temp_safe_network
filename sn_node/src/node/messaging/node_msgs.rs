@@ -19,13 +19,11 @@ use sn_fault_detection::IssueType;
 use sn_interface::{
     messaging::{
         data::{CmdResponse, DataResponse},
-        system::{JoinResponse, NodeDataCmd, NodeEvent, NodeMsg},
+        system::{JoinResponse, NodeEvent, NodeMsg},
         Dst, MsgId, NetworkMsg, WireMsg,
     },
     network_knowledge::{MembershipState, NetworkKnowledge},
-    types::{
-        log_markers::LogMarker, ClientId, Keypair, NodeId, Participant, PublicKey, ReplicatedData,
-    },
+    types::{log_markers::LogMarker, ClientId, Keypair, NodeId, PublicKey, ReplicatedData},
     SectionAuthorityProvider,
 };
 use std::collections::BTreeSet;
@@ -148,7 +146,7 @@ impl MyNode {
 
     // Handler for data messages which have successfully
     // passed all signature checks and msg verifications
-    pub(crate) async fn handle_node_msg(
+    pub(crate) fn handle_node_msg(
         node: &mut MyNode,
         context: NodeContext,
         msg_id: MsgId,
@@ -237,13 +235,6 @@ impl MyNode {
                 cmds.extend(node.handle_membership_votes(node_id, votes)?);
                 Ok(cmds)
             }
-            NodeMsg::MembershipAE(gen) => {
-                Ok(
-                    MyNode::handle_membership_anti_entropy_request(&node.membership, node_id, gen)
-                        .into_iter()
-                        .collect(),
-                )
-            }
             NodeMsg::ProposeNodeOff {
                 vote_node_off: proposal,
                 sig_share,
@@ -294,10 +285,7 @@ impl MyNode {
 
                 node.handle_dkg_votes(&session_id, pub_keys, votes, node_id)
             }
-            NodeMsg::DkgAE(session_id) => {
-                trace!("Handling msg: DkgAE s{} from {}", session_id.sh(), node_id);
-                MyNode::handle_dkg_anti_entropy_request(node.dkg_voter.clone(), session_id, node_id)
-            }
+
             NodeMsg::NodeEvent(NodeEvent::CouldNotStoreData {
                 node_id,
                 data_address,
@@ -334,37 +322,6 @@ impl MyNode {
 
                 Ok(cmds)
             }
-            NodeMsg::NodeDataCmd(NodeDataCmd::StoreData(data)) => {
-                // NB: We would only reach here if this is a Spentbook cmd.
-                trace!("Attempting to store data locally: {:?}", data.address());
-                // TODO: proper err
-                let Some(stream) = send_stream else {
-                    return Ok(vec![])
-                };
-                // NB!! `sender` is actually a node here and should not be casted to ClientId! But since we are reusing the
-                // `store_data_and_respond` fn which is used when a forwarded client cmd comes in, we have to cast to ClientId here.. TO BE FIXED.
-                let sender = ClientId::from(Participant::from_node(node_id));
-                // store data and respond w/ack on the response stream
-                MyNode::store_data_and_respond(&context, data, stream, sender, msg_id).await
-            }
-            NodeMsg::NodeDataCmd(NodeDataCmd::ReplicateDataBatch(data_collection)) => {
-                info!("ReplicateDataBatch MsgId: {:?}", msg_id);
-                MyNode::replicate_data_batch(&context, node_id, data_collection).await
-            }
-            NodeMsg::NodeDataCmd(NodeDataCmd::SendAnyMissingRelevantData(known_data_addresses)) => {
-                info!(
-                    "{:?} MsgId: {:?}",
-                    LogMarker::RequestForAnyMissingData,
-                    msg_id
-                );
-
-                Ok(
-                    MyNode::get_missing_data_for_node(&context, node_id, known_data_addresses)
-                        .await
-                        .into_iter()
-                        .collect(),
-                )
-            }
             NodeMsg::RequestHandover { sap, sig_share } => {
                 info!("RequestHandover with msg_id {msg_id:?}");
                 node.handle_handover_request(msg_id, sap, sig_share, node_id)
@@ -383,6 +340,11 @@ impl MyNode {
                 node.handle_section_split_promotion(
                     msg_id, sap0, sig_share0, sap1, sig_share1, node_id,
                 )
+            }
+            msg => {
+                error!("This node msg should have been handled in the non-blocking flow ctrl cmd thread(s): {msg:?}");
+
+                Ok(vec![])
             }
         }
     }
