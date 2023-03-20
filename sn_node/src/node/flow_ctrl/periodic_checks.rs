@@ -9,7 +9,7 @@
 use crate::node::{
     flow_ctrl::{cmds::Cmd, FlowCtrl, FlowCtrlCmd},
     membership::Membership,
-    MyNode, NodeContext, NodeEvent,
+    MyNode, NodeContext,
 };
 
 use sn_interface::{
@@ -71,14 +71,14 @@ impl PeriodicChecksTimestamps {
 
 impl FlowCtrl {
     /// Generate and fire commands for all types of periodic checks
-    pub(super) async fn perform_periodic_checks(&mut self, node: &mut MyNode) {
+    pub(super) async fn perform_periodic_checks(&mut self, node: &MyNode) {
         if !self.timestamps.something_expired() {
             return;
         }
         let context = node.context();
         let mut cmds = vec![];
 
-        cmds.extend(self.enqueue_cmds_for_node_periodic_checks(&context, node));
+        cmds.extend(self.enqueue_cmds_for_node_periodic_checks(&context));
         if context.is_elder {
             cmds.extend(
                 self.enqueue_cmds_for_elder_periodic_checks(&context, node)
@@ -98,11 +98,7 @@ impl FlowCtrl {
     }
 
     /// Periodic tasks run for both elders and adults
-    fn enqueue_cmds_for_node_periodic_checks(
-        &mut self,
-        context: &NodeContext,
-        node: &mut MyNode,
-    ) -> Vec<Cmd> {
+    fn enqueue_cmds_for_node_periodic_checks(&mut self, context: &NodeContext) -> Vec<Cmd> {
         let mut cmds = vec![];
 
         // here we specifically ask for AE prob msgs and manually
@@ -135,7 +131,6 @@ impl FlowCtrl {
 
         // check if we can join the dst section
         if let RelocationState::ReadyToJoinNewSection(proof) = &context.relocation_state {
-            let prev_name = proof.previous_name();
             let new_name = proof.new_name();
             if self.timestamps.join_as_relocated_check.elapsed() > JOIN_AS_RELOCATED_TIMEOUT_SEC {
                 self.timestamps.join_as_relocated_check = Instant::now();
@@ -147,19 +142,6 @@ impl FlowCtrl {
                         context.network_knowledge.section_auth(),
                         NodeMsg::TryJoin(Some(proof.clone())),
                     ));
-                } else {
-                    node.node_events_sender.broadcast(NodeEvent::RelocateEnd);
-                    info!(
-                        "{} for previous node: {:?} of age: {:?}: The new name is: {:?}, and new age is: {:?} (and pass in context age: {:?})",
-                        LogMarker::RelocateEnd,
-                        prev_name,
-                        proof.previous_age(),
-                        new_name,
-                        proof.new_age(),
-                        context.info.age()
-                    );
-                    info!("We've joined a section, dropping the relocation proof.");
-                    node.relocation_state = RelocationState::NoRelocation;
                 }
             }
         }

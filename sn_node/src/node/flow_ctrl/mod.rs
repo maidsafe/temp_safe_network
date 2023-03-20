@@ -34,6 +34,7 @@ use sn_fault_detection::FaultDetection;
 use sn_interface::{
     messaging::system::{NodeDataCmd, NodeMsg},
     messaging::{AntiEntropyMsg, NetworkMsg},
+    network_knowledge::RelocationState,
     types::{log_markers::LogMarker, ClientId, DataAddress, NodeId, Participant},
 };
 
@@ -249,7 +250,6 @@ impl FlowCtrl {
         mut incoming_cmds_from_apis: Receiver<(Cmd, Vec<usize>)>,
         cmd_processing: Sender<FlowCtrlCmd>,
     ) -> Result<()> {
-        // let cmd_channel = self.cmd_sender_channel.clone();
         // first do any pending processing
         while let Some((cmd, cmd_id)) = incoming_cmds_from_apis.recv().await {
             trace!("Taking cmd off stack: {cmd:?}");
@@ -258,13 +258,38 @@ impl FlowCtrl {
                 .process_blocking_cmd_job(&mut node, cmd, cmd_id, cmd_processing.clone())
                 .await;
 
-            // update our context in read only processor with each cmd
+            let mut context = node.context();
+
+            // See if any changes to context mean we have finished a relocation
+            // check if we can join the dst section
+
+            if let RelocationState::ReadyToJoinNewSection(proof) = &context.relocation_state {
+                let prev_name = proof.previous_name();
+                let new_name = proof.new_name();
+                if context.network_knowledge.is_section_member(&new_name) {
+                    node.node_events_sender.broadcast(NodeEvent::RelocateEnd);
+                    info!(
+                        "{} for previous node: {:?} of age: {:?}: The new name is: {:?}, and new age is: {:?} (and pass in context age: {:?})",
+                        LogMarker::RelocateEnd,
+                        prev_name,
+                        proof.previous_age(),
+                        new_name,
+                        proof.new_age(),
+                        context.info.age()
+                    );
+                    info!("We've joined a section, dropping the relocation proof.");
+                    node.relocation_state = RelocationState::NoRelocation;
+                }
+                context = node.context();
+            }
+
+            // Finally update our context in read only processor with each cmd
             cmd_processing
-                .send(FlowCtrlCmd::UpdateContext(node.context()))
+                .send(FlowCtrlCmd::UpdateContext(context))
                 .await
                 .map_err(|e| Error::TokioChannel(format!("cmd_processing send failed {:?}", e)))?;
 
-            self.perform_periodic_checks(&mut node).await;
+            self.perform_periodic_checks(&node).await;
         }
 
         Ok(())
