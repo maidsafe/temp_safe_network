@@ -92,6 +92,9 @@ impl FlowCtrl {
         // Our channel to process _all_ cmds. If it can, they are processed off thread with latest context,
         // otherwise they are sent to the blocking process channel
         let (flow_ctrl_cmd_sender, flow_ctrl_cmd_reciever) = mpsc::channel(STANDARD_CHANNEL_SIZE);
+        // separate channel to update the periodics loop
+        let (periodic_flow_ctrl_cmd_sender, periodic_flow_ctrl_cmd_reciever) =
+            mpsc::channel(STANDARD_CHANNEL_SIZE);
 
         let all_members = node_context
             .network_knowledge
@@ -124,6 +127,8 @@ impl FlowCtrl {
         // incoming events from comms
         Self::handle_comm_events(incoming_msg_events, flow_ctrl_cmd_sender.clone());
 
+        // handle all incoming cmds, make decisions about pushing them off thread
+        // or onto the blocking loop
         Self::listen_for_flow_ctrl_cmds(
             node_context.clone(),
             flow_ctrl_cmd_sender.clone(),
@@ -139,15 +144,23 @@ impl FlowCtrl {
                 &mut cmd_ctrl,
                 join_retry_timeout,
                 flow_ctrl_cmd_sender.clone(), // sending of updates to context
+                periodic_flow_ctrl_cmd_sender.clone(), // sending of updates to context
                 &mut blocking_cmds_receiver,
             )
             .await?;
 
-        let _handle = tokio::task::spawn(flow_ctrl.process_blocking_cmds(
+        // set up the periodic check loop
+        flow_ctrl.listen_for_flow_ctrl_cmds_for_periodics(
+            node.context(),
+            periodic_flow_ctrl_cmd_reciever,
+        );
+
+        let _handle = tokio::task::spawn(FlowCtrl::process_blocking_cmds(
             node,
             cmd_ctrl,
             blocking_cmds_receiver,
             flow_ctrl_cmd_sender.clone(), // sending of updates to context
+            periodic_flow_ctrl_cmd_sender.clone(), // sending of updates to context
         ));
 
         Self::send_out_data_for_replication(
@@ -168,6 +181,7 @@ impl FlowCtrl {
         cmd_ctrl: &mut CmdCtrl,
         join_retry_timeout: Duration,
         flow_ctrl_cmd_processing: Sender<FlowCtrlCmd>,
+        periodic_flow_ctrl_cmd_processing: Sender<FlowCtrlCmd>,
         blocking_cmds_receiver: &mut Receiver<(Cmd, Vec<usize>)>,
     ) -> Result<MyNode> {
         let mut is_member = false;
@@ -192,6 +206,14 @@ impl FlowCtrl {
 
                 // update our context in flow ctrl cmd processor with each cmd
                 flow_ctrl_cmd_processing
+                    .send(FlowCtrlCmd::UpdateContext(node.context()))
+                    .await
+                    .map_err(|e| {
+                        Error::TokioChannel(format!("cmd_processing send failed {:?}", e))
+                    })?;
+
+                // update our context in periodic flow ctrl loop with each cmd
+                periodic_flow_ctrl_cmd_processing
                     .send(FlowCtrlCmd::UpdateContext(node.context()))
                     .await
                     .map_err(|e| {
@@ -244,11 +266,11 @@ impl FlowCtrl {
     /// This loop processes cmds pushed via the CmdChannel and
     /// runs the periodic events internal to the node.
     async fn process_blocking_cmds(
-        mut self,
         mut node: MyNode,
         cmd_ctrl: CmdCtrl,
         mut incoming_cmds_from_apis: Receiver<(Cmd, Vec<usize>)>,
         cmd_processing: Sender<FlowCtrlCmd>,
+        periodic_cmd_sender: Sender<FlowCtrlCmd>,
     ) -> Result<()> {
         // first do any pending processing
         while let Some((cmd, cmd_id)) = incoming_cmds_from_apis.recv().await {
@@ -283,9 +305,14 @@ impl FlowCtrl {
                 context = node.context();
             }
 
-            self.perform_periodic_checks(&context).await;
             // Finally update our context in read only processor with each cmd
             cmd_processing
+                .send(FlowCtrlCmd::UpdateContext(context.clone()))
+                .await
+                .map_err(|e| Error::TokioChannel(format!("cmd_processing send failed {:?}", e)))?;
+
+            // Finally update our context in periodic loop
+            periodic_cmd_sender
                 .send(FlowCtrlCmd::UpdateContext(context))
                 .await
                 .map_err(|e| Error::TokioChannel(format!("cmd_processing send failed {:?}", e)))?;
@@ -396,6 +423,32 @@ impl FlowCtrl {
                         });
                     }
                 };
+            }
+        });
+    }
+
+    /// Spawns a task to listen for flow ctrl cmds.
+    fn listen_for_flow_ctrl_cmds_for_periodics(
+        mut self,
+        context: NodeContext,
+        mut periodic_flow_ctrl_cmd_reciever: Receiver<FlowCtrlCmd>,
+    ) {
+        // we'll update this as we go
+        let mut context = context;
+
+        // now loop and check periodics with context...
+        let _handle = tokio::task::spawn(async move {
+            loop {
+                while let Ok(FlowCtrlCmd::UpdateContext(new_context)) =
+                    periodic_flow_ctrl_cmd_reciever.try_recv()
+                {
+                    debug!("Periodic context updated");
+                    context = new_context;
+                }
+
+                self.perform_periodic_checks(&context).await;
+
+                tokio::time::sleep(Duration::from_millis(100)).await
             }
         });
     }

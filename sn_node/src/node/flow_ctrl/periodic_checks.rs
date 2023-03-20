@@ -76,9 +76,9 @@ impl FlowCtrl {
         }
         let mut cmds = vec![];
 
-        cmds.extend(self.enqueue_cmds_for_node_periodic_checks(&context));
+        cmds.extend(self.enqueue_cmds_for_node_periodic_checks(context));
         if context.is_elder {
-            cmds.extend(self.enqueue_cmds_for_elder_periodic_checks(&context).await);
+            cmds.extend(self.enqueue_cmds_for_elder_periodic_checks(context).await);
         }
 
         // move cmd spawn off thread to not block

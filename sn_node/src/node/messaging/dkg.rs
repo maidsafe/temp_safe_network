@@ -868,12 +868,15 @@ impl MyNode {
 
 #[cfg(test)]
 mod tests {
-    use crate::node::flow_ctrl::{
-        cmds::Cmd,
-        tests::{
-            network_builder::TestNetworkBuilder,
-            test_utils::{get_next_msg, TestMsgTracker, TestNode},
+    use crate::node::{
+        flow_ctrl::{
+            cmds::Cmd,
+            tests::{
+                network_builder::TestNetworkBuilder,
+                test_utils::{get_next_msg, TestMsgTracker, TestNode},
+            },
         },
+        MyNode,
     };
 
     use sn_comms::CommEvent;
@@ -1091,7 +1094,7 @@ mod tests {
                     "Sending gossip from random node {:?}",
                     random_node.node.name()
                 );
-                let cmds = random_node.node.dkg_gossip_msgs();
+                let cmds = MyNode::dkg_gossip_msgs(&random_node.node.context());
                 for cmd in cmds {
                     info!("Got cmd {}", cmd);
                     assert_matches!(&cmd, Cmd::SendMsg { .. });
