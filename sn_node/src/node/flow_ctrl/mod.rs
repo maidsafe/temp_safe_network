@@ -636,6 +636,15 @@ async fn handle_cmd(
                         new_cmds.push(cmd);
                     }
                 }
+                NodeMsg::DkgAE(session_id) => {
+                    trace!("Handling msg: DkgAE s{} from {}", session_id.sh(), node_id);
+                    let cmd = MyNode::handle_dkg_anti_entropy_request(
+                        context.dkg_voter,
+                        session_id,
+                        node_id,
+                    )?;
+                    new_cmds.extend(cmd);
+                }
                 NodeMsg::MembershipAE(gen) => {
                     if let Some(cmd) = MyNode::handle_membership_anti_entropy_request(
                         &context.membership,
