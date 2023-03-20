@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{flow_ctrl::fault_detection::FaultsCmd, DataStorage, Membership};
+use super::{dkg::DkgVoter, flow_ctrl::fault_detection::FaultsCmd, DataStorage, Membership};
 
 use sn_comms::Comm;
 use sn_fault_detection::IssueType;
@@ -36,6 +36,8 @@ pub struct NodeContext {
     pub(crate) comm: Comm,
     #[debug(skip)]
     pub(crate) membership: Option<Membership>,
+    #[debug(skip)]
+    pub(crate) dkg_voter: DkgVoter,
     pub(crate) joins_allowed: bool,
     pub(crate) joins_allowed_until_split: bool,
     #[debug(skip)]

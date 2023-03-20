@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{
-    dkg::{check_ephemeral_dkg_key, DkgPubKeys},
+    dkg::{check_ephemeral_dkg_key, DkgPubKeys, DkgVoter},
     flow_ctrl::cmds::Cmd,
     messaging::Recipients,
     DkgSessionInfo, Error, MyNode, Result,
@@ -562,12 +562,12 @@ impl MyNode {
     }
 
     pub(crate) fn handle_dkg_anti_entropy_request(
-        &self,
+        dkg_voter: DkgVoter,
         session_id: DkgSessionId,
         sender: NodeId,
     ) -> Result<Vec<Cmd>> {
-        let pub_keys = self.dkg_voter.get_dkg_keys(&session_id)?;
-        let votes = self.dkg_voter.get_all_votes(&session_id)?;
+        let pub_keys = dkg_voter.get_dkg_keys(&session_id)?;
+        let votes = dkg_voter.get_all_votes(&session_id)?;
         trace!(
             "{} s{}: AE to {sender:?}",
             LogMarker::DkgBroadcastVote,
