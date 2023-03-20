@@ -6,13 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{messaging::Recipients, Cmd, Error, MyNode, Result};
+use crate::node::{Cmd, Error, MyNode, Result};
 
-use sn_interface::{
-    messaging::{AntiEntropyMsg, NetworkMsg},
-    network_knowledge::SectionTreeUpdate,
-    types::{NodeId, Participant},
-};
+use sn_interface::network_knowledge::SectionTreeUpdate;
 
 use std::time::Instant;
 
@@ -26,118 +22,6 @@ impl MyNode {
             Cmd::TryJoinNetwork => MyNode::try_join_section(context, None)
                 .into_iter()
                 .collect(),
-            Cmd::UpdateCaller {
-                caller,
-                correlation_id,
-                kind,
-                section_tree_update,
-            } => {
-                info!("Sending ae response msg for {correlation_id:?}");
-                vec![Cmd::send_network_msg(
-                    NetworkMsg::AntiEntropy(AntiEntropyMsg::AntiEntropy {
-                        section_tree_update,
-                        kind,
-                    }),
-                    Recipients::Single(Participant::from_node(caller)), // we're doing a mapping again here.. but this is a necessary evil while transitioning to more clarity and type safety, i.e. TO BE FIXED
-                )]
-            }
-            Cmd::UpdateCallerOnStream {
-                caller,
-                msg_id,
-                kind,
-                section_tree_update,
-                correlation_id,
-                stream,
-            } => MyNode::send_ae_response(
-                AntiEntropyMsg::AntiEntropy {
-                    kind,
-                    section_tree_update,
-                },
-                msg_id,
-                caller,
-                correlation_id,
-                stream,
-                context,
-            )
-            .await?
-            .into_iter()
-            .collect(),
-            Cmd::SendMsg {
-                msg,
-                msg_id,
-                recipients, // NB: SendMsg only calls out via comms, so it should be possible to make this a set of node ids!
-            } => {
-                let recipients = recipients.into_iter().map(NodeId::from).collect();
-                MyNode::send_msg(
-                    msg,
-                    msg_id,
-                    recipients,
-                    context.name,
-                    context.network_knowledge,
-                    context.comm.clone(),
-                )?;
-                vec![]
-            }
-            Cmd::SendMsgEnqueueAnyResponse {
-                msg,
-                msg_id,
-                recipients,
-            } => {
-                debug!("send msg enque cmd...?");
-                MyNode::send_and_enqueue_any_response(msg, msg_id, context, recipients)?;
-                vec![]
-            }
-            Cmd::SendAndForwardResponseToClient {
-                wire_msg,
-                targets,
-                client_stream,
-                client_id,
-            } => {
-                MyNode::send_and_forward_response_to_client(
-                    wire_msg,
-                    context.comm.clone(),
-                    context.network_knowledge.section_key(),
-                    targets,
-                    client_stream,
-                    client_id,
-                )?;
-                vec![]
-            }
-            Cmd::SendNodeMsgResponse {
-                msg,
-                msg_id,
-                correlation_id,
-                node_id,
-                send_stream,
-            } => MyNode::send_node_msg_response(
-                msg,
-                msg_id,
-                correlation_id,
-                node_id,
-                context,
-                send_stream,
-            )
-            .await?
-            .into_iter()
-            .collect(),
-            Cmd::SendDataResponse {
-                msg,
-                msg_id,
-                correlation_id,
-                send_stream,
-                client_id,
-            } => MyNode::send_data_response(
-                msg,
-                msg_id,
-                correlation_id,
-                send_stream,
-                context.name,
-                context.network_knowledge.section_key(),
-                client_id,
-            )
-            .await?
-            .into_iter()
-            .collect(),
             Cmd::TrackNodeIssue { name, issue } => {
                 context.track_node_issue(name, issue);
                 vec![]
@@ -148,23 +32,6 @@ impl MyNode {
                 node_id,
                 send_stream,
             } => MyNode::handle_node_msg(node, context, msg_id, msg, node_id, send_stream)?,
-            Cmd::ProcessClientMsg {
-                msg_id,
-                msg,
-                auth,
-                client_id,
-                send_stream,
-            } => {
-                trace!("Client msg {msg_id:?} reached its destination.");
-
-                let Some(stream) = send_stream else {
-                        error!("No stream for client {client_id} tho....");
-                        // TODO: clarify this err w/ client id
-                        return Err(Error::NoClientResponseStream);
-                    };
-                MyNode::handle_client_msg_for_us(context, msg_id, msg, auth, client_id, stream)
-                    .await?
-            }
             Cmd::ProcessAeMsg {
                 msg_id,
                 kind,
@@ -175,11 +42,6 @@ impl MyNode {
                 MyNode::handle_anti_entropy_msg(node, context, section_tree_update, kind, sender)
                     .await?
             }
-            Cmd::HandleMsg {
-                sender,
-                wire_msg,
-                send_stream,
-            } => MyNode::handle_msg(node.context(), sender, wire_msg, send_stream).await?,
             Cmd::UpdateNetworkAndHandleValidClientMsg {
                 proof_chain,
                 signed_sap,
@@ -201,7 +63,7 @@ impl MyNode {
                 info!("Network knowledge was updated: {updated}");
 
                 let context = if updated { node.context() } else { context };
-
+                // TODO: This could be slow and should be moved out of blocking context
                 MyNode::handle_client_msg_for_us(context, msg_id, msg, auth, client_id, send_stream)
                     .await?
             }
@@ -254,6 +116,11 @@ impl MyNode {
             Cmd::SetJoinsAllowedUntilSplit(joins_allowed_until_split) => {
                 node.joins_allowed = joins_allowed_until_split;
                 node.joins_allowed_until_split = joins_allowed_until_split;
+                vec![]
+            }
+            cmd => {
+                error!("This cmd should not be handled in the blocking loop. Move it to FlowCtrlCmd channel: {cmd:?}");
+
                 vec![]
             }
         };
