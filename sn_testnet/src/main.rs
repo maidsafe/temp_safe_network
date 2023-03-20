@@ -195,9 +195,6 @@ async fn build_node() -> Result<()> {
     if cfg!(feature = "otlp") {
         args.extend(["--features", "otlp"]);
     }
-    if cfg!(feature = "unstable-wiremsg-debuginfo") {
-        args.extend(["--features", "unstable-wiremsg-debuginfo"]);
-    }
 
     info!("Building safenode");
     debug!("Building safenode with args: {:?}", args);
