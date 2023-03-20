@@ -147,7 +147,7 @@ impl MyNode {
                 msg,
                 node_id,
                 send_stream,
-            } => MyNode::handle_node_msg(node, context, msg_id, msg, node_id, send_stream).await?,
+            } => MyNode::handle_node_msg(node, context, msg_id, msg, node_id, send_stream)?,
             Cmd::ProcessClientMsg {
                 msg_id,
                 msg,
