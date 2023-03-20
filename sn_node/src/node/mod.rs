@@ -134,6 +134,7 @@ impl MyNode {
             keypair: self.keypair.clone(),
             membership: self.membership.clone(),
             dkg_voter: self.dkg_voter.clone(),
+            dkg_sessions_info: self.dkg_sessions_info.clone(),
             reward_key: self.reward_key,
             store_cost: sn_dbc::Token::from_nano(1), // hard coded for now
             network_knowledge: self.network_knowledge().clone(),

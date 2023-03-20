@@ -283,13 +283,12 @@ impl FlowCtrl {
                 context = node.context();
             }
 
+            self.perform_periodic_checks(&context).await;
             // Finally update our context in read only processor with each cmd
             cmd_processing
                 .send(FlowCtrlCmd::UpdateContext(context))
                 .await
                 .map_err(|e| Error::TokioChannel(format!("cmd_processing send failed {:?}", e)))?;
-
-            self.perform_periodic_checks(&node).await;
         }
 
         Ok(())

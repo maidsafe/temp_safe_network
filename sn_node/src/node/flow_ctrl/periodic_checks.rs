@@ -8,7 +8,6 @@
 
 use crate::node::{
     flow_ctrl::{cmds::Cmd, FlowCtrl, FlowCtrlCmd},
-    membership::Membership,
     MyNode, NodeContext,
 };
 
@@ -71,19 +70,15 @@ impl PeriodicChecksTimestamps {
 
 impl FlowCtrl {
     /// Generate and fire commands for all types of periodic checks
-    pub(super) async fn perform_periodic_checks(&mut self, node: &MyNode) {
+    pub(super) async fn perform_periodic_checks(&mut self, context: &NodeContext) {
         if !self.timestamps.something_expired() {
             return;
         }
-        let context = node.context();
         let mut cmds = vec![];
 
         cmds.extend(self.enqueue_cmds_for_node_periodic_checks(&context));
         if context.is_elder {
-            cmds.extend(
-                self.enqueue_cmds_for_elder_periodic_checks(&context, node)
-                    .await,
-            );
+            cmds.extend(self.enqueue_cmds_for_elder_periodic_checks(&context).await);
         }
 
         // move cmd spawn off thread to not block
@@ -163,11 +158,7 @@ impl FlowCtrl {
     // }
 
     /// Periodic tasks run for elders only
-    async fn enqueue_cmds_for_elder_periodic_checks(
-        &mut self,
-        context: &NodeContext,
-        node: &MyNode,
-    ) -> Vec<Cmd> {
+    async fn enqueue_cmds_for_elder_periodic_checks(&mut self, context: &NodeContext) -> Vec<Cmd> {
         let now = Instant::now();
         let mut cmds = vec![];
 
@@ -198,14 +189,17 @@ impl FlowCtrl {
         if self.timestamps.last_vote_check.elapsed() > MISSING_VOTE_INTERVAL {
             self.timestamps.last_vote_check = now;
             trace!(" ----> vote periodics start");
-            cmds.extend(self.check_for_missed_votes(context, &node.membership));
+            cmds.extend(self.check_for_missed_votes(context));
             trace!(" ----> vote periodics done");
         }
 
         if self.timestamps.last_dkg_msg_check.elapsed() > MISSING_DKG_MSG_INTERVAL {
             trace!(" ----> dkg msg periodics start");
             self.timestamps.last_dkg_msg_check = now;
-            Self::check_for_missed_dkg_messages(node, self.preprocess_cmd_sender_channel.clone());
+            Self::check_for_missed_dkg_messages(
+                context,
+                self.preprocess_cmd_sender_channel.clone(),
+            );
             trace!(" ----> dkg msg periodics done");
         }
 
@@ -296,22 +290,17 @@ impl FlowCtrl {
     }
 
     /// Checks the interval since last vote received during a generation
-    fn check_for_missed_votes(
-        &self,
-        context: &NodeContext,
-        membership_context: &Option<Membership>,
-    ) -> Vec<Cmd> {
+    fn check_for_missed_votes(&self, context: &NodeContext) -> Vec<Cmd> {
         info!("Checking for missed votes");
         let mut cmds = vec![];
-        if let Some(membership) = &membership_context {
+        if let Some(membership) = &context.membership {
             let last_received_vote_time = membership.last_received_vote_time();
 
             if let Some(time) = last_received_vote_time {
                 // we want to resend the prev vote
                 if time.elapsed() >= MISSING_VOTE_INTERVAL {
                     debug!("Vote consensus appears stalled...");
-                    if let Some(cmd) = MyNode::membership_gossip_votes(context, membership_context)
-                    {
+                    if let Some(cmd) = MyNode::membership_gossip_votes(context) {
                         trace!("Vote resending cmd: {cmd:?}");
 
                         cmds.push(cmd);
@@ -326,15 +315,15 @@ impl FlowCtrl {
     }
 
     /// Checks the interval since last dkg vote received
-    fn check_for_missed_dkg_messages(node: &MyNode, sender_channel: Sender<FlowCtrlCmd>) {
+    fn check_for_missed_dkg_messages(context: &NodeContext, sender_channel: Sender<FlowCtrlCmd>) {
         info!("Checking for DKG missed messages");
 
-        let dkg_voter = &node.dkg_voter;
+        let dkg_voter = &context.dkg_voter;
         let last_received_dkg_message = dkg_voter.last_received_dkg_message();
 
         if let Some(time) = last_received_dkg_message {
             if time.elapsed() >= MISSING_DKG_MSG_INTERVAL {
-                let cmds = node.dkg_gossip_msgs();
+                let cmds = MyNode::dkg_gossip_msgs(context);
                 if !cmds.is_empty() {
                     debug!("Dkg msg resending cmd, as Dkg voting appears stalled...");
                 }

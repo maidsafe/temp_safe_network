@@ -6,16 +6,19 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{dkg::DkgVoter, flow_ctrl::fault_detection::FaultsCmd, DataStorage, Membership};
+use super::{
+    dkg::DkgVoter, flow_ctrl::fault_detection::FaultsCmd, DataStorage, DkgSessionInfo, Membership,
+};
 
+use bls::PublicKey;
+use ed25519_dalek::Keypair;
 use sn_comms::Comm;
 use sn_fault_detection::IssueType;
 use sn_interface::network_knowledge::{
     MyNodeInfo, NetworkKnowledge, RelocationState, SectionKeysProvider,
 };
-
-use bls::PublicKey;
-use ed25519_dalek::Keypair;
+use sn_interface::types::keys::ed25519::Digest256;
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::mpsc::Sender;
 use xor_name::XorName;
@@ -38,6 +41,8 @@ pub struct NodeContext {
     pub(crate) membership: Option<Membership>,
     #[debug(skip)]
     pub(crate) dkg_voter: DkgVoter,
+    #[debug(skip)]
+    pub(crate) dkg_sessions_info: HashMap<Digest256, DkgSessionInfo>,
     pub(crate) joins_allowed: bool,
     pub(crate) joins_allowed_until_split: bool,
     #[debug(skip)]
