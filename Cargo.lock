@@ -2706,7 +2706,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tonic 0.6.2",
- "tonic-build",
+ "tonic-build 0.6.2",
 ]
 
 [[package]]
@@ -3002,6 +3002,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bc5c99d529f0d30937f6f4b8a86d988047327bb88d04d2c4afc356de74722131"
 
 [[package]]
+name = "prettyplease"
+version = "0.1.24"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4ebcd279d20a4a0a2404a33056388e950504d891c855c7975b9a8fef75f3bf04"
+dependencies = [
+ "proc-macro2",
+ "syn",
+]
+
+[[package]]
 name = "proc-macro-error"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3090,6 +3100,28 @@ dependencies = [
  "prost 0.9.0",
  "prost-types 0.9.0",
  "regex",
+ "tempfile",
+ "which",
+]
+
+[[package]]
+name = "prost-build"
+version = "0.11.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2c828f93f5ca4826f97fedcbd3f9a536c16b12cff3dbbb4a007f932bbad95b12"
+dependencies = [
+ "bytes",
+ "heck 0.4.1",
+ "itertools",
+ "lazy_static",
+ "log",
+ "multimap",
+ "petgraph",
+ "prettyplease",
+ "prost 0.11.8",
+ "prost-types 0.11.8",
+ "regex",
+ "syn",
  "tempfile",
  "which",
 ]
@@ -4274,6 +4306,7 @@ dependencies = [
  "opentelemetry-semantic-conventions",
  "parking_lot",
  "proptest",
+ "prost 0.11.8",
  "qp2p",
  "rand 0.7.3",
  "rand 0.8.5",
@@ -4298,7 +4331,10 @@ dependencies = [
  "thiserror",
  "tiny-keccak",
  "tokio",
+ "tokio-stream",
  "tokio-util 0.7.7",
+ "tonic 0.8.3",
+ "tonic-build 0.8.4",
  "tracing",
  "tracing-appender",
  "tracing-core",
@@ -4337,10 +4373,16 @@ dependencies = [
  "eyre",
  "mockall",
  "predicates 2.1.5",
+ "prost 0.11.8",
+ "regex",
  "tokio",
+ "tonic 0.8.3",
+ "tonic-build 0.8.4",
  "tracing",
  "tracing-core",
  "tracing-subscriber",
+ "walkdir",
+ "xor_name",
 ]
 
 [[package]]
@@ -4832,7 +4874,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9403f1bafde247186684b230dc6f38b5cd514584e8bec1dd32514be4745fa757"
 dependencies = [
  "proc-macro2",
- "prost-build",
+ "prost-build 0.9.0",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "tonic-build"
+version = "0.8.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5bf5e9b9c0f7e0a7c027dcfaba7b2c60816c7049171f679d99ee2ff65d0de8c4"
+dependencies = [
+ "prettyplease",
+ "proc-macro2",
+ "prost-build 0.11.8",
  "quote",
  "syn",
 ]

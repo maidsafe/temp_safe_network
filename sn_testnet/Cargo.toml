@@ -15,6 +15,7 @@ version = "0.1.2"
 chaos = []
 statemap = []
 otlp = []
+verify-nodes = []
 
 [[bin]]
 path="src/main.rs"
@@ -25,13 +26,21 @@ color-eyre = "~0.6.0"
 eyre = "~0.6.5"
 clap = { version = "3.0.0", features = ["derive", "env"]}
 dirs-next = "2.0.0"
+prost = "~0.11.8"
+regex = "1.7.1"
+tonic = "~0.8.3"
 tracing = "~0.1.26"
 tracing-core = "~0.1.21"
 tracing-subscriber = { version = "~0.3.1", features = ["env-filter", "json"] }
+xor_name = "~5.0.0"
+walkdir = "2"
 
 [dependencies.tokio]
 version = "1.17.0"
 features = ["fs", "io-util", "macros", "rt", "rt-multi-thread", "sync"]
+
+[build-dependencies]
+tonic-build = "0.8"
 
 [dev-dependencies]
 assert_fs = "~1.0"
