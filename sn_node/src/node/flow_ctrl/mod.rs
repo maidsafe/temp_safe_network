@@ -497,9 +497,39 @@ async fn handle_cmd(
     flow_ctrl_cmd_sender: Sender<FlowCtrlCmd>,
     blocking_cmd_channel: CmdChannel,
 ) -> Result<(), Error> {
+    let (new_cmds, blocking_cmd) = process_cmd_non_blocking(cmd, context).await?;
+
+    if let Some(blocking_cmd) = blocking_cmd {
+        if let Err(error) = blocking_cmd_channel.send((blocking_cmd, vec![])).await {
+            error!("Error sending msg onto cmd channel {error:?}");
+        }
+        // early exit, no cmds produced here...
+        return Ok(());
+    }
+
+    for cmd in new_cmds {
+        flow_ctrl_cmd_sender
+            .send(FlowCtrlCmd::Handle(cmd))
+            .await
+            .map_err(|_| {
+                Error::TokioChannel("Putting fresh cmds in FlowCtrlCmd sender failed".to_string())
+            })?;
+    }
+    Ok(())
+}
+
+// Returns the new_cmds produced after processing the provided Cmd which should be sent to FlowCtrlCmdChannel
+// Optionally returns the unprocessed command if it should be processed in a blocking fashion, this should be sent
+// to the blocking CmdChannel
+async fn process_cmd_non_blocking(
+    cmd: Cmd,
+    context: NodeContext,
+) -> Result<(Vec<Cmd>, Option<Cmd>), Error> {
     let mut new_cmds = vec![];
     let start = Instant::now();
+
     let cmd_string = format!("{:?}", cmd);
+
     match cmd {
         Cmd::HandleMsg {
             sender,
@@ -653,9 +683,8 @@ async fn handle_cmd(
                         "Attempting to store data locally (off-thread): {:?}",
                         data.address()
                     );
-                    // TODO: proper err
                     let Some(stream) = send_stream else {
-                        return Ok(())
+                        return Err(Error::NoClientResponseStream)
                     };
                     // NB!! `sender` is actually a node here and should not be casted to ClientId! But since we are reusing the
                     // `store_data_and_respond` fn which is used when a forwarded client cmd comes in, we have to cast to ClientId here.. TO BE FIXED.
@@ -708,31 +737,21 @@ async fn handle_cmd(
                 }
                 msg => {
                     trace!("Node msg not handled off thread, sending to blocking channel: {msg:?}");
-                    if let Err(error) = blocking_cmd_channel
-                        .send((
-                            Cmd::ProcessNodeMsg {
-                                msg_id,
-                                msg,
-                                node_id,
-                                send_stream,
-                            },
-                            vec![],
-                        ))
-                        .await
-                    {
-                        error!("Error sending node msg cmd onto cmd channel {error:?}");
-                    }
+
+                    let cmd = Cmd::ProcessNodeMsg {
+                        msg_id,
+                        msg,
+                        node_id,
+                        send_stream,
+                    };
+
+                    return Ok((vec![], Some(cmd)));
                 }
             }
         }
         _ => {
             debug!("process cannot be handled off thread: {cmd:?}");
-            if let Err(error) = blocking_cmd_channel.send((cmd, vec![])).await {
-                error!("Error sending msg onto cmd channel {error:?}");
-            }
-
-            // early exit, no cmds produced here...
-            return Ok(());
+            return Ok((vec![], Some(cmd)));
         }
     }
 
@@ -740,13 +759,6 @@ async fn handle_cmd(
         "Off-thread handling of Cmd took {:?}: {cmd_string:?}",
         start.elapsed()
     );
-    for cmd in new_cmds {
-        flow_ctrl_cmd_sender
-            .send(FlowCtrlCmd::Handle(cmd))
-            .await
-            .map_err(|_| {
-                Error::TokioChannel("Putting fresh cmds in FlowCtrlCmd sender failed".to_string())
-            })?;
-    }
-    Ok(())
+
+    Ok((new_cmds, None))
 }

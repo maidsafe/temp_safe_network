@@ -466,7 +466,7 @@ async fn msg_to_self() -> Result<()> {
     let node_msg = NodeMsg::NodeDataCmd(NodeDataCmd::ReplicateDataBatch(vec![]));
 
     // don't use the cmd collection fn, as it skips Cmd::SendMsg
-    let cmds = MyNode::process_cmd(
+    let cmds = MyNode::test_process_cmd(
         Cmd::send_msg(
             node_msg.clone(),
             Recipients::Single(Participant::from_node(info.id())),
