@@ -74,16 +74,20 @@ impl MyNode {
 
         trace!("Handling msg {msg_id:?}. from {sender:?} Checking for AE first...");
 
-        // alternatively we could flag in msg kind for this...
-        // todo: this sender is actually client + forwarder ip....
+        let all_members = context.network_knowledge.members();
 
-        // It's been forwarded, by ourself. This prevents repeatdly
-        // forwarding client msgs
-        let is_from_us = sender.addr() == context.info.addr;
+        // we check if any member sent us this. Client messages could eg reach an elder via another elder and this
+        // checks if _anyone_ forwarded it to us (including ourselves), and if so, we assume that's legit and process
+        let members_with_sender_addr: Vec<_> = all_members
+            .iter()
+            .filter(|n| n.addr() == sender.addr())
+            .collect();
+        let sent_from_a_member = !members_with_sender_addr.is_empty();
 
-        debug!("{msg_id:?} is from us {is_from_us}");
+        debug!("{msg_id:?} was sent from a member: {sent_from_a_member:?}");
+
         let is_for_us =
-            is_from_us || wire_msg.dst().name == context.name || msg_kind.is_client_spend();
+            sent_from_a_member || wire_msg.dst().name == context.name || msg_kind.is_client_spend();
         debug!(
             "{msg_id:?} is for us? {is_for_us}: wiremsg dst name: {:?} vs our name: {:?}",
             wire_msg.dst().name,
