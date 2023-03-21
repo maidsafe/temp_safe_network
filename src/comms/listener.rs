@@ -7,15 +7,15 @@ use crate::comms::{NetworkMsg, NetworkNode};
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
-use super::{CommEvent, MsgReceived};
+use super::{CommEvent, MsgReceived, MsgTrait};
 
 use qp2p::{Connection, ConnectionIncoming, IncomingConnections};
 use tokio::{sync::mpsc::Sender, task};
 use tracing::{debug, error, trace, warn};
 
 #[tracing::instrument(skip_all)]
-pub(crate) fn listen_for_connections(
-    comm_events_sender: Sender<CommEvent>,
+pub(crate) fn listen_for_connections<T: MsgTrait + 'static>(
+    comm_events_sender: Sender<CommEvent<T>>,
     mut incoming_connections: IncomingConnections,
 ) {
     let _handle = task::spawn(async move {
@@ -36,8 +36,8 @@ pub(crate) fn listen_for_connections(
 }
 
 #[tracing::instrument(skip_all)]
-pub(crate) async fn listen_for_msgs(
-    comm_events: Sender<CommEvent>,
+pub(crate) async fn listen_for_msgs<T: MsgTrait>(
+    comm_events: Sender<CommEvent<T>>,
     conn: Connection,
     mut incoming_msgs: ConnectionIncoming,
 ) {
@@ -85,11 +85,11 @@ pub(crate) async fn listen_for_msgs(
     trace!(%conn_id, %remote_address, "ConnectionClosed");
 }
 
-pub(crate) async fn msg_received(
-    wire_msg: NetworkMsg,
+pub(crate) async fn msg_received<T: MsgTrait>(
+    wire_msg: NetworkMsg<T>,
     sender: NetworkNode,
     send_stream: Option<qp2p::SendStream>,
-    comm_events: Sender<CommEvent>,
+    comm_events: Sender<CommEvent<T>>,
 ) {
     let msg_id = wire_msg.id;
     let msg_event = CommEvent::Msg(MsgReceived {

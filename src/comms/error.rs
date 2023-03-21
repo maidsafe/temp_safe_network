@@ -28,7 +28,7 @@ pub enum Error {
     #[error("Failed to send msg {0:?}")]
     FailedSend(MsgId),
     #[error("Serialisation error:: {0}")]
-    Bincode(#[from] bincode::Error),
+    SerialisationError(#[from] bincode::Error),
 }
 
 impl From<qp2p::SendError> for Error {

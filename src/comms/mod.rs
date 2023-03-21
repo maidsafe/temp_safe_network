@@ -31,6 +31,10 @@ use tracing::{debug, error, trace, warn};
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct MsgId(u64);
+pub trait MsgTrait:
+    Default + std::marker::Send + Clone + std::fmt::Debug + Serialize + for<'a> Deserialize<'a>
+{
+}
 
 impl MsgId {
     /// Generates a new `MsgId` with random content.
@@ -40,12 +44,12 @@ impl MsgId {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct NetworkMsg {
+pub struct NetworkMsg<T> {
     pub id: MsgId,
-    pub payload: String,
+    pub payload: T,
 }
 
-impl NetworkMsg {
+impl<T: MsgTrait> NetworkMsg<T> {
     pub fn from_bytes(value: Bytes) -> Result<Self> {
         Ok(bincode::deserialize(&value)?)
     }
@@ -54,10 +58,10 @@ impl NetworkMsg {
         Ok(bincode::serialize(self)?.into())
     }
 
-    pub fn error_msg() -> NetworkMsg {
+    pub fn error_msg() -> NetworkMsg<T> {
         NetworkMsg {
             id: MsgId::new(),
-            payload: "error".to_string(),
+            payload: Default::default(),
         }
     }
 }
@@ -73,9 +77,9 @@ static STANDARD_CHANNEL_SIZE: usize = 100_000;
 
 /// Events from the comm module.
 #[derive(Debug)]
-pub enum CommEvent {
+pub enum CommEvent<T> {
     /// A msg was received.
-    Msg(MsgReceived),
+    Msg(MsgReceived<T>),
     /// A send error occurred.
     Error {
         /// The sender/recipient that failed.
@@ -87,11 +91,11 @@ pub enum CommEvent {
 
 /// A msg received on the wire.
 #[derive(Debug)]
-pub struct MsgReceived {
+pub struct MsgReceived<T> {
     /// The socketaddr of sender of the msg.
     pub sender: SocketAddr,
     /// The msg that we received.
-    pub wire_msg: NetworkMsg,
+    pub wire_msg: NetworkMsg<T>,
     /// An optional stream to return msgs on, if
     /// this msg came on a bidi-stream.
     pub send_stream: Option<SendStream>,
@@ -112,10 +116,10 @@ impl Comm {
     /// Creates a new instance of Comm with an endpoint
     /// and starts listening to the incoming messages from other nodes.
     #[tracing::instrument(skip_all)]
-    pub fn new(
+    pub fn new<T: MsgTrait + 'static>(
         local_addr: SocketAddr,
         mut public_addr: Option<SocketAddr>,
-    ) -> Result<(Self, Receiver<CommEvent>)> {
+    ) -> Result<(Self, Receiver<CommEvent<T>>)> {
         let (our_endpoint, incoming_conns) = Endpoint::builder()
             .addr(local_addr)
             .idle_timeout(70_000)
@@ -250,10 +254,10 @@ enum CommCmd {
     },
 }
 
-fn process_cmds(
+fn process_cmds<T: MsgTrait + 'static>(
     our_endpoint: Endpoint,
     mut cmd_receiver: Receiver<CommCmd>,
-    comm_events: Sender<CommEvent>,
+    comm_events: Sender<CommEvent<T>>,
 ) {
     let _handle = task::spawn(async move {
         let mut links = BTreeMap::<NetworkNode, NodeLink>::new();
@@ -317,11 +321,11 @@ fn process_cmds(
     });
 }
 
-fn get_link(
+fn get_link<T: MsgTrait + 'static>(
     msg_id: MsgId,
     node_id: NetworkNode,
     links: &BTreeMap<NetworkNode, NodeLink>,
-    comm_events: Sender<CommEvent>,
+    comm_events: Sender<CommEvent<T>>,
 ) -> Option<NodeLink> {
     debug!("Trying to get {node_id:?} link in order to send: {msg_id:?}");
     match links.get(&node_id) {
@@ -335,7 +339,12 @@ fn get_link(
 }
 
 #[tracing::instrument(skip_all)]
-fn send(msg_id: MsgId, mut link: NodeLink, bytes: UsrMsgBytes, comm_events: Sender<CommEvent>) {
+fn send<T: MsgTrait + 'static>(
+    msg_id: MsgId,
+    mut link: NodeLink,
+    bytes: UsrMsgBytes,
+    comm_events: Sender<CommEvent<T>>,
+) {
     let _handle = task::spawn(async move {
         let (h, d, p) = &bytes;
         let bytes_len = h.len() + d.len() + p.len();
@@ -354,11 +363,11 @@ fn send(msg_id: MsgId, mut link: NodeLink, bytes: UsrMsgBytes, comm_events: Send
 }
 
 #[tracing::instrument(skip_all)]
-fn send_and_return_response(
+fn send_and_return_response<T: MsgTrait + 'static>(
     msg_id: MsgId,
     link: NodeLink,
     bytes: UsrMsgBytes,
-    comm_events: Sender<CommEvent>,
+    comm_events: Sender<CommEvent<T>>,
 ) {
     let _handle = task::spawn(async move {
         let (h, d, p) = &bytes;
@@ -394,12 +403,12 @@ fn send_and_return_response(
 }
 
 #[tracing::instrument(skip_all)]
-fn send_and_respond_on_stream(
+fn send_and_respond_on_stream<T: MsgTrait + 'static>(
     msg_id: MsgId,
     node_bytes: BTreeMap<NetworkNode, (Option<NodeLink>, UsrMsgBytes)>,
     expected_targets: usize,
     dst_stream: (NetworkNode, SendStream),
-    comm_events: Sender<CommEvent>,
+    comm_events: Sender<CommEvent<T>>,
 ) {
     let _handle = task::spawn(async move {
         let (dst, stream) = dst_stream;
@@ -445,7 +454,7 @@ fn send_and_respond_on_stream(
         let all_ok_equal = || succeeded.windows(2).all(|w| are_equal(&w[0].1, &w[1].1));
 
         let response_bytes = if some_failed || !all_ok_equal() {
-            match error_response(dst) {
+            match error_response::<T>(dst) {
                 None => {
                     error!("Could not send the error response to client!");
                     return;
@@ -467,7 +476,11 @@ fn send_and_respond_on_stream(
 }
 
 #[tracing::instrument(skip_all)]
-fn send_error(node_id: NetworkNode, error: Error, comm_events: Sender<CommEvent>) {
+fn send_error<T: MsgTrait + 'static>(
+    node_id: NetworkNode,
+    error: Error,
+    comm_events: Sender<CommEvent<T>>,
+) {
     let _handle = task::spawn(async move {
         let error_msg =
             format!("Failed to send error {error} of node {node_id:?} on comm event channel ");
@@ -489,8 +502,8 @@ async fn send_on_stream(msg_id: MsgId, bytes: Bytes, mut stream: SendStream) {
     }
 }
 
-fn error_response(dst: NetworkNode) -> Option<Bytes> {
-    let wire_msg = NetworkMsg::error_msg();
+fn error_response<T: MsgTrait>(dst: NetworkNode) -> Option<Bytes> {
+    let wire_msg = NetworkMsg::<T>::error_msg();
     wire_msg.to_bytes().ok()
 }
 
