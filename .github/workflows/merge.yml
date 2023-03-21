@@ -281,7 +281,6 @@ jobs:
       - name: Start a local network (Windows)
         if: matrix.os == 'windows-latest'
         run: cd sn_testnet && cargo run --release --bin testnet --features verify-nodes -- --interval 30000 --node-path ../target/release/safenode
-        continue-on-error: true
         env:
           PROTOC: .\protoc.exe
           RUST_LOG: "safenode,sn_node,sn_comms,sn_consensus,sn_fault_detection,sn_interface=trace"

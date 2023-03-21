@@ -12,7 +12,7 @@ use std::{
     fs::File,
     io::prelude::*,
     io::BufReader,
-    net::SocketAddr,
+    net::{IpAddr, Ipv4Addr, SocketAddr},
     path::{Path, PathBuf},
 };
 use tokio::time::{sleep, Duration};
@@ -165,10 +165,14 @@ fn nodes_info_from_logs(path: &Path) -> Result<Vec<NodeInfo>> {
             let lines = BufReader::new(file).lines();
             lines.filter_map(|item| item.ok()).for_each(|line| {
                 if let Some(cap) = re.captures_iter(&line).next() {
+                    let mut addr: SocketAddr = cap[3].parse().unwrap();
+                    if addr.ip() == IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)) {
+                        addr.set_ip(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)));
+                    }
                     nodes.push(NodeInfo {
                         pid: cap[1].parse().unwrap(),
                         name: cap[2].to_string(),
-                        addr: cap[3].parse().unwrap(),
+                        addr,
                         log_path: file_path.parent().unwrap().to_path_buf(),
                     });
                 }
