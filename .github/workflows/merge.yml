@@ -967,6 +967,5 @@ jobs:
       - api
       - cli
     runs-on: ubuntu-latest
-    if: "! failure()"
     steps:
       - run: echo "All checks passed, ready to merge"
