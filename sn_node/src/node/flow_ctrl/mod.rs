@@ -93,7 +93,7 @@ impl FlowCtrl {
         // otherwise they are sent to the blocking process channel
         let (flow_ctrl_cmd_sender, flow_ctrl_cmd_reciever) = mpsc::channel(STANDARD_CHANNEL_SIZE);
         // separate channel to update the periodics loop
-        let (periodic_flow_ctrl_cmd_sender, periodic_flow_ctrl_cmd_reciever) =
+        let (context_updater_for_periodic, context_receiver_for_periodics) =
             mpsc::channel(STANDARD_CHANNEL_SIZE);
 
         let all_members = node_context
@@ -144,7 +144,7 @@ impl FlowCtrl {
                 &mut cmd_ctrl,
                 join_retry_timeout,
                 flow_ctrl_cmd_sender.clone(), // sending of updates to context
-                periodic_flow_ctrl_cmd_sender.clone(), // sending of updates to context
+                context_updater_for_periodic.clone(), // sending of updates to context
                 &mut blocking_cmds_receiver,
             )
             .await?;
@@ -152,7 +152,7 @@ impl FlowCtrl {
         // set up the periodic check loop
         flow_ctrl.listen_for_flow_ctrl_cmds_for_periodics(
             node.context(),
-            periodic_flow_ctrl_cmd_reciever,
+            context_receiver_for_periodics,
         );
 
         let _handle = tokio::task::spawn(FlowCtrl::process_blocking_cmds(
@@ -160,7 +160,7 @@ impl FlowCtrl {
             cmd_ctrl,
             blocking_cmds_receiver,
             flow_ctrl_cmd_sender.clone(), // sending of updates to context
-            periodic_flow_ctrl_cmd_sender.clone(), // sending of updates to context
+            context_updater_for_periodic.clone(), // sending of updates to context
         ));
 
         Self::send_out_data_for_replication(
@@ -181,7 +181,7 @@ impl FlowCtrl {
         cmd_ctrl: &mut CmdCtrl,
         join_retry_timeout: Duration,
         flow_ctrl_cmd_processing: Sender<FlowCtrlCmd>,
-        periodic_flow_ctrl_cmd_processing: Sender<FlowCtrlCmd>,
+        context_udpated_for_periodics: Sender<FlowCtrlCmd>,
         blocking_cmds_receiver: &mut Receiver<(Cmd, Vec<usize>)>,
     ) -> Result<MyNode> {
         let mut is_member = false;
@@ -213,7 +213,7 @@ impl FlowCtrl {
                     })?;
 
                 // update our context in periodic flow ctrl loop with each cmd
-                periodic_flow_ctrl_cmd_processing
+                context_udpated_for_periodics
                     .send(FlowCtrlCmd::UpdateContext(node.context()))
                     .await
                     .map_err(|e| {
@@ -270,7 +270,7 @@ impl FlowCtrl {
         cmd_ctrl: CmdCtrl,
         mut incoming_cmds_from_apis: Receiver<(Cmd, Vec<usize>)>,
         cmd_processing: Sender<FlowCtrlCmd>,
-        periodic_cmd_sender: Sender<FlowCtrlCmd>,
+        context_updater_for_periodics: Sender<FlowCtrlCmd>,
     ) -> Result<()> {
         // first do any pending processing
         while let Some((cmd, cmd_id)) = incoming_cmds_from_apis.recv().await {
@@ -312,7 +312,7 @@ impl FlowCtrl {
                 .map_err(|e| Error::TokioChannel(format!("cmd_processing send failed {:?}", e)))?;
 
             // Finally update our context in periodic loop
-            periodic_cmd_sender
+            context_updater_for_periodics
                 .send(FlowCtrlCmd::UpdateContext(context))
                 .await
                 .map_err(|e| Error::TokioChannel(format!("cmd_processing send failed {:?}", e)))?;
@@ -431,7 +431,7 @@ impl FlowCtrl {
     fn listen_for_flow_ctrl_cmds_for_periodics(
         mut self,
         context: NodeContext,
-        mut periodic_flow_ctrl_cmd_reciever: Receiver<FlowCtrlCmd>,
+        mut context_receiver_for_periodics: Receiver<FlowCtrlCmd>,
     ) {
         // we'll update this as we go
         let mut context = context;
@@ -440,7 +440,7 @@ impl FlowCtrl {
         let _handle = tokio::task::spawn(async move {
             loop {
                 while let Ok(FlowCtrlCmd::UpdateContext(new_context)) =
-                    periodic_flow_ctrl_cmd_reciever.try_recv()
+                    context_receiver_for_periodics.try_recv()
                 {
                     debug!("Periodic context updated");
                     context = new_context;
