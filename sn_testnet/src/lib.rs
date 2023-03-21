@@ -27,15 +27,27 @@ const TESTNET_DIR_NAME: &str = "local-test-network";
 /// launching processes.
 #[cfg_attr(test, automock)]
 pub trait NodeLauncher {
-    fn launch(&self, node_bin_path: &Path, args: Vec<String>) -> Result<()>;
+    fn launch(
+        &self,
+        node_name: String,
+        // node_data_path: PathBuf,
+        node_bin_path: &Path,
+        args: Vec<String>,
+    ) -> Result<()>;
 }
 
 #[derive(Default)]
 pub struct SafeNodeLauncher {}
 impl NodeLauncher for SafeNodeLauncher {
-    fn launch(&self, node_bin_path: &Path, args: Vec<String>) -> Result<()> {
+    fn launch(&self, node_name: String, node_bin_path: &Path, args: Vec<String>) -> Result<()> {
         debug!("Running {:#?} with {:#?}", node_bin_path, args);
+        let flamestacks_dir = PathBuf::new().join("flamestacks").join(node_name.clone());
+        std::fs::create_dir_all(&flamestacks_dir)?;
+
         Command::new(node_bin_path)
+            // we set the command ro run in each individal node dir (as each flamegraph uses a file `cargo-flamegraph.stacks` which cannot be renamed per per node)
+            // we set flamegraph to root as that's necesasry on mac
+            .current_dir(flamestacks_dir)
             .args(args)
             .stdout(Stdio::inherit())
             .stderr(Stdio::inherit())
@@ -214,18 +226,23 @@ impl Testnet {
         }
 
         let address = address.unwrap_or("127.0.0.1:12000".parse()?);
+        let node_name = format!("safenode-genesis");
+        let node_data_dir_path = self.nodes_dir_path.join(node_name.clone());
+
         info!("Launching genesis node using address {address}...");
         let launch_args = self.get_launch_args(
-            "safenode-genesis".to_string(),
+            node_name.clone(),
+            node_data_dir_path.clone(),
             Some(address),
             None,
             node_args,
         )?;
-        let node_data_dir_path = self.nodes_dir_path.join("safenode-genesis");
-        std::fs::create_dir_all(node_data_dir_path)?;
+
+        info!("Launch args are: {launch_args:?}");
+        std::fs::create_dir_all(node_data_dir_path.clone())?;
 
         let launch_bin = self.get_launch_bin();
-        self.launcher.launch(&launch_bin, launch_args)?;
+        self.launcher.launch(node_name, &launch_bin, launch_args)?;
         info!(
             "Delaying for {} seconds before launching other nodes",
             self.node_launch_interval / 1000
@@ -265,14 +282,23 @@ impl Testnet {
                 .to_string();
             std::fs::create_dir_all(&node_data_dir_path)?;
 
+            let node_name = format!("safenode-{i}");
+            let node_data_dir_path = self.nodes_dir_path.join(node_name.clone());
+
             let launch_args = self.get_launch_args(
-                format!("safenode-{i}"),
+                node_name.clone(),
+                node_data_dir_path.clone(),
                 None,
                 Some(network_contacts_path),
                 node_args.clone(),
             )?;
+
+            std::fs::create_dir_all(node_data_dir_path.clone())?;
+
+            info!("Launch args are: {launch_args:?}");
+
             let launch_bin = self.get_launch_bin();
-            self.launcher.launch(&launch_bin, launch_args)?;
+            self.launcher.launch(node_name, &launch_bin, launch_args)?;
 
             if i < end {
                 info!(
@@ -311,11 +337,11 @@ impl Testnet {
     fn get_launch_args(
         &self,
         node_name: String,
+        node_data_dir_path: PathBuf,
         address: Option<SocketAddr>,
         network_contacts_path: Option<&Path>,
         node_args: Vec<String>,
     ) -> Result<Vec<String>> {
-        let node_data_dir_path = self.nodes_dir_path.join(node_name.clone());
         let mut launch_args = Vec::new();
         if self.flamegraph_mode {
             launch_args.push("flamegraph".to_string());
