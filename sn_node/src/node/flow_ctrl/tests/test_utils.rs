@@ -8,8 +8,8 @@
 
 use crate::{
     node::{
-        cfg::create_test_capacity_and_root_storage, messaging::Recipients, Cmd, MyNode,
-        NodeEventsChannel,
+        cfg::create_test_capacity_and_root_storage, flow_ctrl::process_cmd_non_blocking,
+        messaging::Recipients, Cmd, MyNode, NodeEventsChannel,
     },
     UsedSpace,
 };
@@ -148,7 +148,7 @@ impl ProcessAndInspectCmds {
                     | Cmd::SendDataResponse { .. }
                     | Cmd::SendAndForwardResponseToClient { .. }
             ) {
-                let new_cmds = MyNode::process_cmd(cmd, node).await?;
+                let new_cmds = MyNode::test_process_cmd(cmd, node).await?;
                 self.pending_cmds.extend(new_cmds);
 
                 if next_index < self.pending_cmds.len() {
@@ -206,9 +206,9 @@ impl TestNode {
     pub(crate) async fn process_cmd(&mut self, cmd: Cmd) -> Result<Vec<Cmd>> {
         self.msg_tracker.write().await.track(&cmd);
         let cmd_string = cmd.to_string();
-        MyNode::process_cmd(cmd, &mut self.node)
+        MyNode::test_process_cmd(cmd, &mut self.node)
             .await
-            .wrap_err(format!("Failed to process {cmd_string}"))
+            .wrap_err(format!("Error processing cmd {cmd_string}"))
     }
 
     /// Handle and keep track of msgs from clients and nodes.
@@ -353,6 +353,27 @@ impl Cmd {
             return Err(eyre!("Expected a Cmd::SendMsg* to filter the recipients"));
         };
         Ok(())
+    }
+}
+
+/// Extend the `MyNode` struct with some utilities for testing.
+///
+/// Since this is in a module marked as #[test], this functionality will only be present in the
+/// testing context.
+impl MyNode {
+    /// Helper to process both non-blocking and blocking cmds and return the new cmds
+    pub(crate) async fn test_process_cmd(
+        cmd: Cmd,
+        node: &mut MyNode,
+    ) -> crate::node::error::Result<Vec<Cmd>> {
+        // process non blocking cmd
+        let (new_cmds, blocking_cmd) = process_cmd_non_blocking(cmd, node.context()).await?;
+        if let Some(blocking_cmd) = blocking_cmd {
+            // process blocking cmd
+            MyNode::process_cmd(blocking_cmd, node).await
+        } else {
+            Ok(new_cmds)
+        }
     }
 }
 
