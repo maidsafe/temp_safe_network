@@ -5,7 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.80.3 (2023-03-22)
+
+### Chore
+
+ - <csr-id-29edfcea7d2cb1334422f2fe5dc90e72c7e5ac7c/> bump sn_dbc
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 1 commit contributed to the release.
+ - 6 days passed between releases.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Bump sn_dbc ([`29edfce`](https://github.com/maidsafe/safe_network/commit/29edfcea7d2cb1334422f2fe5dc90e72c7e5ac7c))
+</details>
+
 ## v0.80.2 (2023-03-16)
+
+<csr-id-ed26bc19831a28e2e13f63c77d26e0cd086cf85c/>
+<csr-id-57539fec4288cdd20672186dcfa49f7f6c9f686f/>
 
 ### Chore
 
@@ -17,13 +45,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    release before I tag these manually.
  - <csr-id-57539fec4288cdd20672186dcfa49f7f6c9f686f/> sn_interface-0.20.5/sn_client-0.82.2/sn_node-0.78.6/sn_api-0.80.2/sn_cli-0.74.0
 
+### Chore
+
+ - <csr-id-88d3403ea11f877e1ffa23fe15beafeb9d68111f/> sn_comms-0.6.2/sn_client-0.82.2/sn_api-0.80.2/sn_cli-0.74.0
+
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 4 commits contributed to the release over the course of 1 calendar day.
+ - 5 commits contributed to the release over the course of 1 calendar day.
  - 2 days passed between releases.
- - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -33,6 +65,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Sn_comms-0.6.2/sn_client-0.82.2/sn_api-0.80.2/sn_cli-0.74.0 ([`88d3403`](https://github.com/maidsafe/safe_network/commit/88d3403ea11f877e1ffa23fe15beafeb9d68111f))
     - Manually bump sn_interface and sn_node ([`ed26bc1`](https://github.com/maidsafe/safe_network/commit/ed26bc19831a28e2e13f63c77d26e0cd086cf85c))
     - Revert "chore(release): sn_interface-0.20.5/sn_client-0.82.2/sn_node-0.78.6/sn_api-0.80.2/sn_cli-0.74.0" ([`9dc0fe9`](https://github.com/maidsafe/safe_network/commit/9dc0fe938e1b1c43ca1292fa8640b7ced22aa39b))
     - Sn_interface-0.20.5/sn_client-0.82.2/sn_node-0.78.6/sn_api-0.80.2/sn_cli-0.74.0 ([`57539fe`](https://github.com/maidsafe/safe_network/commit/57539fec4288cdd20672186dcfa49f7f6c9f686f))
@@ -40,6 +73,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.80.1 (2023-03-13)
+
+<csr-id-fce579d1202015bfd111361b780290f88f64a2c8/>
 
 ### Chore
 

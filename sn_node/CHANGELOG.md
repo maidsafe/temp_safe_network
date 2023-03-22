@@ -5,7 +5,84 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.80.1 (2023-03-22)
+
+### Chore
+
+ - <csr-id-29edfcea7d2cb1334422f2fe5dc90e72c7e5ac7c/> bump sn_dbc
+ - <csr-id-5b3c08fe6330ea1b13c48e51e606ad31be442f4d/> rename periodic context sender
+ - <csr-id-5a7e5cd67dd94bd1d73ba05ba08d9842223a2558/> lower rejoin attempt time
+ - <csr-id-ad6bf57c4ff0e3e859068f5d5a1a31094183243f/> move DkgSessionInfo into context; make periodics requrie context only
+ - <csr-id-3bcf453d99241d72d91105a0f3b0ec8341eb7664/> remove duplicate Cmd handling
+ - <csr-id-3189234825323f6480207ef424dab027c3bca409/> remove duplicate NodeMsg handling
+ - <csr-id-89d66365a5a0b26bf832dfebd5a4032363071e6f/> make DKgVoter cloneable
+ - <csr-id-b4fc6539813db7d6657f91e7b8b1a89b90eb6265/> perform relocation finalisation asap after update
+ - <csr-id-a5bb5e86518e23dcc59f252b231de89ed90efcf9/> clarify naming
+
+### New Features
+
+ - <csr-id-1c7fb145c7fd2f3d9109c3e9418ccb5619ab8e5b/> move DkgAe off thread
+
+### Bug Fixes
+
+ - <csr-id-89e10d965fd4001ade575082911594c178c47b76/> process both blocking and non-blocking cmds
+ - <csr-id-5ee1887e79773b4ac784c7631fdd5d6f460058f1/> move periodic checks into their own loop
+ - <csr-id-66a4e6d95b6b5f62832316fa42dfaaf46e644ebd/> check when handling msg if is from member
+   The previous check for "is from me" was failing due to
+   a local 0.0.0.0 representation in testnets vs 127 from other nodes...
+   
+   This was leading to looping.
+   
+   But only checking if it was forwarded from ourselves would mean if
+   an elder was a storage node, we'dsee and forward on the same message
+   several times (as each elder sends it on to us, and its not from us, so
+   we forward to the adults in question etc).
+   
+   This check solves both situations
+ - <csr-id-6c4f873df4ee253b2023e85b1b90baaabd49e109/> push replication send msgs onto flowctrl channel
+ - <csr-id-39b432d365ec745dc31147ca91df23284c1011ac/> node to update its own members list upon being relocated
+
+### Refactor
+
+ - <csr-id-d3c6c9727a69389f4204b746c54a537cd783232c/> remove unused wiremsg-debuginfo ft
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 16 commits contributed to the release over the course of 2 calendar days.
+ - 6 days passed between releases.
+ - 16 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Bump sn_dbc ([`29edfce`](https://github.com/maidsafe/safe_network/commit/29edfcea7d2cb1334422f2fe5dc90e72c7e5ac7c))
+    - Process both blocking and non-blocking cmds ([`89e10d9`](https://github.com/maidsafe/safe_network/commit/89e10d965fd4001ade575082911594c178c47b76))
+    - Rename periodic context sender ([`5b3c08f`](https://github.com/maidsafe/safe_network/commit/5b3c08fe6330ea1b13c48e51e606ad31be442f4d))
+    - Move periodic checks into their own loop ([`5ee1887`](https://github.com/maidsafe/safe_network/commit/5ee1887e79773b4ac784c7631fdd5d6f460058f1))
+    - Lower rejoin attempt time ([`5a7e5cd`](https://github.com/maidsafe/safe_network/commit/5a7e5cd67dd94bd1d73ba05ba08d9842223a2558))
+    - Move DkgSessionInfo into context; make periodics requrie context only ([`ad6bf57`](https://github.com/maidsafe/safe_network/commit/ad6bf57c4ff0e3e859068f5d5a1a31094183243f))
+    - Check when handling msg if is from member ([`66a4e6d`](https://github.com/maidsafe/safe_network/commit/66a4e6d95b6b5f62832316fa42dfaaf46e644ebd))
+    - Remove unused wiremsg-debuginfo ft ([`d3c6c97`](https://github.com/maidsafe/safe_network/commit/d3c6c9727a69389f4204b746c54a537cd783232c))
+    - Remove duplicate Cmd handling ([`3bcf453`](https://github.com/maidsafe/safe_network/commit/3bcf453d99241d72d91105a0f3b0ec8341eb7664))
+    - Remove duplicate NodeMsg handling ([`3189234`](https://github.com/maidsafe/safe_network/commit/3189234825323f6480207ef424dab027c3bca409))
+    - Move DkgAe off thread ([`1c7fb14`](https://github.com/maidsafe/safe_network/commit/1c7fb145c7fd2f3d9109c3e9418ccb5619ab8e5b))
+    - Make DKgVoter cloneable ([`89d6636`](https://github.com/maidsafe/safe_network/commit/89d66365a5a0b26bf832dfebd5a4032363071e6f))
+    - Perform relocation finalisation asap after update ([`b4fc653`](https://github.com/maidsafe/safe_network/commit/b4fc6539813db7d6657f91e7b8b1a89b90eb6265))
+    - Clarify naming ([`a5bb5e8`](https://github.com/maidsafe/safe_network/commit/a5bb5e86518e23dcc59f252b231de89ed90efcf9))
+    - Push replication send msgs onto flowctrl channel ([`6c4f873`](https://github.com/maidsafe/safe_network/commit/6c4f873df4ee253b2023e85b1b90baaabd49e109))
+    - Node to update its own members list upon being relocated ([`39b432d`](https://github.com/maidsafe/safe_network/commit/39b432d365ec745dc31147ca91df23284c1011ac))
+</details>
+
 ## v0.80.0 (2023-03-16)
+
+<csr-id-4dca7700c0a017dbdeb53a0387f895c0dabd00cc/>
 
 ### Refactor (BREAKING)
 
@@ -16,12 +93,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    with a channel where NodeEvents are broadcasted, including a rejoin-required event type.
    - An initial set of `NodeEvents` is defined and broadcasted by the sn_node flows.
 
+### Chore
+
+ - <csr-id-c9f3e7ccad8836c609193f1c6b53f351e5705805/> sn_node-0.80.0
+
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 1 commit contributed to the release.
- - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -31,6 +112,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Sn_node-0.80.0 ([`c9f3e7c`](https://github.com/maidsafe/safe_network/commit/c9f3e7ccad8836c609193f1c6b53f351e5705805))
     - Improving sn_node public API and exposing NodeEvents ([`4dca770`](https://github.com/maidsafe/safe_network/commit/4dca7700c0a017dbdeb53a0387f895c0dabd00cc))
 </details>
 
@@ -48,6 +130,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <csr-id-847703ef5c87db2b22fc21cd6252dcf9dd4a26e9/>
 <csr-id-807d69ef609decfe94230e2086144afc5cc56d7b/>
 <csr-id-1a8b9c9ba5b98c0f1176a0ccbce53d4acea8c84c/>
+<csr-id-50f6ede2104025bd79de8922ca7f27c742cf52bb/>
 
 ### Chore
 

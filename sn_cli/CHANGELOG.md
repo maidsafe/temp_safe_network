@@ -4,19 +4,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
-## v0.74.1 (2023-03-16)
+## v0.74.2 (2023-03-22)
 
 ### Chore
 
- - <csr-id-807d69ef609decfe94230e2086144afc5cc56d7b/> sn_interface-0.20.6/sn_comms-0.6.3/sn_client-0.82.3/sn_node-0.79.0/sn_cli-0.74.1
- - <csr-id-1a8b9c9ba5b98c0f1176a0ccbce53d4acea8c84c/> safenode renaming
+ - <csr-id-29edfcea7d2cb1334422f2fe5dc90e72c7e5ac7c/> bump sn_dbc
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 3 commits contributed to the release.
- - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 1 commit contributed to the release.
+ - 6 days passed between releases.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -26,6 +26,39 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Bump sn_dbc ([`29edfce`](https://github.com/maidsafe/safe_network/commit/29edfcea7d2cb1334422f2fe5dc90e72c7e5ac7c))
+</details>
+
+## v0.74.1 (2023-03-16)
+
+<csr-id-807d69ef609decfe94230e2086144afc5cc56d7b/>
+<csr-id-1a8b9c9ba5b98c0f1176a0ccbce53d4acea8c84c/>
+
+### Chore
+
+ - <csr-id-807d69ef609decfe94230e2086144afc5cc56d7b/> sn_interface-0.20.6/sn_comms-0.6.3/sn_client-0.82.3/sn_node-0.79.0/sn_cli-0.74.1
+ - <csr-id-1a8b9c9ba5b98c0f1176a0ccbce53d4acea8c84c/> safenode renaming
+
+### Chore
+
+ - <csr-id-50f6ede2104025bd79de8922ca7f27c742cf52bb/> sn_interface-0.20.6/sn_comms-0.6.3/sn_client-0.82.3/sn_node-0.79.0/sn_cli-0.74.1
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 4 commits contributed to the release.
+ - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Sn_interface-0.20.6/sn_comms-0.6.3/sn_client-0.82.3/sn_node-0.79.0/sn_cli-0.74.1 ([`50f6ede`](https://github.com/maidsafe/safe_network/commit/50f6ede2104025bd79de8922ca7f27c742cf52bb))
     - Revert "chore(release): sn_interface-0.20.6/sn_comms-0.6.3/sn_client-0.82.3/sn_node-0.79.0/sn_cli-0.74.1" ([`a24dca6`](https://github.com/maidsafe/safe_network/commit/a24dca63d1fde8c5e13fa7bbfadf71cda15af5c5))
     - Sn_interface-0.20.6/sn_comms-0.6.3/sn_client-0.82.3/sn_node-0.79.0/sn_cli-0.74.1 ([`807d69e`](https://github.com/maidsafe/safe_network/commit/807d69ef609decfe94230e2086144afc5cc56d7b))
     - Safenode renaming ([`1a8b9c9`](https://github.com/maidsafe/safe_network/commit/1a8b9c9ba5b98c0f1176a0ccbce53d4acea8c84c))
@@ -35,6 +68,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 <csr-id-57539fec4288cdd20672186dcfa49f7f6c9f686f/>
 <csr-id-d3d328db75c83e7a71c3fe6eff036c16120b6251/>
+<csr-id-88d3403ea11f877e1ffa23fe15beafeb9d68111f/>
 
 ### Chore
 
