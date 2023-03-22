@@ -144,12 +144,11 @@ async fn main() -> Result<()> {
         return Ok(());
     }
 
-    let node_count = args.node_count.unwrap_or(DEFAULT_NODE_COUNT);
     run_network(
         node_bin_path,
         args.node_launch_interval
             .unwrap_or(DEFAULT_NODE_LAUNCH_INTERVAL),
-        node_count,
+        args.node_count.unwrap_or(DEFAULT_NODE_COUNT),
         args.node_args,
         args.flame,
     )

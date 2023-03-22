@@ -186,7 +186,7 @@ fn create_runtime_and_node(config: &Config) -> Result<()> {
 
             let node_ref = Arc::new(RwLock::new(node_ref));
 
-            // Moitor NodeEvents just in case we need to rejoin
+            // Monitor NodeEvents just in case we need to rejoin
             monitor_node_events(node_ref.clone(), ctl_tx.clone(), log_dir.clone());
 
             // Start up gRPC interface

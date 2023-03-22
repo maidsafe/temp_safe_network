@@ -262,27 +262,15 @@ jobs:
 
       - name: Build sn bins (Windows)
         if: matrix.os == 'windows-latest'
-        run: |
-          cd sn_node
-          cargo build --release --bins --features rpc-service
-          cd ../sn_testnet
-          cargo build --release --bins --features verify-nodes
+        run: cargo build --release --bins --features=verify-nodes,rpc-service
         env:
           PROTOC: .\protoc.exe
         timeout-minutes: 60
 
       - name: Start a local network
-        if: matrix.os != 'windows-latest'
         run: cargo run --release --bin testnet --features verify-nodes -- --interval 30000 --node-path ./target/release/safenode
         id: section-startup
         env:
-          RUST_LOG: "safenode,sn_node,sn_comms,sn_consensus,sn_fault_detection,sn_interface=trace"
-
-      - name: Start a local network (Windows)
-        if: matrix.os == 'windows-latest'
-        run: cd sn_testnet && cargo run --release --bin testnet --features verify-nodes -- --interval 30000 --node-path ../target/release/safenode
-        env:
-          PROTOC: .\protoc.exe
           RUST_LOG: "safenode,sn_node,sn_comms,sn_consensus,sn_fault_detection,sn_interface=trace"
 
       - name: Build all tests before running non ubuntu
