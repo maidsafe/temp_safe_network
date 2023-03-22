@@ -307,6 +307,15 @@ jobs:
         env:
           RUST_LOG: "safenode,sn_node,sn_comms,sn_consensus,sn_fault_detection,sn_interface=trace"
 
+      # - name: Wait for all nodes to join
+      #   shell: bash
+      #   run: ./resources/scripts/wait_for_nodes_to_join.sh
+      #   timeout-minutes: 5
+
+      - name: Check we have expected elders
+        shell: bash
+        run: rg "7 Elders, " ~/.safe/node/local-test-network -u
+
       - name: Build all tests before running non ubuntu
         run: cd sn_client && cargo test --no-run --release --features check-replicas
         timeout-minutes: 50
