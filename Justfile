@@ -196,15 +196,6 @@ publish-crates:
   #!/usr/bin/env bash
   set -e
 
-  # On Github Actions, the job will not run if we are not on a release commit.
-  # This check is for when the process needs to be performed manually, which should also
-  # be done on a version bump commit. The caller should do a `git checkout <commit_hash>`
-  # to get on the release commit if need be.
-  if ! git log -1 --pretty=format:%s | grep -q "^chore(release):"; then
-    echo "The HEAD must be on a release commit to perform a publish."
-    exit 1
-  fi
-
   crates=(
     "sn_testnet"
     "sn_updater"
@@ -223,6 +214,8 @@ publish-crates:
     if echo "$response" | jq -r ".versions[].num" | grep -q "^${version}$"; then
       echo "$crate version $version has already been published"
     else
-      cd $crate && cargo publish
+      (
+        cd $crate && cargo publish
+      )
     fi
   done
