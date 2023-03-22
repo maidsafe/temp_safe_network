@@ -191,7 +191,7 @@ function amend_version_bump_commit() {
 
 function amend_tags() {
   if [[ $sn_testnet_has_changes == "true" ]]; then
-    git tag "sn_testnet-v${sn_updater_version}" -f
+    git tag "sn_testnet-v${sn_testnet_version}" -f
   fi
   if [[ $sn_updater_has_changes == "true" ]]; then
     git tag "sn_updater-v${sn_updater_version}" -f
