@@ -121,7 +121,6 @@ impl Comm {
     ) -> Result<(Self, Receiver<CommEvent>)> {
         let (our_endpoint, incoming_conns) = Endpoint::builder()
             .addr(local_addr)
-            .idle_timeout(70_000)
             .server()?;
 
         // If public port is `0`, we assume it is equal to our local endpoint port.
