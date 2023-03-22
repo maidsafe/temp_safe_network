@@ -11,7 +11,7 @@ use mockall::automock;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use tracing::{debug, info};
+use tracing::info;
 
 pub const DEFAULT_NODE_LAUNCH_INTERVAL: u64 = 5000;
 #[cfg(not(target_os = "windows"))]
@@ -34,8 +34,8 @@ pub trait NodeLauncher {
 pub struct SafeNodeLauncher {}
 impl NodeLauncher for SafeNodeLauncher {
     fn launch(&self, node_name: String, node_bin_path: &Path, args: Vec<String>) -> Result<()> {
-        debug!("Running {:#?} with {:#?}", node_bin_path, args);
-        let flamestacks_dir = PathBuf::new().join("flamestacks").join(node_name.clone());
+        info!("Running {:#?} with {:#?}", node_bin_path, args);
+        let flamestacks_dir = PathBuf::new().join("flamestacks").join(node_name);
         std::fs::create_dir_all(&flamestacks_dir)?;
 
         Command::new(node_bin_path)
@@ -220,7 +220,7 @@ impl Testnet {
         }
 
         let address = address.unwrap_or("127.0.0.1:12000".parse()?);
-        let node_name = format!("safenode-genesis");
+        let node_name = "safenode-genesis".to_string();
         let node_data_dir_path = self.nodes_dir_path.join(node_name.clone());
 
         info!("Launching genesis node using address {address}...");
@@ -232,8 +232,7 @@ impl Testnet {
             node_args,
         )?;
 
-        info!("Launch args are: {launch_args:?}");
-        std::fs::create_dir_all(node_data_dir_path.clone())?;
+        std::fs::create_dir_all(node_data_dir_path)?;
 
         let launch_bin = self.get_launch_bin();
         self.launcher.launch(node_name, &launch_bin, launch_args)?;
@@ -288,8 +287,6 @@ impl Testnet {
             )?;
 
             std::fs::create_dir_all(node_data_dir_path.clone())?;
-
-            info!("Launch args are: {launch_args:?}");
 
             let launch_bin = self.get_launch_bin();
             self.launcher.launch(node_name, &launch_bin, launch_args)?;
@@ -882,7 +879,8 @@ mod test {
 
         let mut node_launcher = MockNodeLauncher::new();
         for i in 1..=20 {
-            let node_data_dir = nodes_dir.join(&format!("safenode-{i}"));
+            let node_name = format!("safenode-{i}");
+            let node_data_dir = nodes_dir.join(&node_name);
             let graph_output_file_path = node_data_dir
                 .join(format!("safenode-{i}-flame.svg"))
                 .to_str()
@@ -896,7 +894,7 @@ mod test {
                 .expect_launch()
                 .times(1)
                 .with(
-                    eq("faek safenode".to_string()),
+                    eq(node_name),
                     eq(PathBuf::from("cargo")),
                     eq(vec![
                         "flamegraph".to_string(),
