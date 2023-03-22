@@ -99,6 +99,9 @@ jobs:
       - name: Check formatting
         run: cargo fmt --all -- --check
 
+      - name: Install Protocol Buffer compiler Ubuntu
+        run: sudo apt install -y protobuf-compiler libprotobuf-dev && protoc --version
+
       - shell: bash
         run: cargo clippy --all-targets --all-features -- -Dwarnings
 
