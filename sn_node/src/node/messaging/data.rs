@@ -190,13 +190,17 @@ impl MyNode {
     ) -> (BTreeSet<NodeId>, BTreeSet<NodeId>) {
         // TODO: reuse our_members_sorted_by_distance_to API when core is merged into upper layer
         let members = network_knowledge.members();
+        let elders = network_knowledge.elders();
 
         debug!("Total members known about: {:?}", members.len());
 
         let primary_storage = members
             .clone()
             .into_iter()
-            .filter(|p| p.is_primary_node())
+            .filter(|p| {
+                // Primary storage nodes are elders or anything above PRIMARY_STORAGE_AGE
+                elders.contains(p) || p.is_primary_node()
+            })
             .sorted_by(|lhs, rhs| target.cmp_distance(&lhs.name(), &rhs.name()))
             .take(data_copy_count())
             .enumerate()
@@ -213,7 +217,10 @@ impl MyNode {
 
         let backup_storage = members
             .into_iter()
-            .filter(|p| !p.is_primary_node())
+            .filter(|p| {
+                // node is not an elder and not above PRIMARY_STORAGE_AGE
+                !p.is_primary_node() && !elders.contains(p)
+            })
             .sorted_by(|lhs, rhs| target.cmp_distance(&lhs.name(), &rhs.name()))
             .take(data_copy_count())
             .enumerate()

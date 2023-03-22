@@ -18,7 +18,8 @@ use std::{
 };
 use xor_name::XorName;
 
-const PRIMARY_NODE_AGE: u8 = 7;
+// Above this age, we trust the node to store data
+const PRIMARY_NODE_AGE: u8 = 4;
 
 /// The id of a node is the name, derived from its `PublicKey`, and its address.
 #[derive(Copy, Clone, Debug, serde::Serialize, serde::Deserialize)]
