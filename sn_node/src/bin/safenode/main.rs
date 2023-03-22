@@ -29,15 +29,24 @@
 )]
 
 mod log;
+#[cfg(feature = "rpc-service")]
+mod rpc;
 
-use sn_node::node::{new_node, Config, Error as NodeError, NodeEvent, RejoinReason};
+use sn_node::node::{new_node, Config, Error as NodeError, NodeEvent, NodeRef, RejoinReason};
 use sn_updater::{update_binary, UpdateType};
 
 use clap::{CommandFactory, Parser};
 use clap_complete::{generate, Shell};
-use color_eyre::{eyre::eyre, Result, Section, SectionExt};
-use std::{io::Write, process::exit};
-use tokio::{runtime::Runtime, time::Duration};
+use color_eyre::{
+    eyre::{eyre, Error},
+    Result, Section, SectionExt,
+};
+use std::{io::Write, process::exit, sync::Arc, thread::sleep};
+use tokio::{
+    runtime::Runtime,
+    sync::{mpsc, RwLock},
+    time::Duration,
+};
 use tracing::{self, error, info, warn};
 
 // Time we allow a node to keep attempting to join
@@ -46,6 +55,17 @@ const JOIN_ATTEMPT_TIMEOUT_SEC: u64 = 30;
 const JOIN_TIMEOUT_WAIT_BEFORE_RETRY_TIME_SEC: u64 = 10;
 // Time to wait before trying to join again when joins are not allowed
 const JOIN_DISALLOWED_RETRY_TIME_SEC: u64 = 60;
+
+#[derive(Debug)]
+#[allow(dead_code)]
+// To be sent to the main thread in order to stop/restart the execution of the safenode app.
+enum NodeCtl {
+    // Request to stop the exeution of the safenode app, providing an error as a reason for it.
+    Stop(Error),
+    // Request to restart the exeution of the safenode app,
+    // retrying to join the network, after the requested delay.
+    Restart(Duration),
+}
 
 fn main() -> Result<()> {
     color_eyre::install()?;
@@ -68,7 +88,7 @@ fn main() -> Result<()> {
         create_runtime_and_node(&config)?;
 
         // if we've had an issue, lets put the brakes on any crazy looping here
-        std::thread::sleep(Duration::from_secs(1));
+        sleep(Duration::from_secs(1));
 
         // pull config again in case it has been updated meanwhile
         config = Config::new()?;
@@ -101,12 +121,10 @@ fn create_runtime_and_node(config: &Config) -> Result<()> {
     config.validate()?;
 
     let our_pid = std::process::id();
-    let join_timeout = Duration::from_secs(JOIN_ATTEMPT_TIMEOUT_SEC);
-    let mut join_retry_sec = JOIN_DISALLOWED_RETRY_TIME_SEC;
-    let log_path = if let Some(path) = config.log_dir() {
+    let log_dir = if let Some(path) = config.log_dir() {
         format!("{}", path.display())
     } else {
-        "unknown".to_string()
+        "stdout".to_string()
     };
 
     loop {
@@ -123,18 +141,20 @@ fn create_runtime_and_node(config: &Config) -> Result<()> {
 
         rt.block_on(async {
             info!("Initial node config: {config:?}");
+            let join_timeout = Duration::from_secs(JOIN_ATTEMPT_TIMEOUT_SEC);
             let node_ref = match new_node(config, join_timeout).await {
                 Ok(node_ref) => node_ref,
                 Err(NodeError::JoinTimeout) => {
-                    join_retry_sec = JOIN_TIMEOUT_WAIT_BEFORE_RETRY_TIME_SEC;
-                    let message = format!("(PID: {our_pid}): Encountered a timeout while trying to join the network. Retrying after {join_retry_sec} seconds.");
-                    println!("{message} Node log path: {log_path}");
+                    let join_retry_sec = Duration::from_secs(JOIN_TIMEOUT_WAIT_BEFORE_RETRY_TIME_SEC);
+                    let message = format!("(PID: {our_pid}): Encountered a timeout while trying to join the network. Retrying after {join_retry_sec:?}.");
+                    println!("{message} Node log path: {log_dir}");
                     error!("{message}");
+                    sleep(join_retry_sec);
                     return Ok(());
                 }
                 Err(error) => {
                     let err = Err(error).suggestion(format!(
-                        "Cannot start node. Node log path: {log_path}").header(
+                        "Cannot start node. Node log path: {log_dir}").header(
                         "If this is the first node on the network pass the local address to be used using --first",
                     ));
                     error!("{err:?}");
@@ -161,42 +181,44 @@ fn create_runtime_and_node(config: &Config) -> Result<()> {
                 }
             }
 
-            // We'll loop here until there is a reason reported to rejoin
-            let mut events_rx = node_ref.events_channel.subscribe();
-            while let Ok(event) = events_rx.recv().await {
-                // If there is an event that requires the node to restart we
-                // do so by returning Ok(())).
-                match event {
-                    NodeEvent::RejoinRequired(RejoinReason::RemovedFromSection) => {
-                        let msg = "Restarting node since it has been removed from section...";
-                        println!("{msg} Node log path: {log_path}");
-                        info!("{msg}");
-                        return Ok(());
-                    }
-                    NodeEvent::RejoinRequired(RejoinReason::JoinsDisallowed) => {
-                        join_retry_sec = JOIN_DISALLOWED_RETRY_TIME_SEC;
-                        let message = format!(
-                            "The network is not accepting nodes right now. \
-                            Retrying after {join_retry_sec} seconds."
-                        );
-                        println!("{message} Node log path: {log_path}");
-                        info!("{message}");
-                        return Ok(());
-                    }
-                    _ => { /* ignore any other type of event here */ }
-                }
+            // Node is running
+            let (ctl_tx, mut ctl_rx) = mpsc::channel::<NodeCtl>(5);
+
+            let node_ref = Arc::new(RwLock::new(node_ref));
+
+            // Monitor NodeEvents just in case we need to rejoin
+            monitor_node_events(node_ref.clone(), ctl_tx.clone(), log_dir.clone());
+
+            // Start up gRPC interface
+            #[cfg(feature = "rpc-service")]
+            {
+                // Defining address for our RPC service: we just use the same as sn_node's IP
+                let mut addr = node_ref.read().await.context.socket_addr();
+                // ... and let's use subsequent port number to the one used by sn_node.
+                addr.set_port(addr.port() + 1);
+
+                rpc::start_rpc_service(addr, log_dir.clone(), node_ref, ctl_tx);
             }
 
-            Ok(())
+            // We'll block here until there is a reason reported to restart/stop,
+            // otherwise both the node and the gRPC service (if enabled) will be running.
+            // If there is an event that requires the node to restart we
+            // do so by returning Ok(()).
+            match ctl_rx.recv().await {
+                None => Ok(()),
+                Some(NodeCtl::Restart(delay)) => {
+                    let msg = format!("Node is restartig in {delay:?} ...");
+                    info!("{msg}");
+                    println!("{msg} Node log path: {log_dir}");
+                    sleep(delay);
+                    Ok(())
+                },
+                Some(NodeCtl::Stop(err)) => Err(err)
+            }
         })?;
 
         // actively shut down the runtime
         rt.shutdown_timeout(Duration::from_secs(2));
-
-        // The sleep shall only need to be carried out when being asked to join later?
-        // For the case of a timed_out, a retry can be carried out immediately?
-        // OTOH: A timeout might indicate heavy load or some sync problems. Probably wise to stay a bit loose on the gas pedal then.
-        std::thread::sleep(Duration::from_secs(join_retry_sec));
     }
 }
 
@@ -206,7 +228,7 @@ fn setup_parking_lot() {
 
     // Create a background thread which checks for deadlocks every 3s
     let _handle = thread::spawn(move || loop {
-        thread::sleep(Duration::from_secs(3));
+        sleep(Duration::from_secs(3));
         let deadlocks = deadlock::check_deadlock();
         if deadlocks.is_empty() {
             continue;
@@ -264,4 +286,52 @@ fn gen_completions_for_shell(shell: Shell, mut cmd: clap::Command) -> Result<Vec
     generate(shell, &mut cmd, exec_name, &mut buf);
 
     Ok(buf)
+}
+
+fn monitor_node_events(
+    node_ref: Arc<RwLock<NodeRef>>,
+    ctl_tx: mpsc::Sender<NodeCtl>,
+    log_dir: String,
+) {
+    let _handle = tokio::spawn(async move {
+        let mut events_rx = node_ref.read().await.events_channel.subscribe();
+        while let Ok(event) = events_rx.recv().await {
+            match event {
+                NodeEvent::ContextUpdated(new_context) => {
+                    // update our copy of the node context
+                    // so the RPC services can read up to date info
+                    let mut node_ref = node_ref.write().await;
+                    node_ref.context = new_context;
+                }
+                NodeEvent::RejoinRequired(reason) => {
+                    error!("Rejoin reason: {reason:?}");
+                    let ctl_msg = match reason {
+                        RejoinReason::RemovedFromSection => {
+                            let msg = "Restarting node since it has been removed from section...";
+                            println!("{msg} Node log path: {log_dir}");
+                            info!("{msg}");
+                            NodeCtl::Restart(Duration::from_secs(2))
+                        }
+                        RejoinReason::JoinsDisallowed => {
+                            let delay = JOIN_DISALLOWED_RETRY_TIME_SEC;
+                            let message = format!(
+                                "The network is not accepting nodes right now. \
+                                Retrying after {delay} seconds."
+                            );
+                            println!("{message} Node log path: {log_dir}");
+                            info!("{message}");
+                            NodeCtl::Restart(Duration::from_secs(delay))
+                        }
+                    };
+
+                    if let Err(err) = ctl_tx.send(ctl_msg).await {
+                        error!(
+                            "Failed to send node control msg to safenode bin main thread: {err}"
+                        );
+                    }
+                }
+                _ => { /* we are not interested in any other type of node events here */ }
+            }
+        }
+    });
 }

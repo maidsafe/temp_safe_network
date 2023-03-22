@@ -26,6 +26,7 @@ mod relocation;
 pub use self::{
     api::{new_node, NodeEvent, NodeRef},
     cfg::config_handler::Config,
+    context::NodeContext,
     error::{Error, Result},
     flow_ctrl::RejoinReason,
 };
@@ -34,7 +35,6 @@ pub use sn_interface::network_knowledge::MIN_ADULT_AGE;
 
 use self::{
     api::NodeEventsChannel,
-    context::NodeContext,
     dkg::DkgVoter,
     flow_ctrl::{cmds::Cmd, fault_detection::FaultsCmd},
     handover::Handover,
