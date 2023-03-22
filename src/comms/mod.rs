@@ -17,7 +17,7 @@ use self::node_link::NodeLink;
 use bytes::Bytes;
 use custom_debug::Debug;
 use futures::future::join_all;
-use qp2p::{Endpoint, SendStream, UsrMsgBytes};
+use qp2p::{Endpoint, SendStream};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -178,7 +178,7 @@ impl Comm {
 
     /// Sends the payload on a new or existing connection.
     #[tracing::instrument(skip(self, bytes))]
-    pub fn send_out_bytes(&self, node_id: NetworkNode, msg_id: MsgId, bytes: UsrMsgBytes) {
+    pub fn send_out_bytes(&self, node_id: NetworkNode, msg_id: MsgId, bytes: Bytes) {
         self.send_cmd(CommCmd::Send {
             msg_id,
             node_id,
@@ -188,12 +188,7 @@ impl Comm {
 
     /// Sends the payload on a new bidi-stream and pushes the response onto the comm event channel.
     #[tracing::instrument(skip(self, bytes))]
-    pub fn send_and_return_response(
-        &self,
-        node_id: NetworkNode,
-        msg_id: MsgId,
-        bytes: UsrMsgBytes,
-    ) {
+    pub fn send_and_return_response(&self, node_id: NetworkNode, msg_id: MsgId, bytes: Bytes) {
         self.send_cmd(CommCmd::SendAndReturnResponse {
             msg_id,
             node_id,
@@ -206,7 +201,7 @@ impl Comm {
     pub fn send_and_respond_on_stream(
         &self,
         msg_id: MsgId,
-        node_bytes: BTreeMap<NetworkNode, UsrMsgBytes>,
+        node_bytes: BTreeMap<NetworkNode, Bytes>,
         expected_targets: usize,
         dst_stream: (NetworkNode, SendStream),
     ) {
@@ -236,19 +231,19 @@ enum CommCmd {
         msg_id: MsgId,
         node_id: NetworkNode,
         #[debug(skip)]
-        bytes: UsrMsgBytes,
+        bytes: Bytes,
     },
     SetTargets(BTreeSet<NetworkNode>),
     SendAndReturnResponse {
         node_id: NetworkNode,
         msg_id: MsgId,
         #[debug(skip)]
-        bytes: UsrMsgBytes,
+        bytes: Bytes,
     },
     SendAndRespondOnStream {
         msg_id: MsgId,
         #[debug(skip)]
-        node_bytes: BTreeMap<NetworkNode, UsrMsgBytes>,
+        node_bytes: BTreeMap<NetworkNode, Bytes>,
         expected_targets: usize,
         dst_stream: (NetworkNode, SendStream),
     },
@@ -281,6 +276,10 @@ fn process_cmds<T: MsgTrait + 'static>(
                     node_id,
                     bytes,
                 } => {
+                    // add sender to targets (TODO check if thats ok)
+                    let link = NodeLink::new(node_id, our_endpoint.clone());
+                    let _ = links.insert(node_id, link);
+
                     if let Some(link) = get_link(msg_id, node_id, &links, comm_events.clone()) {
                         send(msg_id, link, bytes, comm_events.clone())
                     }
@@ -332,7 +331,7 @@ fn get_link<T: MsgTrait + 'static>(
         Some(link) => Some(link.clone()),
         None => {
             error!("Sending message (msg_id: {msg_id:?}) to {node_id:?} failed: unknown node.");
-            send_error(node_id, Error::ConnectingToUnknownNode(msg_id), comm_events);
+            send_error(node_id, Error::ConnectingToUnknownNode(node_id), comm_events);
             None
         }
     }
@@ -342,12 +341,11 @@ fn get_link<T: MsgTrait + 'static>(
 fn send<T: MsgTrait + 'static>(
     msg_id: MsgId,
     mut link: NodeLink,
-    bytes: UsrMsgBytes,
+    bytes: Bytes,
     comm_events: Sender<CommEvent<T>>,
 ) {
     let _handle = task::spawn(async move {
-        let (h, d, p) = &bytes;
-        let bytes_len = h.len() + d.len() + p.len();
+        let bytes_len = bytes.len();
         let node_id = link.node();
         trace!("Sending message bytes ({bytes_len} bytes) w/ {msg_id:?} to {node_id:?}");
         match link.send(msg_id, bytes).await {
@@ -366,12 +364,11 @@ fn send<T: MsgTrait + 'static>(
 fn send_and_return_response<T: MsgTrait + 'static>(
     msg_id: MsgId,
     link: NodeLink,
-    bytes: UsrMsgBytes,
+    bytes: Bytes,
     comm_events: Sender<CommEvent<T>>,
 ) {
     let _handle = task::spawn(async move {
-        let (h, d, p) = &bytes;
-        let bytes_len = h.len() + d.len() + p.len();
+        let bytes_len = bytes.len();
         let node_id = link.node();
         trace!("Sending message bytes ({bytes_len} bytes) w/ {msg_id:?} to {node_id:?}");
 
@@ -386,7 +383,7 @@ fn send_and_return_response<T: MsgTrait + 'static>(
                 return;
             }
         };
-        match NetworkMsg::from_bytes(node_response_bytes.2) {
+        match NetworkMsg::from_bytes(node_response_bytes) {
             Ok(wire_msg) => {
                 listener::msg_received(wire_msg, node_id, None, comm_events.clone()).await;
             }
@@ -405,7 +402,7 @@ fn send_and_return_response<T: MsgTrait + 'static>(
 #[tracing::instrument(skip_all)]
 fn send_and_respond_on_stream<T: MsgTrait + 'static>(
     msg_id: MsgId,
-    node_bytes: BTreeMap<NetworkNode, (Option<NodeLink>, UsrMsgBytes)>,
+    node_bytes: BTreeMap<NetworkNode, (Option<NodeLink>, Bytes)>,
     expected_targets: usize,
     dst_stream: (NetworkNode, SendStream),
     comm_events: Sender<CommEvent<T>>,
@@ -419,7 +416,7 @@ fn send_and_respond_on_stream<T: MsgTrait + 'static>(
             .map(|((node_id, (link, bytes)), comm_events)| async move {
                 let link = match link {
                     Some(link) => link,
-                    None => return (node_id, Err(Error::ConnectingToUnknownNode(msg_id))),
+                    None => return (node_id, Err(Error::ConnectingToUnknownNode(node_id))),
                 };
 
                 let node_response_bytes =
@@ -436,7 +433,7 @@ fn send_and_respond_on_stream<T: MsgTrait + 'static>(
                 (node_id, Ok(node_response_bytes))
             });
 
-        let node_results: Vec<(NetworkNode, Result<UsrMsgBytes>)> = join_all(tasks).await;
+        let node_results: Vec<(NetworkNode, Result<Bytes>)> = join_all(tasks).await;
 
         let succeeded: Vec<_> = node_results
             .into_iter()
@@ -463,7 +460,7 @@ fn send_and_respond_on_stream<T: MsgTrait + 'static>(
             }
         } else {
             match succeeded.last() {
-                Some((_, (_, _, bytes))) => bytes.clone(),
+                Some((_, bytes)) => bytes.clone(),
                 _ => {
                     error!("Could not send the response to client!");
                     return;
@@ -508,10 +505,8 @@ fn error_response<T: MsgTrait>(dst: NetworkNode) -> Option<Bytes> {
 }
 
 #[tracing::instrument(skip_all)]
-fn are_equal(a: &UsrMsgBytes, b: &UsrMsgBytes) -> bool {
-    let (_, _, a_payload) = a;
-    let (_, _, b_payload) = b;
-    are_bytes_equal(a_payload.to_vec(), b_payload.to_vec())
+fn are_equal(a: &Bytes, b: &Bytes) -> bool {
+    are_bytes_equal(a.to_vec(), b.to_vec())
 }
 
 #[tracing::instrument(skip_all)]
@@ -710,7 +705,7 @@ fn are_bytes_equal(one: Vec<u8>, other: Vec<u8>) -> bool {
 //         ))
 //     }
 
-//     async fn new_node_id() -> Result<(NetworkNode, Receiver<UsrMsgBytes>)> {
+//     async fn new_node_id() -> Result<(NetworkNode, Receiver<Bytes>)> {
 //         let (endpoint, mut incoming_connections) =
 //             Endpoint::builder().addr(local_addr()).server()?;
 //         let addr = endpoint.local_addr();

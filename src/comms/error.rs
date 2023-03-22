@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::MsgId;
+use super::{MsgId, NetworkNode};
 use thiserror::Error;
 
 /// The type returned by the `sn_routing` message handling methods.
@@ -18,7 +18,7 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 pub enum Error {
     /// Any unknown node comms should be bidi, initiated by the other side
     #[error("Attempted to create a connection for msg {0:?} to unknown node.")]
-    ConnectingToUnknownNode(MsgId),
+    ConnectingToUnknownNode(NetworkNode),
     #[error("Cannot connect to the endpoint: {0}")]
     CannotConnectEndpoint(#[from] qp2p::EndpointError),
     #[error("Address not reachable: {0}")]

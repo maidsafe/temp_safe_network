@@ -8,7 +8,8 @@
 
 use super::{MsgId, NetworkNode, Result};
 
-use qp2p::{Connection, Endpoint, UsrMsgBytes};
+use bytes::Bytes;
+use qp2p::{Connection, Endpoint};
 
 use custom_debug::Debug;
 use dashmap::DashMap;
@@ -64,9 +65,9 @@ impl NodeLink {
     ///    to the node as last attempt.
     pub(crate) async fn send_with_bi_return_response(
         &self,
-        bytes: UsrMsgBytes,
+        bytes: Bytes,
         msg_id: MsgId,
-    ) -> Result<UsrMsgBytes, NodeLinkError> {
+    ) -> Result<Bytes, NodeLinkError> {
         let node = self.node;
         trace!(
             "Sending {msg_id:?} via a bi-stream to {node:?}, we have {} cached connections.",
@@ -121,7 +122,8 @@ impl NodeLink {
             let stream_id = send_stream.id();
             trace!("bidi {stream_id} opened for {msg_id:?} to {node:?}");
             send_stream.set_priority(10);
-            if let Err(err) = send_stream.send_user_msg(bytes.clone()).await {
+            let sn_bytes_format_wrap = (Default::default(), Default::default(), bytes.clone());
+            if let Err(err) = send_stream.send_user_msg(sn_bytes_format_wrap).await {
                 error!("Error sending bytes for {msg_id:?} over {stream_id}: {err:?}");
                 // remove that broken conn
                 let _conn = self.connections.remove(&conn_id);
@@ -147,7 +149,7 @@ impl NodeLink {
             });
 
             match recv_stream.read().await {
-                Ok(response) => break Ok(response),
+                Ok((_sn, _bytes, response)) => break Ok(response),
                 Err(err) => {
                     error!("Error receiving response to {msg_id:?} from {node:?} over {stream_id}: {err:?}");
                     let _conn = self.connections.remove(&conn_id);
@@ -163,11 +165,7 @@ impl NodeLink {
     }
 
     #[instrument(skip(self, bytes))]
-    pub(crate) async fn send(
-        &mut self,
-        msg_id: MsgId,
-        bytes: UsrMsgBytes,
-    ) -> Result<(), NodeLinkError> {
+    pub(crate) async fn send(&mut self, msg_id: MsgId, bytes: Bytes) -> Result<(), NodeLinkError> {
         let mut connection_retries = 0;
 
         let node = self.node;
@@ -263,14 +261,15 @@ impl NodeLink {
     #[instrument(skip_all)]
     async fn send_with_connection(
         conn: Arc<Connection>,
-        bytes: UsrMsgBytes,
+        bytes: Bytes,
         connections: NodeConnections,
     ) -> Result<(), NodeLinkError> {
         let conn_id = conn.id();
         let conns_count = connections.len();
         trace!("We have {conns_count} open connections to node {conn_id}.");
 
-        conn.send_with(bytes, 0 /* priority */).await.map_err(|error| {
+        let sn_bytes_format_wrap = (Default::default(), Default::default(), bytes);
+        conn.send_with(sn_bytes_format_wrap, 0 /* priority */).await.map_err(|error| {
             error!(
                 "Error sending out msg... We have {conns_count} open connections to node {conn_id}: {error:?}",
             );
