@@ -27,6 +27,9 @@
     unused_results
 )]
 
+#[cfg(feature = "verify-nodes")]
+mod check_testnet;
+
 use sn_testnet::{Testnet, DEFAULT_NODE_LAUNCH_INTERVAL, SAFENODE_BIN_NAME};
 
 use clap::Parser;
@@ -195,6 +198,9 @@ async fn build_node() -> Result<()> {
     if cfg!(feature = "otlp") {
         args.extend(["--features", "otlp"]);
     }
+    if cfg!(feature = "verify-nodes") {
+        args.extend(["--features", "rpc-service"]);
+    }
 
     info!("Building safenode");
     debug!("Building safenode with args: {:?}", args);
@@ -224,6 +230,16 @@ async fn run_network(
     testnet.launch_genesis(None, node_args.clone())?;
     testnet.launch_nodes(node_count as usize, &network_contacts_path, node_args)?;
     testnet.configure_network_contacts(&network_contacts_path)?;
+
+    // Perform a verification on the nodes launched (if requested) as a last step
+    #[cfg(feature = "verify-nodes")]
+    check_testnet::run(
+        &testnet.nodes_dir_path,
+        node_count,
+        testnet.node_launch_interval,
+    )
+    .await?;
+
     Ok(())
 }
 
