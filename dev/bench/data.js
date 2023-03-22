@@ -1,152 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1679484324970,
+  "lastUpdate": 1679509501934,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
-      {
-        "commit": {
-          "author": {
-            "email": "26634292+bors[bot]@users.noreply.github.com",
-            "name": "bors[bot]",
-            "username": "bors[bot]"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": false,
-          "id": "96502896245fc41a3ef619d3959f4938413e938c",
-          "message": "Merge #1900\n\n1900: feat(join): prevent joins from nodes behind NAT r=dirvine a=davidrusu\n\nThis PR adds the joining nodes address to the join request.\r\n\r\nIf the address is different from the connection address, then this node is behind NAT 🙅 \n\nCo-authored-by: David Rusu <davidrusu.me@gmail.com>",
-          "timestamp": "2022-12-17T02:22:00Z",
-          "tree_id": "27e254c35d8d09300e36d37bab33562b71eef40a",
-          "url": "https://github.com/maidsafe/safe_network/commit/96502896245fc41a3ef619d3959f4938413e938c"
-        },
-        "date": 1671250188945,
-        "tool": "cargo",
-        "benches": [
-          {
-            "name": "serialize/serialize for sending",
-            "value": 2301761,
-            "range": "± 101995",
-            "unit": "ns/iter"
-          },
-          {
-            "name": "upload-sampling/upload and read 3072b",
-            "value": 116662962,
-            "range": "± 2697124",
-            "unit": "ns/iter"
-          },
-          {
-            "name": "upload-sampling/upload and read 1mb",
-            "value": 137847688,
-            "range": "± 6782777",
-            "unit": "ns/iter"
-          },
-          {
-            "name": "upload-sampling/upload and read 10mb",
-            "value": 541333687,
-            "range": "± 5228006",
-            "unit": "ns/iter"
-          },
-          {
-            "name": "upload-sampling/upload 3072b",
-            "value": 95416996,
-            "range": "± 1451400",
-            "unit": "ns/iter"
-          },
-          {
-            "name": "upload-sampling/upload 1mb",
-            "value": 108646077,
-            "range": "± 2254278",
-            "unit": "ns/iter"
-          },
-          {
-            "name": "upload-sampling/upload 10mb",
-            "value": 441714391,
-            "range": "± 10642254",
-            "unit": "ns/iter"
-          },
-          {
-            "name": "register-edit-sampling/register_edits/1000",
-            "value": 26692006753,
-            "range": "± 292782330",
-            "unit": "ns/iter"
-          },
-          {
-            "name": "write-sampling/register_writes/100",
-            "value": 68395180,
-            "range": "± 34130822",
-            "unit": "ns/iter"
-          },
-          {
-            "name": "write-sampling/register_writes/1000",
-            "value": 2646295375,
-            "range": "± 168919883",
-            "unit": "ns/iter"
-          },
-          {
-            "name": "write-sampling/register_writes/4000",
-            "value": 10676459159,
-            "range": "± 605734207",
-            "unit": "ns/iter"
-          },
-          {
-            "name": "write-sampling/chunk writes/100",
-            "value": 277323200,
-            "range": "± 27181737",
-            "unit": "ns/iter"
-          },
-          {
-            "name": "write-sampling/chunk writes/1000",
-            "value": 2487268554,
-            "range": "± 100212191",
-            "unit": "ns/iter"
-          },
-          {
-            "name": "write-sampling/chunk writes/4000",
-            "value": 9739728724,
-            "range": "± 136255365",
-            "unit": "ns/iter"
-          },
-          {
-            "name": "read-sampling/register_keys/100",
-            "value": 57122473,
-            "range": "± 4679500",
-            "unit": "ns/iter"
-          },
-          {
-            "name": "read-sampling/register_keys/1000",
-            "value": 577001412,
-            "range": "± 32434698",
-            "unit": "ns/iter"
-          },
-          {
-            "name": "read-sampling/register_keys/4000",
-            "value": 2185709615,
-            "range": "± 67690580",
-            "unit": "ns/iter"
-          },
-          {
-            "name": "read-sampling/chunk keys/100",
-            "value": 11720295,
-            "range": "± 864514",
-            "unit": "ns/iter"
-          },
-          {
-            "name": "read-sampling/chunk keys/1000",
-            "value": 111714699,
-            "range": "± 11914596",
-            "unit": "ns/iter"
-          },
-          {
-            "name": "read-sampling/chunk keys/4000",
-            "value": 374878815,
-            "range": "± 30809900",
-            "unit": "ns/iter"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -43373,6 +43229,156 @@ window.BENCHMARK_DATA = {
             "name": "read-sampling/chunk keys/4000",
             "value": 331809430,
             "range": "± 7778988",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "chriso83@protonmail.com",
+            "name": "Chris O'Neil",
+            "username": "jacderida"
+          },
+          "committer": {
+            "email": "joshuef@gmail.com",
+            "name": "joshuef",
+            "username": "joshuef"
+          },
+          "distinct": false,
+          "id": "f4d1e440dda5cce397ca3c0a8f3c2e98320d5789",
+          "message": "ci: add testnet bin to release process\n\nThe `testnet` binary is added to the release process. I initially wanted to have it as a separate\nrelease, but this won't work because our installation process is relying on being able to get the\nlatest version of the client and node from what Github has marked as the latest release for the\nrepository. Having two separate types of releases would confuse this situation.\n\nThis also refactors the Makefile targets to a Justfile. Just is a modern alternative to Make\nimplemented in Rust that has features that greatly help reduce duplication.\n\nEverything that was done with Github Actions is now done with shell scripts in the Justfile. The\nreason for this is so that the process can be run manually from the command line when something goes\nwrong with a release and it needs to be completed manually. Quite honestly I think it is actually\neasier to understand like this anyway.",
+          "timestamp": "2023-03-22T16:21:37Z",
+          "tree_id": "a7efed7a657009bb628cfd1997e9d34b59d5cf48",
+          "url": "https://github.com/maidsafe/safe_network/commit/f4d1e440dda5cce397ca3c0a8f3c2e98320d5789"
+        },
+        "date": 1679509498844,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "serialize/serialize for sending",
+            "value": 2396461,
+            "range": "± 7311",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 112091699,
+            "range": "± 1818251",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 131808473,
+            "range": "± 2923965",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 752317987,
+            "range": "± 6509547",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 94839573,
+            "range": "± 952614",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 110599972,
+            "range": "± 933241",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 667444507,
+            "range": "± 4370922",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/concurrent upload and verify 10mb",
+            "value": 7099064248,
+            "range": "± 57364137",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "register-edit-sampling/register_edits/1000",
+            "value": 23411809982,
+            "range": "± 107701129",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/100",
+            "value": 49801030,
+            "range": "± 32029835",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/1000",
+            "value": 3087836854,
+            "range": "± 372006085",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/4000",
+            "value": 11447814651,
+            "range": "± 2421660399",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/100",
+            "value": 143923005,
+            "range": "± 11531589",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/1000",
+            "value": 1393189220,
+            "range": "± 93743578",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/4000",
+            "value": 5298992850,
+            "range": "± 138664877",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/100",
+            "value": 45123225,
+            "range": "± 495583",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/1000",
+            "value": 432350701,
+            "range": "± 27889620",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/4000",
+            "value": 1685284249,
+            "range": "± 79618633",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/100",
+            "value": 11381729,
+            "range": "± 93012",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/1000",
+            "value": 95998780,
+            "range": "± 3746519",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/4000",
+            "value": 332719891,
+            "range": "± 11696071",
             "unit": "ns/iter"
           }
         ]
