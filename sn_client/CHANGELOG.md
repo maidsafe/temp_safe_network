@@ -1113,19 +1113,18 @@ needed, as they keypair itself contains the Arcs we need.
     - Self authentication Example
     - Example to demonstrate Storage API
 
-## v0.82.4 (2023-03-22)
+## v0.82.3 (2023-03-16)
 
 ### Chore
 
- - <csr-id-29edfcea7d2cb1334422f2fe5dc90e72c7e5ac7c/> bump sn_dbc
- - <csr-id-a5bb5e86518e23dcc59f252b231de89ed90efcf9/> clarify naming
+ - <csr-id-807d69ef609decfe94230e2086144afc5cc56d7b/> sn_interface-0.20.6/sn_comms-0.6.3/sn_client-0.82.3/sn_node-0.79.0/sn_cli-0.74.1
+ - <csr-id-1a8b9c9ba5b98c0f1176a0ccbce53d4acea8c84c/> safenode renaming
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release over the course of 2 calendar days.
- - 6 days passed between releases.
+ - 3 commits contributed to the release.
  - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
@@ -1136,40 +1135,6 @@ needed, as they keypair itself contains the Arcs we need.
 <details><summary>view details</summary>
 
  * **Uncategorized**
-    - Bump sn_dbc ([`29edfce`](https://github.com/maidsafe/safe_network/commit/29edfcea7d2cb1334422f2fe5dc90e72c7e5ac7c))
-    - Clarify naming ([`a5bb5e8`](https://github.com/maidsafe/safe_network/commit/a5bb5e86518e23dcc59f252b231de89ed90efcf9))
-</details>
-
-## v0.82.3 (2023-03-16)
-
-<csr-id-807d69ef609decfe94230e2086144afc5cc56d7b/>
-<csr-id-1a8b9c9ba5b98c0f1176a0ccbce53d4acea8c84c/>
-
-### Chore
-
- - <csr-id-807d69ef609decfe94230e2086144afc5cc56d7b/> sn_interface-0.20.6/sn_comms-0.6.3/sn_client-0.82.3/sn_node-0.79.0/sn_cli-0.74.1
- - <csr-id-1a8b9c9ba5b98c0f1176a0ccbce53d4acea8c84c/> safenode renaming
-
-### Chore
-
- - <csr-id-50f6ede2104025bd79de8922ca7f27c742cf52bb/> sn_interface-0.20.6/sn_comms-0.6.3/sn_client-0.82.3/sn_node-0.79.0/sn_cli-0.74.1
-
-### Commit Statistics
-
-<csr-read-only-do-not-edit/>
-
- - 4 commits contributed to the release.
- - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' were seen in commit messages
-
-### Commit Details
-
-<csr-read-only-do-not-edit/>
-
-<details><summary>view details</summary>
-
- * **Uncategorized**
-    - Sn_interface-0.20.6/sn_comms-0.6.3/sn_client-0.82.3/sn_node-0.79.0/sn_cli-0.74.1 ([`50f6ede`](https://github.com/maidsafe/safe_network/commit/50f6ede2104025bd79de8922ca7f27c742cf52bb))
     - Revert "chore(release): sn_interface-0.20.6/sn_comms-0.6.3/sn_client-0.82.3/sn_node-0.79.0/sn_cli-0.74.1" ([`a24dca6`](https://github.com/maidsafe/safe_network/commit/a24dca63d1fde8c5e13fa7bbfadf71cda15af5c5))
     - Sn_interface-0.20.6/sn_comms-0.6.3/sn_client-0.82.3/sn_node-0.79.0/sn_cli-0.74.1 ([`807d69e`](https://github.com/maidsafe/safe_network/commit/807d69ef609decfe94230e2086144afc5cc56d7b))
     - Safenode renaming ([`1a8b9c9`](https://github.com/maidsafe/safe_network/commit/1a8b9c9ba5b98c0f1176a0ccbce53d4acea8c84c))
@@ -1180,7 +1145,6 @@ needed, as they keypair itself contains the Arcs we need.
 <csr-id-ed26bc19831a28e2e13f63c77d26e0cd086cf85c/>
 <csr-id-4f04bd1a5d1c747bfc6b5d39824dd108f8546b7b/>
 <csr-id-57539fec4288cdd20672186dcfa49f7f6c9f686f/>
-<csr-id-88d3403ea11f877e1ffa23fe15beafeb9d68111f/>
 
 ### Chore
 
