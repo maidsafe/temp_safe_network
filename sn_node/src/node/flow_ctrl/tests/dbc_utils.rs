@@ -51,19 +51,43 @@ pub(crate) fn get_genesis_dbc_spend_info(
     BTreeSet<DbcTransaction>,
 )> {
     let genesis_dbc = gen_genesis_dbc(sk_set, &sk_set.secret_key())?;
-    let dbc_owner = genesis_dbc.owner_base().clone();
-    let output_owner = OwnerOnce::from_owner_base(dbc_owner, &mut rand::thread_rng());
-    let tx_builder = TransactionBuilder::default().add_input_dbc_bearer(&genesis_dbc)?;
-    let inputs_amount_sum = tx_builder.inputs_amount_sum();
-    let dbc_builder = tx_builder
-        .add_output_by_amount(inputs_amount_sum, output_owner)
-        .build(rand::thread_rng())?;
+    let full_amount = genesis_dbc.amount_secrets_bearer()?.amount();
+    let output_owner =
+        OwnerOnce::from_owner_base(genesis_dbc.owner_base().clone(), &mut rand::thread_rng());
+    get_dbc_spend_info_with_outputs(genesis_dbc, vec![(output_owner, full_amount)])
+}
+
+/// Returns the info necessary to populate the `SpentbookCmd::Spend` message to be handled, given specific outputs.
+///
+/// The genesis DBC is used, but that doesn't really matter; for testing the code in the message
+/// handler we could use any DBC.
+///
+/// The `gen_genesis_dbc` function returns the DBC itself. To put it through the spending message
+/// handler, it needs to have a transaction, which is what we provide here before we return it
+/// back for use in tests.
+pub(crate) fn get_dbc_spend_info_with_outputs(
+    dbc: Dbc,
+    outputs: Vec<(OwnerOnce, Token)>,
+) -> Result<(
+    PublicKey,
+    DbcTransaction,
+    BTreeSet<SpentProof>,
+    BTreeSet<DbcTransaction>,
+)> {
+    let mut tx_builder = TransactionBuilder::default().add_input_dbc_bearer(&dbc)?;
+
+    for (output_owner, output_amount) in outputs {
+        tx_builder = tx_builder.add_output_by_amount(output_amount, output_owner);
+    }
+
+    let dbc_builder = tx_builder.build(rand::thread_rng())?;
     let (public_key, tx) = &dbc_builder.inputs()[0];
+
     Ok((
         *public_key,
         tx.clone(),
-        genesis_dbc.inputs_spent_proofs.clone(),
-        genesis_dbc.inputs_spent_transactions,
+        dbc.inputs_spent_proofs.clone(),
+        dbc.inputs_spent_transactions,
     ))
 }
 

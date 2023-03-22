@@ -21,7 +21,7 @@ use crate::node::{
 };
 
 use sn_comms::{CommEvent, MsgReceived};
-use sn_dbc::Hash;
+use sn_dbc::{rng, Hash, Owner, OwnerOnce, Token};
 use sn_interface::{
     dbcs::{gen_genesis_dbc, DbcReason},
     elder_count, init_logger,
@@ -716,11 +716,34 @@ async fn spentbook_spend_client_message_should_replicate_to_adults_and_send_ack(
                 .sk_threshold_size(0),
         )
         .build()?;
+
     let mut node = env.get_nodes(prefix, 1, 0, None)?.remove(0);
+
     let sk_set = env.get_secret_key_set(prefix, None)?;
+    let dbc = gen_genesis_dbc(&sk_set, &sk_set.secret_key())?;
+    let context = node.context();
+
+    let dbc_amount = dbc.amount_secrets_bearer()?.amount();
+    let change_owner = OwnerOnce::from_owner_base(dbc.owner_base().clone(), &mut thread_rng());
+    #[cfg(feature = "data-network")]
+    let outputs = vec![(change_owner, dbc_amount)];
+    #[cfg(not(feature = "data-network"))]
+    let outputs = vec![
+        (
+            change_owner,
+            Token::from_nano(dbc_amount.as_nano() - context.store_cost.as_nano()),
+        ),
+        (
+            OwnerOnce::from_owner_base(
+                Owner::from(context.reward_secret_key.public_key()),
+                &mut rng::thread_rng(),
+            ),
+            context.store_cost,
+        ),
+    ];
 
     let (public_key, tx, spent_proofs, spent_transactions) =
-        dbc_utils::get_genesis_dbc_spend_info(&sk_set)?;
+        dbc_utils::get_dbc_spend_info_with_outputs(dbc, outputs)?;
 
     let comm_rx = env.take_comm_rx(node.info().public_key());
     let mut cmds = ProcessAndInspectCmds::new_from_client_msg(
@@ -768,7 +791,7 @@ async fn spentbook_spend_client_message_should_replicate_to_adults_and_send_ack(
         }
     }
 
-    bail!("No cmd msg was generate to replicate the data to node holders");
+    bail!("No cmd msg was generated to replicate the data to node holders");
 }
 
 #[tokio::test]
