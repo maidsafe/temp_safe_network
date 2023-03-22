@@ -6,21 +6,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## v0.20.6 (2023-03-16)
+## v0.20.7 (2023-03-22)
 
 ### Chore
 
- - <csr-id-414670a541cd9392b07d998fd546a783c81133a4/> apply fixes from sn_consensus changes
- - <csr-id-847703ef5c87db2b22fc21cd6252dcf9dd4a26e9/> bump consensus
- - <csr-id-807d69ef609decfe94230e2086144afc5cc56d7b/> sn_interface-0.20.6/sn_comms-0.6.3/sn_client-0.82.3/sn_node-0.79.0/sn_cli-0.74.1
- - <csr-id-1a8b9c9ba5b98c0f1176a0ccbce53d4acea8c84c/> safenode renaming
+ - <csr-id-b0627339e2458fd762084cc4805d7adedfd8c05e/> sn_testnet-0.1.3/sn_interface-0.20.7/sn_comms-0.6.4/sn_client-0.82.4/sn_node-0.80.1/sn_api-0.80.3/sn_cli-0.74.2
+ - <csr-id-29edfcea7d2cb1334422f2fe5dc90e72c7e5ac7c/> bump sn_dbc
+ - <csr-id-89d66365a5a0b26bf832dfebd5a4032363071e6f/> make DKgVoter cloneable
+ - <csr-id-a5bb5e86518e23dcc59f252b231de89ed90efcf9/> clarify naming
+
+### Bug Fixes
+
+ - <csr-id-39b432d365ec745dc31147ca91df23284c1011ac/> node to update its own members list upon being relocated
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 5 commits contributed to the release.
- - 4 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 6 commits contributed to the release over the course of 2 calendar days.
+ - 6 days passed between releases.
+ - 5 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -30,6 +35,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Revert "chore(release): sn_testnet-0.1.3/sn_interface-0.20.7/sn_comms-0.6.4/sn_client-0.82.4/sn_node-0.80.1/sn_api-0.80.3/sn_cli-0.74.2" ([`2e25949`](https://github.com/maidsafe/safe_network/commit/2e25949f685b0b805d8866527232c010380573ce))
+    - Sn_testnet-0.1.3/sn_interface-0.20.7/sn_comms-0.6.4/sn_client-0.82.4/sn_node-0.80.1/sn_api-0.80.3/sn_cli-0.74.2 ([`b062733`](https://github.com/maidsafe/safe_network/commit/b0627339e2458fd762084cc4805d7adedfd8c05e))
+    - Bump sn_dbc ([`29edfce`](https://github.com/maidsafe/safe_network/commit/29edfcea7d2cb1334422f2fe5dc90e72c7e5ac7c))
+    - Make DKgVoter cloneable ([`89d6636`](https://github.com/maidsafe/safe_network/commit/89d66365a5a0b26bf832dfebd5a4032363071e6f))
+    - Clarify naming ([`a5bb5e8`](https://github.com/maidsafe/safe_network/commit/a5bb5e86518e23dcc59f252b231de89ed90efcf9))
+    - Node to update its own members list upon being relocated ([`39b432d`](https://github.com/maidsafe/safe_network/commit/39b432d365ec745dc31147ca91df23284c1011ac))
+</details>
+
+## v0.20.6 (2023-03-16)
+
+<csr-id-414670a541cd9392b07d998fd546a783c81133a4/>
+<csr-id-847703ef5c87db2b22fc21cd6252dcf9dd4a26e9/>
+<csr-id-807d69ef609decfe94230e2086144afc5cc56d7b/>
+<csr-id-1a8b9c9ba5b98c0f1176a0ccbce53d4acea8c84c/>
+
+### Chore
+
+ - <csr-id-414670a541cd9392b07d998fd546a783c81133a4/> apply fixes from sn_consensus changes
+ - <csr-id-847703ef5c87db2b22fc21cd6252dcf9dd4a26e9/> bump consensus
+ - <csr-id-807d69ef609decfe94230e2086144afc5cc56d7b/> sn_interface-0.20.6/sn_comms-0.6.3/sn_client-0.82.3/sn_node-0.79.0/sn_cli-0.74.1
+ - <csr-id-1a8b9c9ba5b98c0f1176a0ccbce53d4acea8c84c/> safenode renaming
+
+### Chore
+
+ - <csr-id-50f6ede2104025bd79de8922ca7f27c742cf52bb/> sn_interface-0.20.6/sn_comms-0.6.3/sn_client-0.82.3/sn_node-0.79.0/sn_cli-0.74.1
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 6 commits contributed to the release.
+ - 5 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Sn_interface-0.20.6/sn_comms-0.6.3/sn_client-0.82.3/sn_node-0.79.0/sn_cli-0.74.1 ([`50f6ede`](https://github.com/maidsafe/safe_network/commit/50f6ede2104025bd79de8922ca7f27c742cf52bb))
     - Revert "chore(release): sn_interface-0.20.6/sn_comms-0.6.3/sn_client-0.82.3/sn_node-0.79.0/sn_cli-0.74.1" ([`a24dca6`](https://github.com/maidsafe/safe_network/commit/a24dca63d1fde8c5e13fa7bbfadf71cda15af5c5))
     - Apply fixes from sn_consensus changes ([`414670a`](https://github.com/maidsafe/safe_network/commit/414670a541cd9392b07d998fd546a783c81133a4))
     - Bump consensus ([`847703e`](https://github.com/maidsafe/safe_network/commit/847703ef5c87db2b22fc21cd6252dcf9dd4a26e9))
@@ -38,6 +85,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.20.5 (2023-03-16)
+
+<csr-id-ed26bc19831a28e2e13f63c77d26e0cd086cf85c/>
+<csr-id-57539fec4288cdd20672186dcfa49f7f6c9f686f/>
+<csr-id-7ec944309e26c7428f5ebd55efc266cb2594da29/>
+<csr-id-5c19f7e9e9472c616de88d16ad244de0fa638bef/>
 
 ### Chore
 
@@ -86,6 +138,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## v0.20.4 (2023-03-10)
 
 <csr-id-6d17af24fcaf1e340dc3aec3d40e55ee80b154cf/>
+<csr-id-bc33b08ae2a49ec28fdca5cf7fd5bffacc79567f/>
 
 ### Chore
 
