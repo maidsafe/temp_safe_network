@@ -27,13 +27,7 @@ const TESTNET_DIR_NAME: &str = "local-test-network";
 /// launching processes.
 #[cfg_attr(test, automock)]
 pub trait NodeLauncher {
-    fn launch(
-        &self,
-        node_name: String,
-        // node_data_path: PathBuf,
-        node_bin_path: &Path,
-        args: Vec<String>,
-    ) -> Result<()>;
+    fn launch(&self, node_name: String, node_bin_path: &Path, args: Vec<String>) -> Result<()>;
 }
 
 #[derive(Default)]
@@ -413,7 +407,7 @@ mod test {
     #[test]
     fn new_should_create_a_testnet_with_zero_nodes_when_no_previous_network_exists() -> Result<()> {
         let mut node_launcher = MockNodeLauncher::new();
-        node_launcher.expect_launch().returning(|_, _| Ok(()));
+        node_launcher.expect_launch().returning(|_, _, _| Ok(()));
 
         let testnet = Testnet::new(
             PathBuf::from(SAFENODE_BIN_NAME),
@@ -445,7 +439,7 @@ mod test {
         }
 
         let mut node_launcher = MockNodeLauncher::new();
-        node_launcher.expect_launch().returning(|_, _| Ok(()));
+        node_launcher.expect_launch().returning(|_, _, _| Ok(()));
         let testnet = Testnet::new(
             PathBuf::from(SAFENODE_BIN_NAME),
             30000,
@@ -478,7 +472,7 @@ mod test {
         random_dir.create_dir_all()?;
 
         let mut node_launcher = MockNodeLauncher::new();
-        node_launcher.expect_launch().returning(|_, _| Ok(()));
+        node_launcher.expect_launch().returning(|_, _, _| Ok(()));
 
         let testnet = Testnet::new(
             PathBuf::from(SAFENODE_BIN_NAME),
@@ -515,6 +509,7 @@ mod test {
             .expect_launch()
             .times(1)
             .with(
+                eq(GENESIS_NODE_DIR_NAME.to_string()),
                 eq(node_bin_path.path().to_path_buf()),
                 eq(vec![
                     "--first".to_string(),
@@ -528,7 +523,7 @@ mod test {
                     "--json-logs".to_string(),
                 ]),
             )
-            .returning(|_, _| Ok(()));
+            .returning(|_, _, _| Ok(()));
 
         let testnet = Testnet::new(
             node_bin_path.path().to_path_buf(),
@@ -564,6 +559,7 @@ mod test {
             .expect_launch()
             .times(1)
             .with(
+                eq(GENESIS_NODE_DIR_NAME.to_string()),
                 eq(node_bin_path.path().to_path_buf()),
                 eq(vec![
                     "--first".to_string(),
@@ -577,7 +573,7 @@ mod test {
                     "--json-logs".to_string(),
                 ]),
             )
-            .returning(|_, _| Ok(()));
+            .returning(|_, _, _| Ok(()));
 
         let testnet = Testnet::new(
             node_bin_path.path().to_path_buf(),
@@ -601,7 +597,7 @@ mod test {
         nodes_dir.create_dir_all()?;
 
         let mut node_launcher = MockNodeLauncher::new();
-        node_launcher.expect_launch().returning(|_, _| Ok(()));
+        node_launcher.expect_launch().returning(|_, _, _| Ok(()));
         let testnet = Testnet::new(
             node_bin_path.path().to_path_buf(),
             NODE_LAUNCH_INTERVAL,
@@ -629,7 +625,7 @@ mod test {
         let nodes_dir = tmp_data_dir.child(TESTNET_DIR_NAME);
 
         let mut node_launcher = MockNodeLauncher::new();
-        node_launcher.expect_launch().returning(|_, _| Ok(()));
+        node_launcher.expect_launch().returning(|_, _, _| Ok(()));
         let testnet = Testnet::new(
             node_bin_path.path().to_path_buf(),
             NODE_LAUNCH_INTERVAL,
@@ -669,6 +665,7 @@ mod test {
             .expect_launch()
             .times(1)
             .with(
+                eq(GENESIS_NODE_DIR_NAME.to_string()),
                 eq(PathBuf::from("cargo")),
                 eq(vec![
                     "flamegraph".to_string(),
@@ -693,7 +690,7 @@ mod test {
                     "--json-logs".to_string(),
                 ]),
             )
-            .returning(|_, _| Ok(()));
+            .returning(|_, _, _| Ok(()));
 
         let testnet = Testnet::new(
             node_bin_path.path().to_path_buf(),
@@ -725,7 +722,7 @@ mod test {
         }
 
         let mut node_launcher = MockNodeLauncher::new();
-        node_launcher.expect_launch().returning(|_, _| Ok(()));
+        node_launcher.expect_launch().returning(|_, _, _| Ok(()));
 
         let testnet = Testnet::new(
             node_bin_path.path().to_path_buf(),
@@ -763,8 +760,9 @@ mod test {
 
         let mut node_launcher = MockNodeLauncher::new();
         for i in 1..=20 {
+            let node_name = format!("safenode-{i}");
             let node_data_dir = nodes_dir
-                .join(&format!("safenode-{i}"))
+                .join(&node_name)
                 .to_str()
                 .ok_or_else(|| eyre!("Unable to obtain path"))?
                 .to_string();
@@ -772,6 +770,7 @@ mod test {
                 .expect_launch()
                 .times(1)
                 .with(
+                    eq(node_name),
                     eq(node_bin_path.path().to_path_buf()),
                     eq(vec![
                         "--network-contacts-file".to_string(),
@@ -783,7 +782,7 @@ mod test {
                         "--json-logs".to_string(),
                     ]),
                 )
-                .returning(|_, _| Ok(()));
+                .returning(|_, _, _| Ok(()));
         }
 
         let mut testnet = Testnet::new(
@@ -815,7 +814,7 @@ mod test {
         network_contacts_file.write_str("section tree content")?;
 
         let mut node_launcher = MockNodeLauncher::new();
-        node_launcher.expect_launch().returning(|_, _| Ok(()));
+        node_launcher.expect_launch().returning(|_, _, _| Ok(()));
         let mut testnet = Testnet::new(
             node_bin_path.path().to_path_buf(),
             NODE_LAUNCH_INTERVAL,
@@ -848,7 +847,7 @@ mod test {
         network_contacts_file.write_str("section tree content")?;
 
         let mut node_launcher = MockNodeLauncher::new();
-        node_launcher.expect_launch().returning(|_, _| Ok(()));
+        node_launcher.expect_launch().returning(|_, _, _| Ok(()));
         let mut testnet = Testnet::new(
             node_bin_path.path().to_path_buf(),
             NODE_LAUNCH_INTERVAL,
@@ -897,6 +896,7 @@ mod test {
                 .expect_launch()
                 .times(1)
                 .with(
+                    eq("faek safenode".to_string()),
                     eq(PathBuf::from("cargo")),
                     eq(vec![
                         "flamegraph".to_string(),
@@ -915,7 +915,7 @@ mod test {
                         "--json-logs".to_string(),
                     ]),
                 )
-                .returning(|_, _| Ok(()));
+                .returning(|_, _, _| Ok(()));
         }
 
         let mut testnet = Testnet::new(
@@ -947,8 +947,9 @@ mod test {
 
         let mut node_launcher = MockNodeLauncher::new();
         for i in 1..=30 {
+            let node_name = format!("safenode-{i}");
             let node_data_dir = nodes_dir
-                .join(&format!("safenode-{i}"))
+                .join(&node_name)
                 .to_str()
                 .ok_or_else(|| eyre!("Unable to obtain path"))?
                 .to_string();
@@ -956,6 +957,7 @@ mod test {
                 .expect_launch()
                 .times(1)
                 .with(
+                    eq(node_name),
                     eq(node_bin_path.path().to_path_buf()),
                     eq(vec![
                         "--network-contacts-file".to_string(),
@@ -967,7 +969,7 @@ mod test {
                         "--json-logs".to_string(),
                     ]),
                 )
-                .returning(|_, _| Ok(()));
+                .returning(|_, _, _| Ok(()));
         }
 
         let mut testnet = Testnet::new(
