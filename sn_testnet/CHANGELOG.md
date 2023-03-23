@@ -5,27 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.1.3 (2023-03-22)
+## v0.1.4 (2023-03-23)
 
-### Chore
+### New Features
 
- - <csr-id-b0627339e2458fd762084cc4805d7adedfd8c05e/> sn_testnet-0.1.3/sn_interface-0.20.7/sn_comms-0.6.4/sn_client-0.82.4/sn_node-0.80.1/sn_api-0.80.3/sn_cli-0.74.2
- - <csr-id-c9f3e7ccad8836c609193f1c6b53f351e5705805/> sn_node-0.80.0
- - <csr-id-50f6ede2104025bd79de8922ca7f27c742cf52bb/> sn_interface-0.20.6/sn_comms-0.6.3/sn_client-0.82.3/sn_node-0.79.0/sn_cli-0.74.1
- - <csr-id-807d69ef609decfe94230e2086144afc5cc56d7b/> sn_interface-0.20.6/sn_comms-0.6.3/sn_client-0.82.3/sn_node-0.79.0/sn_cli-0.74.1
- - <csr-id-1a8b9c9ba5b98c0f1176a0ccbce53d4acea8c84c/> safenode renaming
-
-### Refactor
-
- - <csr-id-d3c6c9727a69389f4204b746c54a537cd783232c/> remove unused wiremsg-debuginfo ft
+ - <csr-id-16bb3389cdd665fe9a577587d9b7a6e8d21a3028/> exposing a gRPC interface on safenode bin/app
+   - The safenode RPC service is exposed only when built with 'rpc-service' feature.
+   - The safenode RPC service code is generated automatically using gRPC (`tonic` crate)
+   from a `proto` file with messages definitions added to sn_interface.
+   - The RPC is exposed at the same address as the node's address used for network connections,
+   but using the subsequent port number.
+   - A new final step was implemented for the sn_testnet tool, to run a check on the launched nodes,
+   verifying their names and network knowledge are the expected for the launched testnet.
+   - The new sn_testnet tool step is run only if built with 'verify-nodes' feature.
+   - Running the `verify-nodes` check of sn_testnet in CI previous to sn_client e2e tests.
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 9 commits contributed to the release over the course of 6 calendar days.
- - 6 days passed between releases.
- - 6 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 1 commit contributed to the release.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -35,6 +35,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Exposing a gRPC interface on safenode bin/app ([`16bb338`](https://github.com/maidsafe/safe_network/commit/16bb3389cdd665fe9a577587d9b7a6e8d21a3028))
+</details>
+
+## v0.1.3 (2023-03-22)
+
+<csr-id-b0627339e2458fd762084cc4805d7adedfd8c05e/>
+<csr-id-c9f3e7ccad8836c609193f1c6b53f351e5705805/>
+<csr-id-50f6ede2104025bd79de8922ca7f27c742cf52bb/>
+<csr-id-807d69ef609decfe94230e2086144afc5cc56d7b/>
+<csr-id-1a8b9c9ba5b98c0f1176a0ccbce53d4acea8c84c/>
+<csr-id-d3c6c9727a69389f4204b746c54a537cd783232c/>
+
+### Chore
+
+ - <csr-id-b0627339e2458fd762084cc4805d7adedfd8c05e/> sn_testnet-0.1.3/sn_interface-0.20.7/sn_comms-0.6.4/sn_client-0.82.4/sn_node-0.80.1/sn_api-0.80.3/sn_cli-0.74.2
+ - <csr-id-c9f3e7ccad8836c609193f1c6b53f351e5705805/> sn_node-0.80.0
+ - <csr-id-50f6ede2104025bd79de8922ca7f27c742cf52bb/> sn_interface-0.20.6/sn_comms-0.6.3/sn_client-0.82.3/sn_node-0.79.0/sn_cli-0.74.1
+ - <csr-id-807d69ef609decfe94230e2086144afc5cc56d7b/> sn_interface-0.20.6/sn_comms-0.6.3/sn_client-0.82.3/sn_node-0.79.0/sn_cli-0.74.1
+ - <csr-id-1a8b9c9ba5b98c0f1176a0ccbce53d4acea8c84c/> safenode renaming
+
+### Chore
+
+ - <csr-id-22c6e341d28c913a3acaaeae0ceeb8c0a1ef4d4e/> sn_testnet-0.1.3/sn_interface-0.20.7/sn_comms-0.6.4/sn_client-0.82.4/sn_node-0.80.1/sn_api-0.80.3/sn_cli-0.74.2
+
+### Refactor
+
+ - <csr-id-d3c6c9727a69389f4204b746c54a537cd783232c/> remove unused wiremsg-debuginfo ft
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 10 commits contributed to the release over the course of 6 calendar days.
+ - 6 days passed between releases.
+ - 7 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Sn_testnet-0.1.3/sn_interface-0.20.7/sn_comms-0.6.4/sn_client-0.82.4/sn_node-0.80.1/sn_api-0.80.3/sn_cli-0.74.2 ([`22c6e34`](https://github.com/maidsafe/safe_network/commit/22c6e341d28c913a3acaaeae0ceeb8c0a1ef4d4e))
     - Revert "chore(release): sn_testnet-0.1.3/sn_interface-0.20.7/sn_comms-0.6.4/sn_client-0.82.4/sn_node-0.80.1/sn_api-0.80.3/sn_cli-0.74.2" ([`2e25949`](https://github.com/maidsafe/safe_network/commit/2e25949f685b0b805d8866527232c010380573ce))
     - Sn_testnet-0.1.3/sn_interface-0.20.7/sn_comms-0.6.4/sn_client-0.82.4/sn_node-0.80.1/sn_api-0.80.3/sn_cli-0.74.2 ([`b062733`](https://github.com/maidsafe/safe_network/commit/b0627339e2458fd762084cc4805d7adedfd8c05e))
     - Remove unused wiremsg-debuginfo ft ([`d3c6c97`](https://github.com/maidsafe/safe_network/commit/d3c6c9727a69389f4204b746c54a537cd783232c))

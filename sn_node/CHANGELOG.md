@@ -5,11 +5,50 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.80.3 (2023-03-23)
+
+### New Features
+
+ - <csr-id-16bb3389cdd665fe9a577587d9b7a6e8d21a3028/> exposing a gRPC interface on safenode bin/app
+   - The safenode RPC service is exposed only when built with 'rpc-service' feature.
+   - The safenode RPC service code is generated automatically using gRPC (`tonic` crate)
+   from a `proto` file with messages definitions added to sn_interface.
+   - The RPC is exposed at the same address as the node's address used for network connections,
+   but using the subsequent port number.
+   - A new final step was implemented for the sn_testnet tool, to run a check on the launched nodes,
+   verifying their names and network knowledge are the expected for the launched testnet.
+   - The new sn_testnet tool step is run only if built with 'verify-nodes' feature.
+   - Running the `verify-nodes` check of sn_testnet in CI previous to sn_client e2e tests.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 1 commit contributed to the release.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Exposing a gRPC interface on safenode bin/app ([`16bb338`](https://github.com/maidsafe/safe_network/commit/16bb3389cdd665fe9a577587d9b7a6e8d21a3028))
+</details>
+
 ## v0.80.2 (2023-03-23)
+
+<csr-id-7a4bdb9dac983d957077878ac87d65535baeee9c/>
 
 ### Chore
 
  - <csr-id-7a4bdb9dac983d957077878ac87d65535baeee9c/> refactor SectionPeers to using Decision
+
+### Chore
+
+ - <csr-id-4cf0bf0e69f70c7303d4dcda581e5fbc54d0e51c/> sn_interface-0.20.8/sn_client-0.82.5/sn_node-0.80.2/sn_api-0.80.4
 
 ### Bug Fixes
 
@@ -29,8 +68,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 4 commits contributed to the release.
- - 4 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 5 commits contributed to the release.
+ - 5 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -40,6 +79,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Sn_interface-0.20.8/sn_client-0.82.5/sn_node-0.80.2/sn_api-0.80.4 ([`4cf0bf0`](https://github.com/maidsafe/safe_network/commit/4cf0bf0e69f70c7303d4dcda581e5fbc54d0e51c))
     - Couple fixes for readings members from section_peer ([`bd97c9a`](https://github.com/maidsafe/safe_network/commit/bd97c9aa64b7fc878bc5411b82f5105dce4b1e49))
     - Couple fixes to allow read members from section_members ([`3c0e304`](https://github.com/maidsafe/safe_network/commit/3c0e3048e15be2ca973de26079864e0f7fd5c157))
     - Compose valid decision for test ([`9450dda`](https://github.com/maidsafe/safe_network/commit/9450dda00e3c507ee2c93891a297425128bc1ce4))
@@ -59,6 +99,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <csr-id-b4fc6539813db7d6657f91e7b8b1a89b90eb6265/>
 <csr-id-a5bb5e86518e23dcc59f252b231de89ed90efcf9/>
 <csr-id-d3c6c9727a69389f4204b746c54a537cd783232c/>
+<csr-id-22c6e341d28c913a3acaaeae0ceeb8c0a1ef4d4e/>
 
 ### Chore
 
