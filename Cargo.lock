@@ -4223,7 +4223,7 @@ dependencies = [
 
 [[package]]
 name = "sn_interface"
-version = "0.20.9"
+version = "0.20.10"
 dependencies = [
  "base64 0.13.1",
  "bincode",
