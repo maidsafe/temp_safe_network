@@ -5,20 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.80.3 (2023-03-22)
+## v0.80.4 (2023-03-23)
 
-### Chore
+### Bug Fixes
 
- - <csr-id-b0627339e2458fd762084cc4805d7adedfd8c05e/> sn_testnet-0.1.3/sn_interface-0.20.7/sn_comms-0.6.4/sn_client-0.82.4/sn_node-0.80.1/sn_api-0.80.3/sn_cli-0.74.2
- - <csr-id-29edfcea7d2cb1334422f2fe5dc90e72c7e5ac7c/> bump sn_dbc
+ - <csr-id-bd97c9aa64b7fc878bc5411b82f5105dce4b1e49/> couple fixes for readings members from section_peer
+   1, clear dkg timer once completed
+   2, do not carry out elder candidates check during handover
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 3 commits contributed to the release.
- - 6 days passed between releases.
- - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 1 commit contributed to the release.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -28,6 +28,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Couple fixes for readings members from section_peer ([`bd97c9a`](https://github.com/maidsafe/safe_network/commit/bd97c9aa64b7fc878bc5411b82f5105dce4b1e49))
+</details>
+
+## v0.80.3 (2023-03-22)
+
+<csr-id-b0627339e2458fd762084cc4805d7adedfd8c05e/>
+<csr-id-29edfcea7d2cb1334422f2fe5dc90e72c7e5ac7c/>
+
+### Chore
+
+ - <csr-id-b0627339e2458fd762084cc4805d7adedfd8c05e/> sn_testnet-0.1.3/sn_interface-0.20.7/sn_comms-0.6.4/sn_client-0.82.4/sn_node-0.80.1/sn_api-0.80.3/sn_cli-0.74.2
+ - <csr-id-29edfcea7d2cb1334422f2fe5dc90e72c7e5ac7c/> bump sn_dbc
+
+### Chore
+
+ - <csr-id-22c6e341d28c913a3acaaeae0ceeb8c0a1ef4d4e/> sn_testnet-0.1.3/sn_interface-0.20.7/sn_comms-0.6.4/sn_client-0.82.4/sn_node-0.80.1/sn_api-0.80.3/sn_cli-0.74.2
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 4 commits contributed to the release.
+ - 6 days passed between releases.
+ - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Sn_testnet-0.1.3/sn_interface-0.20.7/sn_comms-0.6.4/sn_client-0.82.4/sn_node-0.80.1/sn_api-0.80.3/sn_cli-0.74.2 ([`22c6e34`](https://github.com/maidsafe/safe_network/commit/22c6e341d28c913a3acaaeae0ceeb8c0a1ef4d4e))
     - Revert "chore(release): sn_testnet-0.1.3/sn_interface-0.20.7/sn_comms-0.6.4/sn_client-0.82.4/sn_node-0.80.1/sn_api-0.80.3/sn_cli-0.74.2" ([`2e25949`](https://github.com/maidsafe/safe_network/commit/2e25949f685b0b805d8866527232c010380573ce))
     - Sn_testnet-0.1.3/sn_interface-0.20.7/sn_comms-0.6.4/sn_client-0.82.4/sn_node-0.80.1/sn_api-0.80.3/sn_cli-0.74.2 ([`b062733`](https://github.com/maidsafe/safe_network/commit/b0627339e2458fd762084cc4805d7adedfd8c05e))
     - Bump sn_dbc ([`29edfce`](https://github.com/maidsafe/safe_network/commit/29edfcea7d2cb1334422f2fe5dc90e72c7e5ac7c))
@@ -37,6 +71,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-id-ed26bc19831a28e2e13f63c77d26e0cd086cf85c/>
 <csr-id-57539fec4288cdd20672186dcfa49f7f6c9f686f/>
+<csr-id-88d3403ea11f877e1ffa23fe15beafeb9d68111f/>
 
 ### Chore
 

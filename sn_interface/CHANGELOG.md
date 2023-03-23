@@ -6,26 +6,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## v0.20.7 (2023-03-22)
+## v0.20.8 (2023-03-23)
 
 ### Chore
 
- - <csr-id-b0627339e2458fd762084cc4805d7adedfd8c05e/> sn_testnet-0.1.3/sn_interface-0.20.7/sn_comms-0.6.4/sn_client-0.82.4/sn_node-0.80.1/sn_api-0.80.3/sn_cli-0.74.2
- - <csr-id-29edfcea7d2cb1334422f2fe5dc90e72c7e5ac7c/> bump sn_dbc
- - <csr-id-89d66365a5a0b26bf832dfebd5a4032363071e6f/> make DKgVoter cloneable
- - <csr-id-a5bb5e86518e23dcc59f252b231de89ed90efcf9/> clarify naming
+ - <csr-id-7a4bdb9dac983d957077878ac87d65535baeee9c/> refactor SectionPeers to using Decision
 
 ### Bug Fixes
 
- - <csr-id-39b432d365ec745dc31147ca91df23284c1011ac/> node to update its own members list upon being relocated
+ - <csr-id-bd97c9aa64b7fc878bc5411b82f5105dce4b1e49/> couple fixes for readings members from section_peer
+   1, clear dkg timer once completed
+   2, do not carry out elder candidates check during handover
+ - <csr-id-3c0e3048e15be2ca973de26079864e0f7fd5c157/> couple fixes to allow read members from section_members
+   1, avoid un-necessary data re-organisation
+   2, not push Joined decision of initial members
+   3, reset section_members whenever sap updated
+   4, remove network knowledge members check due to changed format
+   5, do not AE update sibling sender when self is not an elder
+   6, only update members when SAP updated or already the latest SAP
+ - <csr-id-9450dda00e3c507ee2c93891a297425128bc1ce4/> compose valid decision for test
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 6 commits contributed to the release over the course of 2 calendar days.
- - 6 days passed between releases.
- - 5 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 4 commits contributed to the release.
+ - 4 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -35,6 +41,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Couple fixes for readings members from section_peer ([`bd97c9a`](https://github.com/maidsafe/safe_network/commit/bd97c9aa64b7fc878bc5411b82f5105dce4b1e49))
+    - Couple fixes to allow read members from section_members ([`3c0e304`](https://github.com/maidsafe/safe_network/commit/3c0e3048e15be2ca973de26079864e0f7fd5c157))
+    - Compose valid decision for test ([`9450dda`](https://github.com/maidsafe/safe_network/commit/9450dda00e3c507ee2c93891a297425128bc1ce4))
+    - Refactor SectionPeers to using Decision ([`7a4bdb9`](https://github.com/maidsafe/safe_network/commit/7a4bdb9dac983d957077878ac87d65535baeee9c))
+</details>
+
+## v0.20.7 (2023-03-22)
+
+<csr-id-b0627339e2458fd762084cc4805d7adedfd8c05e/>
+<csr-id-29edfcea7d2cb1334422f2fe5dc90e72c7e5ac7c/>
+<csr-id-89d66365a5a0b26bf832dfebd5a4032363071e6f/>
+<csr-id-a5bb5e86518e23dcc59f252b231de89ed90efcf9/>
+
+### Chore
+
+ - <csr-id-b0627339e2458fd762084cc4805d7adedfd8c05e/> sn_testnet-0.1.3/sn_interface-0.20.7/sn_comms-0.6.4/sn_client-0.82.4/sn_node-0.80.1/sn_api-0.80.3/sn_cli-0.74.2
+ - <csr-id-29edfcea7d2cb1334422f2fe5dc90e72c7e5ac7c/> bump sn_dbc
+ - <csr-id-89d66365a5a0b26bf832dfebd5a4032363071e6f/> make DKgVoter cloneable
+ - <csr-id-a5bb5e86518e23dcc59f252b231de89ed90efcf9/> clarify naming
+
+### Chore
+
+ - <csr-id-22c6e341d28c913a3acaaeae0ceeb8c0a1ef4d4e/> sn_testnet-0.1.3/sn_interface-0.20.7/sn_comms-0.6.4/sn_client-0.82.4/sn_node-0.80.1/sn_api-0.80.3/sn_cli-0.74.2
+
+### Bug Fixes
+
+ - <csr-id-39b432d365ec745dc31147ca91df23284c1011ac/> node to update its own members list upon being relocated
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 7 commits contributed to the release over the course of 2 calendar days.
+ - 6 days passed between releases.
+ - 6 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Sn_testnet-0.1.3/sn_interface-0.20.7/sn_comms-0.6.4/sn_client-0.82.4/sn_node-0.80.1/sn_api-0.80.3/sn_cli-0.74.2 ([`22c6e34`](https://github.com/maidsafe/safe_network/commit/22c6e341d28c913a3acaaeae0ceeb8c0a1ef4d4e))
     - Revert "chore(release): sn_testnet-0.1.3/sn_interface-0.20.7/sn_comms-0.6.4/sn_client-0.82.4/sn_node-0.80.1/sn_api-0.80.3/sn_cli-0.74.2" ([`2e25949`](https://github.com/maidsafe/safe_network/commit/2e25949f685b0b805d8866527232c010380573ce))
     - Sn_testnet-0.1.3/sn_interface-0.20.7/sn_comms-0.6.4/sn_client-0.82.4/sn_node-0.80.1/sn_api-0.80.3/sn_cli-0.74.2 ([`b062733`](https://github.com/maidsafe/safe_network/commit/b0627339e2458fd762084cc4805d7adedfd8c05e))
     - Bump sn_dbc ([`29edfce`](https://github.com/maidsafe/safe_network/commit/29edfcea7d2cb1334422f2fe5dc90e72c7e5ac7c))
@@ -49,6 +100,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <csr-id-847703ef5c87db2b22fc21cd6252dcf9dd4a26e9/>
 <csr-id-807d69ef609decfe94230e2086144afc5cc56d7b/>
 <csr-id-1a8b9c9ba5b98c0f1176a0ccbce53d4acea8c84c/>
+<csr-id-50f6ede2104025bd79de8922ca7f27c742cf52bb/>
 
 ### Chore
 

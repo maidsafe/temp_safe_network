@@ -5,7 +5,60 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.80.2 (2023-03-23)
+
+### Chore
+
+ - <csr-id-7a4bdb9dac983d957077878ac87d65535baeee9c/> refactor SectionPeers to using Decision
+
+### Bug Fixes
+
+ - <csr-id-bd97c9aa64b7fc878bc5411b82f5105dce4b1e49/> couple fixes for readings members from section_peer
+   1, clear dkg timer once completed
+   2, do not carry out elder candidates check during handover
+ - <csr-id-3c0e3048e15be2ca973de26079864e0f7fd5c157/> couple fixes to allow read members from section_members
+   1, avoid un-necessary data re-organisation
+   2, not push Joined decision of initial members
+   3, reset section_members whenever sap updated
+   4, remove network knowledge members check due to changed format
+   5, do not AE update sibling sender when self is not an elder
+   6, only update members when SAP updated or already the latest SAP
+ - <csr-id-9450dda00e3c507ee2c93891a297425128bc1ce4/> compose valid decision for test
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 4 commits contributed to the release.
+ - 4 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Couple fixes for readings members from section_peer ([`bd97c9a`](https://github.com/maidsafe/safe_network/commit/bd97c9aa64b7fc878bc5411b82f5105dce4b1e49))
+    - Couple fixes to allow read members from section_members ([`3c0e304`](https://github.com/maidsafe/safe_network/commit/3c0e3048e15be2ca973de26079864e0f7fd5c157))
+    - Compose valid decision for test ([`9450dda`](https://github.com/maidsafe/safe_network/commit/9450dda00e3c507ee2c93891a297425128bc1ce4))
+    - Refactor SectionPeers to using Decision ([`7a4bdb9`](https://github.com/maidsafe/safe_network/commit/7a4bdb9dac983d957077878ac87d65535baeee9c))
+</details>
+
 ## v0.80.1 (2023-03-22)
+
+<csr-id-b0627339e2458fd762084cc4805d7adedfd8c05e/>
+<csr-id-29edfcea7d2cb1334422f2fe5dc90e72c7e5ac7c/>
+<csr-id-5b3c08fe6330ea1b13c48e51e606ad31be442f4d/>
+<csr-id-5a7e5cd67dd94bd1d73ba05ba08d9842223a2558/>
+<csr-id-ad6bf57c4ff0e3e859068f5d5a1a31094183243f/>
+<csr-id-3bcf453d99241d72d91105a0f3b0ec8341eb7664/>
+<csr-id-3189234825323f6480207ef424dab027c3bca409/>
+<csr-id-89d66365a5a0b26bf832dfebd5a4032363071e6f/>
+<csr-id-b4fc6539813db7d6657f91e7b8b1a89b90eb6265/>
+<csr-id-a5bb5e86518e23dcc59f252b231de89ed90efcf9/>
+<csr-id-d3c6c9727a69389f4204b746c54a537cd783232c/>
 
 ### Chore
 
@@ -19,6 +72,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-89d66365a5a0b26bf832dfebd5a4032363071e6f/> make DKgVoter cloneable
  - <csr-id-b4fc6539813db7d6657f91e7b8b1a89b90eb6265/> perform relocation finalisation asap after update
  - <csr-id-a5bb5e86518e23dcc59f252b231de89ed90efcf9/> clarify naming
+
+### Chore
+
+ - <csr-id-22c6e341d28c913a3acaaeae0ceeb8c0a1ef4d4e/> sn_testnet-0.1.3/sn_interface-0.20.7/sn_comms-0.6.4/sn_client-0.82.4/sn_node-0.80.1/sn_api-0.80.3/sn_cli-0.74.2
 
 ### New Features
 
@@ -51,9 +108,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 18 commits contributed to the release over the course of 2 calendar days.
+ - 19 commits contributed to the release over the course of 2 calendar days.
  - 6 days passed between releases.
- - 17 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 18 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -63,6 +120,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Sn_testnet-0.1.3/sn_interface-0.20.7/sn_comms-0.6.4/sn_client-0.82.4/sn_node-0.80.1/sn_api-0.80.3/sn_cli-0.74.2 ([`22c6e34`](https://github.com/maidsafe/safe_network/commit/22c6e341d28c913a3acaaeae0ceeb8c0a1ef4d4e))
     - Revert "chore(release): sn_testnet-0.1.3/sn_interface-0.20.7/sn_comms-0.6.4/sn_client-0.82.4/sn_node-0.80.1/sn_api-0.80.3/sn_cli-0.74.2" ([`2e25949`](https://github.com/maidsafe/safe_network/commit/2e25949f685b0b805d8866527232c010380573ce))
     - Sn_testnet-0.1.3/sn_interface-0.20.7/sn_comms-0.6.4/sn_client-0.82.4/sn_node-0.80.1/sn_api-0.80.3/sn_cli-0.74.2 ([`b062733`](https://github.com/maidsafe/safe_network/commit/b0627339e2458fd762084cc4805d7adedfd8c05e))
     - Bump sn_dbc ([`29edfce`](https://github.com/maidsafe/safe_network/commit/29edfcea7d2cb1334422f2fe5dc90e72c7e5ac7c))
@@ -86,6 +144,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## v0.80.0 (2023-03-16)
 
 <csr-id-4dca7700c0a017dbdeb53a0387f895c0dabd00cc/>
+<csr-id-c9f3e7ccad8836c609193f1c6b53f351e5705805/>
 
 ### Refactor (BREAKING)
 
