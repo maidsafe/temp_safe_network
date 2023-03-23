@@ -70,6 +70,10 @@ impl MyNode {
         // TODO: only send out segment of decisions instead of whole
         let section_decisions = context.network_knowledge.section_decisions();
 
+        // This log is for script parsing network knowledge
+        let members = context.network_knowledge.section_members();
+        trace!("AntiEntropy update others, current members: {:?}", members);
+
         let ae_msg = NetworkMsg::AntiEntropy(AntiEntropyMsg::AntiEntropy {
             section_tree_update: MyNode::generate_ae_section_tree_update(context, Some(section_pk)),
             kind: AntiEntropyKind::Update { section_decisions },
