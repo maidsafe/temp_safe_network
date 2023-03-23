@@ -295,7 +295,6 @@ mod tests {
                 // NOTE: uncomment this line for pretty printed log output.
                 .with_thread_names(true)
                 .with_ansi(false)
-                .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
                 .with_target(false)
                 // .event_format(LogFormatter::default())
                 .try_init()

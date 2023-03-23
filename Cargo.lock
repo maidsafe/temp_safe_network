@@ -4226,7 +4226,6 @@ name = "sn_interface"
 version = "0.20.12"
 dependencies = [
  "assert_matches",
- "base64 0.13.1",
  "bincode",
  "blsttc",
  "bytes",
@@ -4236,7 +4235,6 @@ dependencies = [
  "ed25519",
  "ed25519-dalek",
  "eyre",
- "futures",
  "hex",
  "hex_fmt",
  "itertools",
