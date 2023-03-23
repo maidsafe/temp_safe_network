@@ -30,18 +30,28 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     needs:
-      - cargo-udeps
-      - lint
-      - checks
-      - build-arm
       - unit
       - e2e
       - e2e-msg-happy-path
-      # - e2e-churn
       - api
       - cli
     steps:
       - run: echo "All checks passed, ready to merge"
+
+  # make sure all the os agnostic specific jobs pass
+  # (those that are not os dependent, so we only run once)
+  merge-after-os-agnostic-only-tests:
+    if: "!startsWith(github.event.head_commit.message, 'chore(release):') && needs.pre_job.outputs.should_skip != 'true'"
+    name: Allow merge if all ubuntu only tests pass
+    runs-on: ubuntu-latest
+    needs:
+      - cargo-udeps
+      - lint
+      - checks
+      - build-arm
+      # - e2e-churn
+    steps:
+      - run: echo "All os agnostic checks passed, ready to merge"
 
   pre_job:
     # continue-on-error: true # Uncomment once integration is finished
