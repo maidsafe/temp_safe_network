@@ -10,6 +10,7 @@ use crate::network_knowledge::{
     errors::{Error, Result},
     MembershipState, NodeState, SectionsDAG,
 };
+use bls::PublicKey;
 use sn_consensus::Decision;
 use std::collections::{BTreeMap, BTreeSet};
 use xor_name::{Prefix, XorName};
@@ -125,7 +126,11 @@ impl SectionMemberHistory {
     ///         - Joined -> Left
     ///         - Joined -> Relocated
     ///         - Relocated <--> Left (should not happen, but needed for consistency)
-    pub(super) fn update(&mut self, new_decision: Decision<NodeState>) -> Result<bool> {
+    pub(super) fn update(
+        &mut self,
+        section_key: &PublicKey,
+        new_decision: Decision<NodeState>,
+    ) -> Result<bool> {
         let incoming_generation = new_decision.generation as usize;
 
         trace!(
@@ -146,6 +151,7 @@ impl SectionMemberHistory {
         }
 
         if incoming_generation == self.decisions.len() + 1 {
+            new_decision.validate(section_key)?;
             self.decisions.push(new_decision.clone());
             trace!("Pushed decision {new_decision:?}");
 
@@ -169,12 +175,19 @@ impl SectionMemberHistory {
         }
     }
 
-    pub(super) fn update_peers(&mut self, peers: Vec<Decision<NodeState>>) -> bool {
+    pub(super) fn update_peers(
+        &mut self,
+        section_key: &PublicKey,
+        peers: Vec<Decision<NodeState>>,
+    ) -> bool {
         let mut there_was_an_update = false;
 
         for peer in peers {
-            if let Ok(updated) = self.update(peer) {
-                there_was_an_update |= updated;
+            match self.update(section_key, peer.clone()) {
+                Ok(updated) => there_was_an_update |= updated,
+                Err(err) => warn!(
+                    "Failed {err:?} to update Decision {peer:?} with section_key {section_key:?}"
+                ),
             }
         }
 
@@ -191,7 +204,7 @@ impl SectionMemberHistory {
     pub(super) fn prune_members_archive(
         &mut self,
         proof_chain: &SectionsDAG,
-        last_key: &bls::PublicKey,
+        last_key: &PublicKey,
     ) -> Result<()> {
         let mut latest_section_keys = proof_chain.get_ancestors(last_key)?;
         latest_section_keys.truncate(ELDER_CHURN_EVENTS_TO_PRUNE_ARCHIVE - 1);
@@ -237,7 +250,7 @@ mod tests {
         let sk_set_1 = bls::SecretKeySet::random(0, &mut thread_rng());
         let nodes_1 = gen_random_signed_node_states(1, 1, MembershipState::Left, &sk_set_1)?;
         nodes_1.iter().for_each(|node| {
-            let _ = section_members.update(node.clone());
+            let _ = section_members.update(&sk_set_1.public_keys().public_key(), node.clone());
         });
         let mut proof_chain = SectionsDAG::new(sk_set_1.secret_key().public_key());
         // 1 should be retained
@@ -251,7 +264,7 @@ mod tests {
         let nodes_2 =
             gen_random_signed_node_states(2, 1, MembershipState::Relocated(trigger), &sk_set_2)?;
         nodes_2.iter().for_each(|node| {
-            let _ = section_members.update(node.clone());
+            let _ = section_members.update(&sk_set_2.public_keys().public_key(), node.clone());
         });
         let sig = TestKeys::sign(&sk_set_1.secret_key(), &sk_set_2.secret_key().public_key())?;
         proof_chain.verify_and_insert(
@@ -270,7 +283,7 @@ mod tests {
         let sk_set_3 = bls::SecretKeySet::random(0, &mut thread_rng());
         let nodes_3 = gen_random_signed_node_states(3, 1, MembershipState::Left, &sk_set_3)?;
         nodes_3.iter().for_each(|node| {
-            let _ = section_members.update(node.clone());
+            let _ = section_members.update(&sk_set_3.public_keys().public_key(), node.clone());
         });
         let sig = TestKeys::sign(&sk_set_2.secret_key(), &sk_set_3.secret_key().public_key())?;
         proof_chain.verify_and_insert(
@@ -289,7 +302,7 @@ mod tests {
         let sk_set_4 = bls::SecretKeySet::random(0, &mut thread_rng());
         let nodes_4 = gen_random_signed_node_states(4, 1, MembershipState::Left, &sk_set_4)?;
         nodes_4.iter().for_each(|node| {
-            let _ = section_members.update(node.clone());
+            let _ = section_members.update(&sk_set_4.public_keys().public_key(), node.clone());
         });
         let sig = TestKeys::sign(&sk_set_3.secret_key(), &sk_set_4.secret_key().public_key())?;
         proof_chain.verify_and_insert(
@@ -311,7 +324,7 @@ mod tests {
         let sk_set_5 = bls::SecretKeySet::random(0, &mut thread_rng());
         let nodes_5 = gen_random_signed_node_states(5, 1, MembershipState::Left, &sk_set_5)?;
         nodes_5.iter().for_each(|node| {
-            let _ = section_members.update(node.clone());
+            let _ = section_members.update(&sk_set_5.public_keys().public_key(), node.clone());
         });
         let sig = TestKeys::sign(&sk_set_3.secret_key(), &sk_set_5.secret_key().public_key())?;
         proof_chain.verify_and_insert(
@@ -341,8 +354,8 @@ mod tests {
             gen_random_signed_node_states(2, 1, MembershipState::Relocated(trigger), &sk_set)?[0]
                 .clone();
 
-        assert!(section_members.update(node_left.clone())?);
-        assert!(section_members.update(node_relocated.clone())?);
+        assert!(section_members.update(&sk_set.public_keys().public_key(), node_left.clone())?);
+        assert!(section_members.update(&sk_set.public_keys().public_key(), node_relocated.clone())?);
 
         let (node_left_state, _) = node_left
             .proposals
@@ -391,8 +404,8 @@ mod tests {
         let node_2 =
             gen_random_signed_node_states(2, 1, MembershipState::Relocated(trigger), &sk_set)?[0]
                 .clone();
-        assert!(section_members.update(node_1.clone())?);
-        assert!(section_members.update(node_2.clone())?);
+        assert!(section_members.update(&sk_set.public_keys().public_key(), node_1.clone())?);
+        assert!(section_members.update(&sk_set.public_keys().public_key(), node_2.clone())?);
 
         let (node_state_1, _) = node_1
             .proposals
@@ -407,8 +420,8 @@ mod tests {
         let node_1 = section_decision(&sk_set, 3, node_1)?;
         let node_2 = NodeState::left(*node_state_2.node_id(), Some(node_state_2.name()));
         let node_2 = section_decision(&sk_set, 4, node_2)?;
-        assert!(section_members.update(node_1.clone())?);
-        assert!(section_members.update(node_2.clone())?);
+        assert!(section_members.update(&sk_set.public_keys().public_key(), node_1.clone())?);
+        assert!(section_members.update(&sk_set.public_keys().public_key(), node_2.clone())?);
 
         assert!(section_members.members().is_empty());
         assert_lists(section_members.archive.values(), &[node_1, node_2]);

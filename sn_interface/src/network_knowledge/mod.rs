@@ -446,18 +446,15 @@ impl NetworkKnowledge {
     /// Try to merge this `NetworkKnowledge` members with `peers`.
     /// Checks if we're already up to date before attempting to verify and merge members
     pub fn update_members(&mut self, peers: SectionDecisions) -> Result<bool> {
-        // for decision in peers.iter() {
-        //     // The update will be terminated on any of failed validation.
-        //     decision.validate(&self.signed_sap.public_key_set())?;
-        // }
-
-        Ok(self.section_members.update_peers(peers))
+        Ok(self
+            .section_members
+            .update_peers(&self.signed_sap.section_key(), peers))
     }
 
     /// Try update one member with the incoming decision. Returns whether it actually updated.
     pub fn try_update_member(&mut self, decision: Decision<NodeState>) -> Result<bool> {
-        // decision.validate(&self.signed_sap.public_key_set())?;
-        self.section_members.update(decision)
+        self.section_members
+            .update(&self.signed_sap.section_key(), decision)
     }
 
     /// Returns the members of our section
