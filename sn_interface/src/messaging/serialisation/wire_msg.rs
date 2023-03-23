@@ -16,7 +16,6 @@ use crate::messaging::{
 
 use bytes::{BufMut, Bytes, BytesMut};
 use custom_debug::Debug;
-use qp2p::UsrMsgBytes;
 use serde::Serialize;
 
 /// In order to send a message over the wire, it needs to be serialized
@@ -91,7 +90,7 @@ impl WireMsg {
 
     /// Attempts to create an instance of `WireMsg` by deserialising the bytes provided.
     /// To succeed, the bytes should contain at least a valid `WireMsgHeader`.
-    pub fn from(bytes: UsrMsgBytes) -> Result<Self> {
+    pub fn from(bytes: (Bytes, Bytes, Bytes)) -> Result<Self> {
         let (header_bytes, dst_bytes, payload) = bytes;
         // Deserialize the header bytes first
         let header = WireMsgHeader::from(header_bytes.clone())?;
@@ -113,7 +112,7 @@ impl WireMsg {
 
     /// Return the serialized `WireMsgHeader`, the Dst and the Payload bytes contained
     /// on the WireMsg
-    pub fn serialize(&self) -> Result<UsrMsgBytes> {
+    pub fn serialize(&self) -> Result<(Bytes, Bytes, Bytes)> {
         let header = if let Some(bytes) = &self.serialized_header {
             bytes.clone()
         } else {
@@ -134,7 +133,7 @@ impl WireMsg {
 
     /// Return the serialized `WireMsgHeader`, the Dst and the Payload bytes
     /// Caching the bytes to the WireMsg itself
-    pub fn serialize_and_cache_bytes(&mut self) -> Result<UsrMsgBytes> {
+    pub fn serialize_and_cache_bytes(&mut self) -> Result<(Bytes, Bytes, Bytes)> {
         // if we've already serialized, grab those header bytes
         let header = if let Some(hdr_bytes) = &self.serialized_header {
             hdr_bytes.clone()
@@ -157,7 +156,7 @@ impl WireMsg {
 
     /// Return the serialized `WireMsg`, which contains the `WireMsgHeader` bytes,
     /// followed by the provided dst and payload bytes, i.e. the serialized Message.
-    pub fn serialize_with_new_dst(&self, dst: &Dst) -> Result<UsrMsgBytes> {
+    pub fn serialize_with_new_dst(&self, dst: &Dst) -> Result<(Bytes, Bytes, Bytes)> {
         // if we've already serialized, grab those header bytes
         let header = if let Some(bytes) = &self.serialized_header {
             bytes.clone()
@@ -220,7 +219,7 @@ impl WireMsg {
 
     /// Convenience function which creates a temporary `WireMsg` from the provided
     /// bytes, returning the deserialized message.
-    pub fn deserialize(bytes: UsrMsgBytes) -> Result<(MsgId, NetworkMsg)> {
+    pub fn deserialize(bytes: (Bytes, Bytes, Bytes)) -> Result<(MsgId, NetworkMsg)> {
         let msg = Self::from(bytes)?;
         Ok((msg.msg_id(), msg.into_msg()?))
     }
