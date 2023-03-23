@@ -134,7 +134,6 @@ impl MyNode {
             keypair: self.keypair.clone(),
             membership: self.membership.clone(),
             reward_key: self.reward_key,
-            store_cost: sn_dbc::Token::from_nano(1), // hard coded for now
             network_knowledge: self.network_knowledge().clone(),
             section_keys_provider: self.section_keys_provider.clone(),
             comm: self.comm.clone(),

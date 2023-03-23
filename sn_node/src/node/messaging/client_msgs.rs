@@ -51,7 +51,7 @@ impl MyNode {
     ) -> Vec<Cmd> {
         let response = if let DataQuery::Spentbook(SpendQuery::GetFees(_)) = query {
             // We receive this directly from client, as an Elder, since `is_spend` is set to true (that is a very messy/confusing pattern, to be fixed).
-            NodeQueryResponse::GetFees(Ok((context.reward_key, context.store_cost)))
+            NodeQueryResponse::GetFees(Ok((context.reward_key, context.current_fee())))
         } else {
             context
                 .data_storage
@@ -239,7 +239,7 @@ impl MyNode {
         context: &NodeContext,
     ) -> Result<SpentProofShare> {
         // verify that fee is paid (we are included as output)
-        MyNode::verify_fee(context.store_cost, context.reward_key, tx)?;
+        MyNode::verify_fee(context.current_fee(), context.reward_key, tx)?;
 
         // verify the spent proofs
         MyNode::verify_spent_proofs(spent_proofs, &context.network_knowledge)?;
@@ -287,7 +287,7 @@ impl MyNode {
     }
 
     fn verify_fee(
-        _store_cost: sn_dbc::Token,
+        _op_cost: sn_dbc::Token,
         _our_key: PublicKey,
         _tx: &DbcTransaction,
     ) -> Result<()> {
@@ -299,15 +299,15 @@ impl MyNode {
         //     Some(output) => output.amount(),
         //     None => {
         //         return Err(Error::InsufficientFeesPaid {
-        //             min_required: store_cost,
+        //             min_required: op_cost,
         //             paid: sn_dbc::Token::zero(),
         //         })
         //     }
         // };
 
-        // if store_cost > paid_to_us {
+        // if op_cost > paid_to_us {
         //     return Err(Error::InsufficientFeesPaid {
-        //         min_required: store_cost,
+        //         min_required: op_cost,
         //         paid: paid_to_us,
         //     });
         // }

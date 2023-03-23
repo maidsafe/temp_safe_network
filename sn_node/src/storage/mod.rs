@@ -59,6 +59,11 @@ impl DataStorage {
         }
     }
 
+    /// Returns the ratio of used storage space to min capacity.
+    pub(crate) fn used_space_ratio(&self) -> f64 {
+        self.used_space.ratio()
+    }
+
     /// Returns whether the storage min capacity has been reached or not.
     pub(crate) fn has_reached_min_capacity(&self) -> bool {
         self.used_space.has_reached_min_capacity()
