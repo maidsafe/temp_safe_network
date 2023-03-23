@@ -121,7 +121,6 @@ jobs:
         with:
           name: safe_network-aarch64-unknown-linux-musl
           path: artifacts/aarch64-unknown-linux-musl/release
-      - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1
         id: toolchain
         with:
