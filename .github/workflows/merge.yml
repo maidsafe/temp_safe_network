@@ -20,6 +20,28 @@ env:
   NODE_COUNT: 14
 
 jobs:
+  # make sure all the jobs are not failed.
+  # Note that the duplicated jobs might be skipped.
+  merge-after-tests:
+    if: "!startsWith(github.event.head_commit.message, 'chore(release):') && needs.pre_job.outputs.should_skip != 'true'"
+    name: Allow merge if all tests have passed
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    needs:
+      - cargo-udeps
+      - lint
+      - checks
+      - build-arm
+      - unit
+      - e2e
+      - e2e-msg-happy-path
+      # - e2e-churn
+      - api
+      - cli
+    steps:
+      - run: echo "All checks passed, ready to merge"
 
   pre_job:
     # continue-on-error: true # Uncomment once integration is finished
@@ -972,21 +994,3 @@ jobs:
         if: failure()
         continue-on-error: true
 
-  # make sure all the jobs are not failed.
-  # Note that the duplicated jobs might be skipped.
-  merge-after-tests:
-    needs:
-      - pre_job
-      - cargo-udeps
-      - lint
-      - checks
-      - build-arm
-      - unit
-      - e2e
-      - e2e-msg-happy-path
-      - e2e-churn
-      - api
-      - cli
-    runs-on: ubuntu-latest
-    steps:
-      - run: echo "All checks passed, ready to merge"
