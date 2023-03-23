@@ -745,13 +745,12 @@ async fn spentbook_spend_client_message_should_replicate_to_adults_and_send_ack(
         // Encrypt the index to the _well-known reward key_.
         let derivation_index_cipher = fee_base_pk.encrypt(fee_derived_owner.derivation_index);
 
+        let fee = context.current_fee().as_nano();
+
         // We must generate the revealed output (i.e. the blinding factor) to be both encrypted, and used in the dbc
         // this is how the Elder can verify that the dbc contains sufficient amount, since the amount in the dbc is blinded.
         let fee_derived_owner_pk = fee_derived_owner.as_owner().public_key();
-        let fee_output = RevealedOutput::new(
-            Output::new(fee_derived_owner_pk, context.store_cost.as_nano()),
-            &mut rng,
-        );
+        let fee_output = RevealedOutput::new(Output::new(fee_derived_owner_pk, fee), &mut rng);
         // Encrypt the amount to the _derived key_ (i.e. new dbc id).
         let amount_cipher = fee_output.revealed_amount.encrypt(&fee_derived_owner_pk);
         let fee_ciphers = BTreeMap::from([(
@@ -760,9 +759,10 @@ async fn spentbook_spend_client_message_should_replicate_to_adults_and_send_ack(
         )]);
 
         // We make an output of the change as well, even if not needed, just to pass in both change and fee in the same fn.
-        let change_amount = dbc_amount.value() - context.store_cost.as_nano();
-        let change_output =
-            RevealedOutput::new(Output::new(fee_derived_owner_pk, change_amount), &mut rng);
+        let change_output = RevealedOutput::new(
+            Output::new(fee_derived_owner_pk, dbc_amount.value() - fee),
+            &mut rng,
+        );
 
         let outputs = vec![
             (change_owner, change_output),
