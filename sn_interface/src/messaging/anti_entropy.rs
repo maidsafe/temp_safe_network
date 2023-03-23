@@ -9,8 +9,7 @@
 use super::system::SectionDecisions;
 
 use crate::network_knowledge::SectionTreeUpdate;
-
-use qp2p::UsrMsgBytes;
+use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, PartialEq, custom_debug::Debug, serde::Serialize, serde::Deserialize)]
@@ -37,14 +36,14 @@ pub enum AntiEntropyKind {
     /// the node or client can resend it with up to date destination information.
     Retry {
         #[debug(skip)]
-        bounced_msg: UsrMsgBytes,
+        bounced_msg: (Bytes, Bytes, Bytes),
     },
     /// This AE message is sent to a node or client when a message needs to be sent to a
     /// different and/or closest section, attaching the bounced message so the node or client
     /// can resend it to the correct section with up to date destination information.
     Redirect {
         #[debug(skip)]
-        bounced_msg: UsrMsgBytes,
+        bounced_msg: (Bytes, Bytes, Bytes),
     },
     /// This AE message is sent to update a node or client when we notice they are behind
     Update { section_decisions: SectionDecisions },
