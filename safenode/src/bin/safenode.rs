@@ -1,8 +1,5 @@
-mod comms;
-mod stableset;
-
-use crate::comms::{Comm, NetworkNode};
-use crate::stableset::{run_stable_set, StableSetMsg};
+use safenode::comms::{Comm, NetworkNode};
+use safenode::stableset::{run_stable_set, StableSetMsg};
 
 use std::collections::BTreeSet;
 use std::{env, fs, net::SocketAddr};
