@@ -322,8 +322,8 @@ impl Membership {
         node_state: NodeState,
         _prefix: &Prefix,
     ) -> Result<Vec<Outgoing<NodeState>>> {
-        let mut outgoings = self.consensus.lock().unwrap().propose(node_state)?;
-        self.outgoings.append(&mut outgoings);
+        let outgoings = self.consensus.lock().unwrap().propose(node_state)?;
+        self.outgoings.append(&mut outgoings.clone());
 
         Ok(outgoings)
     }
@@ -348,8 +348,8 @@ impl Membership {
         bundle: Bundle<NodeState>,
         _prefix: &Prefix,
     ) -> Result<(Vec<Outgoing<NodeState>>, Option<Decision<NodeState>>)> {
-        let mut outgoings = self.consensus.lock().unwrap().process_bundle(&bundle)?;
-        self.outgoings.append(&mut outgoings);
+        let outgoings = self.consensus.lock().unwrap().process_bundle(&bundle)?;
+        self.outgoings.append(&mut outgoings.clone());
 
         let decision = self.consensus.lock().unwrap().decided_proposal();
 

@@ -132,7 +132,6 @@ pub fn init_logger() {
             // NOTE: uncomment this line for pretty printed log output.
             //.pretty()
             .with_ansi(false)
-            .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
             .with_target(false)
             .event_format(LogFormatter::default())
             .try_init()

@@ -196,13 +196,20 @@ impl MyNode {
         let mut cmds = vec![];
         let node_state = decision.proposal.clone();
 
-        if let Err(_err) = self
+        match self
             .network_knowledge
             .try_update_member(gen, decision.clone())
         {
-            error!("Ignored decision {decision:?} as we are lagging");
-            cmds.push(Self::generate_probe_msg(&self.context())?);
-            return Ok(cmds);
+            Err(_err) => {
+                error!("Ignored decision {decision:?} as we are lagging");
+                cmds.push(Self::generate_probe_msg(&self.context())?);
+                return Ok(cmds);
+            }
+            Ok(updated) => {
+                if !updated {
+                    debug!("decision {decision:?} didn't update the members");
+                }
+            }
         }
 
         let mut excluded_from_relocation = BTreeSet::new();
