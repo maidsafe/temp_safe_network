@@ -12,7 +12,8 @@ use sn_comms::Comm;
 use bls::PublicKey;
 use sn_interface::{
     messaging::{
-        data::DataResponse, system::NodeMsg, AntiEntropyMsg, Dst, MsgId, MsgKind, WireMsg,
+        data::DataResponse, system::NodeMsg, AntiEntropyMsg, Dst, MsgId, MsgKind, NetworkMsg,
+        WireMsg,
     },
     types::{ClientId, NodeId, Participant},
 };
@@ -94,7 +95,7 @@ impl MyNode {
     /// Sends a msg, and listens for any response
     /// The response is returned to be handled via the dispatcher (though a response is not necessarily expected)
     pub(crate) fn send_and_enqueue_any_response(
-        msg: NodeMsg,
+        msg: NetworkMsg,
         msg_id: MsgId,
         context: NodeContext,
         recipients: BTreeSet<NodeId>,
@@ -102,7 +103,7 @@ impl MyNode {
         let targets_len = recipients.len();
         trace!("Sending out + awaiting response of {msg_id:?} to {targets_len} holder node/s {recipients:?}");
 
-        let (kind, payload) = MyNode::serialize_node_msg(context.name, &msg)?;
+        let (kind, payload) = MyNode::serialize_msg(context.name, &msg)?;
 
         // We create a Dst with random dst name, but we'll update it accordingly for each target
         let mut dst = Dst {

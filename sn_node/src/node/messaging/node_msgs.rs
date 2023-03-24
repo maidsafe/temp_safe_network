@@ -55,7 +55,7 @@ impl MyNode {
     pub(crate) fn send_to_elders(context: &NodeContext, msg: NodeMsg) -> Cmd {
         let sap = context.network_knowledge.section_auth();
         let recipients = sap.elders_set();
-        Cmd::send_msg(msg, Recipients::Multiple(recipients))
+        Cmd::send_node_msg(msg, Recipients::Multiple(recipients))
     }
 
     /// Send a (`NodeMsg`) message to all Elders in our section, await all responses & enqueue
@@ -65,7 +65,7 @@ impl MyNode {
     ) -> Cmd {
         let recipients = sap.elders_set();
         Cmd::SendMsgEnqueueAnyResponse {
-            msg,
+            msg: NetworkMsg::Node(msg),
             msg_id: MsgId::new(),
             recipients,
         }

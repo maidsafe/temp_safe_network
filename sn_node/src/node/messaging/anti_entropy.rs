@@ -62,11 +62,10 @@ impl MyNode {
     }
 
     /// Send `AntiEntropy` update message to the specified nodes.
-    pub(crate) fn send_ae_update_to_nodes(
+    pub(crate) fn generate_ae_update_msg(
         context: &NodeContext,
-        recipients: Recipients,
         section_pk: BlsPublicKey,
-    ) -> Cmd {
+    ) -> AntiEntropyMsg {
         // TODO: only send out segment of decisions instead of whole
         let section_decisions = context.network_knowledge.section_decisions();
 
@@ -74,10 +73,19 @@ impl MyNode {
         let members = context.network_knowledge.section_members();
         trace!("AntiEntropy update others, current members: {:?}", members);
 
-        let ae_msg = NetworkMsg::AntiEntropy(AntiEntropyMsg::AntiEntropy {
+        AntiEntropyMsg::AntiEntropy {
             section_tree_update: MyNode::generate_ae_section_tree_update(context, Some(section_pk)),
             kind: AntiEntropyKind::Update { section_decisions },
-        });
+        }
+    }
+
+    /// Send `AntiEntropy` update message to the specified nodes.
+    pub(crate) fn send_ae_update_to_nodes(
+        context: &NodeContext,
+        recipients: Recipients,
+        section_pk: BlsPublicKey,
+    ) -> Cmd {
+        let ae_msg = NetworkMsg::AntiEntropy(MyNode::generate_ae_update_msg(context, section_pk));
 
         Cmd::send_network_msg(ae_msg, recipients)
     }
@@ -299,7 +307,10 @@ impl MyNode {
         trace!("Resending original {msg_id:?} to {recipient:?} with {msg_to_resend:?}");
         trace!("{}", LogMarker::AeResendAfterRedirect);
 
-        cmds.push(Cmd::send_msg(msg_to_resend, Recipients::Single(recipient)));
+        cmds.push(Cmd::send_node_msg(
+            msg_to_resend,
+            Recipients::Single(recipient),
+        ));
         Ok(cmds)
     }
 

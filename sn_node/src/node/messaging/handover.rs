@@ -202,7 +202,7 @@ impl MyNode {
                     sap: sap.clone(),
                     sig_share: sig_share.clone(),
                 };
-                cmds.push(Cmd::send_msg(msg, nodes));
+                cmds.push(Cmd::send_node_msg(msg, nodes));
 
                 // handle our own if we are elder
                 if let Some(elder) = myself {
@@ -223,7 +223,7 @@ impl MyNode {
                     sap1: sap1.clone(),
                     sig_share1: sig_share1.clone(),
                 };
-                cmds.push(Cmd::send_msg(msg, nodes));
+                cmds.push(Cmd::send_node_msg(msg, nodes));
 
                 // handle our own if we are elder
                 if let Some(elder) = myself {
@@ -494,7 +494,7 @@ impl MyNode {
                     // We hit an error while processing this vote, perhaps we are missing information.
                     // We'll send a handover AE request to see if they can help us catch up.
                     debug!("{:?}", LogMarker::HandoverSendingAeUpdateRequest);
-                    cmds.push(Cmd::send_msg(
+                    cmds.push(Cmd::send_node_msg(
                         NodeMsg::HandoverAE(gen),
                         Recipients::Single(Participant::from_node(node_id)),
                     ));
@@ -523,7 +523,7 @@ impl MyNode {
 
         if let Some(handover) = self.handover_voting.as_ref() {
             match handover.anti_entropy(gen) {
-                Ok(catchup_votes) => Some(Cmd::send_msg(
+                Ok(catchup_votes) => Some(Cmd::send_node_msg(
                     NodeMsg::HandoverVotes(catchup_votes),
                     Recipients::Single(Participant::from_node(node_id)),
                 )),

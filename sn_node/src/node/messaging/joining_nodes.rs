@@ -91,7 +91,7 @@ impl MyNode {
                     )]);
                 }
 
-                return Ok(vec![Cmd::send_msg(
+                return Ok(vec![Cmd::send_node_msg(
                     msg,
                     Recipients::Single(Participant::from_node(node_id)),
                 )]);

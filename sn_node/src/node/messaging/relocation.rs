@@ -62,7 +62,7 @@ impl MyNode {
                 trigger.dst_section(node_state.node_id().name()),
                 trigger.churn_id(),
             );
-            let cmd = Cmd::send_msg(
+            let cmd = Cmd::send_node_msg(
                 NodeMsg::PrepareToRelocate(trigger.clone()),
                 Recipients::Single(Participant::from_node(*node_state.node_id())),
             );

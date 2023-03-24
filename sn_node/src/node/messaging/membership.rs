@@ -95,7 +95,7 @@ impl MyNode {
                         // We'll send a membership AE request to see if they can help us catch up.
                         debug!("{:?}", LogMarker::MembershipSendingAeUpdateRequest);
                         let msg = NodeMsg::MembershipAE(membership.generation());
-                        cmds.push(Cmd::send_msg(
+                        cmds.push(Cmd::send_node_msg(
                             msg,
                             Recipients::Single(Participant::from_node(node_id)),
                         ));
@@ -149,7 +149,7 @@ impl MyNode {
             match membership.anti_entropy(gen) {
                 Ok(catchup_votes) => {
                     trace!("Sending catchup votes to {node_id:?}");
-                    Some(Cmd::send_msg(
+                    Some(Cmd::send_node_msg(
                         NodeMsg::MembershipVotes(catchup_votes),
                         Recipients::Single(Participant::from_node(node_id)),
                     ))
@@ -312,7 +312,7 @@ impl MyNode {
         let msg = NodeMsg::JoinResponse(JoinResponse::Approved(decision));
 
         trace!("{}", LogMarker::SendNodeApproval);
-        Cmd::send_msg(msg, Recipients::Multiple(nodes))
+        Cmd::send_node_msg(msg, Recipients::Multiple(nodes))
     }
 
     pub(crate) fn handle_node_left(
@@ -343,7 +343,7 @@ impl MyNode {
                 sig,
             };
             let msg = NodeMsg::CompleteRelocation(node_state);
-            Some(Cmd::send_msg(
+            Some(Cmd::send_node_msg(
                 msg,
                 Recipients::Single(Participant::from_node(node_id)),
             ))

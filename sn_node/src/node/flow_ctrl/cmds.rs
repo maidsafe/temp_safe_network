@@ -174,7 +174,7 @@ pub enum Cmd {
     /// Performs serialisation and signing and sends the msg over a bidi connection
     /// and then enqueues any response returned.
     SendMsgEnqueueAnyResponse {
-        msg: NodeMsg,
+        msg: NetworkMsg,
         msg_id: MsgId,
         recipients: BTreeSet<NodeId>,
     },
@@ -208,17 +208,17 @@ pub enum Cmd {
 
 impl Cmd {
     // this fn shall be fixed to be more type safe so that unnecessary casting upstream is avoided
-    pub(crate) fn send_msg(msg: NodeMsg, recipients: Recipients) -> Self {
+    pub(crate) fn send_node_msg(msg: NodeMsg, recipients: Recipients) -> Self {
         Cmd::send_network_msg(NetworkMsg::Node(msg), recipients)
     }
 
     pub(crate) fn send_network_msg(msg: NetworkMsg, recipients: Recipients) -> Self {
         let msg_id = MsgId::new();
         debug!("Sending msg {msg_id:?} to {recipients:?}: {msg:?}");
-        Cmd::SendMsg {
+        Cmd::SendMsgEnqueueAnyResponse {
             msg,
             msg_id,
-            recipients,
+            recipients: recipients.into_iter().map(NodeId::from).collect(),
         }
     }
 

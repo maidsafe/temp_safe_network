@@ -356,8 +356,10 @@ impl FlowCtrl {
                     trace!("Sending out data batch to {node_id:?}");
                     let msg = NodeMsg::NodeDataCmd(NodeDataCmd::ReplicateDataBatch(data_bundle));
 
-                    let cmd =
-                        Cmd::send_msg(msg, Recipients::Single(Participant::from_node(node_id)));
+                    let cmd = Cmd::send_node_msg(
+                        msg,
+                        Recipients::Single(Participant::from_node(node_id)),
+                    );
                     if let Err(error) = flow_ctrl_cmd_channel.send(FlowCtrlCmd::Handle(cmd)).await {
                         error!("Failed to enqueue send msg command for replication of data batch to {node_id:?}: {error:?}");
                     }
@@ -531,7 +533,7 @@ async fn process_cmd_non_blocking(
     let start = Instant::now();
 
     let cmd_string = format!("{:?}", cmd);
-
+    debug!("Starting to process: {cmd_string}");
     match cmd {
         Cmd::HandleMsg {
             sender,

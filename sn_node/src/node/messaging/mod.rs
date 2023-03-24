@@ -25,7 +25,7 @@ mod update_section;
 
 use crate::node::{flow_ctrl::cmds::Cmd, Error, MyNode, NodeContext, Result};
 use sn_interface::{
-    messaging::{AntiEntropyMsg, MsgKind, NetworkMsg, WireMsg},
+    messaging::{AntiEntropyMsg, MsgId, MsgKind, NetworkMsg, WireMsg},
     types::{log_markers::LogMarker, ClientId, NodeId, Participant},
 };
 
@@ -192,11 +192,23 @@ impl MyNode {
                     return Ok(cmds);
                 }
                 trace!("Received Probe message from {}: {:?}", sender, msg_id);
-                cmds.push(MyNode::send_ae_update_to_nodes(
-                    &context,
-                    Recipients::Single(sender),
-                    section_key,
-                ));
+
+                if let Some(stream) = send_stream {
+                    let msg = MyNode::generate_ae_update_msg(&context, section_key);
+
+                    if let Some(cmd) =
+                        MyNode::send_ae_response(msg, MsgId::new(), sender, msg_id, stream, context)
+                            .await?
+                    {
+                        cmds.push(cmd)
+                    };
+                } else {
+                    cmds.push(MyNode::send_ae_update_to_nodes(
+                        &context,
+                        Recipients::Single(sender),
+                        section_key,
+                    ));
+                }
                 Ok(cmds)
             }
             other @ NetworkMsg::DataResponse { .. } => {

@@ -60,7 +60,7 @@ impl MyNode {
             vote_node_off: proposal.clone(),
             sig_share: sig_share.clone(),
         };
-        cmds.push(Cmd::send_msg(msg, nodes));
+        cmds.push(Cmd::send_node_msg(msg, nodes));
 
         // handle ourselves if we are in the recipients
         if let Some(me) = myself {

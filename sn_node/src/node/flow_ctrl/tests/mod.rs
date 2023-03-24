@@ -468,7 +468,7 @@ async fn msg_to_self() -> Result<()> {
 
     // don't use the cmd collection fn, as it skips Cmd::SendMsg
     let cmds = MyNode::test_process_cmd(
-        Cmd::send_msg(
+        Cmd::send_node_msg(
             node_msg.clone(),
             Recipients::Single(Participant::from_node(info.id())),
         ),

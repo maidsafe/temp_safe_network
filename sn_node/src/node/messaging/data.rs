@@ -277,7 +277,7 @@ impl MyNode {
                 LogMarker::DataReorganisationUnderway
             );
             let msg = NodeMsg::NodeDataCmd(NodeDataCmd::SendAnyMissingRelevantData(data_i_have));
-            let cmd = Cmd::send_msg(msg, Recipients::Single(Participant::from_node(sender)));
+            let cmd = Cmd::send_node_msg(msg, Recipients::Single(Participant::from_node(sender)));
             cmds.push(cmd);
         } else if is_full {
             warn!("Not attempting further retrieval of missing data as we are full");
