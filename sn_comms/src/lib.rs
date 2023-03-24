@@ -259,6 +259,7 @@ fn process_cmds(
             match cmd {
                 // This is the only place that mutates `links`.
                 CommCmd::SetTargets(targets) => {
+                    trace!("Setting comms targets to {targets:?}");
                     // Drops links that are not among the targets.
                     links.retain(|p, _| targets.contains(p));
                     // Adds new links for each new target.
