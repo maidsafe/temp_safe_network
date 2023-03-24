@@ -112,7 +112,7 @@ impl MyNode {
         // first check for AE, if this isn't an ae msg itself
         if !msg_kind.is_ae_msg() {
             let entropy =
-                MyNode::check_for_entropy(is_elder, &wire_msg, &network_knowledge, &sender)?;
+                MyNode::check_for_entropy(is_elder, &wire_msg, network_knowledge, &sender)?;
             if let Some((update, ae_kind)) = entropy {
                 debug!("bailing early, AE found for {msg_id:?}");
                 return MyNode::generate_anti_entropy_cmds(

@@ -39,7 +39,6 @@ use qp2p::SendStream;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 use xor_name::XorName;
-
 impl MyNode {
     /// Forms a `CmdError` msg to send back to the client over the response stream
     pub(crate) fn send_cmd_error_response_over_stream(
@@ -53,6 +52,7 @@ impl MyNode {
     }
 
     /// Handle data query
+    #[allow(clippy::too_many_arguments)]
     pub(crate) async fn handle_data_query_where_stored(
         msg_id: MsgId,
         query: &DataQuery,
@@ -90,6 +90,9 @@ impl MyNode {
     /// If this is a store request, and we are an Elder and one of
     /// the `data_copy_count()` nodes, then we will send a wiremsg
     /// to ourselves, among the msgs sent to the other holders.
+    ///
+    // TODO: Refactor this down where possible
+    #[allow(clippy::too_many_arguments)]
     pub(crate) async fn handle_client_msg_for_us(
         msg_id: MsgId,
         msg: ClientMsg,
@@ -145,6 +148,7 @@ impl MyNode {
     }
 
     /// Handle the DataCmd variant
+    #[allow(clippy::too_many_arguments)]
     async fn handle_data_cmd(
         data_cmd: DataCmd,
         msg_id: MsgId,
@@ -216,7 +220,7 @@ impl MyNode {
                 // first we validate it here at the Elder
                 let spent_share = match MyNode::validate_spentbook_cmd(
                     cmd,
-                    &network_knowledge,
+                    network_knowledge,
                     section_keys_provider,
                     reward_secret_key,
                     store_cost,
@@ -245,7 +249,7 @@ impl MyNode {
         match data_result {
             Ok(data) => {
                 MyNode::store_data_and_respond(
-                    &network_knowledge,
+                    network_knowledge,
                     ed_keypair,
                     data_storage,
                     joins_allowed_until_split,
@@ -321,6 +325,7 @@ impl MyNode {
     }
 
     /// Generate a spent proof share from the information provided by the client.
+    #[allow(clippy::too_many_arguments)]
     fn gen_spent_proof_share(
         public_key: &PublicKey,
         tx: &DbcTransaction,
@@ -345,7 +350,7 @@ impl MyNode {
         )?;
 
         // verify the spent proofs
-        MyNode::verify_spent_proofs(spent_proofs, &network_knowledge)?;
+        MyNode::verify_spent_proofs(spent_proofs, network_knowledge)?;
 
         let blinded_amounts_info =
             get_blinded_amounts_from_transaction(tx, spent_proofs, spent_transactions)?;

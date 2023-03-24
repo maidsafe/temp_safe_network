@@ -533,7 +533,7 @@ async fn process_cmd_non_blocking(
             send_stream,
         } => {
             let network_knowledge = context.network_knowledge.clone();
-            let our_name = context.name.clone();
+            let our_name = context.name;
             let is_elder = context.is_elder;
             let handle = tokio::spawn(async move {
                 let mut new_cmds = vec![];
@@ -573,7 +573,7 @@ async fn process_cmd_non_blocking(
             send_stream,
         } => {
             let network_knowledge = context.network_knowledge.clone();
-            let our_name = context.name.clone();
+            let our_name = context.name;
             let data_storage = context.data_storage.clone();
             let is_elder = context.is_elder;
             let joins_allowed = context.joins_allowed;
@@ -633,7 +633,7 @@ async fn process_cmd_non_blocking(
         } => {
             let comm = context.comm.clone();
             let network_knowledge = context.network_knowledge.clone();
-            let our_name = context.name.clone();
+            let our_name = context.name;
 
             let handle = tokio::spawn(async move {
                 let recipients = recipients.into_iter().map(NodeId::from).collect();
@@ -650,7 +650,7 @@ async fn process_cmd_non_blocking(
         } => {
             let comm = context.comm.clone();
             let current_section_key = context.network_knowledge.section_key();
-            let our_name = context.name.clone();
+            let our_name = context.name;
             let handle = tokio::spawn(async move {
                 MyNode::send_and_enqueue_any_response(
                     msg,
@@ -672,7 +672,7 @@ async fn process_cmd_non_blocking(
             send_stream,
         } => {
             let current_section_key = context.network_knowledge.section_key();
-            let our_name = context.name.clone();
+            let our_name = context.name;
 
             let handle = tokio::spawn(async move {
                 let mut new_cmds = vec![];
@@ -713,7 +713,7 @@ async fn process_cmd_non_blocking(
             client_id,
         } => {
             let current_section_key = context.network_knowledge.section_key();
-            let our_name = context.name.clone();
+            let our_name = context.name;
 
             let handle = tokio::spawn(async move {
                 let mut new_cmds = vec![];
@@ -814,7 +814,7 @@ async fn process_cmd_non_blocking(
             stream,
         } => {
             let current_section_key = context.network_knowledge.section_key();
-            let our_name = context.name.clone();
+            let our_name = context.name;
 
             let handle = tokio::spawn(async move {
                 let mut new_cmds = vec![];
