@@ -8,15 +8,18 @@
 
 use crate::node::{
     flow_ctrl::cmds::Cmd,
-    membership::{self, Membership},
+    membership::{self, Generation, Membership},
     messaging::Recipients,
     MyNode, NodeContext, Result,
 };
 
-use bls::Signature;
-use sn_consensus::{Decision, Generation, SignedVote, VoteResponse};
+use sn_consensus::mvba::{
+    bundle::Bundle,
+    bundle::Outgoing::{Direct, Gossip},
+    Decision,
+};
 use sn_interface::{
-    messaging::system::{JoinResponse, NodeMsg, SectionSig, SectionSigned},
+    messaging::system::{JoinResponse, NodeMsg},
     network_knowledge::{node_state::RelocationTrigger, MembershipState, NodeState},
     types::{log_markers::LogMarker, NodeId, Participant},
 };
@@ -35,16 +38,27 @@ impl MyNode {
         let context = &self.context();
         let prefix = self.network_knowledge.prefix();
         if let Some(membership) = self.membership.as_mut() {
-            let membership_vote = match membership.propose(node_state, &prefix) {
+            let outgoings = match membership.propose(node_state, &prefix) {
                 Ok(vote) => vote,
                 Err(e) => {
                     warn!("Membership - failed to propose change: {e:?}");
                     return None;
                 }
             };
+
+            let mut bundles = Vec::new();
+            for outgoing in outgoings {
+                let bundle = match outgoing {
+                    Gossip(bundle) => bundle,
+                    Direct(_node_id, bundle) => bundle,
+                };
+
+                bundles.push(bundle);
+            }
+
             Some(MyNode::send_to_elders(
                 context,
-                NodeMsg::MembershipVotes(vec![membership_vote]),
+                NodeMsg::MembershipVotes(bundles),
             ))
         } else {
             error!("Membership - Failed to propose membership change, no membership instance");
@@ -58,8 +72,13 @@ impl MyNode {
     pub(crate) fn membership_gossip_votes(context: &NodeContext) -> Option<Cmd> {
         if let Some(membership) = &context.membership {
             trace!("{}", LogMarker::GossippingMembershipVotes);
-            if let Ok(ae_votes) = membership.anti_entropy(membership.generation()) {
-                let cmd = MyNode::send_to_elders(context, NodeMsg::MembershipVotes(ae_votes));
+            if let Some(ae_outgoings) = membership.anti_entropy(membership.generation()) {
+                let bundle = match ae_outgoings {
+                    Gossip(bundle) => bundle,
+                    Direct(_node_id, bundle) => bundle,
+                };
+
+                let cmd = MyNode::send_to_elders(context, NodeMsg::MembershipVotes(vec![bundle]));
                 return Some(cmd);
             }
         }
@@ -70,10 +89,10 @@ impl MyNode {
     pub(crate) fn handle_membership_votes(
         &mut self,
         node_id: NodeId,
-        signed_votes: Vec<SignedVote<NodeState>>,
+        bundles: Vec<Bundle<NodeState>>,
     ) -> Result<Vec<Cmd>> {
         trace!(
-            "{:?} {signed_votes:?} from {node_id}",
+            "{:?} {bundles:?} from {node_id}",
             LogMarker::MembershipVotesBeingHandled
         );
 
@@ -82,10 +101,10 @@ impl MyNode {
 
         let mut cmds = vec![];
 
-        for signed_vote in signed_votes {
-            let mut vote_broadcast = None;
+        for signed_vote in bundles {
+            let vote_broadcast = None;
             if let Some(membership) = self.membership.as_mut() {
-                let (vote_response, decision) = match membership
+                let (_vote_response, decision) = match membership
                     .handle_signed_vote(signed_vote, &prefix)
                 {
                     Ok(result) => result,
@@ -109,14 +128,14 @@ impl MyNode {
                     }
                 };
 
-                match vote_response {
-                    VoteResponse::Broadcast(response_vote) => {
-                        vote_broadcast = Some(NodeMsg::MembershipVotes(vec![response_vote]));
-                    }
-                    VoteResponse::WaitingForMoreVotes => {
-                        // do nothing
-                    }
-                };
+                // match vote_response {
+                //     VoteResponse::Broadcast(response_vote) => {
+                //         vote_broadcast = Some(NodeMsg::MembershipVotes(vec![response_vote]));
+                //     }
+                //     VoteResponse::WaitingForMoreVotes => {
+                //         // do nothing
+                //     }
+                // };
 
                 if let Some(decision) = decision {
                     cmds.push(Cmd::HandleMembershipDecision(decision));
@@ -147,17 +166,18 @@ impl MyNode {
 
         if let Some(membership) = membership_context {
             match membership.anti_entropy(gen) {
-                Ok(catchup_votes) => {
+                Some(catchup_votes) => {
                     trace!("Sending catchup votes to {node_id:?}");
+                    let bundle = match catchup_votes {
+                        Gossip(bundle) => bundle,
+                        Direct(_node_id, bundle) => bundle,
+                    };
                     Some(Cmd::send_msg(
-                        NodeMsg::MembershipVotes(catchup_votes),
+                        NodeMsg::MembershipVotes(vec![bundle]),
                         Recipients::Single(Participant::from_node(node_id)),
                     ))
                 }
-                Err(e) => {
-                    error!("Membership - Error while processing anti-entropy {:?}", e);
-                    None
-                }
+                None => None,
             }
         } else {
             error!(
@@ -173,18 +193,7 @@ impl MyNode {
     ) -> Result<Vec<Cmd>> {
         info!("{}", LogMarker::AgreementOfMembership);
         let mut cmds = vec![];
-
-        let (joining_nodes, leaving_nodes): (Vec<_>, Vec<_>) = decision
-            .proposals
-            .clone()
-            .into_iter()
-            .partition(|(n, _)| n.state() == MembershipState::Joined);
-
-        info!(
-            "Handling membership decision: joining = {:?}, leaving = {:?}",
-            Vec::from_iter(joining_nodes.iter().map(|(n, _)| n.name())),
-            Vec::from_iter(leaving_nodes.iter().map(|(n, _)| n.name()))
-        );
+        let node_state = decision.proposal.clone();
 
         if let Err(_err) = self.network_knowledge.try_update_member(decision.clone()) {
             error!("Ignored decision {decision:?} as we are lagging");
@@ -192,16 +201,13 @@ impl MyNode {
             return Ok(cmds);
         }
 
-        for (new_info, _signature) in joining_nodes.iter().cloned() {
-            cmds.extend(self.handle_node_joined(new_info).await);
-        }
-
-        for (new_info, signature) in leaving_nodes.iter().cloned() {
-            cmds.extend(self.handle_node_left(new_info, signature).into_iter());
-        }
-
-        if !joining_nodes.is_empty() {
+        let mut excluded_from_relocation = BTreeSet::new();
+        if node_state.state() == MembershipState::Joined {
+            cmds.extend(self.handle_node_joined(decision.clone()).await);
             cmds.push(self.send_node_approvals(decision.clone()));
+        } else {
+            cmds.extend(self.handle_node_left(decision.clone()).into_iter());
+            let _res = excluded_from_relocation.insert(node_state.name());
         }
 
         // Do not disable node joins in first section.
@@ -211,13 +217,10 @@ impl MyNode {
             self.joins_allowed = false;
         }
 
-        if !decision.proposals.is_empty() {
-            let relocation_trigger = RelocationTrigger::new(decision);
-            let excluded_from_relocation =
-                BTreeSet::from_iter(joining_nodes.iter().map(|(n, _)| n.name()));
+        //let node_state = decision.proposal;
+        let relocation_trigger = RelocationTrigger::new(decision);
 
-            cmds.extend(self.try_relocate_nodes(relocation_trigger, excluded_from_relocation)?);
-        }
+        cmds.extend(self.try_relocate_nodes(relocation_trigger, excluded_from_relocation)?);
 
         cmds.extend(self.trigger_dkg()?);
 
@@ -237,11 +240,11 @@ impl MyNode {
         )
         .await;
 
-        if !leaving_nodes.is_empty() {
+        if node_state.state() != MembershipState::Joined {
             self.joins_allowed = true;
         }
 
-        let net_increase = joining_nodes.len() > leaving_nodes.len();
+        let net_increase = node_state.state() == MembershipState::Joined;
 
         // We do this check on every net node join.
         // It is a cheap check and any actual cleanup won't happen back to back,
@@ -290,22 +293,21 @@ impl MyNode {
         }
     }
 
-    async fn handle_node_joined(&mut self, new_info: NodeState) -> Vec<Cmd> {
-        self.add_new_adult_to_trackers(new_info.name()).await;
+    async fn handle_node_joined(&mut self, decision: Decision<NodeState>) -> Vec<Cmd> {
+        let node_state = decision.proposal;
+        self.add_new_adult_to_trackers(node_state.name()).await;
 
-        info!("handle Online: {:?}", new_info);
+        info!("handle Online: {:?}", node_state);
 
         vec![]
     }
 
     // Send `NodeApproval` to a joining node which makes it a section member
     pub(crate) fn send_node_approvals(&self, decision: Decision<NodeState>) -> Cmd {
-        let nodes: BTreeSet<_> = decision
-            .proposals
-            .keys()
-            .filter(|n| n.state() == MembershipState::Joined)
-            .map(|n| *n.node_id())
-            .collect();
+        let mut nodes = BTreeSet::new();
+        if decision.proposal.state() == MembershipState::Joined {
+            let _res = nodes.insert(*decision.proposal.node_id());
+        }
         let prefix = self.network_knowledge.prefix();
         info!("Section {prefix:?} has approved new nodes {nodes:?}.");
 
@@ -315,11 +317,8 @@ impl MyNode {
         Cmd::send_msg(msg, Recipients::Multiple(nodes))
     }
 
-    pub(crate) fn handle_node_left(
-        &mut self,
-        node_state: NodeState,
-        signature: Signature,
-    ) -> Option<Cmd> {
+    pub(crate) fn handle_node_left(&mut self, decision: Decision<NodeState>) -> Option<Cmd> {
+        let node_state = decision.proposal.clone();
         info!(
             "{}: {}",
             LogMarker::AcceptedNodeAsOffline,
@@ -333,16 +332,7 @@ impl MyNode {
             let node_id = *node_state.node_id();
             info!("Notify relocation to node {node_id:?}");
 
-            let sig = SectionSig {
-                public_key: self.network_knowledge.section_key(),
-                signature,
-            };
-
-            let node_state = SectionSigned {
-                value: node_state,
-                sig,
-            };
-            let msg = NodeMsg::CompleteRelocation(node_state);
+            let msg = NodeMsg::CompleteRelocation(decision);
             Some(Cmd::send_msg(
                 msg,
                 Recipients::Single(Participant::from_node(node_id)),

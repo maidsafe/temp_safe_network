@@ -32,7 +32,7 @@ pub enum MembershipState {
     /// Node went offline.
     Left,
     /// Node was relocated to a different section.
-    Relocated(RelocationTrigger),
+    Relocated(Box<RelocationTrigger>),
 }
 
 /// Information about a member of our section.
@@ -91,7 +91,7 @@ impl NodeState {
     ) -> Self {
         Self {
             node_id,
-            state: MembershipState::Relocated(relocation_trigger),
+            state: MembershipState::Relocated(Box::new(relocation_trigger)),
             previous_name,
         }
     }
@@ -191,7 +191,7 @@ impl NodeState {
     // Convert this info into one with the state changed to `Relocated`.
     pub fn relocate(self, relocation_trigger: RelocationTrigger) -> Self {
         Self {
-            state: MembershipState::Relocated(relocation_trigger),
+            state: MembershipState::Relocated(Box::new(relocation_trigger)),
             ..self
         }
     }

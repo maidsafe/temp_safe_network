@@ -7,14 +7,14 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::NodeState;
-use crate::messaging::system::SectionSigned;
+
 use crate::network_knowledge::{Error, Result};
 use crate::types::utils::calc_age;
 
 use ed25519_dalek::{PublicKey, Signature, Verifier};
 use hex_fmt::HexFmt;
 use serde::{Deserialize, Serialize};
-use sn_consensus::Decision;
+use sn_consensus::mvba::Decision;
 use xor_name::XorName;
 
 use std::fmt::{self, Display, Formatter};
@@ -45,11 +45,11 @@ impl RelocationTrigger {
 
     /// calculates the destination section for the given `peer_name`.
     pub fn dst_section(&self, peer_name: XorName) -> XorName {
-        let mut content_parts = Vec::new();
-        content_parts.push(peer_name.0.to_vec());
-        for sig in self.0.proposals.values() {
-            content_parts.push(sig.to_bytes().to_vec());
-        }
+        let content_parts = vec![
+            peer_name.0.to_vec(),
+            self.0.proof.vcbc_signature.to_bytes().to_vec(),
+            self.0.proof.abba_signature.to_bytes().to_vec(),
+        ];
 
         XorName::from_content_parts(
             Vec::from_iter(content_parts.iter().map(|v| v.as_slice())).as_slice(),
@@ -58,10 +58,10 @@ impl RelocationTrigger {
 
     /// calculates the churn_id for the given proposals.
     pub fn churn_id(&self) -> ChurnId {
-        let mut content_parts = Vec::new();
-        for sig in self.0.proposals.values() {
-            content_parts.push(sig.to_bytes().to_vec());
-        }
+        let content_parts = vec![
+            self.0.proof.vcbc_signature.to_bytes().to_vec(),
+            self.0.proof.abba_signature.to_bytes().to_vec(),
+        ];
 
         ChurnId(XorName::from_content_parts(
             Vec::from_iter(content_parts.iter().map(|v| v.as_slice())).as_slice(),
@@ -74,7 +74,8 @@ impl RelocationTrigger {
 /// over the fact that the section considered the node to be relocated.
 #[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
 pub struct RelocationInfo {
-    signed_relocation: SectionSigned<NodeState>,
+    signed_relocation: Decision<NodeState>,
+    pk: bls::PublicKey,
     new_name: XorName,
 }
 
@@ -95,9 +96,14 @@ pub struct RelocationProof {
 }
 
 impl RelocationInfo {
-    pub fn new(signed_relocation: SectionSigned<NodeState>, new_name: XorName) -> Self {
+    pub fn new(
+        signed_relocation: Decision<NodeState>,
+        pk: bls::PublicKey,
+        new_name: XorName,
+    ) -> Self {
         Self {
             signed_relocation,
+            pk,
             new_name,
         }
     }
@@ -114,7 +120,7 @@ impl RelocationProof {
 
     /// The key of the section that the node is relocating from.
     pub fn signed_by(&self) -> &bls::PublicKey {
-        &self.info.signed_relocation.sig.public_key
+        &self.info.pk
     }
 
     /// This verifies that the new name was actually created by the node holding the old name,
@@ -122,7 +128,7 @@ impl RelocationProof {
     /// Calling context will need to verify that said section key is also a known section.
     pub fn verify(&self) -> Result<()> {
         // the key that we use to verify the sig over the new name, must match the name of the relocated node
-        if self.old_key_name() != self.info.signed_relocation.name() {
+        if self.old_key_name() != self.info.signed_relocation.proposal.name() {
             return Err(Error::InvalidRelocationProof);
         }
         let serialized_info =
@@ -130,9 +136,12 @@ impl RelocationProof {
         self.self_old_key
             .verify(&serialized_info, &self.self_sig)
             .map_err(|_err| Error::InvalidRelocationProof)?;
-        let serialized_state = bincode::serialize(&self.info.signed_relocation.value)
-            .map_err(|_err| Error::InvalidRelocationProof)?;
-        if !self.info.signed_relocation.sig.verify(&serialized_state) {
+        if !self
+            .info
+            .signed_relocation
+            .validate(&self.info.pk)
+            .unwrap_or(false)
+        {
             Err(Error::InvalidRelocationProof)
         } else {
             Ok(())
@@ -150,14 +159,14 @@ impl RelocationProof {
 
     /// Previous name of the relocating node.
     pub fn previous_name(&self) -> XorName {
-        self.info.signed_relocation.name()
+        self.info.signed_relocation.proposal.name()
     }
     /// Previous age of the relocating node.
     pub fn previous_age(&self) -> u8 {
-        self.info.signed_relocation.age()
+        self.info.signed_relocation.proposal.age()
     }
 
-    pub fn signed_relocation(&self) -> &SectionSigned<NodeState> {
+    pub fn signed_relocation(&self) -> &Decision<NodeState> {
         &self.info.signed_relocation
     }
 

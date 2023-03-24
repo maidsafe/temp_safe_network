@@ -9,7 +9,7 @@
 use crate::node::{messaging::Recipients, XorName};
 
 use qp2p::SendStream;
-use sn_consensus::Decision;
+use sn_consensus::mvba::Decision;
 use sn_fault_detection::IssueType;
 use sn_interface::{
     messaging::{

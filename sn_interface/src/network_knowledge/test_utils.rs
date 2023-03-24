@@ -5,18 +5,15 @@ use crate::{
     types::{keys::ed25519, NodeId},
     SectionAuthorityProvider,
 };
-use eyre::{eyre, Context, ContextCompat, Result};
-use sn_consensus::{Ballot, Consensus, Decision, Proposition, Vote, VoteResponse};
+use eyre::{eyre, Result};
+
+use serde::Serialize;
+use sn_consensus::mvba::{mock_decision, tag::Domain, Decision};
 use sn_dbc::{
     get_public_commitments_from_transaction, Commitment, Dbc, DbcTransaction, Owner, OwnerOnce,
     Token, TransactionBuilder,
 };
-use std::{
-    cell::Cell,
-    collections::{BTreeMap, BTreeSet},
-    fmt,
-    net::SocketAddr,
-};
+use std::{cell::Cell, fmt, net::SocketAddr};
 use xor_name::Prefix;
 
 // Parse `Prefix` from string
@@ -102,58 +99,14 @@ pub fn expand_age_pattern(age_pattern: Option<&[u8]>, len: usize) -> Vec<u8> {
     }
 }
 
-pub fn section_decision<P: Proposition>(
+pub fn section_decision<P: Clone + Serialize>(
     secret_key_set: &bls::SecretKeySet,
-    gen: u64,
+    proposer: usize,
     proposal: P,
-) -> Result<Decision<P>> {
-    let n = secret_key_set.threshold() + 1;
-    let mut nodes = Vec::from_iter((1..=n).map(|idx| {
-        let secret = (idx as u8, secret_key_set.secret_key_share(idx));
-        Consensus::from(secret, secret_key_set.public_keys(), n)
-    }));
-
-    let first_vote = nodes[0]
-        .sign_vote(Vote {
-            gen,
-            ballot: Ballot::Propose(proposal),
-            faults: Default::default(),
-        })
-        .wrap_err("Failed to sign first vote")?;
-
-    let mut votes = vec![nodes[0]
-        .cast_vote(first_vote)
-        .wrap_err("Failed to cast vote")?];
-
-    while let Some(vote) = votes.pop() {
-        for node in &mut nodes {
-            match node
-                .handle_signed_vote(vote.clone())
-                .wrap_err("Failed to handle vote")?
-            {
-                VoteResponse::WaitingForMoreVotes => (),
-                VoteResponse::Broadcast(vote) => votes.push(vote),
-            }
-        }
-    }
-
-    // All nodes have agreed to the same proposal
-    assert_eq!(
-        BTreeSet::from_iter(nodes.iter().map(|n| {
-            if let Some(d) = n.decision.clone() {
-                d.proposals
-            } else {
-                BTreeMap::new()
-            }
-        }))
-        .len(),
-        1
-    );
-
-    nodes[0]
-        .decision
-        .clone()
-        .wrap_err("We should have seen a decision, this is a bug")
+) -> core::result::Result<Decision<P>, Error> {
+    let domain = Domain::new("test".to_string(), 0);
+    let sk = secret_key_set.secret_key();
+    Ok(mock_decision(domain, proposal, proposer, &sk)?)
 }
 
 struct FakeProofKeyVerifier {}
@@ -300,7 +253,7 @@ pub fn try_create_relocation_trigger(
     use super::relocation_check;
 
     let node_state = NodeState::joined(node_id, None);
-    let decision = section_decision(sk_set, gen, node_state)?;
+    let decision = section_decision(sk_set, gen as usize, node_state)?;
     let relocation_trigger = RelocationTrigger::new(decision.clone());
     let churn_id = relocation_trigger.churn_id();
 

@@ -21,7 +21,9 @@ pub use join::JoinResponse;
 pub use node_msgs::{NodeDataCmd, NodeEvent, NodeQueryResponse};
 pub use section_sig::{SectionSig, SectionSigShare, SectionSigned};
 
-use sn_consensus::{Decision, Generation, SignedVote};
+use sn_consensus::mvba::bundle::Bundle;
+use sn_consensus::mvba::Decision;
+use sn_consensus::{Generation, SignedVote};
 use sn_sdkg::DkgSignedVote;
 
 use bls::PublicKey as BlsPublicKey;
@@ -53,9 +55,9 @@ pub enum NodeMsg {
     /// Sent from the section of a node that is undergoing the relocation process, containing the
     /// signed membership change. This is used by the node to complete the relocation by including
     /// it in a `proof` when joining the new section.
-    CompleteRelocation(SectionSigned<NodeState>),
+    CompleteRelocation(Decision<NodeState>),
     /// Membership Votes, in order they should be processed in.
-    MembershipVotes(Vec<SignedVote<NodeState>>),
+    MembershipVotes(Vec<Bundle<NodeState>>),
     /// Membership Anti-Entropy request
     MembershipAE(Generation),
     /// Try to join a section in the network.

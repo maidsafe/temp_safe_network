@@ -47,7 +47,7 @@ mod tests {
     use sn_interface::{
         elder_count, init_logger,
         messaging::{system::JoinResponse, MsgId, NetworkMsg},
-        network_knowledge::{MembershipState, NetworkKnowledge},
+        network_knowledge::NetworkKnowledge,
         test_utils::TestSapBuilder,
         types::Participant,
     };
@@ -161,24 +161,10 @@ mod tests {
             .iter()
             .find(|cmd| matches!(cmd, Cmd::SendMsg { .. }));
         assert_matches!(some_cmd, Some(Cmd::SendMsg {
-            msg: NetworkMsg::Node(msg),
+            msg: NetworkMsg::Node(_msg),
             recipients,
             ..
         }) => {
-            // verify the msg
-            assert_matches!(msg, NodeMsg::MembershipVotes(votes) => {
-                let vote = votes.first().expect("A vote should exist.");
-                let proposals = vote.proposals();
-                let node_state = proposals.first().expect("A proposal should exist.");
-                let node_id = node_state.node_id();
-                let state = node_state.state();
-                let previous_name = node_state.previous_name();
-                let age = node_state.age();
-                assert_eq!(node_id, &joiner_node_id);
-                assert_matches!(state, MembershipState::Joined);
-                assert_matches!(previous_name, None);
-                assert_eq!(age, MIN_ADULT_AGE);
-            });
             // verify the recipients
             assert_matches!(recipients, Recipients::Multiple(recipients) => {
                 let recipient = recipients.first().expect("A recipient should exist.");

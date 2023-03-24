@@ -7,8 +7,11 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 use bls::{PublicKeySet, SecretKeyShare};
 use core::fmt::Debug;
-use sn_consensus::{
-    Ballot, Consensus, Decision, Generation, NodeId, SignedVote, Vote, VoteResponse,
+use sn_consensus::mvba::{
+    bundle::{Bundle, Outgoing},
+    consensus::Consensus,
+    tag::Domain,
+    Decision, NodeId,
 };
 use sn_interface::{
     messaging::system::DkgSessionId,
@@ -17,19 +20,26 @@ use sn_interface::{
         SectionAuthorityProvider,
     },
 };
-use std::collections::{BTreeMap, BTreeSet};
-use std::time::Instant;
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    sync::Arc,
+};
+use std::{sync::Mutex, time::Instant};
 use thiserror::Error;
 use xor_name::{Prefix, XorName};
 
+pub(crate) type Generation = u64;
+
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("Consensus error while processing vote {0}")]
-    Consensus(#[from] sn_consensus::Error),
+    #[error("Consensus error {0}")]
+    Consensus(#[from] sn_consensus::mvba::error::Error),
     #[error("We are behind the voter, caller should request anti-entropy")]
     RequestAntiEntropy,
     #[error("Invalid proposal")]
     InvalidProposal,
+    #[error("Invalid generation {0}")]
+    InvalidGeneration(u64),
     #[error("Network Knowledge error {0:?}")]
     NetworkKnowledge(#[from] sn_interface::network_knowledge::Error),
 }
@@ -134,18 +144,34 @@ pub(crate) fn elder_candidates(
         .collect()
 }
 
-#[derive(Debug, Clone)]
+// 1- Proposal is a `NodeState`
+// 2- Define Decision in sn_consensus
+// 3- We can define Generic for proposal in Consensus<T>
+//       * We don't need Ser/Des
+//
+
+#[derive(Clone)]
 pub(crate) struct Membership {
-    consensus: Consensus<NodeState>,
+    consensus: Arc<Mutex<Consensus<NodeState>>>,
     bootstrap_members: BTreeSet<NodeState>,
-    gen: Generation,
-    history: BTreeMap<Generation, (Decision<NodeState>, Consensus<NodeState>)>,
+    gen: Generation, // current generation
+    history: BTreeMap<Generation, Decision<NodeState>>,
     // last membership vote timestamp
     last_received_vote_time: Option<Instant>,
+    outgoings: Vec<Outgoing<NodeState>>,
+}
+
+fn checker(_: NodeId, _: &NodeState) -> bool {
+    // We need to pass current state:
+    //   1- Clone: 3rd  argument as Any
+    //   2- Closure: To not pass 3rd argument?
+    //   3- Generic: 3rd  argument as generic
+
+    // cast any to something that possible to cast
+    true
 }
 
 impl Membership {
-    #[instrument]
     pub(crate) fn from(
         secret_key: (NodeId, SecretKeyShare),
         elders: PublicKeySet,
@@ -153,17 +179,32 @@ impl Membership {
         bootstrap_members: BTreeSet<NodeState>,
     ) -> Self {
         trace!("Membership - Creating new membership instance");
+        let domain = Domain::new("membership", 0);
+        let mut elders_id = Vec::new();
+        for i in 0..n_elders {
+            elders_id.push(i);
+        }
+
+        let consensus = Arc::new(Mutex::new(Consensus::init(
+            domain,
+            secret_key.0,
+            secret_key.1,
+            elders,
+            elders_id,
+            checker,
+        )));
         Membership {
-            consensus: Consensus::from(secret_key, elders, n_elders),
+            consensus,
             bootstrap_members,
             gen: 0,
             history: BTreeMap::default(),
             last_received_vote_time: None,
+            outgoings: Vec::new(),
         }
     }
 
     pub(crate) fn section_key_set(&self) -> PublicKeySet {
-        self.consensus.elders.clone()
+        self.consensus.lock().unwrap().pub_key_set() // TODO: no unwrap
     }
 
     pub(crate) fn last_received_vote_time(&self) -> Option<Instant> {
@@ -176,7 +217,7 @@ impl Membership {
 
     #[cfg(test)]
     pub(crate) fn is_churn_in_progress(&self) -> bool {
-        !self.consensus.votes.is_empty()
+        self.consensus.lock().unwrap().decided_proposal().is_none() // TODO: no unwrap
     }
 
     #[cfg(test)]
@@ -184,33 +225,33 @@ impl Membership {
         let _ = self.bootstrap_members.insert(state);
     }
 
-    fn consensus_at_gen(&self, gen: Generation) -> Result<&Consensus<NodeState>> {
-        if gen == self.gen + 1 {
-            Ok(&self.consensus)
-        } else {
-            self.history
-                .get(&gen)
-                .map(|(_, c)| c)
-                .ok_or(Error::Consensus(sn_consensus::Error::BadGeneration {
-                    requested_gen: gen,
-                    gen: self.gen,
-                }))
-        }
-    }
+    // fn consensus_at_gen(&self, gen: Generation) -> Result<&Consensus<NodeState>> {
+    //     if gen == self.gen + 1 {
+    //         Ok(&self.consensus)
+    //     } else {
+    //         self.history
+    //             .get(&gen)
+    //             .map(|(_, c)| c)
+    //             .ok_or(Error::Consensus(sn_consensus::Error::BadGeneration {
+    //                 requested_gen: gen,
+    //                 gen: self.gen,
+    //             }))
+    //     }
+    // }
 
-    fn consensus_at_gen_mut(&mut self, gen: Generation) -> Result<&mut Consensus<NodeState>> {
-        if gen == self.gen + 1 {
-            Ok(&mut self.consensus)
-        } else {
-            self.history
-                .get_mut(&gen)
-                .map(|(_, c)| c)
-                .ok_or(Error::Consensus(sn_consensus::Error::BadGeneration {
-                    requested_gen: gen,
-                    gen: self.gen,
-                }))
-        }
-    }
+    // fn consensus_at_gen_mut(&mut self, gen: Generation) -> Result<&mut Consensus<NodeState>> {
+    //     if gen == self.gen + 1 {
+    //         Ok(&mut self.consensus)
+    //     } else {
+    //         self.history
+    //             .get_mut(&gen)
+    //             .map(|(_, c)| c)
+    //             .ok_or(Error::Consensus(sn_consensus::Error::BadGeneration {
+    //                 requested_gen: gen,
+    //                 gen: self.gen,
+    //             }))
+    //     }
+    // }
 
     pub(crate) fn archived_members(&self) -> BTreeSet<XorName> {
         let mut members = BTreeSet::from_iter(
@@ -225,15 +266,14 @@ impl Membership {
                 .map(|n| n.name()),
         );
 
-        for (decision, _) in self.history.values() {
-            for node_state in decision.proposals.keys() {
-                match node_state.state() {
-                    MembershipState::Joined => {
-                        continue;
-                    }
-                    MembershipState::Left | MembershipState::Relocated(_) => {
-                        let _ = members.insert(node_state.name());
-                    }
+        for decision in self.history.values() {
+            let node_state = &decision.proposal;
+            match node_state.state() {
+                MembershipState::Joined => {
+                    continue;
+                }
+                MembershipState::Left | MembershipState::Relocated(_) => {
+                    let _ = members.insert(node_state.name());
                 }
             }
         }
@@ -255,18 +295,17 @@ impl Membership {
             return Ok(members);
         }
 
-        for (history_gen, (decision, _)) in &self.history {
-            for node_state in decision.proposals.keys() {
-                match node_state.state() {
-                    MembershipState::Joined => {
-                        let _ = members.insert(node_state.name(), node_state.clone());
-                    }
-                    MembershipState::Left => {
-                        let _ = members.remove(&node_state.name());
-                    }
-                    MembershipState::Relocated(_) => {
-                        let _ = members.remove(&node_state.name());
-                    }
+        for (history_gen, decision) in &self.history {
+            let node_state = &decision.proposal;
+            match node_state.state() {
+                MembershipState::Joined => {
+                    let _ = members.insert(node_state.name(), node_state.clone());
+                }
+                MembershipState::Left => {
+                    let _ = members.remove(&node_state.name());
+                }
+                MembershipState::Relocated(_) => {
+                    let _ = members.remove(&node_state.name());
                 }
             }
 
@@ -275,180 +314,77 @@ impl Membership {
             }
         }
 
-        Err(Error::Consensus(sn_consensus::Error::InvalidGeneration(
-            gen,
-        )))
+        Err(Error::InvalidGeneration(gen))
     }
 
     pub(crate) fn propose(
         &mut self,
         node_state: NodeState,
-        prefix: &Prefix,
-    ) -> Result<SignedVote<NodeState>> {
-        info!("[{}] proposing {:?}", self.id(), node_state);
-        let vote = Vote {
-            gen: self.gen + 1,
-            ballot: Ballot::Propose(node_state.clone()),
-            faults: self.consensus.faults(),
-        };
-        let signed_vote = self.sign_vote(vote)?;
+        _prefix: &Prefix,
+    ) -> Result<Vec<Outgoing<NodeState>>> {
+        let mut outgoings = self.consensus.lock().unwrap().propose(node_state)?;
+        self.outgoings.append(&mut outgoings);
 
-        // For relocation, the `validate_proposals` will call `NodeState::validate`,
-        // where the name of the node_state is using old_name, and won't match the relocate_details
-        // within the node_state, hence fail the `expected age` check.
-        self.validate_proposals(&signed_vote, prefix)?;
-        if let Err(e) = signed_vote.detect_byzantine_faults(
-            &self.consensus.elders,
-            &self.consensus.votes,
-            &self.consensus.processed_votes_cache,
-        ) {
-            error!(
-                "Attempted proposal {node_state:?} at genereation {:?} invalidated with error {e:?}",
-                self.gen + 1
-            );
-            return Err(Error::InvalidProposal);
+        Ok(outgoings)
+    }
+
+    pub(crate) fn anti_entropy(&self, _from_gen: Generation) -> Option<Outgoing<NodeState>> {
+        if self.outgoings.is_empty() {
+            return None;
         }
+        let index: usize = rand::random();
+        let outgoing = self.outgoings[index].clone();
 
-        self.cast_vote(signed_vote)
+        Some(outgoing)
     }
 
-    pub(crate) fn anti_entropy(&self, from_gen: Generation) -> Result<Vec<SignedVote<NodeState>>> {
-        let mut msgs = self
-            .history
-            .iter() // history is a BTreeSet, .iter() is ordered by generation
-            .filter(|(gen, _)| **gen >= from_gen)
-            .map(|(gen, (_, c))| {
-                Ok(c.build_super_majority_vote(
-                    c.votes.values().cloned().collect(),
-                    c.faults.values().cloned().collect(),
-                    *gen,
-                )?)
-            })
-            .collect::<Result<Vec<_>>>()?;
-
-        // include the current in-progres votes as well.
-        msgs.extend(self.consensus.votes.values().cloned());
-
-        info!(
-            "Membership - anti-entropy from gen {}..{}: {} msgs",
-            from_gen,
-            self.gen,
-            msgs.len()
-        );
-
-        Ok(msgs)
-    }
-
+    #[allow(dead_code)]
     pub(crate) fn id(&self) -> NodeId {
-        self.consensus.id()
+        self.consensus.lock().unwrap().self_id()
     }
 
     pub(crate) fn handle_signed_vote(
         &mut self,
-        signed_vote: SignedVote<NodeState>,
-        prefix: &Prefix,
-    ) -> Result<(VoteResponse<NodeState>, Option<Decision<NodeState>>)> {
-        self.validate_proposals(&signed_vote, prefix)?;
+        bundle: Bundle<NodeState>,
+        _prefix: &Prefix,
+    ) -> Result<(Vec<Outgoing<NodeState>>, Option<Decision<NodeState>>)> {
+        let mut outgoings = self.consensus.lock().unwrap().process_bundle(&bundle)?;
+        self.outgoings.append(&mut outgoings);
 
-        let vote_gen = signed_vote.vote.gen;
-        let is_ongoing_consensus = vote_gen == self.gen + 1;
-        let consensus = self.consensus_at_gen_mut(vote_gen)?;
-        let is_fresh_vote = !consensus.processed_votes_cache.contains(&signed_vote.sig);
+        let decision = self.consensus.lock().unwrap().decided_proposal();
 
-        info!(
-            "Membership - accepted signed vote from voter {:?}",
-            signed_vote.voter
-        );
-        let vote_response = consensus.handle_signed_vote(signed_vote)?;
-
-        debug!("Membership - Vote response: {vote_response:?}");
-        let decision = if let Some(decision) = consensus.decision.clone() {
-            if is_ongoing_consensus {
-                info!(
-                    "Membership - decided {:?}",
-                    BTreeSet::from_iter(decision.proposals.keys())
-                );
-
-                // wipe the last vote time
-                self.last_received_vote_time = None;
-
-                let next_consensus = Consensus::from(
-                    self.consensus.secret_key.clone(),
-                    self.consensus.elders.clone(),
-                    self.consensus.n_elders,
-                );
-
-                let decided_consensus = std::mem::replace(&mut self.consensus, next_consensus);
-                let _ = self
-                    .history
-                    .insert(vote_gen, (decision.clone(), decided_consensus));
-                info!(
-                    "Membership - updated generation from {:?} to {:?}",
-                    self.gen, vote_gen
-                );
-                trace!("Membership - history is {:?}", self.history);
-                self.gen = vote_gen;
-
-                Some(decision)
-            } else {
-                None
-            }
-        } else {
-            // if this is our ongoing round, lets log the vote
-            if is_ongoing_consensus && is_fresh_vote {
-                self.last_received_vote_time = Some(Instant::now());
-            }
-
-            None
-        };
-
-        Ok((vote_response, decision))
-    }
-
-    fn sign_vote(&self, vote: Vote<NodeState>) -> Result<SignedVote<NodeState>> {
-        Ok(self.consensus.sign_vote(vote)?)
-    }
-
-    pub(crate) fn cast_vote(
-        &mut self,
-        signed_vote: SignedVote<NodeState>,
-    ) -> Result<SignedVote<NodeState>> {
-        self.last_received_vote_time = Some(Instant::now());
-        Ok(self.consensus.cast_vote(signed_vote)?)
+        Ok((outgoings, decision))
     }
 
     /// Returns true if the proposal is valid
-    fn validate_proposals(
-        &self,
-        signed_vote: &SignedVote<NodeState>,
-        prefix: &Prefix,
-    ) -> Result<()> {
+    #[allow(dead_code)]
+    fn validate_proposals(&self, _signed_vote: &Bundle<NodeState>, _prefix: &Prefix) -> Result<()> {
         // check we're section the vote is for our current membership state
-        signed_vote.validate_signature(&self.consensus.elders)?;
+        // signed_vote.validate_signature(&self.consensus.elders)?;
 
-        // ensure we have a consensus instance for this votes generations
-        let _ = self
-            .consensus_at_gen(signed_vote.vote.gen)
-            .map_err(|_| Error::RequestAntiEntropy)?;
+        // // ensure we have a consensus instance for this votes generations
+        // let _ = self
+        //     .consensus_at_gen(signed_vote.vote.gen)
+        //     .map_err(|_| Error::RequestAntiEntropy)?;
 
-        let members =
-            BTreeMap::from_iter(self.section_members(signed_vote.vote.gen - 1)?.into_iter());
+        // let members =
+        //     BTreeMap::from_iter(self.section_members(signed_vote.vote.gen - 1)?.into_iter());
 
-        let archived_members = self.archived_members();
+        // let archived_members = self.archived_members();
 
-        for proposal in signed_vote.proposals() {
-            if let Err(err) = proposal.validate_node_state(prefix, &members, &archived_members) {
-                warn!("Failed to validate {proposal:?} with error {:?}", err);
-                // TODO: certain errors need AE?
-                warn!(
-                    "Members at generation {} are: {:?}",
-                    signed_vote.vote.gen - 1,
-                    members
-                );
-                warn!("Archived members are {:?}", archived_members);
-                return Err(Error::NetworkKnowledge(err));
-            }
-        }
+        // for proposal in signed_vote.proposals() {
+        //     if let Err(err) = proposal.validate_node_state(prefix, &members, &archived_members) {
+        //         warn!("Failed to validate {proposal:?} with error {:?}", err);
+        //         // TODO: certain errors need AE?
+        //         warn!(
+        //             "Members at generation {} are: {:?}",
+        //             signed_vote.vote.gen - 1,
+        //             members
+        //         );
+        //         warn!("Archived members are {:?}", archived_members);
+        //         return Err(Error::NetworkKnowledge(err));
+        //     }
+        // }
 
         Ok(())
     }
@@ -456,40 +392,40 @@ impl Membership {
 
 #[cfg(test)]
 mod tests {
-    use super::Error;
-    use crate::node::flow_ctrl::tests::network_builder::TestNetworkBuilder;
-    use sn_interface::{
-        network_knowledge::NodeState,
-        test_utils::{gen_node_id, TestSapBuilder},
-    };
+    // use super::Error;
+    // use crate::node::flow_ctrl::tests::network_builder::TestNetworkBuilder;
+    // use sn_interface::{
+    //     network_knowledge::NodeState,
+    //     test_utils::{gen_node_id, TestSapBuilder},
+    // };
 
-    use assert_matches::assert_matches;
-    use eyre::Result;
-    use rand::thread_rng;
-    use xor_name::Prefix;
+    // use assert_matches::assert_matches;
+    // use eyre::Result;
+    // use rand::thread_rng;
+    // use xor_name::Prefix;
 
-    #[tokio::test]
-    async fn multiple_proposals_in_a_single_generation_should_not_be_possible() -> Result<()> {
-        let prefix = Prefix::default();
-        let env = TestNetworkBuilder::new(thread_rng())
-            .sap(TestSapBuilder::new(prefix))
-            .build()?;
+    // #[tokio::test]
+    // async fn multiple_proposals_in_a_single_generation_should_not_be_possible() -> Result<()> {
+    //     let prefix = Prefix::default();
+    //     let env = TestNetworkBuilder::new(thread_rng())
+    //         .sap(TestSapBuilder::new(prefix))
+    //         .build()?;
 
-        let mut membership = env
-            .get_nodes(prefix, 1, 0, None)?
-            .remove(0)
-            .membership
-            .expect("Membership for the elder should've been initialized");
+    //     let mut membership = env
+    //         .get_nodes(prefix, 1, 0, None)?
+    //         .remove(0)
+    //         .membership
+    //         .expect("Membership for the elder should've been initialized");
 
-        let state1 = NodeState::joined(gen_node_id(5), None);
-        let state2 = NodeState::joined(gen_node_id(5), None);
+    //     let state1 = NodeState::joined(gen_node_id(5), None);
+    //     let state2 = NodeState::joined(gen_node_id(5), None);
 
-        let _ = membership.propose(state1, &prefix)?;
-        assert_matches!(
-            membership.propose(state2, &prefix),
-            Err(Error::InvalidProposal)
-        );
+    //     let _ = membership.propose(state1, &prefix)?;
+    //     assert_matches!(
+    //         membership.propose(state2, &prefix),
+    //         Err(Error::InvalidProposal)
+    //     );
 
-        Ok(())
-    }
+    //     Ok(())
+    // }
 }

@@ -70,6 +70,8 @@ pub enum Error {
     WrongSection,
     #[error("Consensus({0:?})")]
     Consensus(#[from] sn_consensus::Error),
+    #[error("Consensus_mvba({0:?})")]
+    ConsensusMvba(#[from] sn_consensus::mvba::error::Error),
     #[error("An archived node attempted to rejoin the section")]
     ArchivedNodeRejoined,
     #[error("We are behind, need to request AE update")]

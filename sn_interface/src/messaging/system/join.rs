@@ -8,7 +8,7 @@
 
 use super::NodeState;
 use serde::{Deserialize, Serialize};
-use sn_consensus::Decision;
+use sn_consensus::mvba::Decision;
 
 /// Response to a request to join a section
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]

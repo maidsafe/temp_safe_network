@@ -11,7 +11,7 @@ use crate::network_knowledge::{
     MembershipState, NodeState, SectionsDAG,
 };
 use bls::PublicKey;
-use sn_consensus::Decision;
+use sn_consensus::mvba::Decision;
 use std::collections::{BTreeMap, BTreeSet};
 use xor_name::{Prefix, XorName};
 
@@ -57,7 +57,7 @@ impl SectionMemberHistory {
     pub(crate) fn members_at_gen(&self, gen: u64) -> BTreeMap<XorName, NodeState> {
         if gen as usize > self.decisions.len() {
             warn!(
-                "Cann't get members at genereation {gen:?} as we only have {:?}",
+                "Can't get members at generation {gen:?} as we only have {:?}",
                 self.decisions.len()
             );
             return BTreeMap::new();
@@ -75,15 +75,15 @@ impl SectionMemberHistory {
         }
 
         for i in 0..gen as usize {
-            for node_state in self.decisions[i].proposals.keys() {
-                trace!("SectionPeers::members checking against {node_state:?}");
-                match node_state.state() {
-                    MembershipState::Joined => {
-                        let _ = members.insert(node_state.name(), node_state.clone());
-                    }
-                    MembershipState::Left | MembershipState::Relocated(_) => {
-                        let _ = members.remove(&node_state.name());
-                    }
+            let node_state = &self.decisions[i].proposal;
+
+            trace!("SectionPeers::members checking against {node_state:?}");
+            match node_state.state() {
+                MembershipState::Joined => {
+                    let _ = members.insert(node_state.name(), node_state.clone());
+                }
+                MembershipState::Left | MembershipState::Relocated(_) => {
+                    let _ = members.remove(&node_state.name());
                 }
             }
         }
@@ -95,13 +95,13 @@ impl SectionMemberHistory {
     pub(super) fn archived_members(&self) -> BTreeSet<NodeState> {
         let mut node_state_list = BTreeSet::new();
         for (name, decision) in self.archive.iter() {
-            if let Some(node_state) = decision
-                .proposals
-                .keys()
-                .find(|state| state.name() == *name)
-            {
+            let node_state = decision.proposal.clone();
+            if node_state.name() == *name {
                 let _ = node_state_list.insert(node_state.clone());
             }
+
+            // TODO: can we simply do:
+            //node_state_list.insert(node_state.clone());
         }
         node_state_list
     }
@@ -131,7 +131,9 @@ impl SectionMemberHistory {
         section_key: &PublicKey,
         new_decision: Decision<NodeState>,
     ) -> Result<bool> {
-        let incoming_generation = new_decision.generation as usize;
+        // MMMMMMMMMMMMMMMMM
+        //let incoming_generation = new_decision.generation as usize;
+        let incoming_generation = 0 as usize;
 
         trace!(
             "incoming_generation {incoming_generation:?} self.decisions.len() {:?}",
@@ -139,13 +141,10 @@ impl SectionMemberHistory {
         );
 
         // Reject Decision when contains a Joined entry of any initial members
-        for (node, _) in new_decision
-            .proposals
-            .iter()
-            .filter(|(n, _)| matches!(n.state(), MembershipState::Joined))
-        {
-            if self.initial_members.contains(node) {
-                warn!("The incoming Joined decision of {node:?} existing as initial members");
+        let node_state = &new_decision.proposal;
+        if node_state.state() == MembershipState::Joined {
+            if self.initial_members.contains(node_state) {
+                warn!("The incoming Joined decision of {node_state:?} existing as initial members");
                 return Ok(false);
             }
         }
@@ -155,14 +154,12 @@ impl SectionMemberHistory {
             self.decisions.push(new_decision.clone());
             trace!("Pushed decision {new_decision:?}");
 
-            for (node, _) in new_decision.proposals.iter().filter(|(n, _)| {
-                matches!(
-                    n.state(),
-                    MembershipState::Left | MembershipState::Relocated(_)
-                )
-            }) {
-                trace!("Archived node {:?} - {:?}", node.name(), new_decision);
-                self.archive.insert(node.name(), new_decision.clone());
+            if matches!(
+                node_state.state(),
+                MembershipState::Left | MembershipState::Relocated(_)
+            ) {
+                trace!("Archived node {:?} - {:?}", node_state.name(), new_decision);
+                self.archive.insert(node_state.name(), new_decision.clone());
             }
 
             Ok(true)
@@ -211,13 +208,8 @@ impl SectionMemberHistory {
         latest_section_keys.push(*last_key);
         self.archive.retain(|_, decision| {
             latest_section_keys.iter().any(|section_key| {
-                for (node_state, sig) in decision.proposals.iter() {
-                    if bincode::serialize(node_state)
-                        .map(|bytes| section_key.verify(sig, bytes))
-                        .unwrap_or(false)
-                    {
-                        return true;
-                    }
+                if decision.validate(section_key).unwrap_or(false) {
+                    return true;
                 }
                 false
             })
@@ -238,7 +230,8 @@ mod tests {
     };
     use eyre::Result;
     use rand::thread_rng;
-    use sn_consensus::Decision;
+    use sn_consensus::mvba::Decision;
+
     use xor_name::XorName;
 
     #[test]
@@ -261,8 +254,12 @@ mod tests {
         let sk_set_2 = bls::SecretKeySet::random(0, &mut thread_rng());
         let (trigger, _) = create_relocation_trigger(&sk_set_2, 2, 4)?;
 
-        let nodes_2 =
-            gen_random_signed_node_states(2, 1, MembershipState::Relocated(trigger), &sk_set_2)?;
+        let nodes_2 = gen_random_signed_node_states(
+            2,
+            1,
+            MembershipState::Relocated(Box::new(trigger)),
+            &sk_set_2,
+        )?;
         nodes_2.iter().for_each(|node| {
             let _ = section_members.update(&sk_set_2.public_keys().public_key(), node.clone());
         });
@@ -350,31 +347,29 @@ mod tests {
         let node_left =
             gen_random_signed_node_states(1, 1, MembershipState::Left, &sk_set)?[0].clone();
         let (trigger, _) = create_relocation_trigger(&sk_set, 2, 4)?;
-        let node_relocated =
-            gen_random_signed_node_states(2, 1, MembershipState::Relocated(trigger), &sk_set)?[0]
-                .clone();
+        let node_relocated = gen_random_signed_node_states(
+            2,
+            1,
+            MembershipState::Relocated(Box::new(trigger)),
+            &sk_set,
+        )?[0]
+            .clone();
 
         assert!(section_members.update(&sk_set.public_keys().public_key(), node_left.clone())?);
         assert!(section_members.update(&sk_set.public_keys().public_key(), node_relocated.clone())?);
 
-        let (node_left_state, _) = node_left
-            .proposals
-            .first_key_value()
-            .unwrap_or_else(|| panic!("Proposal of Decision is empty"));
-        let (node_relocated_state, _) = node_relocated
-            .proposals
-            .first_key_value()
-            .unwrap_or_else(|| panic!("Proposal of Decision is empty"));
+        let node_left_state = node_left.proposal.clone();
+        let node_relocated_state = node_relocated.proposal.clone();
 
         let _node_left_joins = section_decision(
             &sk_set,
-            3,
+            3, // MMMMMMMMMMMMMM it was gen
             NodeState::joined(*node_left_state.node_id(), None),
         );
 
         let _node_relocated_joins = section_decision(
             &sk_set,
-            4,
+            4, // MMMMMMMMMMMMMM it was gen
             NodeState::joined(*node_relocated_state.node_id(), None),
         )?;
 
@@ -401,22 +396,21 @@ mod tests {
         let node_1 =
             gen_random_signed_node_states(1, 1, MembershipState::Joined, &sk_set)?[0].clone();
         let (trigger, _) = create_relocation_trigger(&sk_set, 2, 4)?;
-        let node_2 =
-            gen_random_signed_node_states(2, 1, MembershipState::Relocated(trigger), &sk_set)?[0]
-                .clone();
+        let node_2 = gen_random_signed_node_states(
+            2,
+            1,
+            MembershipState::Relocated(Box::new(trigger)),
+            &sk_set,
+        )?[0]
+            .clone();
         assert!(section_members.update(&sk_set.public_keys().public_key(), node_1.clone())?);
         assert!(section_members.update(&sk_set.public_keys().public_key(), node_2.clone())?);
 
-        let (node_state_1, _) = node_1
-            .proposals
-            .first_key_value()
-            .unwrap_or_else(|| panic!("Proposal of Decision is empty"));
-        let (node_state_2, _) = node_2
-            .proposals
-            .first_key_value()
-            .unwrap_or_else(|| panic!("Proposal of Decision is empty"));
+        let node_state_1 = node_1.proposal;
+        let node_state_2 = node_2.proposal;
 
         let node_1 = NodeState::left(*node_state_1.node_id(), Some(node_state_1.name()));
+        // MMMMMMMMMMMMMM it was gen
         let node_1 = section_decision(&sk_set, 3, node_1)?;
         let node_2 = NodeState::left(*node_state_2.node_id(), Some(node_state_2.name()));
         let node_2 = section_decision(&sk_set, 4, node_2)?;
@@ -447,10 +441,11 @@ mod tests {
                 MembershipState::Joined => NodeState::joined(node_id, None),
                 MembershipState::Left => NodeState::left(node_id, None),
                 MembershipState::Relocated(ref trigger) => {
-                    NodeState::relocated(node_id, None, trigger.clone())
+                    NodeState::relocated(node_id, None, *trigger.clone())
                 }
             };
-            decisions.push(section_decision(secret_key_set, gen, node_state)?);
+            // MMMMMMMMMMMMMM it was gen
+            decisions.push(section_decision(secret_key_set, gen as usize, node_state)?);
         }
         Ok(decisions)
     }

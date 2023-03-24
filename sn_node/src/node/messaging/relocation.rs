@@ -11,10 +11,10 @@ use crate::node::{
     NodeContext, NodeEvent, Result,
 };
 
-use sn_consensus::Decision;
+use sn_consensus::mvba::Decision;
 use sn_interface::{
     elder_count,
-    messaging::system::{NodeMsg, SectionSigned},
+    messaging::system::NodeMsg,
     network_knowledge::{
         node_state::RelocationInfo, Error, MembershipState, NodeState, RelocationProof,
     },
@@ -115,30 +115,31 @@ impl MyNode {
     /// Join the destination section as a relocated node
     pub(crate) fn relocate(
         &mut self,
-        signed_relocation: SectionSigned<NodeState>,
+        signed_relocation: Decision<NodeState>,
+        pk: &bls::PublicKey,
     ) -> Result<Option<Cmd>> {
         // should be unreachable, but a sanity check
-        let serialized = bincode::serialize(&signed_relocation.value)?;
-        if !signed_relocation.sig.verify(&serialized) {
+        if !signed_relocation.validate(pk).unwrap_or(false) {
             warn!("Relocate: Could not verify section signature of our relocation");
             return Err(super::Error::InvalidSignature);
         }
-        if self.name() != signed_relocation.node_id().name() {
+        if self.name() != signed_relocation.proposal.node_id().name() {
             // not for us, drop it
             warn!("Relocate: The received section signed relocation is not for us.");
             return Ok(None);
         }
 
-        let dst_section =
-            if let MembershipState::Relocated(relocation_trigger) = signed_relocation.state() {
-                relocation_trigger.dst_section(self.name())
-            } else {
-                warn!(
-                    "Relocate: Ignoring msg containing invalid NodeState: {:?}",
-                    signed_relocation.state()
-                );
-                return Ok(None);
-            };
+        let dst_section = if let MembershipState::Relocated(relocation_trigger) =
+            signed_relocation.proposal.state()
+        {
+            relocation_trigger.dst_section(self.name())
+        } else {
+            warn!(
+                "Relocate: Ignoring msg containing invalid NodeState: {:?}",
+                signed_relocation.proposal.state()
+            );
+            return Ok(None);
+        };
 
         debug!("Relocate: Received decision to relocate to other section at {dst_section}");
 
@@ -154,7 +155,7 @@ impl MyNode {
         );
         let new_name = ed25519::name(&new_keypair.public);
 
-        let info = RelocationInfo::new(signed_relocation, new_name);
+        let info = RelocationInfo::new(signed_relocation, *pk, new_name);
         let serialized_info = bincode::serialize(&info)?;
         // we verify that this new name was actually created by the old name
         let node_sig = ed25519::sign(&serialized_info, &original_info.keypair);
@@ -199,20 +200,20 @@ impl MyNode {
         self.relocation_state = RelocationState::NoRelocation;
 
         // Update our members list making sure we don't exist in it with our old name.
-        let new_states: BTreeSet<_> = decision.proposals.keys().cloned().collect();
+        let new_state = decision.proposal.clone();
         match self.network_knowledge.try_update_member(decision) {
             Ok(true) => trace!(
-                "Section members list updated due to relocation: {new_states:?}. \
+                "Section members list updated due to relocation: {new_state:?}. \
                     New members list: {:?}",
                 self.network_knowledge.members()
             ),
             Ok(false) => warn!(
-                "Relocation: {new_states:?} doesn't trigger an update \
+                "Relocation: {new_state:?} doesn't trigger an update \
                     among current knowledge {:?}",
                 self.network_knowledge.members()
             ),
             Err(err) => error!(
-                "Failed to update relocation: {new_states:?} among \
+                "Failed to update relocation: {new_state:?} among \
                     current knowledge {:?} with error {:?}",
                 self.network_knowledge.members(),
                 err
@@ -234,7 +235,7 @@ mod tests {
         },
     };
     use sn_comms::{Comm, CommEvent};
-    use sn_consensus::Decision;
+    use sn_consensus::mvba::Decision;
     use sn_interface::{
         elder_count, init_logger,
         messaging::{

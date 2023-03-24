@@ -170,7 +170,7 @@ impl MyNode {
             let bootstrap_members = network_knowledge.section_members();
 
             Some(Membership::from(
-                (key.index as u8, key.secret_key_share),
+                (key.index, key.secret_key_share),
                 key.public_key_set,
                 n_elders,
                 bootstrap_members,
@@ -485,7 +485,7 @@ impl MyNode {
         }
 
         self.membership = Some(Membership::from(
-            (key.index as u8, key.secret_key_share),
+            (key.index, key.secret_key_share),
             key.public_key_set,
             sap.elders().count(),
             BTreeSet::from_iter(sap.members().cloned()),

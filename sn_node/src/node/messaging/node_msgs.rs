@@ -22,7 +22,7 @@ use sn_interface::{
         system::{JoinResponse, NodeEvent, NodeMsg},
         Dst, MsgId, NetworkMsg, WireMsg,
     },
-    network_knowledge::{MembershipState, NetworkKnowledge},
+    network_knowledge::NetworkKnowledge,
     types::{log_markers::LogMarker, ClientId, Keypair, NodeId, PublicKey, ReplicatedData},
     SectionAuthorityProvider,
 };
@@ -172,7 +172,8 @@ impl MyNode {
             }
             NodeMsg::CompleteRelocation(signed_relocation) => {
                 trace!("Handling CompleteRelocation msg from {node_id}: {msg_id:?}");
-                Ok(node.relocate(signed_relocation)?.into_iter().collect())
+                let pk = context.network_knowledge.section_key();
+                Ok(node.relocate(signed_relocation, &pk)?.into_iter().collect())
             }
             // The approval or rejection of a join (approval both for new network joiner as well as
             // existing node relocated to the section) will be received here.
@@ -191,19 +192,20 @@ impl MyNode {
                         info!("{}", LogMarker::ReceivedJoinApproval);
                         let target_sap = context.network_knowledge.signed_sap();
 
-                        if let Err(e) = decision.validate(&target_sap.section_key()) {
+                        if let Err(e) = decision.validate(&target_sap.public_key_set().public_key())
+                        {
                             error!("Failed to validate with {target_sap:?}, dropping invalid join decision: {e:?}");
                             return Ok(vec![]);
                         }
 
                         // Ensure this decision includes us as a joining node
-                        if decision
-                            .proposals
-                            .keys()
-                            .filter(|n| n.state() == MembershipState::Joined)
-                            .all(|n| n.name() != context.name)
-                        {
-                            trace!("MyNode named: {:?} Ignore join approval decision not for us: {decision:?}", context.name);
+                        let node_state = decision.proposal.clone();
+                        if node_state.name() != context.name {
+                            trace!(
+                                "MyNode named: {:?} Ignore join approval decision not for us: {:?}",
+                                context.name,
+                                node_state.name()
+                            );
                             return Ok(vec![]);
                         }
 

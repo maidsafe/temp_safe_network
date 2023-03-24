@@ -17,6 +17,7 @@ pub mod section_authority_provider;
 pub mod section_keys;
 #[cfg(any(test, feature = "test-utils"))]
 pub mod test_utils;
+
 #[cfg(any(test, feature = "test-utils"))]
 pub use section_tree::test_utils as test_utils_st;
 
@@ -40,7 +41,7 @@ use crate::{
     types::NodeId,
 };
 
-use sn_consensus::Decision;
+use sn_consensus::mvba::{mock_decision, tag::Domain, Decision};
 
 use bls::PublicKey as BlsPublicKey;
 use serde::Serialize;

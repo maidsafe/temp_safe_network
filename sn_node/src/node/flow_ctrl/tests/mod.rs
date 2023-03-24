@@ -34,8 +34,9 @@ use sn_interface::{
         AntiEntropyKind, AntiEntropyMsg, Dst, NetworkMsg, WireMsg,
     },
     network_knowledge::{
-        section_keys::SectionKeysProvider, Error as NetworkKnowledgeError, MyNodeInfo, NodeState,
-        RelocationInfo, RelocationProof, SectionTreeUpdate, SectionsDAG, MIN_ADULT_AGE,
+        section_decision, section_keys::SectionKeysProvider, Error as NetworkKnowledgeError,
+        MyNodeInfo, NodeState, RelocationInfo, RelocationProof, SectionTreeUpdate, SectionsDAG,
+        MIN_ADULT_AGE,
     },
     test_utils::*,
     types::{keys::ed25519, Participant, PublicKey},
@@ -76,9 +77,13 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
 
     let (relocation_trigger, _) = create_relocation_trigger(&sk_set, 1, old_info.age() + 1)?;
     let relocated_state = NodeState::relocated(old_info.id(), Some(old_name), relocation_trigger);
-    let section_signed_state = TestKeys::get_section_signed(&sk_set.secret_key(), relocated_state)?;
+    let section_decision = TestKeys::get_decision(&sk_set, relocated_state)?;
 
-    let info = RelocationInfo::new(section_signed_state, new_info.name());
+    let info = RelocationInfo::new(
+        section_decision,
+        sk_set.public_keys().public_key(),
+        new_info.name(),
+    );
     let serialized_info = bincode::serialize(&info)?;
     let signature_over_new_name = ed25519::sign(&serialized_info, &old_keypair);
 

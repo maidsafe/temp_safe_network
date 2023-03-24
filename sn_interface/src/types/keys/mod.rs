@@ -23,10 +23,13 @@ pub mod test_utils {
     use crate::{
         messaging::system::{SectionSig, SectionSigned},
         network_knowledge::{SectionAuthUtils, SectionKeyShare},
+        test_utils::section_decision,
     };
     use bls::{blstrs::Scalar, poly::Poly, SecretKey, SecretKeySet, Signature};
     use eyre::{eyre, Context, Result};
     use serde::Serialize;
+    use sn_consensus::mvba::Decision;
+
     use std::collections::{BTreeMap, BTreeSet};
 
     /// bls key related test utilities
@@ -69,6 +72,13 @@ pub mod test_utils {
         ) -> Result<SectionSigned<T>> {
             let sig = Self::get_section_sig(secret_key, &payload)?;
             Ok(SectionSigned::new(payload, sig))
+        }
+
+        pub fn get_decision<T: Clone + Serialize>(
+            sk_set: &SecretKeySet,
+            proposal: T,
+        ) -> Result<Decision<T>> {
+            Ok(section_decision(sk_set, 0, proposal)?)
         }
 
         /// Generate a `SectionKeyShare` from the `bls::SecretKeySet` and given index
