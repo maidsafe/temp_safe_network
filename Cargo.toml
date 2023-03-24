@@ -1,4 +1,5 @@
 [workspace]
 members = [
-    "safenode"
+    "safenode",
+    "sn_testnet"
 ]
