@@ -18,7 +18,7 @@ use sn_interface::{
         AntiEntropyKind, AuthorityProof, ClientAuth, MsgId, NetworkMsg, WireMsg,
     },
     network_knowledge::{
-        NodeState, SectionAuthorityProvider, SectionKeyShare, SectionTreeUpdate, SectionsDAG,
+        NodeState, SectionAuthorityProvider, SectionKeyShare, SectionTreeUpdate, SectionsDAG, node_state::MembershipProposal,
     },
     types::{ClientId, DataAddress, NodeId, Participant},
 };
@@ -110,7 +110,7 @@ pub enum Cmd {
         sig: SectionSig,
     },
     /// Handle a membership decision.
-    HandleMembershipDecision(Decision<NodeState>),
+    HandleMembershipDecision(Decision<MembershipProposal>),
     /// Handle agree on elders. This blocks node message processing until complete.
     HandleNewEldersAgreement {
         new_elders: SectionSigned<SectionAuthorityProvider>,

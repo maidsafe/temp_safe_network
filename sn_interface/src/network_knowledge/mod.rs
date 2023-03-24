@@ -31,7 +31,10 @@ pub use self::{
     sections_dag::SectionsDAG,
 };
 
-use self::{node_state::ChurnId, section_member_history::SectionMemberHistory};
+use self::{
+    node_state::{ChurnId, MembershipProposal},
+    section_member_history::SectionMemberHistory,
+};
 
 use crate::{
     messaging::{
@@ -450,13 +453,17 @@ impl NetworkKnowledge {
     pub fn update_members(&mut self, gen: u64, peers: SectionDecisions) -> Result<bool> {
         Ok(self
             .section_members
-            .update_peers(gen, &self.signed_sap.section_key(), peers))
+            .update_peers(&self.signed_sap.section_key(), peers))
     }
 
     /// Try update one member with the incoming decision. Returns whether it actually updated.
-    pub fn try_update_member(&mut self, gen: u64, decision: Decision<NodeState>) -> Result<bool> {
+    pub fn try_update_member(
+        &mut self,
+        gen: u64,
+        decision: Decision<MembershipProposal>,
+    ) -> Result<bool> {
         self.section_members
-            .update(gen, &self.signed_sap.section_key(), decision)
+            .update(&self.signed_sap.section_key(), decision)
     }
 
     /// Returns the members of our section

@@ -6,6 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::network_knowledge::node_state::MembershipProposal;
+
 use super::NodeState;
 use serde::{Deserialize, Serialize};
 use sn_consensus::mvba::Decision;
@@ -15,7 +17,7 @@ use sn_consensus::mvba::Decision;
 pub enum JoinResponse {
     /// Message sent to joining node containing the current node's
     /// state as a member of the section.
-    Approved(Decision<NodeState>),
+    Approved(Decision<MembershipProposal>),
     /// No new nodes are currently accepted for joining
     /// NB: Relocated nodes that try to join, are accepted even if joins are disallowed.
     JoinsDisallowed,

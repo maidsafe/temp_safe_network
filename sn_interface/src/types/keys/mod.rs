@@ -74,13 +74,6 @@ pub mod test_utils {
             Ok(SectionSigned::new(payload, sig))
         }
 
-        pub fn get_decision<T: Clone + Serialize>(
-            sk_set: &SecretKeySet,
-            proposal: T,
-        ) -> Result<Decision<T>> {
-            Ok(section_decision(sk_set, 0, proposal)?)
-        }
-
         /// Generate a `SectionKeyShare` from the `bls::SecretKeySet` and given index
         pub fn get_section_key_share(sk_set: &SecretKeySet, index: usize) -> SectionKeyShare {
             SectionKeyShare {

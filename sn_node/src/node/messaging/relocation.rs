@@ -16,7 +16,7 @@ use sn_interface::{
     elder_count,
     messaging::system::NodeMsg,
     network_knowledge::{
-        node_state::RelocationInfo, Error, MembershipState, NodeState, RelocationProof,
+        node_state::{RelocationInfo, MembershipProposal}, Error, MembershipState, NodeState, RelocationProof,
     },
     network_knowledge::{node_state::RelocationTrigger, RelocationState},
     types::{keys::ed25519, log_markers::LogMarker, Participant},
@@ -115,7 +115,7 @@ impl MyNode {
     /// Join the destination section as a relocated node
     pub(crate) fn relocate(
         &mut self,
-        signed_relocation: Decision<NodeState>,
+        signed_relocation: Decision<MembershipProposal>,
         pk: &bls::PublicKey,
     ) -> Result<Option<Cmd>> {
         // should be unreachable, but a sanity check
@@ -187,7 +187,7 @@ impl MyNode {
     pub(crate) fn finalise_relocation(
         &mut self,
         context: &NodeContext,
-        decision: Decision<NodeState>,
+        decision: Decision<MembershipProposal>,
     ) {
         info!(
             "{} for node: {:?}: Age is: {:?}",
@@ -243,7 +243,7 @@ mod tests {
             system::{JoinResponse, NodeMsg},
             AntiEntropyKind, AntiEntropyMsg, NetworkMsg,
         },
-        network_knowledge::{recommended_section_size, MyNodeInfo, NodeState, MIN_ADULT_AGE},
+        network_knowledge::{recommended_section_size, MyNodeInfo, NodeState, MIN_ADULT_AGE, node_state::MembershipProposal},
         test_utils::{
             gen_node_id_in_prefix, prefix, section_decision, try_create_relocation_trigger,
             TestSapBuilder,
@@ -269,7 +269,7 @@ mod tests {
         gen: u64,
         age: u8,
         prefix: Prefix,
-    ) -> Result<(Decision<NodeState>, MyNodeInfo, Comm, Receiver<CommEvent>)> {
+    ) -> Result<(Decision<MembershipProposal>, MyNodeInfo, Comm, Receiver<CommEvent>)> {
         loop {
             let (info, comm, comm_rx) = gen_info_with_comm(MIN_ADULT_AGE, Some(prefix));
             if let Some((_trigger, decision)) =
@@ -296,7 +296,7 @@ mod tests {
 
         let relocated_node = gen_node_id_in_prefix(MIN_ADULT_AGE - 1, prefix);
         let node_state = NodeState::joined(relocated_node, None);
-        let node_state = section_decision(&sk_set, 1, node_state)?;
+        let node_state = section_decision(&sk_set, 0, 1, node_state)?;
         assert!(section.try_update_member(gen, node_state)?);
         // update our node with the new network_knowledge
         node.network_knowledge = section.clone();

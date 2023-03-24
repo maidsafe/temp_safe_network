@@ -76,7 +76,7 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
 
     let (relocation_trigger, _) = create_relocation_trigger(&sk_set, 1, old_info.age() + 1)?;
     let relocated_state = NodeState::relocated(old_info.id(), Some(old_name), relocation_trigger);
-    let section_decision = TestKeys::get_decision(&sk_set, relocated_state)?;
+    let section_decision = section_decision(&sk_set, 0, 1, relocated_state)?;
 
     let info = RelocationInfo::new(
         section_decision,
@@ -128,7 +128,7 @@ async fn handle_agreement_on_online() -> Result<()> {
     let mut approval_sent = false;
     let new_node_state = NodeState::joined(new_node_id, None);
 
-    let membership_decision = section_decision(&sk_set, 1, new_node_state.clone())?;
+    let membership_decision = section_decision(&sk_set, 0, 1, new_node_state.clone())?;
     let mut all_cmds =
         ProcessAndInspectCmds::new(Cmd::HandleMembershipDecision(membership_decision));
 
@@ -182,7 +182,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
     let new_node = gen_node_id(MIN_ADULT_AGE + 1);
     let node_state = NodeState::joined(new_node, None);
 
-    let membership_decision = section_decision(&sk_set, 1, node_state.clone())?;
+    let membership_decision = section_decision(&sk_set, 0, 1, node_state.clone())?;
 
     // Force this node to join
     node.membership

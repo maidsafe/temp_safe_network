@@ -17,7 +17,7 @@ use sn_interface::{
     messaging::system::DkgSessionId,
     network_knowledge::{
         partition_by_prefix, recommended_section_size, MembershipState, NodeState,
-        SectionAuthorityProvider,
+        SectionAuthorityProvider, node_state::MembershipProposal,
     },
 };
 use std::{
@@ -152,16 +152,16 @@ pub(crate) fn elder_candidates(
 
 #[derive(Clone)]
 pub(crate) struct Membership {
-    consensus: Arc<Mutex<Consensus<NodeState>>>,
+    consensus: Arc<Mutex<Consensus<MembershipProposal>>>,
     bootstrap_members: BTreeSet<NodeState>,
     pub(crate) gen: Generation, // current generation
-    history: BTreeMap<Generation, Decision<NodeState>>,
+    history: BTreeMap<Generation, Decision<MembershipProposal>>,
     // last membership vote timestamp
     last_received_vote_time: Option<Instant>,
-    outgoings: Vec<Outgoing<NodeState>>,
+    outgoings: Vec<Outgoing<MembershipProposal>>,
 }
 
-fn checker(_: NodeId, _: &NodeState) -> bool {
+fn checker(_: NodeId, _: &MembershipProposal) -> bool {
     // We need to pass current state:
     //   1- Clone: 3rd  argument as Any
     //   2- Closure: To not pass 3rd argument?
@@ -296,7 +296,7 @@ impl Membership {
         }
 
         for (history_gen, decision) in &self.history {
-            let node_state = &decision.proposal;
+            let node_state = &decision.proposal.1;
             match node_state.state() {
                 MembershipState::Joined => {
                     let _ = members.insert(node_state.name(), node_state.clone());
@@ -321,14 +321,15 @@ impl Membership {
         &mut self,
         node_state: NodeState,
         _prefix: &Prefix,
-    ) -> Result<Vec<Outgoing<NodeState>>> {
-        let outgoings = self.consensus.lock().unwrap().propose(node_state)?;
+    ) -> Result<Vec<Outgoing<MembershipProposal>>> {
+        let proposal = MembershipProposal(self.gen +1 , node_state);
+        let outgoings = self.consensus.lock().unwrap().propose(proposal)?;
         self.outgoings.append(&mut outgoings.clone());
 
         Ok(outgoings)
     }
 
-    pub(crate) fn anti_entropy(&self, _from_gen: Generation) -> Option<Outgoing<NodeState>> {
+    pub(crate) fn anti_entropy(&self, _from_gen: Generation) -> Option<Outgoing<MembershipProposal>> {
         if self.outgoings.is_empty() {
             return None;
         }
@@ -345,9 +346,9 @@ impl Membership {
 
     pub(crate) fn handle_signed_vote(
         &mut self,
-        bundle: Bundle<NodeState>,
+        bundle: Bundle<MembershipProposal>,
         _prefix: &Prefix,
-    ) -> Result<(Vec<Outgoing<NodeState>>, Option<Decision<NodeState>>)> {
+    ) -> Result<(Vec<Outgoing<MembershipProposal>>, Option<Decision<MembershipProposal>>)> {
         let outgoings = self.consensus.lock().unwrap().process_bundle(&bundle)?;
         self.outgoings.append(&mut outgoings.clone());
 

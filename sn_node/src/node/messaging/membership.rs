@@ -20,7 +20,7 @@ use sn_consensus::mvba::{
 };
 use sn_interface::{
     messaging::system::{JoinResponse, NodeMsg},
-    network_knowledge::{node_state::RelocationTrigger, MembershipState, NodeState},
+    network_knowledge::{node_state::{RelocationTrigger, MembershipProposal}, MembershipState, NodeState},
     types::{log_markers::LogMarker, NodeId, Participant},
 };
 
@@ -89,7 +89,7 @@ impl MyNode {
     pub(crate) fn handle_membership_votes(
         &mut self,
         node_id: NodeId,
-        bundles: Vec<Bundle<NodeState>>,
+        bundles: Vec<Bundle<MembershipProposal>>,
     ) -> Result<Vec<Cmd>> {
         trace!(
             "{:?} {bundles:?} from {node_id}",
@@ -190,7 +190,7 @@ impl MyNode {
     pub(crate) async fn handle_membership_decision(
         &mut self,
         gen: u64,
-        decision: Decision<NodeState>,
+        decision: Decision<MembershipProposal>,
     ) -> Result<Vec<Cmd>> {
         info!("{}", LogMarker::AgreementOfMembership);
         let mut cmds = vec![];
@@ -304,7 +304,7 @@ impl MyNode {
         }
     }
 
-    async fn handle_node_joined(&mut self, decision: Decision<NodeState>) -> Vec<Cmd> {
+    async fn handle_node_joined(&mut self, decision: Decision<MembershipProposal>) -> Vec<Cmd> {
         let node_state = decision.proposal;
         self.add_new_adult_to_trackers(node_state.name()).await;
 
@@ -314,7 +314,7 @@ impl MyNode {
     }
 
     // Send `NodeApproval` to a joining node which makes it a section member
-    pub(crate) fn send_node_approvals(&self, decision: Decision<NodeState>) -> Cmd {
+    pub(crate) fn send_node_approvals(&self, decision: Decision<MembershipProposal>) -> Cmd {
         let mut nodes = BTreeSet::new();
         if decision.proposal.state() == MembershipState::Joined {
             let _res = nodes.insert(*decision.proposal.node_id());
@@ -328,8 +328,8 @@ impl MyNode {
         Cmd::send_msg(msg, Recipients::Multiple(nodes))
     }
 
-    pub(crate) fn handle_node_left(&mut self, decision: Decision<NodeState>) -> Option<Cmd> {
-        let node_state = decision.proposal.clone();
+    pub(crate) fn handle_node_left(&mut self, decision: Decision<MembershipProposal>) -> Option<Cmd> {
+        let node_state = decision.proposal.1.clone();
         info!(
             "{}: {}",
             LogMarker::AcceptedNodeAsOffline,

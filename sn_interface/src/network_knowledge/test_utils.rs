@@ -1,4 +1,4 @@
-use super::{node_state::RelocationTrigger, NodeState, SectionKeysProvider};
+use super::{node_state::{RelocationTrigger, MembershipProposal}, NodeState, SectionKeysProvider};
 use crate::{
     dbcs::DbcReason,
     network_knowledge::{section_keys::build_spent_proof_share, Error, MyNodeInfo, MIN_ADULT_AGE},
@@ -99,13 +99,15 @@ pub fn expand_age_pattern(age_pattern: Option<&[u8]>, len: usize) -> Vec<u8> {
     }
 }
 
-pub fn section_decision<P: Clone + Serialize>(
+pub fn section_decision(
     secret_key_set: &bls::SecretKeySet,
     proposer: usize,
-    proposal: P,
-) -> core::result::Result<Decision<P>, Error> {
+    gen: u64,
+    node_state: NodeState,
+) -> core::result::Result<Decision<MembershipProposal>, Error> {
     let domain = Domain::new("test".to_string(), 0);
     let sk = secret_key_set.secret_key();
+    let proposal = MembershipProposal(gen, node_state);
     Ok(mock_decision(domain, proposal, proposer, &sk)?)
 }
 
@@ -249,11 +251,11 @@ pub fn try_create_relocation_trigger(
     sk_set: &bls::SecretKeySet,
     gen: u64,
     age: u8,
-) -> Result<Option<(RelocationTrigger, Decision<NodeState>)>> {
+) -> Result<Option<(RelocationTrigger, Decision<MembershipProposal>)>> {
     use super::relocation_check;
 
     let node_state = NodeState::joined(node_id, None);
-    let decision = section_decision(sk_set, gen as usize, node_state)?;
+    let decision = section_decision(sk_set, 0, gen,  node_state)?;
     let relocation_trigger = RelocationTrigger::new(decision.clone());
     let churn_id = relocation_trigger.churn_id();
 
@@ -273,7 +275,7 @@ pub fn create_relocation_trigger(
     sk_set: &bls::SecretKeySet,
     gen: u64,
     age: u8,
-) -> Result<(RelocationTrigger, Decision<NodeState>)> {
+) -> Result<(RelocationTrigger, Decision<MembershipProposal>)> {
     loop {
         let node_id = gen_node_id(MIN_ADULT_AGE);
         if let Some((trigger, decision)) = try_create_relocation_trigger(node_id, sk_set, gen, age)?
