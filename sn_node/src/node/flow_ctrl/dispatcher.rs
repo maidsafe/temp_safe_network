@@ -65,7 +65,7 @@ impl MyNode {
                 let context = if updated { node.context() } else { context };
 
                 let network_knowledge = context.network_knowledge.clone();
-                let our_name = context.name.clone();
+                let our_name = context.name;
                 let data_storage = context.data_storage.clone();
                 let is_elder = context.is_elder;
                 let joins_allowed = context.joins_allowed;

@@ -60,7 +60,7 @@ impl MyNode {
             _ => None,
         };
 
-        let targets = Self::target_data_holders(&network_knowledge, target_addr, query_index);
+        let targets = Self::target_data_holders(network_knowledge, target_addr, query_index);
 
         // make sure the expected replication factor is achieved
         if query_index.is_none() && data_copy_count() > targets.len() {
