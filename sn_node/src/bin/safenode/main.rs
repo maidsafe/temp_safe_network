@@ -351,7 +351,10 @@ fn monitor_node_events(
                         );
                     }
                 }
-                _ => { /* we are not interested in any other type of node events here */ }
+                _ => {
+                    /* we are not interested in any other type of node events here */
+                    info!("Received an un-interested node event {event:?}");
+                }
             }
         }
     });
