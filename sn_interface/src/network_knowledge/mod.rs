@@ -41,7 +41,7 @@ use crate::{
     types::NodeId,
 };
 
-use sn_consensus::mvba::{mock_decision, tag::Domain, Decision};
+use sn_consensus::mvba::Decision;
 
 use bls::PublicKey as BlsPublicKey;
 use serde::Serialize;
@@ -291,6 +291,7 @@ impl NetworkKnowledge {
     /// Update our section members with the provided `SectionDecisions`
     pub fn update_section_member_knowledge(
         &mut self,
+        gen: u64,
         updated_members: Option<SectionDecisions>,
     ) -> Result<bool> {
         trace!("Attempting to update section members` knowledge");
@@ -298,7 +299,7 @@ impl NetworkKnowledge {
 
         // Update members if changes were provided
         if let Some(members) = updated_members {
-            if self.update_members(members)? {
+            if self.update_members(gen, members)? {
                 there_was_an_update = true;
                 let prefix = self.prefix();
                 info!(
@@ -446,16 +447,16 @@ impl NetworkKnowledge {
 
     /// Try to merge this `NetworkKnowledge` members with `peers`.
     /// Checks if we're already up to date before attempting to verify and merge members
-    pub fn update_members(&mut self, peers: SectionDecisions) -> Result<bool> {
+    pub fn update_members(&mut self, gen: u64, peers: SectionDecisions) -> Result<bool> {
         Ok(self
             .section_members
-            .update_peers(&self.signed_sap.section_key(), peers))
+            .update_peers(gen, &self.signed_sap.section_key(), peers))
     }
 
     /// Try update one member with the incoming decision. Returns whether it actually updated.
-    pub fn try_update_member(&mut self, decision: Decision<NodeState>) -> Result<bool> {
+    pub fn try_update_member(&mut self, gen: u64, decision: Decision<NodeState>) -> Result<bool> {
         self.section_members
-            .update(&self.signed_sap.section_key(), decision)
+            .update(gen, &self.signed_sap.section_key(), decision)
     }
 
     /// Returns the members of our section

@@ -154,7 +154,7 @@ pub(crate) fn elder_candidates(
 pub(crate) struct Membership {
     consensus: Arc<Mutex<Consensus<NodeState>>>,
     bootstrap_members: BTreeSet<NodeState>,
-    gen: Generation, // current generation
+    pub(crate) gen: Generation, // current generation
     history: BTreeMap<Generation, Decision<NodeState>>,
     // last membership vote timestamp
     last_received_vote_time: Option<Instant>,

@@ -71,7 +71,8 @@ impl MyNode {
                 node.handle_section_decision_agreement(proposal, sig)?
             }
             Cmd::HandleMembershipDecision(decision) => {
-                node.handle_membership_decision(decision).await?
+                let gen = context.membership.unwrap().gen; // TODO: no unwrap
+                node.handle_membership_decision(gen, decision).await?
             }
             Cmd::HandleNewEldersAgreement { new_elders, sig } => {
                 node.handle_new_elders_agreement(new_elders, sig).await?

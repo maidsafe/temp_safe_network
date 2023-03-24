@@ -189,13 +189,17 @@ impl MyNode {
 
     pub(crate) async fn handle_membership_decision(
         &mut self,
+        gen: u64,
         decision: Decision<NodeState>,
     ) -> Result<Vec<Cmd>> {
         info!("{}", LogMarker::AgreementOfMembership);
         let mut cmds = vec![];
         let node_state = decision.proposal.clone();
 
-        if let Err(_err) = self.network_knowledge.try_update_member(decision.clone()) {
+        if let Err(_err) = self
+            .network_knowledge
+            .try_update_member(gen, decision.clone())
+        {
             error!("Ignored decision {decision:?} as we are lagging");
             cmds.push(Self::generate_probe_msg(&self.context())?);
             return Ok(cmds);

@@ -201,7 +201,8 @@ impl MyNode {
 
         // Update our members list making sure we don't exist in it with our old name.
         let new_state = decision.proposal.clone();
-        match self.network_knowledge.try_update_member(decision) {
+        let gen = self.membership.as_ref().unwrap().gen; // TODO: no unwrap
+        match self.network_knowledge.try_update_member(gen, decision) {
             Ok(true) => trace!(
                 "Section members list updated due to relocation: {new_state:?}. \
                     New members list: {:?}",
@@ -284,6 +285,7 @@ mod tests {
         init_logger();
 
         let prefix: Prefix = prefix("0");
+        let gen = 5;
         let adults = recommended_section_size() - elder_count();
         let env = TestNetworkBuilder::new(rand::thread_rng())
             .sap(TestSapBuilder::new(prefix).adult_count(adults))
@@ -295,7 +297,7 @@ mod tests {
         let relocated_node = gen_node_id_in_prefix(MIN_ADULT_AGE - 1, prefix);
         let node_state = NodeState::joined(relocated_node, None);
         let node_state = section_decision(&sk_set, 1, node_state)?;
-        assert!(section.try_update_member(node_state)?);
+        assert!(section.try_update_member(gen, node_state)?);
         // update our node with the new network_knowledge
         node.network_knowledge = section.clone();
 

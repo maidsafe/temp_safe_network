@@ -34,9 +34,8 @@ use sn_interface::{
         AntiEntropyKind, AntiEntropyMsg, Dst, NetworkMsg, WireMsg,
     },
     network_knowledge::{
-        section_decision, section_keys::SectionKeysProvider, Error as NetworkKnowledgeError,
-        MyNodeInfo, NodeState, RelocationInfo, RelocationProof, SectionTreeUpdate, SectionsDAG,
-        MIN_ADULT_AGE,
+        section_keys::SectionKeysProvider, Error as NetworkKnowledgeError, MyNodeInfo, NodeState,
+        RelocationInfo, RelocationProof, SectionTreeUpdate, SectionsDAG, MIN_ADULT_AGE,
     },
     test_utils::*,
     types::{keys::ed25519, Participant, PublicKey},
