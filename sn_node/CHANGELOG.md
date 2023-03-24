@@ -5,20 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.80.3 (2023-03-23)
+## v0.80.4 (2023-03-24)
 
-### New Features
+### Chore
 
- - <csr-id-16bb3389cdd665fe9a577587d9b7a6e8d21a3028/> exposing a gRPC interface on safenode bin/app
-   - The safenode RPC service is exposed only when built with 'rpc-service' feature.
-   - The safenode RPC service code is generated automatically using gRPC (`tonic` crate)
-   from a `proto` file with messages definitions added to sn_interface.
-   - The RPC is exposed at the same address as the node's address used for network connections,
-   but using the subsequent port number.
-   - A new final step was implemented for the sn_testnet tool, to run a check on the launched nodes,
-   verifying their names and network knowledge are the expected for the launched testnet.
-   - The new sn_testnet tool step is run only if built with 'verify-nodes' feature.
-   - Running the `verify-nodes` check of sn_testnet in CI previous to sn_client e2e tests.
+ - <csr-id-142dd14fe1fb99a301e65adc72b739788015c959/> parse network knowledge members from logs
 
 ### Commit Statistics
 
@@ -35,12 +26,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Parse network knowledge members from logs ([`142dd14`](https://github.com/maidsafe/safe_network/commit/142dd14fe1fb99a301e65adc72b739788015c959))
+</details>
+
+## v0.80.3 (2023-03-23)
+
+### Chore
+
+ - <csr-id-358174ab1503fc8cf1b07ab66be397f3e853a14c/> sn_testnet-0.1.4/sn_interface-0.20.9/sn_node-0.80.3
+
+### New Features
+
+ - <csr-id-16bb3389cdd665fe9a577587d9b7a6e8d21a3028/> exposing a gRPC interface on safenode bin/app
+   - The safenode RPC service is exposed only when built with 'rpc-service' feature.
+- The safenode RPC service code is generated automatically using gRPC (`tonic` crate)
+   from a `proto` file with messages definitions added to sn_interface.
+- The RPC is exposed at the same address as the node's address used for network connections,
+   but using the subsequent port number.
+- A new final step was implemented for the sn_testnet tool, to run a check on the launched nodes,
+   verifying their names and network knowledge are the expected for the launched testnet.
+- The new sn_testnet tool step is run only if built with 'verify-nodes' feature.
+- Running the `verify-nodes` check of sn_testnet in CI previous to sn_client e2e tests.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Sn_testnet-0.1.4/sn_interface-0.20.9/sn_node-0.80.3 ([`358174a`](https://github.com/maidsafe/safe_network/commit/358174ab1503fc8cf1b07ab66be397f3e853a14c))
     - Exposing a gRPC interface on safenode bin/app ([`16bb338`](https://github.com/maidsafe/safe_network/commit/16bb3389cdd665fe9a577587d9b7a6e8d21a3028))
 </details>
 
 ## v0.80.2 (2023-03-23)
 
 <csr-id-7a4bdb9dac983d957077878ac87d65535baeee9c/>
+<csr-id-4cf0bf0e69f70c7303d4dcda581e5fbc54d0e51c/>
 
 ### Chore
 
