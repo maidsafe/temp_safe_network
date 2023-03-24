@@ -140,6 +140,7 @@ jobs:
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.S3_DEPLOY_AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.S3_DEPLOY_AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: eu-west-2
         run: |
           just package-release-assets "safe"
           just package-release-assets "safenode"
