@@ -73,7 +73,7 @@ pub(crate) fn reissue_invalid_dbc_with_no_inputs(
     output_owner_sk: &bls::SecretKey,
 ) -> Result<Dbc> {
     let output_amount = Token::from_nano(amount);
-    let input_amount = input.amount_secrets_bearer()?.amount();
+    let input_amount = Token::from_nano(input.revealed_amount_bearer()?.value());
     let change_amount = input_amount
         .checked_sub(output_amount)
         .ok_or_else(|| eyre!("The input amount minus the amount must evaluate to a valid value"))?;

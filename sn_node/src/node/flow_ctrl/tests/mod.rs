@@ -831,7 +831,7 @@ async fn spentbook_spend_transaction_with_no_inputs_should_return_spentbook_erro
             assert_eq!(
                 error,
                 &MessagingDataError::from(Error::SpentbookError(
-                    "The DBC transaction must have at least one input".to_string()
+                    "The DBC transaction must have at least one input.".to_string()
                 )),
                 "A different error was expected for this case: {error:?}"
             );

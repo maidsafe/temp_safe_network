@@ -379,8 +379,7 @@ mod tests {
                 source: ErrorMsg::InvalidOperation(error_string),
                 ..
             }) => {
-                let correct_error_str =
-                    format!("{:?}", sn_dbc::Error::MissingCommitmentForPubkey(pk));
+                let correct_error_str = format!("{:?}", sn_dbc::Error::MissingAmountForPubkey(pk));
                 assert!(
                     error_string.contains(&correct_error_str),
                     "A different SpentbookError error was expected for this case. What we got: {error_string:?}, expected: {correct_error_str:?}"
@@ -427,7 +426,7 @@ mod tests {
                 ..
             }) => {
                 let correct_error_str =
-                    format!("SpentbookError(\"There are no commitments for the given public key {random_public_key:?}\"");
+                    format!("SpentbookError(\"There are no amounts for the given public key {random_public_key:?}\"");
                 assert!(
                     error_string.contains(&correct_error_str),
                     "A different SpentbookError error was expected for this case. What we got: {error_string:?}"
@@ -491,7 +490,7 @@ mod tests {
         outputs: Vec<(sn_dbc::Token, OwnerOnce)>,
         change_amount: sn_dbc::Token,
     ) -> Result<(
-        Vec<(sn_dbc::Dbc, OwnerOnce, sn_dbc::AmountSecrets)>,
+        Vec<(sn_dbc::Dbc, OwnerOnce, sn_dbc::RevealedAmount)>,
         Option<sn_dbc::Dbc>,
     )> {
         let mut tx_builder = TransactionBuilder::default()

@@ -86,8 +86,8 @@ pub async fn get_next_bearer_dbc() -> Result<(Dbc, Token)> {
 
 // Build a set of bearer DBCs with random amounts, by reissuing them from testnet genesis DBC.
 async fn reissue_bearer_dbcs() -> Result<Vec<(Dbc, Token)>> {
-    let total_balance = match GENESIS_DBC.amount_secrets_bearer() {
-        Ok(amount_secrets) => amount_secrets.amount().as_nano(),
+    let total_balance = match GENESIS_DBC.revealed_amount_bearer() {
+        Ok(amount) => amount.value(),
         Err(err) => bail!("Failed to obtain genesis DBC balance: {:?}", err),
     };
 
@@ -120,10 +120,7 @@ async fn reissue_bearer_dbcs() -> Result<Vec<(Dbc, Token)>> {
 
     Ok(output_dbcs
         .into_iter()
-        .map(|(dbc, _, amount_secrets)| {
-            let amount = amount_secrets.amount();
-            (dbc, amount)
-        })
+        .map(|(dbc, _, amount)| (dbc, Token::from_nano(amount.value())))
         .collect())
 }
 
