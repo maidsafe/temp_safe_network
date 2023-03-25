@@ -2,25 +2,23 @@ use safenode::comms::{Comm, NetworkNode};
 use safenode::stableset::{run_stable_set, StableSetMsg};
 
 use std::collections::BTreeSet;
+use std::path::Path;
 use std::{env, fs, net::SocketAddr};
 
 const PEERS_CONFIG_FILE: &str = "peers.json";
 
 /// Read my addr from env var and peers addr from config file
-fn get_config() -> (SocketAddr, BTreeSet<SocketAddr>) {
-    let my_addr_str: String = env::var("NODE_ADDR").expect("Failed to read NODE_ADDR from env");
-    let my_addr = my_addr_str.parse().expect("Unable to parse socket address");
+fn peers_from_json(path: impl AsRef<Path>) -> BTreeSet<SocketAddr> {
     let peers_json =
-        fs::read_to_string(PEERS_CONFIG_FILE).expect("Unable to read peers config file");
+        fs::read_to_string(path).expect("Unable to read peers config file");
     let peers_ip_str: Vec<String> =
         serde_json::from_str(&peers_json).expect("Unable to parse peers config file");
     let peers_addr: BTreeSet<SocketAddr> = peers_ip_str
         .iter()
-        .filter(|p| *p != &my_addr_str)
         .map(|p| p.parse().expect("Unable to parse socket address"))
         .collect();
     println!("Read Peers from config: {:?}", peers_addr);
-    (my_addr, peers_addr)
+    peers_addr
 }
 
 /// start node and no_return unless fatal error
@@ -42,7 +40,18 @@ async fn start_node(my_addr: SocketAddr, peers_addrs: BTreeSet<SocketAddr>) {
 async fn main() {
     tracing_subscriber::fmt::init();
 
-    let (my_addr, peers_addr) = get_config();
+    // Simple parsing of single socket address argument.
+    let my_addr = {
+        let args: Vec<String> = env::args().collect();
+        if args.len() != 2 {
+            eprintln!("Missing argument\nusage: safenode <socket address>");
+            return;
+        }
+        args[1].parse().expect("Unable to parse socket address")
+    };
+
+    let mut peers_addr = peers_from_json(PEERS_CONFIG_FILE);
+    peers_addr.remove(&my_addr); // Remove our own address from our network list.
 
     start_node(my_addr, peers_addr).await;
 }
