@@ -8,6 +8,8 @@
 
 //! SAFE network data types.
 
+/// Fees for a spend.
+pub mod fees;
 /// public key types (ed25519)
 pub mod keys;
 /// Standardised log markers for various events
