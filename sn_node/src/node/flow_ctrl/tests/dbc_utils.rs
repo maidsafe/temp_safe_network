@@ -8,10 +8,10 @@
 
 use eyre::{eyre, Result};
 use sn_dbc::{
-    Dbc, DbcTransaction, Owner, OwnerOnce, PublicKey, SpentProof, SpentProofShare, Token,
-    TransactionBuilder,
+    Dbc, DbcTransaction, Owner, OwnerOnce, PublicKey, RevealedOutput, SpentProof, SpentProofShare,
+    Token, TransactionBuilder,
 };
-use sn_interface::{dbcs::gen_genesis_dbc, messaging::data::RegisterCmd, types::ReplicatedData};
+use sn_interface::{messaging::data::RegisterCmd, types::ReplicatedData};
 use std::collections::BTreeSet;
 
 /// Get the spent proof share that's packaged inside the data that's to be replicated to the adults
@@ -34,32 +34,6 @@ pub(crate) fn get_spent_proof_share_from_replicated_data(
     }
 }
 
-/// Returns the info necessary to populate the `SpentbookCmd::Spend` message to be handled.
-///
-/// The genesis DBC is used, but that doesn't really matter; for testing the code in the message
-/// handler we could use any DBC.
-///
-/// The `gen_genesis_dbc` function returns the DBC itself. To put it through the spending message
-/// handler, it needs to have a transaction, which is what we provide here before we return it
-/// back for use in tests.
-pub(crate) fn get_genesis_dbc_spend_info(
-    sk_set: &bls::SecretKeySet,
-) -> Result<(
-    PublicKey,
-    DbcTransaction,
-    BTreeSet<SpentProof>,
-    BTreeSet<DbcTransaction>,
-)> {
-    let genesis_dbc = gen_genesis_dbc(sk_set, &sk_set.secret_key())?;
-    let full_amount = genesis_dbc.revealed_amount_bearer()?.value();
-    let output_owner =
-        OwnerOnce::from_owner_base(genesis_dbc.owner_base().clone(), &mut rand::thread_rng());
-    get_dbc_spend_info_with_outputs(
-        genesis_dbc,
-        vec![(output_owner, Token::from_nano(full_amount))],
-    )
-}
-
 /// Returns the info necessary to populate the `SpentbookCmd::Spend` message to be handled, given specific outputs.
 ///
 /// The genesis DBC is used, but that doesn't really matter; for testing the code in the message
@@ -70,7 +44,7 @@ pub(crate) fn get_genesis_dbc_spend_info(
 /// back for use in tests.
 pub(crate) fn get_dbc_spend_info_with_outputs(
     dbc: Dbc,
-    outputs: Vec<(OwnerOnce, Token)>,
+    outputs: impl IntoIterator<Item = (RevealedOutput, OwnerOnce)>,
 ) -> Result<(
     PublicKey,
     DbcTransaction,
@@ -79,9 +53,7 @@ pub(crate) fn get_dbc_spend_info_with_outputs(
 )> {
     let mut tx_builder = TransactionBuilder::default().add_input_dbc_bearer(&dbc)?;
 
-    for (output_owner, output_amount) in outputs {
-        tx_builder = tx_builder.add_output_by_amount(output_amount, output_owner);
-    }
+    tx_builder = tx_builder.add_outputs(outputs);
 
     let dbc_builder = tx_builder.build(rand::thread_rng())?;
     let (public_key, tx) = &dbc_builder.inputs()[0];
