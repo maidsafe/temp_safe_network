@@ -17,7 +17,7 @@ use crate::{
 
 use sn_client::Client;
 use sn_dbc::{
-    rng, AmountSecrets, Error as DbcError, Hash, Owner, OwnerOnce, PublicKey, SpentProof,
+    rng, Error as DbcError, Hash, Owner, OwnerOnce, PublicKey, RevealedAmount, SpentProof,
     SpentProofShare, TransactionBuilder,
 };
 use sn_interface::{elder_count, network_knowledge::supermajority};
@@ -129,8 +129,8 @@ impl Safe {
         };
 
         let amount = dbc_to_deposit
-            .amount_secrets_bearer()
-            .map(|amount_secrets| amount_secrets.amount())?;
+            .revealed_amount_bearer()
+            .map(|amount| amount.value())?;
 
         let safeurl = self.parse_and_resolve_url(wallet_url).await?;
         self.insert_dbc_into_wallet(&safeurl, &dbc_to_deposit, spendable_name.clone())
@@ -141,7 +141,7 @@ impl Safe {
             amount, safeurl, spendable_name
         );
 
-        Ok((spendable_name, amount))
+        Ok((spendable_name, Token::from_nano(amount)))
     }
 
     /// Verify if the provided DBC's public_key has been already spent on the network.
@@ -243,10 +243,10 @@ impl Safe {
         for (name, (dbc, _)) in &balances {
             debug!("Checking spendable balance named: {}", name);
 
-            let balance = match dbc.amount_secrets_bearer() {
-                Ok(amount_secrets) => amount_secrets.amount(),
+            let balance = match dbc.revealed_amount_bearer() {
+                Ok(amount) => Token::from_nano(amount.value()),
                 Err(err) => {
-                    warn!("Ignoring amount from DBC found in wallet due to error in revealing secret amount: {:?}", err);
+                    warn!("Ignoring amount from DBC found in wallet due to dbc not being bearer: {:?}", err);
                     continue;
                 }
             };
@@ -414,8 +414,8 @@ impl Safe {
         let mut total_input_amount = Token::zero();
         let mut change_amount = total_output_amount;
         for (name, (dbc, entry_hash)) in spendable_dbcs {
-            let dbc_balance = match dbc.amount_secrets_bearer() {
-                Ok(amount_secrets) => amount_secrets.amount(),
+            let dbc_balance = match dbc.revealed_amount_bearer() {
+                Ok(amount) => Token::from_nano(amount.value()),
                 Err(err) => {
                     warn!("Ignoring input DBC found in wallet (entry: {}) due to error in revealing secret amount: {:?}", name, err);
                     continue;
@@ -508,10 +508,10 @@ impl Safe {
                 outputs_owners.push((fee, owner_once));
             });
 
-            let dbc_balance = match dbc.amount_secrets_bearer() {
-                Ok(amount_secrets) => amount_secrets.amount(),
+            let dbc_balance = match dbc.revealed_amount_bearer() {
+                Ok(amount) => Token::from_nano(amount.value()),
                 Err(err) => {
-                    warn!("Ignoring input DBC found in wallet (entry: {}) due to error in revealing secret amount: {:?}", name, err);
+                    warn!("Ignoring input DBC found in wallet (entry: {name}) due to not being a bearer: {err:?}");
                     continue;
                 }
             };
@@ -616,7 +616,7 @@ impl Safe {
         outputs: Vec<(Token, OwnerOnce)>,
         reason: DbcReason,
         change_amount: Token,
-    ) -> Result<(Vec<(Dbc, OwnerOnce, AmountSecrets)>, Option<Dbc>)> {
+    ) -> Result<(Vec<(Dbc, OwnerOnce, RevealedAmount)>, Option<Dbc>)> {
         let mut tx_builder = TransactionBuilder::default()
             .add_inputs_dbc_bearer(input_dbcs.iter())?
             .add_outputs_by_amount(outputs.into_iter().map(|(token, owner)| (token, owner)));
@@ -1046,18 +1046,18 @@ mod tests {
             .ok_or_else(|| anyhow!("Couldn't read first DBC from fetched wallet"))?;
         assert_eq!(dbc1_read.owner_base(), dbc1.owner_base());
         let balance1 = dbc1_read
-            .amount_secrets_bearer()
+            .revealed_amount_bearer()
             .map_err(|err| anyhow!("Couldn't read balance from first DBC fetched: {:?}", err))?;
-        assert_eq!(balance1.amount(), dbc1_balance);
+        assert_eq!(balance1.value(), dbc1_balance.as_nano());
 
         let (dbc2_read, _) = wallet_balances
             .get("my-second-dbc")
             .ok_or_else(|| anyhow!("Couldn't read second DBC from fetched wallet"))?;
         assert_eq!(dbc2_read.owner_base(), dbc2.owner_base());
         let balance2 = dbc2_read
-            .amount_secrets_bearer()
+            .revealed_amount_bearer()
             .map_err(|err| anyhow!("Couldn't read balance from second DBC fetched: {:?}", err))?;
-        assert_eq!(balance2.amount(), dbc2_balance);
+        assert_eq!(balance2.value(), dbc2_balance.as_nano());
 
         Ok(())
     }
@@ -1137,9 +1137,9 @@ mod tests {
             .await?;
 
         let output_balance = output_dbc
-            .amount_secrets_bearer()
+            .revealed_amount_bearer()
             .map_err(|err| anyhow!("Couldn't read balance from output DBC: {:?}", err))?;
-        assert_eq!(output_balance.amount(), amount_to_reissue);
+        assert_eq!(output_balance.value(), amount_to_reissue.as_nano());
 
         let current_balance = safe.wallet_balance(&wallet_xorurl).await?;
         assert_eq!(current_balance, Token::from_nano(expected_change));
@@ -1153,9 +1153,9 @@ mod tests {
             .next()
             .ok_or_else(|| anyhow!("Couldn't read change DBC from fetched wallet"))?;
         let change = change_dbc_read
-            .amount_secrets_bearer()
+            .revealed_amount_bearer()
             .map_err(|err| anyhow!("Couldn't read balance from change DBC fetched: {:?}", err))?;
-        assert_eq!(change.amount(), Token::from_nano(expected_change));
+        assert_eq!(change.value(), expected_change);
 
         Ok(())
     }
@@ -1173,9 +1173,9 @@ mod tests {
             .await?;
 
         let output_balance = output_dbc
-            .amount_secrets_bearer()
+            .revealed_amount_bearer()
             .map_err(|err| anyhow!("Couldn't read balance from output DBC: {:?}", err))?;
-        assert_eq!(output_balance.amount(), Token::from_nano(1_000_000_000));
+        assert_eq!(output_balance.value(), 1_000_000_000);
 
         tokio::time::sleep(tokio::time::Duration::from_millis(5000)).await;
 
@@ -1193,9 +1193,9 @@ mod tests {
             .next()
             .ok_or_else(|| anyhow!("Couldn't read change DBC from fetched wallet"))?;
         let change = change_dbc_read
-            .amount_secrets_bearer()
+            .revealed_amount_bearer()
             .map_err(|err| anyhow!("Couldn't read balance from change DBC fetched: {:?}", err))?;
-        assert_eq!(change.amount(), change_amount);
+        assert_eq!(change.value(), change_amount.as_nano());
 
         Ok(())
     }
@@ -1540,8 +1540,8 @@ mod tests {
 
         let mut num_fee_outputs = 0;
         for dbc in output_dbcs {
-            if let Ok(balance) = dbc.amount_secrets_bearer() {
-                assert!(output_amounts.contains(&balance.amount().as_nano()));
+            if let Ok(balance) = dbc.revealed_amount_bearer() {
+                assert!(output_amounts.contains(&balance.value()));
             } else {
                 num_fee_outputs += 1;
             }
@@ -1560,9 +1560,9 @@ mod tests {
             .next()
             .ok_or_else(|| anyhow!("Couldn't read change DBC from fetched wallet"))?;
         let change = change_dbc_read
-            .amount_secrets_bearer()
+            .revealed_amount_bearer()
             .map_err(|err| anyhow!("Couldn't read balance from change DBC fetched: {:?}", err))?;
-        assert_eq!(change.amount(), Token::from_nano(expected_change));
+        assert_eq!(change.value(), expected_change);
 
         Ok(())
     }

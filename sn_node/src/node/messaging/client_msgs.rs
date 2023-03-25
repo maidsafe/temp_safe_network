@@ -9,7 +9,7 @@
 use crate::node::{flow_ctrl::cmds::Cmd, Error, MyNode, NodeContext, Result};
 
 use sn_dbc::{
-    get_public_commitments_from_transaction, Commitment, DbcTransaction, PublicKey, SpentProof,
+    get_blinded_amounts_from_transaction, BlindedAmount, DbcTransaction, PublicKey, SpentProof,
     SpentProofShare,
 };
 use sn_interface::{
@@ -244,17 +244,17 @@ impl MyNode {
         // verify the spent proofs
         MyNode::verify_spent_proofs(spent_proofs, &context.network_knowledge)?;
 
-        let public_commitments_info =
-            get_public_commitments_from_transaction(tx, spent_proofs, spent_transactions)?;
+        let blinded_amounts_info =
+            get_blinded_amounts_from_transaction(tx, spent_proofs, spent_transactions)?;
 
         // Do not sign invalid TX.
-        let tx_public_commitments: Vec<Commitment> = public_commitments_info
+        let tx_blinded_amounts: Vec<BlindedAmount> = blinded_amounts_info
             .clone()
             .into_iter()
             .map(|(_, v)| v)
             .collect();
 
-        if let Err(err) = tx.verify(&tx_public_commitments) {
+        if let Err(err) = tx.verify(&tx_blinded_amounts) {
             warn!("Dropping spend request: {:?}", err.to_string());
             return Err(Error::SpentbookError(err.to_string()));
         }
@@ -262,14 +262,13 @@ impl MyNode {
         // TODO:
         // Check the public_key wasn't already spent with a different TX (i.e. double spent)
 
-        // Grab the commitment specific to the spent public key.
-        let public_commitment: Commitment = public_commitments_info
+        // Grab the amount specific to the spent public key.
+        let blinded_amount: BlindedAmount = blinded_amounts_info
             .into_iter()
             .find(|(k, _c)| k == public_key)
             .map(|(_k, c)| c)
             .ok_or_else(|| {
-                let msg =
-                    format!("There are no commitments for the given public key {public_key:?}",);
+                let msg = format!("There are no amounts for the given public key {public_key:?}",);
                 warn!("Dropping spend request: {msg}");
                 Error::SpentbookError(msg)
             })?;
@@ -280,7 +279,7 @@ impl MyNode {
             reason,
             &context.network_knowledge.section_auth(),
             &context.section_keys_provider,
-            public_commitment,
+            blinded_amount,
         )?;
 
         Ok(spent_proof_share)

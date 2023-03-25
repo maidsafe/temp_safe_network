@@ -11,7 +11,7 @@ use crate::network_knowledge::{Error, Result, SectionAuthorityProvider};
 use crate::types::log_markers::LogMarker;
 
 use sn_dbc::{
-    Commitment, DbcTransaction, Hash, IndexedSignatureShare, SpentProofContent, SpentProofShare,
+    BlindedAmount, DbcTransaction, Hash, IndexedSignatureShare, SpentProofContent, SpentProofShare,
 };
 use uluru::LRUCache;
 
@@ -111,13 +111,13 @@ pub fn build_spent_proof_share(
     reason: DbcReason,
     sap: &SectionAuthorityProvider,
     skp: &SectionKeysProvider,
-    public_commitment: Commitment,
+    blinded_amount: BlindedAmount,
 ) -> Result<SpentProofShare> {
     let content = SpentProofContent {
         public_key: *public_key,
         transaction_hash: Hash::from(tx.hash()),
         reason: reason.into(),
-        public_commitment,
+        blinded_amount,
     };
     let (index, sig_share) = skp.sign_with(content.hash().as_ref(), &sap.section_key())?;
     Ok(SpentProofShare {
