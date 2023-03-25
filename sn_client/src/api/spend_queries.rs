@@ -10,12 +10,9 @@ use super::Client;
 use crate::errors::{Error, Result};
 
 use sn_dbc::{PublicKey, Token};
-use sn_interface::{
-    messaging::{
-        data::{ClientMsg, DataQuery, Error as ErrorMsg, QueryResponse, SpendQuery},
-        ClientAuth, WireMsg,
-    },
-    types::SpentbookAddress,
+use sn_interface::messaging::{
+    data::{ClientMsg, DataQuery, Error as ErrorMsg, QueryResponse, SpendQuery},
+    ClientAuth, WireMsg,
 };
 
 use backoff::{backoff::Backoff, ExponentialBackoff};
@@ -23,14 +20,12 @@ use futures::future::join_all;
 use std::collections::BTreeMap;
 use tokio::time::sleep;
 use tracing::{debug, info_span};
-use xor_name::XorName;
 
 impl Client {
     /// Return the set of Elder reward keys and the individual fee they ask for processing a spend.
     #[instrument(skip(self), level = "debug")]
-    pub async fn get_mint_fees(&self, dbc_key: PublicKey) -> Result<BTreeMap<PublicKey, Token>> {
-        let address = SpentbookAddress::new(XorName::from_content(&dbc_key.to_bytes()));
-        let fee_query = DataQuery::Spentbook(SpendQuery::GetFees(address));
+    pub async fn get_mint_fees(&self, dbc_id: PublicKey) -> Result<BTreeMap<PublicKey, Token>> {
+        let fee_query = DataQuery::Spentbook(SpendQuery::GetFees(dbc_id));
 
         let (_, elders) = self
             .session

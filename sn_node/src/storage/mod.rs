@@ -182,9 +182,11 @@ impl DataStorage {
                 }
             }
             // this should be unreachable
-            DataQuery::Spentbook(SpendQuery::GetFees(addr)) => NodeQueryResponse::GetFees(Err(
-                sn_interface::messaging::data::Error::DataNotFound(DataAddress::Spentbook(*addr)),
-            )),
+            DataQuery::Spentbook(SpendQuery::GetFees(dbc_id)) => {
+                NodeQueryResponse::GetFees(Err(sn_interface::messaging::data::Error::DataNotFound(
+                    DataAddress::Spentbook(SpendQuery::GetFees(*dbc_id).dst_address()),
+                )))
+            }
         }
     }
 
