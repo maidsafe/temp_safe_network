@@ -4225,6 +4225,7 @@ dependencies = [
 name = "sn_interface"
 version = "0.20.11"
 dependencies = [
+ "assert_matches",
  "base64 0.13.1",
  "bincode",
  "blsttc",
