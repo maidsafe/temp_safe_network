@@ -51,10 +51,13 @@ pub(crate) fn get_genesis_dbc_spend_info(
     BTreeSet<DbcTransaction>,
 )> {
     let genesis_dbc = gen_genesis_dbc(sk_set, &sk_set.secret_key())?;
-    let full_amount = genesis_dbc.amount_secrets_bearer()?.amount();
+    let full_amount = genesis_dbc.revealed_amount_bearer()?.value();
     let output_owner =
         OwnerOnce::from_owner_base(genesis_dbc.owner_base().clone(), &mut rand::thread_rng());
-    get_dbc_spend_info_with_outputs(genesis_dbc, vec![(output_owner, full_amount)])
+    get_dbc_spend_info_with_outputs(
+        genesis_dbc,
+        vec![(output_owner, Token::from_nano(full_amount))],
+    )
 }
 
 /// Returns the info necessary to populate the `SpentbookCmd::Spend` message to be handled, given specific outputs.
@@ -97,7 +100,7 @@ pub(crate) fn reissue_invalid_dbc_with_no_inputs(
     output_owner_sk: &bls::SecretKey,
 ) -> Result<Dbc> {
     let output_amount = Token::from_nano(amount);
-    let input_amount = input.amount_secrets_bearer()?.amount();
+    let input_amount = Token::from_nano(input.revealed_amount_bearer()?.value());
     let change_amount = input_amount
         .checked_sub(output_amount)
         .ok_or_else(|| eyre!("The input amount minus the amount must evaluate to a valid value"))?;

@@ -45,7 +45,7 @@ use assert_matches::assert_matches;
 use eyre::{bail, eyre, Result};
 use rand::{rngs::StdRng, thread_rng, SeedableRng};
 use std::{
-    collections::{BTreeSet, HashSet},
+    collections::{BTreeMap, BTreeSet, HashSet},
     iter,
 };
 use test_utils::ProcessAndInspectCmds;
@@ -723,7 +723,7 @@ async fn spentbook_spend_client_message_should_replicate_to_adults_and_send_ack(
     let dbc = gen_genesis_dbc(&sk_set, &sk_set.secret_key())?;
     let context = node.context();
 
-    let dbc_amount = dbc.amount_secrets_bearer()?.amount();
+    let dbc_amount = dbc.revealed_amount_bearer()?.value();
     let change_owner = OwnerOnce::from_owner_base(dbc.owner_base().clone(), &mut thread_rng());
     #[cfg(feature = "data-network")]
     let outputs = vec![(change_owner, dbc_amount)];
@@ -731,7 +731,7 @@ async fn spentbook_spend_client_message_should_replicate_to_adults_and_send_ack(
     let outputs = vec![
         (
             change_owner,
-            Token::from_nano(dbc_amount.as_nano() - context.store_cost.as_nano()),
+            Token::from_nano(dbc_amount - context.store_cost.as_nano()),
         ),
         (
             OwnerOnce::from_owner_base(
@@ -754,6 +754,8 @@ async fn spentbook_spend_client_message_should_replicate_to_adults_and_send_ack(
             spent_proofs,
             spent_transactions,
             network_knowledge: None,
+            #[cfg(not(feature = "data-network"))]
+            fee_ciphers: BTreeMap::new(),
         })),
         &mut node,
         comm_rx,
@@ -761,33 +763,40 @@ async fn spentbook_spend_client_message_should_replicate_to_adults_and_send_ack(
     .await?;
 
     while let Some(cmd) = cmds.next(&mut node).await? {
-        if let Cmd::SendAndForwardResponseToClient {
-            wire_msg, targets, ..
-        } = cmd
-        {
-            let msg = wire_msg.into_msg()?;
-            match msg {
-                NetworkMsg::Node(msg) => match msg {
-                    NodeMsg::NodeDataCmd(NodeDataCmd::StoreData(data)) => {
-                        assert_eq!(targets.len(), replication_count);
-                        let spent_proof_share =
-                            dbc_utils::get_spent_proof_share_from_replicated_data(data)?;
-                        assert_eq!(public_key.to_hex(), spent_proof_share.public_key().to_hex());
-                        assert_eq!(Hash::from(tx.hash()), spent_proof_share.transaction_hash());
-                        assert_eq!(
-                            sk_set.public_keys().public_key().to_hex(),
-                            spent_proof_share.spentbook_pks().public_key().to_hex()
-                        );
-                    }
+        match cmd {
+            Cmd::SendAndForwardResponseToClient {
+                wire_msg, targets, ..
+            } => {
+                let msg = wire_msg.into_msg()?;
+                match msg {
+                    NetworkMsg::Node(msg) => match msg {
+                        NodeMsg::NodeDataCmd(NodeDataCmd::StoreData(data)) => {
+                            assert_eq!(targets.len(), replication_count);
+                            let spent_proof_share =
+                                dbc_utils::get_spent_proof_share_from_replicated_data(data)?;
+                            assert_eq!(
+                                public_key.to_hex(),
+                                spent_proof_share.public_key().to_hex()
+                            );
+                            assert_eq!(Hash::from(tx.hash()), spent_proof_share.transaction_hash());
+                            assert_eq!(
+                                sk_set.public_keys().public_key().to_hex(),
+                                spent_proof_share.spentbook_pks().public_key().to_hex()
+                            );
+                        }
+                        _ => {
+                            bail!("Unexpected msg type when processing cmd")
+                        }
+                    },
                     _ => {
-                        bail!("Unexpected msg type when processing cmd")
+                        bail!("Unexpected Cmd type when processing cmd")
                     }
-                },
-                _ => {
-                    bail!("Unexpected Cmd type when processing cmd")
                 }
+                return Ok(());
             }
-            return Ok(());
+            other => {
+                println!("other cmd: {other:?}");
+            }
         }
     }
 
@@ -835,6 +844,8 @@ async fn spentbook_spend_transaction_with_no_inputs_should_return_spentbook_erro
             spent_proofs: new_dbc.inputs_spent_proofs.clone(),
             spent_transactions: new_dbc.inputs_spent_transactions,
             network_knowledge: None,
+            #[cfg(not(feature = "data-network"))]
+            fee_ciphers: BTreeMap::new(),
         })),
         &mut node,
         comm_rx,
@@ -939,6 +950,8 @@ async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node()
             spent_proofs: new_dbc2.inputs_spent_proofs,
             spent_transactions: new_dbc2.inputs_spent_transactions,
             network_knowledge: Some((proof_chain, sap)),
+            #[cfg(not(feature = "data-network"))]
+            fee_ciphers: BTreeMap::new(),
         })),
         &mut node,
         comm_rx,

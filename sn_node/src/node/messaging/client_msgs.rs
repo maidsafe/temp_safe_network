@@ -9,11 +9,11 @@
 use crate::node::{flow_ctrl::cmds::Cmd, Error, MyNode, NodeContext, Result};
 
 use sn_dbc::{
-    get_public_commitments_from_transaction, Commitment, DbcTransaction, PublicKey, SpentProof,
+    get_blinded_amounts_from_transaction, BlindedAmount, DbcTransaction, PublicKey, SpentProof,
     SpentProofShare,
 };
 use sn_interface::{
-    dbcs::DbcReason,
+    dbcs::{DbcReason, FeeCiphers},
     messaging::{
         data::{ClientMsg, DataCmd, DataQuery, DataResponse, SpendQuery, SpentbookCmd},
         system::NodeQueryResponse,
@@ -26,7 +26,8 @@ use sn_interface::{
 };
 
 use qp2p::SendStream;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
+use xor_name::XorName;
 
 impl MyNode {
     /// Forms a `CmdError` msg to send back to the client over the response stream
@@ -121,6 +122,8 @@ impl MyNode {
                     reason,
                     spent_proofs,
                     spent_transactions,
+                    #[cfg(not(feature = "data-network"))]
+                    fee_ciphers,
                 } = cmd.clone();
                 if let Some((proof_chain, signed_sap)) = network_knowledge {
                     info!(
@@ -140,6 +143,7 @@ impl MyNode {
                             ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
                                 public_key,
                                 tx,
+                                fee_ciphers,
                                 reason,
                                 spent_proofs,
                                 spent_transactions,
@@ -213,10 +217,12 @@ impl MyNode {
             reason,
             spent_proofs,
             spent_transactions,
+            #[cfg(not(feature = "data-network"))]
+            fee_ciphers,
             ..
         } = cmd;
 
-        info!("Processing spend request for public key: {:?}", public_key);
+        info!("Processing spend request for dbc key: {public_key:?}");
 
         let spent_proof_share = MyNode::gen_spent_proof_share(
             &public_key,
@@ -225,6 +231,8 @@ impl MyNode {
             &spent_proofs,
             &spent_transactions,
             context,
+            #[cfg(not(feature = "data-network"))]
+            fee_ciphers,
         )?;
 
         Ok(spent_proof_share)
@@ -238,18 +246,26 @@ impl MyNode {
         spent_proofs: &BTreeSet<SpentProof>,
         spent_transactions: &BTreeSet<DbcTransaction>,
         context: &NodeContext,
+        #[cfg(not(feature = "data-network"))] fee_ciphers: BTreeMap<XorName, FeeCiphers>,
     ) -> Result<SpentProofShare> {
-        // verify that fee is paid (we are included as output)
-        MyNode::verify_fee(context.store_cost, context.reward_secret_key.as_ref(), tx)?;
+        // verify that fee is paid to us
+        #[cfg(not(feature = "data-network"))]
+        MyNode::verify_fee(
+            context.store_cost,
+            context.reward_secret_key.as_ref(),
+            tx,
+            context.name,
+            fee_ciphers,
+        )?;
 
         // verify the spent proofs
         MyNode::verify_spent_proofs(spent_proofs, &context.network_knowledge)?;
 
         let public_commitments_info =
-            get_public_commitments_from_transaction(tx, spent_proofs, spent_transactions)?;
+            get_blinded_amounts_from_transaction(tx, spent_proofs, spent_transactions)?;
 
         // Do not sign invalid TX.
-        let tx_public_commitments: Vec<Commitment> = public_commitments_info
+        let tx_public_commitments: Vec<BlindedAmount> = public_commitments_info
             .clone()
             .into_iter()
             .map(|(_, v)| v)
@@ -264,7 +280,7 @@ impl MyNode {
         // Check the public_key wasn't already spent with a different TX (i.e. double spent)
 
         // Grab the commitment specific to the spent public key.
-        let public_commitment: Commitment = public_commitments_info
+        let public_commitment: BlindedAmount = public_commitments_info
             .into_iter()
             .find(|(k, _c)| k == public_key)
             .map(|(_k, c)| c)
@@ -287,32 +303,14 @@ impl MyNode {
         Ok(spent_proof_share)
     }
 
+    #[cfg(not(feature = "data-network"))]
     fn verify_fee(
         _store_cost: sn_dbc::Token,
-        _our_key: &bls::SecretKey,
+        _reward_secret_key: &bls::SecretKey,
         _tx: &DbcTransaction,
+        _our_name: XorName,
+        _fee_ciphers: BTreeMap<XorName, FeeCiphers>,
     ) -> Result<()> {
-        // TODO: check that we have an output to us, and that it is of sufficient value.
-
-        // pseudo code:
-
-        // let paid_to_us = match tx.get(our_key) {
-        //     Some(output) => output.amount(),
-        //     None => {
-        //         return Err(Error::InsufficientFeesPaid {
-        //             min_required: store_cost,
-        //             paid: sn_dbc::Token::zero(),
-        //         })
-        //     }
-        // };
-
-        // if store_cost > paid_to_us {
-        //     return Err(Error::InsufficientFeesPaid {
-        //         min_required: store_cost,
-        //         paid: paid_to_us,
-        //     });
-        // }
-
         Ok(())
     }
 

@@ -12,7 +12,7 @@
 ///     The invoice consists of the `invoice_content` field, and `seller_signature` - the seller signature over it.
 ///     An `InvoiceContent` has the following fields:
 ///       a. `amount_commitment`: an amount commitment.
-///       b. `amount_secrets_cipher`: `AmountSecret` (amount, blindfactor) ciphertext encrypted to buyer's pubkey
+///       b. `revealed_amount_cipher`: `AmountSecret` (amount, blindfactor) ciphertext encrypted to buyer's pubkey
 ///       c. `seller_public_key`:  owner's well-known pubkey (should be one-time-use)
 ///  3. Buyer verifies seller's signature over `invoice_content`.
 ///  4. Buyer decrypts the `AmountSecret` to obtain the invoice amount.
@@ -51,7 +51,7 @@ pub use self::{
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
-    use sn_dbc::{AmountSecrets, Token};
+    use sn_dbc::{RevealedAmount, Token};
 
     #[tokio::test]
     async fn invoice_can_be_read_buyer() -> Result<()> {
@@ -67,9 +67,9 @@ mod tests {
 
         // verify buyer can read the amount
         let decryption_result =
-            AmountSecrets::try_from((&buyer_secret, &invoice.content.amount_secrets_cipher));
-        assert_matches!(decryption_result, Ok(amount_secret) => {
-            assert!(invoice.content.matches_commitment(&amount_secret));
+            RevealedAmount::try_from((&buyer_secret, &invoice.content.revealed_amount_cipher));
+        assert_matches!(decryption_result, Ok(revealed_amount) => {
+            assert!(invoice.content.amount_equals(&revealed_amount));
         });
 
         Ok(())

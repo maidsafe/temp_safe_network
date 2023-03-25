@@ -8,7 +8,7 @@ use crate::{
 use eyre::{eyre, Context, ContextCompat, Result};
 use sn_consensus::{Ballot, Consensus, Decision, Proposition, Vote, VoteResponse};
 use sn_dbc::{
-    get_public_commitments_from_transaction, Commitment, Dbc, DbcTransaction, Owner, OwnerOnce,
+    get_blinded_amounts_from_transaction, BlindedAmount, Dbc, DbcTransaction, Owner, OwnerOnce,
     Token, TransactionBuilder,
 };
 use std::{
@@ -179,7 +179,7 @@ pub fn reissue_dbc(
     section_keys_provider: &SectionKeysProvider,
 ) -> Result<Dbc> {
     let output_amount = Token::from_nano(amount);
-    let input_amount = input.amount_secrets_bearer()?.amount();
+    let input_amount = Token::from_nano(input.revealed_amount_bearer()?.value());
     let change_amount = input_amount
         .checked_sub(output_amount)
         .ok_or_else(|| eyre!("The input amount minus the amount must evaluate to a valid value"))?;
@@ -198,12 +198,12 @@ pub fn reissue_dbc(
         )
         .build(rng)?;
     for (public_key, tx) in dbc_builder.inputs() {
-        let public_commitments = get_public_commitments_from_transaction(
+        let blinded_amounts = get_blinded_amounts_from_transaction(
             &tx,
             &input.inputs_spent_proofs,
             &input.inputs_spent_transactions,
         )?;
-        let public_commitment: Commitment = public_commitments
+        let blinded_amount: BlindedAmount = blinded_amounts
             .into_iter()
             .find(|(k, _c)| k == &public_key)
             .map(|(_k, c)| c)
@@ -215,7 +215,7 @@ pub fn reissue_dbc(
             DbcReason::none(),
             sap,
             section_keys_provider,
-            public_commitment,
+            blinded_amount,
         )?;
         dbc_builder = dbc_builder
             .add_spent_proof_share(spent_proof_share)
@@ -237,7 +237,7 @@ pub fn get_input_dbc_spend_info(
     output_owner_sk: &bls::SecretKey,
 ) -> Result<(bls::PublicKey, DbcTransaction)> {
     let output_amount = Token::from_nano(amount);
-    let input_amount = input.amount_secrets_bearer()?.amount();
+    let input_amount = Token::from_nano(input.revealed_amount_bearer()?.value());
     let change_amount = input_amount
         .checked_sub(output_amount)
         .ok_or_else(|| eyre!("The input amount minus the amount must evaluate to a valid value"))?;

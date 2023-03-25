@@ -6,7 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-pub use sn_dbc::{self as dbc, Dbc, DbcTransaction, Token};
+use dbc::PedersenGens;
+pub use sn_dbc::{self as dbc, Dbc, DbcTransaction, Output, RevealedOutput, Token};
 pub use sn_interface::dbcs::DbcReason;
 
 use super::{helpers::parse_tokens_amount, register::EntryHash};
@@ -17,14 +18,15 @@ use crate::{
 
 use sn_client::Client;
 use sn_dbc::{
-    rng, AmountSecrets, Error as DbcError, Hash, Owner, OwnerOnce, PublicKey, SpentProof,
+    rng, Error as DbcError, Hash, Owner, OwnerOnce, PublicKey, RevealedAmount, SpentProof,
     SpentProofShare, TransactionBuilder,
 };
-use sn_interface::{elder_count, network_knowledge::supermajority};
+use sn_interface::{dbcs::FeeCiphers, elder_count, network_knowledge::supermajority};
 
 use bytes::Bytes;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use tracing::{debug, warn};
+use xor_name::XorName;
 
 /// Type tag to use for the Wallet stored on Register
 pub const WALLET_TYPE_TAG: u64 = 1_000;
@@ -32,6 +34,18 @@ pub const WALLET_TYPE_TAG: u64 = 1_000;
 /// Set of spendable DBCs mapped to their friendly name as defined/chosen by the user when
 /// depositing DBCs into a wallet.
 pub type WalletSpendableDbcs = BTreeMap<String, (Dbc, EntryHash)>;
+
+/// Convenience struct to avoid complex fn signatures.
+struct ReissueComponents {
+    input_dbcs_to_spend: Vec<Dbc>,
+    input_dbcs_entries_hash: BTreeSet<EntryHash>,
+    outputs_owners: Vec<(RevealedAmount, OwnerOnce)>,
+    change_amount: Token,
+    /// This is the set of input dbc keys, each having a set of
+    /// Elder names and their respective fee ciphers.
+    #[cfg(not(feature = "data-network"))]
+    all_inputs_fee_ciphers: BTreeMap<PublicKey, BTreeMap<XorName, FeeCiphers>>,
+}
 
 // Number of attempts to make trying to spend inputs when reissuing DBCs
 // As the spend and query cmds are cascaded closely, there is high chance
@@ -129,8 +143,9 @@ impl Safe {
         };
 
         let amount = dbc_to_deposit
-            .amount_secrets_bearer()
-            .map(|amount_secrets| amount_secrets.amount())?;
+            .revealed_amount_bearer()
+            .map(|revealed_amount| revealed_amount.value())
+            .map(Token::from_nano)?;
 
         let safeurl = self.parse_and_resolve_url(wallet_url).await?;
         self.insert_dbc_into_wallet(&safeurl, &dbc_to_deposit, spendable_name.clone())
@@ -243,8 +258,8 @@ impl Safe {
         for (name, (dbc, _)) in &balances {
             debug!("Checking spendable balance named: {}", name);
 
-            let balance = match dbc.amount_secrets_bearer() {
-                Ok(amount_secrets) => amount_secrets.amount(),
+            let balance = match dbc.revealed_amount_bearer() {
+                Ok(revealed_amount) => Token::from_nano(revealed_amount.value()),
                 Err(err) => {
                     warn!("Ignoring amount from DBC found in wallet due to error in revealing secret amount: {:?}", err);
                     continue;
@@ -318,8 +333,10 @@ impl Safe {
         reason: DbcReason,
     ) -> Result<Vec<Dbc>> {
         let mut total_output_amount = Token::zero();
-        let mut outputs_owners = Vec::<(Token, OwnerOnce)>::new();
-        for (amount, owner_pk) in outputs {
+        let mut outputs_owners = Vec::<(RevealedAmount, OwnerOnce)>::new();
+        let mut rng = rng::thread_rng();
+
+        for (amount, base_owner_pk) in outputs {
             let output_amount = parse_tokens_amount(&amount)?;
             if output_amount.as_nano() == 0 {
                 return Err(Error::InvalidAmount(
@@ -337,13 +354,15 @@ impl Safe {
                     )
                     })?;
 
-            let output_owner = if let Some(pk) = owner_pk {
+            let output_owner = if let Some(pk) = base_owner_pk {
                 let owner = Owner::from(pk);
-                OwnerOnce::from_owner_base(owner, &mut rng::thread_rng())
+                OwnerOnce::from_owner_base(owner, &mut rng)
             } else {
-                let owner = Owner::from_random_secret_key(&mut rng::thread_rng());
-                OwnerOnce::from_owner_base(owner, &mut rng::thread_rng())
+                let owner = Owner::from_random_secret_key(&mut rng);
+                OwnerOnce::from_owner_base(owner, &mut rng)
             };
+
+            let output_amount = RevealedAmount::from_amount(output_amount.as_nano(), &mut rng);
 
             outputs_owners.push((output_amount, output_owner));
         }
@@ -354,10 +373,9 @@ impl Safe {
         // From the spendable dbcs, we select the number required to cover the
         // amount going to the output dbcs.
         #[cfg(feature = "data-network")]
-        let (input_dbcs_to_spend, input_dbcs_entries_hash, outputs_owners, change_amount) =
-            Self::select_inputs(spendable_dbcs, total_output_amount, outputs_owners)?;
+        let components = Self::select_inputs(spendable_dbcs, total_output_amount, outputs_owners)?;
         #[cfg(not(feature = "data-network"))]
-        let (input_dbcs_to_spend, input_dbcs_entries_hash, outputs_owners, change_amount) = {
+        let components = {
             let client = self.get_safe_client()?;
             Self::select_inputs_with_fees(
                 client,
@@ -368,9 +386,25 @@ impl Safe {
             .await?
         };
 
+        let ReissueComponents {
+            input_dbcs_to_spend,
+            input_dbcs_entries_hash,
+            outputs_owners,
+            change_amount,
+            #[cfg(not(feature = "data-network"))]
+            all_inputs_fee_ciphers,
+        } = components;
+
         // We can now reissue the output DBCs
         let (output_dbcs, change_dbc) = self
-            .reissue_dbcs(input_dbcs_to_spend, outputs_owners, reason, change_amount)
+            .reissue_dbcs(
+                input_dbcs_to_spend,
+                outputs_owners,
+                change_amount,
+                reason,
+                #[cfg(not(feature = "data-network"))]
+                all_inputs_fee_ciphers,
+            )
             .await?;
 
         if output_dbcs.is_empty() {
@@ -404,8 +438,8 @@ impl Safe {
     fn select_inputs(
         spendable_dbcs: WalletSpendableDbcs,
         total_output_amount: Token,
-        outputs_owners: Vec<(Token, OwnerOnce)>,
-    ) -> Result<SelectedInputs> {
+        outputs_owners: Vec<(RevealedAmount, OwnerOnce)>,
+    ) -> Result<ReissueComponents> {
         // We'll combine one or more input DBCs and reissue:
         // - one output DBC for the recipient,
         // - and a second DBC for the change, which will be stored in the source wallet.
@@ -414,8 +448,8 @@ impl Safe {
         let mut total_input_amount = Token::zero();
         let mut change_amount = total_output_amount;
         for (name, (dbc, entry_hash)) in spendable_dbcs {
-            let dbc_balance = match dbc.amount_secrets_bearer() {
-                Ok(amount_secrets) => amount_secrets.amount(),
+            let dbc_balance = match dbc.revealed_amount_bearer() {
+                Ok(revealed_amount) => revealed_amount.amount(),
                 Err(err) => {
                     warn!("Ignoring input DBC found in wallet (entry: {}) due to error in revealing secret amount: {:?}", name, err);
                     continue;
@@ -453,12 +487,12 @@ impl Safe {
         // If not enough spendable was found, this check will return an error.
         Self::verify_amounts(total_input_amount, total_output_amount)?;
 
-        Ok((
+        Ok(ReissueComponents {
             input_dbcs_to_spend,
             input_dbcs_entries_hash,
             outputs_owners,
             change_amount,
-        ))
+        })
     }
 
     ///
@@ -467,8 +501,8 @@ impl Safe {
         client: &Client,
         spendable_dbcs: WalletSpendableDbcs,
         mut total_output_amount: Token,
-        mut outputs_owners: Vec<(Token, OwnerOnce)>,
-    ) -> Result<SelectedInputs> {
+        mut outputs_owners: Vec<(RevealedAmount, OwnerOnce)>,
+    ) -> Result<ReissueComponents> {
         // We'll combine one or more input DBCs and reissue:
         // - one output DBC for the recipient,
         // - and a second DBC for the change, which will be stored in the source wallet.
@@ -476,35 +510,42 @@ impl Safe {
         let mut input_dbcs_entries_hash = BTreeSet::<EntryHash>::new();
         let mut total_input_amount = Token::zero();
         let mut change_amount = total_output_amount;
+        #[cfg(not(feature = "data-network"))]
+        let mut all_inputs_fee_ciphers = BTreeMap::new();
 
         for (name, (dbc, entry_hash)) in spendable_dbcs {
-            // TODO: Query the network, one section per input, for the current fee.
-            // Right now, now fees are added, as a dummy is used instead.
+            #[cfg(not(feature = "data-network"))]
+            let mut input_fee_ciphers = BTreeMap::new();
 
             let revealed_bearer = dbc.as_revealed_input_bearer()?;
             let input_key = revealed_bearer.public_key();
-            // each mint will have elder_count() instances to pay individually (for now, later they will be more)
-            let mint_fees = client.get_mint_fees(input_key).await?;
-            let responses = mint_fees.len();
-            let required_num_mints = supermajority(elder_count());
-            if required_num_mints > mint_fees.len() {
-                warn!("Not enough mints contacted for the section to spend the input. Got: {responses}, needed: {required_num_mints}");
+            // each section will have elder_count() instances to pay individually (for now, later they will be more)
+            let elder_fees = client.get_mint_fees(input_key).await?;
+            let num_responses = elder_fees.len();
+            let required_responses = supermajority(elder_count());
+            if required_responses > num_responses {
+                warn!("Not enough elders contacted for the section to spend the input. Got: {num_responses}, needed: {required_responses}");
                 continue;
             }
 
             // Fees that were not encrypted to us.
             let mut invalid_fees = BTreeSet::new();
             // As the mints encrypt the amount to our public key, we need to decrypt it.
-            let mut decrypted_mint_fees = vec![];
+            let mut decrypted_elder_fees = vec![];
 
-            for invoice in mint_fees {
-                match AmountSecrets::try_from((
+            for (elder, invoice) in elder_fees {
+                match RevealedAmount::try_from((
                     &revealed_bearer.secret_key,
-                    &invoice.content.amount_secrets_cipher,
+                    &invoice.content.revealed_amount_cipher,
                 )) {
                     Ok(amount) => {
-                        let fee = amount.amount();
-                        decrypted_mint_fees.push((invoice, fee));
+                        if amount.blinded_amount(&PedersenGens::default())
+                            != invoice.content.blinded_amount
+                        {
+                            warn!("An invalid fee result returned from Elder!"); // TODO: How shall this be handled?
+                            continue;
+                        }
+                        decrypted_elder_fees.push(((elder, invoice), amount));
                     }
                     Err(_) => {
                         let _ = invalid_fees.insert(invoice.content.seller_public_key);
@@ -512,42 +553,60 @@ impl Safe {
                 }
             }
 
-            let max_invalid_fees = elder_count() - required_num_mints;
+            let max_invalid_fees = elder_count() - required_responses;
             if invalid_fees.len() > max_invalid_fees {
-                let valid_responses = responses - invalid_fees.len();
-                warn!("Not enough valid fees received from the section to spend the input. Found: {valid_responses}, needed: {required_num_mints}", );
+                let valid_responses = num_responses - invalid_fees.len();
+                warn!("Not enough valid fees received from the section to spend the input. Found: {valid_responses}, needed: {required_responses}", );
                 continue;
             }
 
             // Total fee paid to all recipients in the section for this input.
-            let fee_per_input = decrypted_mint_fees
+            let fee_per_input = decrypted_elder_fees
                 .iter()
                 .fold(Some(Token::zero()), |total, (_, fee)| {
-                    total.and_then(|t| t.checked_add(*fee))
+                    total.and_then(|t| t.checked_add(Token::from_nano(fee.value())))
                 })
                 .ok_or_else(|| Error::DbcReissueError(
                     "Overflow occurred while summing the individual Elder's fees in order to calculate the total amount for the output DBCs."
                         .to_string(),
                 ))?;
 
-            // Add mints to outputs.
-            decrypted_mint_fees.iter().for_each(|(invoice, fee)| {
-                let owner = Owner::from(invoice.content.seller_public_key);
-                let owner_once = OwnerOnce::from_owner_base(owner, &mut rng::thread_rng());
-                outputs_owners.push((*fee, owner_once));
-            });
+            // Add elders to outputs and generate their fee ciphers.
+            decrypted_elder_fees
+                .iter()
+                .for_each(|((elder, invoice), fee)| {
+                    let owner = Owner::from(invoice.content.seller_public_key);
+                    let owner_once = OwnerOnce::from_owner_base(owner, &mut rng::thread_rng());
 
-            // NB: We are not yet using the commitment sent by Elders. TBD.
+                    #[cfg(not(feature = "data-network"))]
+                    {
+                        let derivation_index_cipher = invoice
+                            .content
+                            .seller_public_key
+                            .encrypt(owner_once.derivation_index);
+                        let output_owner_pk = owner_once.as_owner().public_key();
+                        let amount_cipher = fee.encrypt(&output_owner_pk);
+                        input_fee_ciphers.insert(
+                            elder.name(),
+                            FeeCiphers::new(amount_cipher, derivation_index_cipher),
+                        );
+                    }
 
-            let dbc_balance = match dbc.amount_secrets_bearer() {
-                Ok(amount_secrets) => amount_secrets.amount(),
+                    outputs_owners.push((*fee, owner_once));
+                });
+
+            #[cfg(not(feature = "data-network"))]
+            let _ = all_inputs_fee_ciphers.insert(input_key, input_fee_ciphers);
+
+            let dbc_balance = match dbc.revealed_amount_bearer() {
+                Ok(revealed_amount) => Token::from_nano(revealed_amount.value()),
                 Err(err) => {
-                    warn!("Ignoring input DBC found in wallet (entry: {}) due to error in revealing secret amount: {:?}", name, err);
+                    warn!("Ignoring input Dbc found in wallet (entry: {}) due Dbc not being a bearer: {:?}", name, err);
                     continue;
                 }
             };
 
-            // Add this DBC as input to be spent.
+            // Add this Dbc as input to be spent.
             input_dbcs_to_spend.push(dbc);
             input_dbcs_entries_hash.insert(entry_hash);
 
@@ -596,12 +655,14 @@ impl Safe {
         // If not enough spendable was found, this check will return an error.
         Self::verify_amounts(total_input_amount, total_output_amount)?;
 
-        Ok((
+        Ok(ReissueComponents {
             input_dbcs_to_spend,
             input_dbcs_entries_hash,
             outputs_owners,
             change_amount,
-        ))
+            #[cfg(not(feature = "data-network"))]
+            all_inputs_fee_ciphers,
+        })
     }
 
     // Make sure total input amount gathered with input DBCs are enough for the output amount
@@ -644,17 +705,27 @@ impl Safe {
     pub(super) async fn reissue_dbcs(
         &self,
         input_dbcs: Vec<Dbc>,
-        outputs: Vec<(Token, OwnerOnce)>,
-        reason: DbcReason,
+        outputs: Vec<(RevealedAmount, OwnerOnce)>,
         change_amount: Token,
-    ) -> Result<(Vec<(Dbc, OwnerOnce, AmountSecrets)>, Option<Dbc>)> {
+        reason: DbcReason,
+        #[cfg(not(feature = "data-network"))] all_inputs_fee_ciphers: BTreeMap<
+            PublicKey,
+            BTreeMap<XorName, FeeCiphers>,
+        >,
+    ) -> Result<(Vec<(Dbc, OwnerOnce, RevealedAmount)>, Option<Dbc>)> {
+        let mut rng = rng::thread_rng();
+        let outputs = outputs.into_iter().map(|(r, owner)| {
+            let output_owner_pk = owner.as_owner().public_key();
+            let output = RevealedOutput::new(Output::new(output_owner_pk, r.value()), &mut rng);
+            (output, owner)
+        });
+
         let mut tx_builder = TransactionBuilder::default()
             .add_inputs_dbc_bearer(input_dbcs.iter())?
-            .add_outputs_by_amount(outputs.into_iter().map(|(token, owner)| (token, owner)));
+            .add_outputs(outputs);
 
         let client = self.get_safe_client()?;
-        let change_owneronce =
-            OwnerOnce::from_owner_base(client.dbc_owner().clone(), &mut rng::thread_rng());
+        let change_owneronce = OwnerOnce::from_owner_base(client.dbc_owner().clone(), &mut rng);
         if change_amount.as_nano() > 0 {
             tx_builder = tx_builder.add_output_by_amount(change_amount, change_owneronce.clone());
         }
@@ -676,6 +747,12 @@ impl Safe {
 
         // Spend all the input DBCs, collecting the spent proof shares for each of them
         for (public_key, tx) in dbc_builder.inputs() {
+            #[cfg(not(feature = "data-network"))]
+            let input_fee_ciphers = all_inputs_fee_ciphers
+                .get(&public_key)
+                .cloned()
+                .ok_or(Error::DbcReissueError("Missing fee!".to_string()))?;
+
             let tx_hash = Hash::from(tx.hash());
             // TODO: spend DBCs concurrently spawning tasks
             let mut attempts = 0;
@@ -688,6 +765,8 @@ impl Safe {
                         reason,
                         inputs_spent_proofs.clone(),
                         inputs_spent_transactions.clone(),
+                        #[cfg(not(feature = "data-network"))]
+                        input_fee_ciphers.clone(),
                     )
                     .await?;
 
@@ -743,13 +822,6 @@ impl Safe {
         Ok((output_dbcs, change_dbc))
     }
 }
-
-type SelectedInputs = (
-    Vec<Dbc>,
-    BTreeSet<EntryHash>,
-    Vec<(Token, OwnerOnce)>,
-    Token,
-);
 
 // Private helper to verify if a set of spent proof shares are valid for a given public_key and TX
 fn verify_spent_proof_shares_for_tx(
@@ -1077,18 +1149,18 @@ mod tests {
             .ok_or_else(|| anyhow!("Couldn't read first DBC from fetched wallet"))?;
         assert_eq!(dbc1_read.owner_base(), dbc1.owner_base());
         let balance1 = dbc1_read
-            .amount_secrets_bearer()
+            .revealed_amount_bearer()
             .map_err(|err| anyhow!("Couldn't read balance from first DBC fetched: {:?}", err))?;
-        assert_eq!(balance1.amount(), dbc1_balance);
+        assert_eq!(balance1.value(), dbc1_balance.as_nano());
 
         let (dbc2_read, _) = wallet_balances
             .get("my-second-dbc")
             .ok_or_else(|| anyhow!("Couldn't read second DBC from fetched wallet"))?;
         assert_eq!(dbc2_read.owner_base(), dbc2.owner_base());
         let balance2 = dbc2_read
-            .amount_secrets_bearer()
+            .revealed_amount_bearer()
             .map_err(|err| anyhow!("Couldn't read balance from second DBC fetched: {:?}", err))?;
-        assert_eq!(balance2.amount(), dbc2_balance);
+        assert_eq!(balance2.value(), dbc2_balance.as_nano());
 
         Ok(())
     }
@@ -1168,9 +1240,9 @@ mod tests {
             .await?;
 
         let output_balance = output_dbc
-            .amount_secrets_bearer()
+            .revealed_amount_bearer()
             .map_err(|err| anyhow!("Couldn't read balance from output DBC: {:?}", err))?;
-        assert_eq!(output_balance.amount(), amount_to_reissue);
+        assert_eq!(output_balance.value(), amount_to_reissue.as_nano());
 
         let current_balance = safe.wallet_balance(&wallet_xorurl).await?;
         assert_eq!(current_balance, Token::from_nano(expected_change));
@@ -1184,9 +1256,9 @@ mod tests {
             .next()
             .ok_or_else(|| anyhow!("Couldn't read change DBC from fetched wallet"))?;
         let change = change_dbc_read
-            .amount_secrets_bearer()
+            .revealed_amount_bearer()
             .map_err(|err| anyhow!("Couldn't read balance from change DBC fetched: {:?}", err))?;
-        assert_eq!(change.amount(), Token::from_nano(expected_change));
+        assert_eq!(change.value(), expected_change);
 
         Ok(())
     }
@@ -1204,9 +1276,9 @@ mod tests {
             .await?;
 
         let output_balance = output_dbc
-            .amount_secrets_bearer()
+            .revealed_amount_bearer()
             .map_err(|err| anyhow!("Couldn't read balance from output DBC: {:?}", err))?;
-        assert_eq!(output_balance.amount(), Token::from_nano(1_000_000_000));
+        assert_eq!(output_balance.value(), 1_000_000_000);
 
         tokio::time::sleep(tokio::time::Duration::from_millis(5000)).await;
 
@@ -1224,9 +1296,9 @@ mod tests {
             .next()
             .ok_or_else(|| anyhow!("Couldn't read change DBC from fetched wallet"))?;
         let change = change_dbc_read
-            .amount_secrets_bearer()
+            .revealed_amount_bearer()
             .map_err(|err| anyhow!("Couldn't read balance from change DBC fetched: {:?}", err))?;
-        assert_eq!(change.amount(), change_amount);
+        assert_eq!(change.value(), change_amount.as_nano());
 
         Ok(())
     }
@@ -1571,8 +1643,8 @@ mod tests {
 
         let mut num_fee_outputs = 0;
         for dbc in output_dbcs {
-            if let Ok(balance) = dbc.amount_secrets_bearer() {
-                assert!(output_amounts.contains(&balance.amount().as_nano()));
+            if let Ok(balance) = dbc.revealed_amount_bearer() {
+                assert!(output_amounts.contains(&balance.value()));
             } else {
                 num_fee_outputs += 1;
             }
@@ -1591,9 +1663,9 @@ mod tests {
             .next()
             .ok_or_else(|| anyhow!("Couldn't read change DBC from fetched wallet"))?;
         let change = change_dbc_read
-            .amount_secrets_bearer()
+            .revealed_amount_bearer()
             .map_err(|err| anyhow!("Couldn't read balance from change DBC fetched: {:?}", err))?;
-        assert_eq!(change.amount(), Token::from_nano(expected_change));
+        assert_eq!(change.value(), expected_change);
 
         Ok(())
     }

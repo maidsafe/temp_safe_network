@@ -15,11 +15,12 @@ use sn_interface::{
         data::{ClientMsg, DataQuery, Error as ErrorMsg, QueryResponse, SpendQuery},
         ClientAuth, WireMsg,
     },
-    types::{payments::Invoice, SpentbookAddress},
+    types::{payments::Invoice, NodeId, SpentbookAddress},
 };
 
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use futures::future::join_all;
+use std::collections::BTreeMap;
 use tokio::time::sleep;
 use tracing::{debug, info_span};
 use xor_name::XorName;
@@ -27,10 +28,10 @@ use xor_name::XorName;
 impl Client {
     /// Return the set of Elder reward keys and the individual fee they ask for processing a spend.
     #[instrument(skip(self), level = "debug")]
-    pub async fn get_mint_fees(&self, dbc_key: PublicKey) -> Result<Vec<Invoice>> {
-        let address = SpentbookAddress::new(XorName::from_content(&dbc_key.to_bytes()));
+    pub async fn get_mint_fees(&self, public_key: PublicKey) -> Result<BTreeMap<NodeId, Invoice>> {
+        let address = SpentbookAddress::new(XorName::from_content(&public_key.to_bytes()));
         let fee_query = DataQuery::Spentbook(SpendQuery::GetFees {
-            buyer: dbc_key,
+            buyer: public_key,
             address,
         });
 
@@ -46,7 +47,7 @@ impl Client {
 
         // We just want to receive at least supermajority of results, we don't care about any errors
         // so we log them, but return whatever results we get. If not enough for upper layer, it will error there.
-        let results = join_all(tasks)
+        let results: BTreeMap<NodeId, Invoice> = join_all(tasks)
             .await
             .into_iter()
             .flat_map(|res| {
@@ -61,8 +62,8 @@ impl Client {
                 }
                 res
             })
-            .filter_map(|r| match r {
-                QueryResponse::GetFees(Ok(res)) => Some(res),
+            .filter_map(|(elder, resp)| match resp {
+                QueryResponse::GetFees(Ok(fee)) => Some((elder, fee)),
                 QueryResponse::GetFees(Err(error)) => {
                     warn!("Fee query unexpectedly failed: {error}");
                     None
@@ -80,7 +81,11 @@ impl Client {
     /// Send a Query to the network and await a response.
     /// Queries are automatically retried using exponential backoff if the timeout is hit.
     #[instrument(skip(self), level = "debug")]
-    async fn send_fee_query(&self, query: DataQuery, elder_index: usize) -> Result<QueryResponse> {
+    async fn send_fee_query(
+        &self,
+        query: DataQuery,
+        elder_index: usize,
+    ) -> Result<(NodeId, QueryResponse)> {
         let client_pk = self.public_key();
 
         trace!("Setting up fee query retry.");
@@ -138,7 +143,7 @@ impl Client {
                 .await;
 
             // if the response is acceptable, return instead of wait/retry loop
-            if let Ok(response) = &result {
+            if let Ok((elder, response)) = &result {
                 if response.is_error() {
                     warn!(
                         "Fee query errored... querying again until we hit query_timeout ({:?})",
@@ -146,7 +151,7 @@ impl Client {
                     );
                 } else {
                     debug!("{query:?} sent and received okay");
-                    return Ok(response.clone());
+                    return Ok((*elder, response.clone()));
                 }
             }
 

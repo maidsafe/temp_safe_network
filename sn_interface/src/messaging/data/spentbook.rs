@@ -8,14 +8,15 @@
 
 use super::{CmdResponse, Error, QueryResponse};
 
-use crate::dbcs::DbcReason;
+use crate::dbcs::{DbcReason, FeeCiphers};
 use crate::messaging::system::SectionSigned;
 use crate::network_knowledge::{SectionAuthorityProvider, SectionsDAG};
 use crate::types::SpentbookAddress;
 
-use serde::{Deserialize, Serialize};
 use sn_dbc::{DbcTransaction, PublicKey, SpentProof};
-use std::collections::BTreeSet;
+
+use serde::{Deserialize, Serialize};
+use std::collections::{BTreeMap, BTreeSet};
 use xor_name::XorName;
 
 /// Spend related read operations.
@@ -52,6 +53,11 @@ pub enum SpentbookCmd {
         spent_transactions: BTreeSet<DbcTransaction>,
         #[debug(skip)]
         network_knowledge: Option<(SectionsDAG, SectionSigned<SectionAuthorityProvider>)>,
+        /// As to avoid impl separate cmd flow, we send
+        /// all fee ciphers to all Elders for now.
+        #[debug(skip)]
+        #[cfg(not(feature = "data-network"))]
+        fee_ciphers: BTreeMap<XorName, FeeCiphers>,
     },
 }
 

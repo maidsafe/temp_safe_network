@@ -6,14 +6,15 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+mod fee_ciphers;
 mod reasons;
 
+pub use fee_ciphers::FeeCiphers;
 pub use reasons::DbcReason;
 
 use sn_dbc::{
     rng, Dbc, Error as DbcError, Hash, IndexedSignatureShare, Owner, OwnerOnce, PedersenGens,
-    RevealedCommitment, RevealedInput, SpentProofContent, SpentProofShare, Token,
-    TransactionBuilder,
+    RevealedAmount, RevealedInput, SpentProofContent, SpentProofShare, Token, TransactionBuilder,
 };
 
 use std::{fmt::Debug, result};
@@ -58,10 +59,10 @@ pub fn gen_genesis_dbc(
     let output_owner =
         OwnerOnce::from_owner_base(Owner::from(genesis_dbc_sk.clone()), &mut rng::thread_rng());
 
-    let revealed_commitment = RevealedCommitment::from_value(GENESIS_DBC_AMOUNT, rng::thread_rng());
+    let revealed_amount = RevealedAmount::from_amount(GENESIS_DBC_AMOUNT, rng::thread_rng());
 
     // Use the same key as the input and output of Genesis Tx.
-    let genesis_input = RevealedInput::new(genesis_dbc_sk.clone(), revealed_commitment);
+    let genesis_input = RevealedInput::new(genesis_dbc_sk.clone(), revealed_amount);
 
     let mut dbc_builder = TransactionBuilder::default()
         .add_input(genesis_input)
@@ -84,7 +85,7 @@ pub fn gen_genesis_dbc(
         public_key,
         transaction_hash: Hash::from(tx.hash()),
         reason: Hash::default(),
-        public_commitment: revealed_commitment.commit(&PedersenGens::default()),
+        blinded_amount: revealed_amount.blinded_amount(&PedersenGens::default()),
     };
 
     let sk_share_index = 0;

@@ -8,7 +8,7 @@
 
 use super::{Error, Result};
 
-use sn_dbc::{Commitment, Dbc, Hash, PublicKey};
+use sn_dbc::{BlindedAmount, Dbc, Hash, PublicKey};
 
 use serde::{Deserialize, Serialize};
 use tiny_keccak::{Hasher, Sha3};
@@ -31,12 +31,15 @@ impl Payment {
         Hash::from(hash)
     }
 
-    /// Retrieve sum of commitments for Dbcs derived from payto_public_key.
-    pub fn commitment_sum_by_owner(&self, payto_public_key: &PublicKey) -> Result<Commitment> {
+    /// Retrieve sum of blinded amounts for Dbcs derived from buyer_public_key.
+    pub fn sum_by_owner(&self, buyer_public_key: &PublicKey) -> Result<BlindedAmount> {
         self.dbcs
             .iter()
-            .filter(|d| &d.content.owner_base.public_key() == payto_public_key)
-            .map(|d| d.commitment().map_err(|_| Error::AmountCommitmentInvalid))
-            .sum::<Result<Commitment, _>>()
+            .filter(|d| &d.content.owner_base.public_key() == buyer_public_key)
+            .map(|d| {
+                d.blinded_amount()
+                    .map_err(|_| Error::AmountCommitmentInvalid)
+            })
+            .sum::<Result<BlindedAmount, _>>()
     }
 }

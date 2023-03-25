@@ -23,10 +23,10 @@ impl PaidInvoice {
         self.invoice.verify()?;
 
         let seller_public_key = self.invoice.content.seller_public_key;
-        let payment_sum = self.payment.commitment_sum_by_owner(&seller_public_key)?;
-        let invoice_amount_commitment = self.invoice.content.amount_commitment;
+        let payment_sum = self.payment.sum_by_owner(&seller_public_key)?;
+        let blinded_amount = self.invoice.content.blinded_amount;
 
-        if payment_sum == invoice_amount_commitment {
+        if payment_sum == blinded_amount {
             Ok(())
         } else {
             Err(Error::PaymentDoesNotMatchInvoiceAmount)

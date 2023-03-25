@@ -175,8 +175,8 @@ pub async fn gen_wallet_table(safe: &Safe, multimap: &Multimap) -> Result<Table>
             }
         };
 
-        let balance = match dbc.amount_secrets_bearer() {
-            Ok(amount_secrets) => amount_secrets.amount().to_string(),
+        let balance = match dbc.revealed_amount_bearer() {
+            Ok(revealed_amount) => sn_dbc::Token::from_nano(revealed_amount.value()).to_string(),
             Err(err) => {
                 warn!("Ignoring amount from DBC found in wallet due to error in revealing secret amount: {:?}", err);
                 "unknown".to_string()
