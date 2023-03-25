@@ -22,11 +22,9 @@ use xor_name::XorName;
 /// Spend related read operations.
 #[derive(Hash, Eq, PartialEq, PartialOrd, Clone, Serialize, Deserialize, Debug)]
 pub enum SpendQuery {
-    /// Query for the individual reward keys and their respective fee amount for processing a `Spend`.
-    GetFees {
-        buyer: PublicKey,
-        address: SpentbookAddress,
-    },
+    /// Query for the individual reward keys and their respective
+    /// fee amount for processing a `Spend` of a Dbc with the given id.
+    GetFees(PublicKey),
     /// Query for the set of spent proofs if the provided public key has already been spent with a Tx.
     GetSpentProofShares(SpentbookAddress),
 }
@@ -76,7 +74,7 @@ impl SpendQuery {
     /// Request variant.
     pub fn to_error_response(&self, error: Error) -> QueryResponse {
         match self {
-            Self::GetFees { .. } => QueryResponse::GetFees(Err(error)),
+            Self::GetFees(_) => QueryResponse::GetFees(Err(error)),
             Self::GetSpentProofShares(_) => QueryResponse::GetSpentProofShares(Err(error)),
         }
     }
@@ -84,7 +82,9 @@ impl SpendQuery {
     /// Returns the dst address for the request.
     pub fn dst_address(&self) -> SpentbookAddress {
         match self {
-            Self::GetFees { address, .. } => *address,
+            Self::GetFees(dbc_id) => {
+                SpentbookAddress::new(XorName::from_content(&dbc_id.to_bytes()))
+            }
             Self::GetSpentProofShares(address) => *address,
         }
     }

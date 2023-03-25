@@ -50,9 +50,14 @@ impl MyNode {
         send_stream: SendStream,
         context: NodeContext,
     ) -> Vec<Cmd> {
-        let response = if let DataQuery::Spentbook(SpendQuery::GetFees { buyer, .. }) = query {
-            // We receive this directly from client, as an Elder, since `is_spend` is set to true (that is a very messy/confusing pattern, to be fixed).
-            let invoice = Invoice::new(context.store_cost, buyer, &context.reward_secret_key);
+        let response = if let DataQuery::Spentbook(SpendQuery::GetFees(dbc_id)) = query {
+            // We receive this directly from client, as an Elder, since `is_spend` is set to true (that is a very
+            // messy/confusing pattern, to be fixed).
+
+            // This is using the invoice type a bit outside its intended use. The client is asking for the fee to spend
+            // a specific dbc, and including the id of that dbc. The invoice content is encrypted to that dbc id, and so
+            // only the holder of the dbc secret key can unlock the contents of this invoice.
+            let invoice = Invoice::new(context.store_cost, dbc_id, &context.reward_secret_key);
             NodeQueryResponse::GetFees(Ok(invoice))
         } else {
             context
