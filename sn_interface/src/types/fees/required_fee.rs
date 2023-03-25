@@ -6,33 +6,31 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{
-    errors::{Error, Result},
-    InvoiceContent,
-};
+use super::{Error, RequiredFeeContent, Result};
 
-use bls::SecretKey;
 use sn_dbc::{Hash, PublicKey, Signature, Token};
 
+use bls::SecretKey;
 use serde::{Deserialize, Serialize};
 use tiny_keccak::{Hasher, Sha3};
 
-/// A seller issues an Invoice thereby commiting to a price.
+/// An Elder responds to a Client who wishes to spend a dbc,
+/// informing the Client of the required fee for the spend.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub struct Invoice {
-    pub content: InvoiceContent,
-    pub seller_signature: Signature,
+pub struct RequiredFee {
+    pub content: RequiredFeeContent,
+    pub elder_reward_key_sig: Signature,
 }
 
-impl Invoice {
+impl RequiredFee {
     /// Create an invoice by encrypting the amount to the buyers key, and signing
     /// it all with the seller secret key.
-    pub fn new(amount: Token, buyer_public_key: &PublicKey, seller_secret_key: &SecretKey) -> Self {
-        let content = InvoiceContent::new(amount, buyer_public_key, seller_secret_key.public_key());
-        let seller_signature = seller_secret_key.sign(content.to_bytes());
+    pub fn new(amount: Token, dbc_id: &PublicKey, elder_reward_key_secret: &SecretKey) -> Self {
+        let content = RequiredFeeContent::new(amount, dbc_id, elder_reward_key_secret.public_key());
+        let elder_reward_key_sig = elder_reward_key_secret.sign(content.to_bytes());
         Self {
             content,
-            seller_signature,
+            elder_reward_key_sig,
         }
     }
 
@@ -40,12 +38,12 @@ impl Invoice {
     pub fn verify(&self) -> Result<()> {
         let valid = self
             .content
-            .seller_public_key
-            .verify(&self.seller_signature, self.content.to_bytes());
+            .elder_reward_key
+            .verify(&self.elder_reward_key_sig, self.content.to_bytes());
 
         match valid {
             true => Ok(()),
-            false => Err(Error::InvoiceSignatureInvalid),
+            false => Err(Error::RequiredFeeSignatureInvalid),
         }
     }
 
@@ -53,7 +51,7 @@ impl Invoice {
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut v: Vec<u8> = Default::default();
         v.extend(&self.content.to_bytes());
-        v.extend(&self.seller_signature.to_bytes());
+        v.extend(&self.elder_reward_key_sig.to_bytes());
         v
     }
 

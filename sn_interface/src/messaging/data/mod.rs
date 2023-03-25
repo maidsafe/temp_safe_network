@@ -26,7 +26,7 @@ pub use self::{
 };
 
 use crate::types::{
-    payments::Invoice,
+    fees::RequiredFee,
     register::{Entry, EntryHash, Permissions, Policy, Register, User},
     Chunk,
 };
@@ -146,7 +146,7 @@ pub enum QueryResponse {
     GetSpentProofShares(Result<Vec<SpentProofShare>>),
     //
     /// Response to [`SpendQuery::GetFees`].
-    GetFees(Result<Invoice>),
+    GetFees(Result<RequiredFee>),
 }
 
 impl QueryResponse {

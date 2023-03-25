@@ -12,14 +12,12 @@ use thiserror::Error;
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 /// Payment errors.
-#[derive(Error, Debug)]
+#[derive(Debug, Error)]
 pub enum Error {
-    #[error("payment amount does not match invoice amount")]
-    PaymentDoesNotMatchInvoiceAmount,
-    #[error("invoice signature is invalid")]
-    InvoiceSignatureInvalid,
-    #[error("amount commitment is invalid")]
-    AmountCommitmentInvalid,
+    #[error("signature is invalid")]
+    RequiredFeeSignatureInvalid,
+    #[error("Decryption of the amount failed. Wrong secret key used.")]
+    AmountDecryptionFailed,
     #[error("dbc error: {0}")]
     Dbc(#[from] sn_dbc::Error),
 }

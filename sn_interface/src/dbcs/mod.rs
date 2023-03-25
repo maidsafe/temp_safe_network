@@ -6,10 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-mod fee_ciphers;
 mod reasons;
 
-pub use fee_ciphers::FeeCiphers;
 pub use reasons::DbcReason;
 
 use sn_dbc::{

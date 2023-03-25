@@ -15,7 +15,7 @@ use sn_interface::{
         data::{ClientMsg, DataQuery, Error as ErrorMsg, QueryResponse, SpendQuery},
         ClientAuth, WireMsg,
     },
-    types::{payments::Invoice, NodeId},
+    types::{fees::RequiredFee, NodeId},
 };
 
 use backoff::{backoff::Backoff, ExponentialBackoff};
@@ -27,7 +27,7 @@ use tracing::{debug, info_span};
 impl Client {
     /// Return the set of Elder reward keys and the individual fee they ask for processing a spend.
     #[instrument(skip(self), level = "debug")]
-    pub async fn get_mint_fees(&self, dbc_id: PublicKey) -> Result<BTreeMap<NodeId, Invoice>> {
+    pub async fn get_mint_fees(&self, dbc_id: PublicKey) -> Result<BTreeMap<NodeId, RequiredFee>> {
         let fee_query = DataQuery::Spentbook(SpendQuery::GetFees(dbc_id));
 
         let (_, elders) = self
@@ -42,7 +42,7 @@ impl Client {
 
         // We just want to receive at least supermajority of results, we don't care about any errors
         // so we log them, but return whatever results we get. If not enough for upper layer, it will error there.
-        let results: BTreeMap<NodeId, Invoice> = join_all(tasks)
+        let results: BTreeMap<NodeId, RequiredFee> = join_all(tasks)
             .await
             .into_iter()
             .flat_map(|res| {

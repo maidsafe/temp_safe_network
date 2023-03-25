@@ -13,7 +13,7 @@ use sn_dbc::{
     SpentProofShare,
 };
 use sn_interface::{
-    dbcs::{DbcReason, FeeCiphers},
+    dbcs::DbcReason,
     messaging::{
         data::{ClientMsg, DataCmd, DataQuery, DataResponse, SpendQuery, SpentbookCmd},
         system::NodeQueryResponse,
@@ -22,7 +22,12 @@ use sn_interface::{
     network_knowledge::{
         section_keys::build_spent_proof_share, NetworkKnowledge, SectionTreeUpdate,
     },
-    types::{log_markers::LogMarker, payments::Invoice, register::User, ClientId, ReplicatedData},
+    types::{
+        fees::{FeeCiphers, RequiredFee},
+        log_markers::LogMarker,
+        register::User,
+        ClientId, ReplicatedData,
+    },
 };
 
 use qp2p::SendStream;
@@ -57,8 +62,9 @@ impl MyNode {
             // This is using the invoice type a bit outside its intended use. The client is asking for the fee to spend
             // a specific dbc, and including the id of that dbc. The invoice content is encrypted to that dbc id, and so
             // only the holder of the dbc secret key can unlock the contents of this invoice.
-            let invoice = Invoice::new(context.store_cost, dbc_id, &context.reward_secret_key);
-            NodeQueryResponse::GetFees(Ok(invoice))
+            let required_fee =
+                RequiredFee::new(context.store_cost, dbc_id, &context.reward_secret_key);
+            NodeQueryResponse::GetFees(Ok(required_fee))
         } else {
             context
                 .data_storage
@@ -310,12 +316,44 @@ impl MyNode {
 
     #[cfg(not(feature = "data-network"))]
     fn verify_fee(
-        _store_cost: sn_dbc::Token,
-        _reward_secret_key: &bls::SecretKey,
-        _tx: &DbcTransaction,
-        _our_name: XorName,
-        _fee_ciphers: BTreeMap<XorName, FeeCiphers>,
+        store_cost: sn_dbc::Token,
+        reward_secret_key: &bls::SecretKey,
+        tx: &DbcTransaction,
+        our_name: XorName,
+        fee_ciphers: BTreeMap<XorName, FeeCiphers>,
     ) -> Result<()> {
+        // find the ciphers for us
+        let fee_ciphers = fee_ciphers.get(&our_name).ok_or(Error::MissingFee)?;
+        // decrypt the ciphers
+        let (derived_key, revealed_amount) = fee_ciphers.decrypt(reward_secret_key)?;
+
+        // find the output for the derived key
+        let output_proof = match tx
+            .outputs
+            .iter()
+            .find(|proof| proof.public_key() == &derived_key)
+        {
+            Some(proof) => proof,
+            None => return Err(Error::MissingFee),
+        };
+
+        // blind the amount
+        let blinded_amount = revealed_amount.blinded_amount(&sn_dbc::PedersenGens::default());
+        // Since the output proof contains blinded amounts, we can only verify
+        // that the amount is what we expect by..
+        // 1. ..comparing equality to the blinded amount we build from the decrypted revealed amount (i.e. amount + blinding factor)..
+        if blinded_amount != output_proof.blinded_amount() {
+            return Err(Error::InvalidFeeBlindedAmount);
+        }
+        // .. and 2. checking that the revealed amount we have, (that we now know is what the output blinded amount contains, since the above check 1. passed),
+        // also is what we expect the amount to be.
+        // The basic rule for now is that if the paid fee is over 1% less than the required fee, we don't accept the fee.
+        // This is a temporary diff value/design.
+        // (And yes, this means that for now, the Client can try to get away cheaper by sending in up to 1% lower fee than they were asked for.)
+        if store_cost.as_nano() as f64 * 0.99 > revealed_amount.value() as f64 {
+            return Err(Error::FeeTooLow);
+        }
+
         Ok(())
     }
 

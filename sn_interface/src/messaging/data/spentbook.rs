@@ -8,10 +8,10 @@
 
 use super::{CmdResponse, Error, QueryResponse};
 
-use crate::dbcs::{DbcReason, FeeCiphers};
+use crate::dbcs::DbcReason;
 use crate::messaging::system::SectionSigned;
 use crate::network_knowledge::{SectionAuthorityProvider, SectionsDAG};
-use crate::types::SpentbookAddress;
+use crate::types::{fees::FeeCiphers, SpentbookAddress};
 
 use sn_dbc::{DbcTransaction, PublicKey, SpentProof};
 

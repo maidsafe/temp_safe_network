@@ -38,28 +38,30 @@ impl FeeCiphers {
         }
     }
 
-    /// Decrypts the derivation index cipher, and derives the public key from it.
-    pub fn decrypt_derived_key(&self, base_sk: &bls::SecretKey) -> Result<bls::PublicKey> {
-        let derivation_index = self.decrypt_derivation_index(base_sk)?;
-        let owner_base = Owner::from(base_sk.clone());
-        let public_key = owner_base
-            .derive(&derivation_index)
-            .secret_key()?
-            .public_key();
-        Ok(public_key)
-    }
+    /// Decrypts the derivation index cipher using the reward secret, then derives the secret key
+    /// that was used to decrypt the amount cipher, giving the RevealedAmount containing amount and blinding factor.
+    /// Returns the public key of the derived secret, and the revealed amount.
+    pub fn decrypt(
+        &self,
+        elder_reward_secret: &bls::SecretKey,
+    ) -> Result<(bls::PublicKey, RevealedAmount)> {
+        let derivation_index = self.decrypt_derivation_index(elder_reward_secret)?;
+        let owner_base = Owner::from(elder_reward_secret.clone());
 
-    /// Decrypts the derivation index cipher, and uses that to decrypt
-    /// the amount cipher, and turn that to a blinded amount that is returned.
-    pub fn decrypt_revealed_amount(&self, base_sk: &bls::SecretKey) -> Result<RevealedAmount> {
-        let derivation_index = self.decrypt_derivation_index(base_sk)?;
-        let owner_base = Owner::from(base_sk.clone());
         let derived_sk = owner_base.derive(&derivation_index).secret_key()?;
-        Ok(RevealedAmount::try_from((&derived_sk, &self.amount))?)
+        let derived_pk = derived_sk.public_key();
+        let amount = RevealedAmount::try_from((&derived_sk, &self.amount))?;
+
+        Ok((derived_pk, amount))
     }
 
-    fn decrypt_derivation_index(&self, base_sk: &bls::SecretKey) -> Result<DerivationIndex> {
-        let bytes = base_sk
+    /// The derivation index is encrypted to the well-known Elder reward key.
+    /// The key which can be derived from the Elder reward key using that index, is then used to decrypt the amount cihper.
+    fn decrypt_derivation_index(
+        &self,
+        elder_reward_secret: &bls::SecretKey,
+    ) -> Result<DerivationIndex> {
+        let bytes = elder_reward_secret
             .decrypt(&self.derivation_index)
             .ok_or(sn_dbc::Error::DecryptionBySecretKeyFailed)?;
 

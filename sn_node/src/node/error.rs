@@ -14,6 +14,7 @@ use sn_dbc::Error as DbcError;
 use sn_interface::{
     dbcs::Error as GenesisError,
     messaging::{data::Error as ErrorMsg, system::DkgSessionId},
+    types::fees::Error as FeeError,
 };
 
 use ed25519::Signature;
@@ -203,6 +204,9 @@ pub enum Error {
     /// Error occurred when minting the Genesis DBC.
     #[error("Genesis DBC error:: {0}")]
     GenesisDbcError(#[from] GenesisError),
+    /// An error when generating/verifying fee.
+    #[error(transparent)]
+    FeeError(#[from] FeeError),
     /// Error thrown by DBC public API
     #[error("DbcError: {0}")]
     DbcError(#[from] DbcError),

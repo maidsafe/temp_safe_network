@@ -6,7 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use dbc::PedersenGens;
 pub use sn_dbc::{self as dbc, Dbc, DbcTransaction, Output, RevealedOutput, Token};
 pub use sn_interface::dbcs::DbcReason;
 
@@ -21,7 +20,7 @@ use sn_dbc::{
     rng, Error as DbcError, Hash, Owner, OwnerOnce, PublicKey, RevealedAmount, SpentProof,
     SpentProofShare, TransactionBuilder,
 };
-use sn_interface::{dbcs::FeeCiphers, elder_count, network_knowledge::supermajority};
+use sn_interface::{elder_count, network_knowledge::supermajority, types::fees::FeeCiphers};
 
 use bytes::Bytes;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
@@ -512,6 +511,7 @@ impl Safe {
         let mut change_amount = total_output_amount;
         #[cfg(not(feature = "data-network"))]
         let mut all_inputs_fee_ciphers = BTreeMap::new();
+        let mut rng = rng::thread_rng();
 
         for (name, (dbc, entry_hash)) in spendable_dbcs {
             #[cfg(not(feature = "data-network"))]
@@ -533,22 +533,11 @@ impl Safe {
             // As the mints encrypt the amount to our public key, we need to decrypt it.
             let mut decrypted_elder_fees = vec![];
 
-            for (elder, invoice) in elder_fees {
-                match RevealedAmount::try_from((
-                    &revealed_bearer.secret_key,
-                    &invoice.content.revealed_amount_cipher,
-                )) {
-                    Ok(amount) => {
-                        if amount.blinded_amount(&PedersenGens::default())
-                            != invoice.content.blinded_amount
-                        {
-                            warn!("An invalid fee result returned from Elder!"); // TODO: How shall this be handled?
-                            continue;
-                        }
-                        decrypted_elder_fees.push(((elder, invoice), amount));
-                    }
+            for (elder, fee) in elder_fees {
+                match fee.content.decrypt_amount(&revealed_bearer.secret_key) {
+                    Ok(amount) => decrypted_elder_fees.push(((elder, fee), amount)),
                     Err(_) => {
-                        let _ = invalid_fees.insert(invoice.content.seller_public_key);
+                        let _ = invalid_fees.insert(fee.content.elder_reward_key);
                     }
                 }
             }
@@ -564,7 +553,7 @@ impl Safe {
             let fee_per_input = decrypted_elder_fees
                 .iter()
                 .fold(Some(Token::zero()), |total, (_, fee)| {
-                    total.and_then(|t| t.checked_add(Token::from_nano(fee.value())))
+                    total.and_then(|t| t.checked_add(*fee))
                 })
                 .ok_or_else(|| Error::DbcReissueError(
                     "Overflow occurred while summing the individual Elder's fees in order to calculate the total amount for the output DBCs."
@@ -575,24 +564,25 @@ impl Safe {
             decrypted_elder_fees
                 .iter()
                 .for_each(|((elder, invoice), fee)| {
-                    let owner = Owner::from(invoice.content.seller_public_key);
-                    let owner_once = OwnerOnce::from_owner_base(owner, &mut rng::thread_rng());
+                    let owner = Owner::from(invoice.content.elder_reward_key);
+                    let owner_once = OwnerOnce::from_owner_base(owner, &mut rng);
+                    let revealed_amount = RevealedAmount::from_amount(fee.as_nano(), &mut rng);
 
                     #[cfg(not(feature = "data-network"))]
                     {
                         let derivation_index_cipher = invoice
                             .content
-                            .seller_public_key
+                            .elder_reward_key
                             .encrypt(owner_once.derivation_index);
                         let output_owner_pk = owner_once.as_owner().public_key();
-                        let amount_cipher = fee.encrypt(&output_owner_pk);
+                        let amount_cipher = revealed_amount.encrypt(&output_owner_pk);
                         input_fee_ciphers.insert(
                             elder.name(),
                             FeeCiphers::new(amount_cipher, derivation_index_cipher),
                         );
                     }
 
-                    outputs_owners.push((*fee, owner_once));
+                    outputs_owners.push((revealed_amount, owner_once));
                 });
 
             #[cfg(not(feature = "data-network"))]

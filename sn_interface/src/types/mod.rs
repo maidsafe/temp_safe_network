@@ -8,12 +8,12 @@
 
 //! Shared types of the repository.
 
+/// Fees for a spend.
+pub mod fees;
 /// public key types (ed25519)
 pub mod keys;
 /// Standardised log markers for various events
 pub mod log_markers;
-// Payments.
-pub mod payments;
 /// Register data type
 pub mod register;
 /// Encoding utils

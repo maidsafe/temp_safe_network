@@ -12,11 +12,11 @@ use crate::{Error, Result};
 
 use sn_dbc::{DbcTransaction, PublicKey, SpentProof, SpentProofShare};
 use sn_interface::{
-    dbcs::{DbcReason, FeeCiphers},
+    dbcs::DbcReason,
     messaging::data::{
         DataCmd, DataQuery, Error as NetworkDataError, QueryResponse, SpendQuery, SpentbookCmd,
     },
-    types::SpentbookAddress,
+    types::{fees::FeeCiphers, SpentbookAddress},
 };
 
 use std::collections::{BTreeMap, BTreeSet};
