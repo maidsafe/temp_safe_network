@@ -21,7 +21,7 @@ use crate::node::{
 };
 
 use sn_comms::{CommEvent, MsgReceived};
-use sn_dbc::{rng, Hash, Owner, OwnerOnce, Token};
+use sn_dbc::{Hash, Output, Owner, OwnerOnce, RevealedOutput};
 use sn_interface::{
     dbcs::{gen_genesis_dbc, DbcReason},
     elder_count, init_logger,
@@ -38,7 +38,7 @@ use sn_interface::{
         RelocationInfo, RelocationProof, SectionTreeUpdate, SectionsDAG, MIN_ADULT_AGE,
     },
     test_utils::*,
-    types::{keys::ed25519, Participant, PublicKey},
+    types::{fees::FeeCiphers, keys::ed25519, Participant, PublicKey},
 };
 
 use assert_matches::assert_matches;
@@ -723,24 +723,63 @@ async fn spentbook_spend_client_message_should_replicate_to_adults_and_send_ack(
     let dbc = gen_genesis_dbc(&sk_set, &sk_set.secret_key())?;
     let context = node.context();
 
-    let dbc_amount = dbc.revealed_amount_bearer()?.value();
-    let change_owner = OwnerOnce::from_owner_base(dbc.owner_base().clone(), &mut thread_rng());
+    let dbc_amount = dbc.revealed_amount_bearer()?;
+
+    let mut rng = thread_rng();
+    let change_owner = OwnerOnce::from_owner_base(dbc.owner_base().clone(), &mut rng);
     #[cfg(feature = "data-network")]
-    let outputs = vec![(change_owner, dbc_amount)];
+    let outputs = vec![(
+        RevealedOutput::new(
+            Output::new(fee_derived_owner_pk, dbc_amount.value()),
+            &mut rng,
+        ),
+        change_owner,
+    )];
     #[cfg(not(feature = "data-network"))]
-    let outputs = vec![
-        (
-            change_owner,
-            Token::from_nano(dbc_amount - context.store_cost.as_nano()),
-        ),
-        (
-            OwnerOnce::from_owner_base(
-                Owner::from(context.reward_secret_key.public_key()),
-                &mut rng::thread_rng(),
-            ),
-            context.store_cost,
-        ),
-    ];
+    let (outputs, fee_ciphers) = {
+        let fee_base_pk = context.reward_secret_key.public_key();
+
+        // Derive an owner (i.e. the id of the new dbc).
+        let fee_derived_owner = OwnerOnce::from_owner_base(Owner::from(fee_base_pk), &mut rng);
+
+        // Encrypt the index to the _well-known reward key_.
+        let derivation_index_cipher = fee_base_pk.encrypt(fee_derived_owner.derivation_index);
+
+        // We must generate the revealed output (i.e. the blinding factor) to be both encrypted, and used in the dbc
+        // this is how the Elder can verify that the dbc contains sufficient amount, since the amount in the dbc is blinded.
+        let fee_derived_owner_pk = fee_derived_owner.as_owner().public_key();
+        let fee_output = RevealedOutput::new(
+            Output::new(fee_derived_owner_pk, context.store_cost.as_nano()),
+            &mut rng,
+        );
+        // Encrypt the amount to the _derived key_ (i.e. new dbc id).
+        let amount_cipher = fee_output.revealed_amount.encrypt(&fee_derived_owner_pk);
+        let fee_ciphers = BTreeMap::from([(
+            context.name,
+            FeeCiphers::new(amount_cipher, derivation_index_cipher),
+        )]);
+
+        // We make an output of the change as well, even if not needed, just to pass in both change and fee in the same fn.
+        let change_amount = dbc_amount.value() - context.store_cost.as_nano();
+        let change_output =
+            RevealedOutput::new(Output::new(fee_derived_owner_pk, change_amount), &mut rng);
+
+        let outputs = vec![
+            (change_owner, change_output),
+            (fee_derived_owner, fee_output),
+        ];
+
+        let outputs = outputs.into_iter().map(|(owner, amount)| {
+            let output_owner_pk = owner.as_owner().public_key();
+            let output = RevealedOutput::new(
+                Output::new(output_owner_pk, amount.revealed_amount.value()),
+                &mut rng,
+            );
+            (output, owner)
+        });
+
+        (outputs, fee_ciphers)
+    };
 
     let (public_key, tx, spent_proofs, spent_transactions) =
         dbc_utils::get_dbc_spend_info_with_outputs(dbc, outputs)?;
@@ -755,7 +794,7 @@ async fn spentbook_spend_client_message_should_replicate_to_adults_and_send_ack(
             spent_transactions,
             network_knowledge: None,
             #[cfg(not(feature = "data-network"))]
-            fee_ciphers: BTreeMap::new(),
+            fee_ciphers,
         })),
         &mut node,
         comm_rx,
@@ -862,6 +901,13 @@ async fn spentbook_spend_transaction_with_no_inputs_should_return_spentbook_erro
             ..
         } = cmd
         {
+            #[cfg(not(feature = "data-network"))]
+            assert_eq!(
+                error,
+                &MessagingDataError::from(Error::MissingFee),
+                "A different error was expected for this case: {error:?}"
+            );
+            #[cfg(feature = "data-network")]
             assert_eq!(
                 error,
                 &MessagingDataError::from(Error::SpentbookError(
