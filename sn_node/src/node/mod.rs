@@ -94,7 +94,7 @@ pub(crate) struct MyNode {
     pub(crate) root_storage_dir: PathBuf,
     pub(crate) data_storage: DataStorage, // Adult only before cache
     pub(crate) keypair: Arc<Keypair>,
-    pub(crate) reward_key: PublicKey,
+    pub(crate) reward_secret_key: Arc<bls::SecretKey>,
     // Network resources
     pub(crate) section_keys_provider: SectionKeysProvider,
     pub(crate) network_knowledge: NetworkKnowledge,
@@ -135,7 +135,7 @@ impl MyNode {
             membership: self.membership.clone(),
             dkg_voter: self.dkg_voter.clone(),
             dkg_sessions_info: self.dkg_sessions_info.clone(),
-            reward_key: self.reward_key,
+            reward_secret_key: self.reward_secret_key.clone(),
             store_cost: sn_dbc::Token::from_nano(1), // hard coded for now
             network_knowledge: self.network_knowledge().clone(),
             section_keys_provider: self.section_keys_provider.clone(),
@@ -152,7 +152,7 @@ impl MyNode {
     pub(crate) fn new(
         comm: Comm,
         keypair: Arc<Keypair>, //todo: Keypair, only test design blocks this
-        reward_key: PublicKey,
+        reward_secret_key: bls::SecretKey,
         network_knowledge: NetworkKnowledge,
         section_key_share: Option<SectionKeyShare>,
         used_space: UsedSpace,
@@ -203,7 +203,7 @@ impl MyNode {
             addr,
             root_storage_dir,
             keypair,
-            reward_key,
+            reward_secret_key: Arc::new(reward_secret_key),
             network_knowledge,
             section_keys_provider,
             dkg_sessions_info: HashMap::default(),
@@ -231,7 +231,7 @@ impl MyNode {
     pub(crate) fn first_node(
         comm: Comm,
         keypair: Keypair,
-        reward_key: PublicKey,
+        reward_secret_key: bls::SecretKey,
         used_space: UsedSpace,
         root_storage_dir: PathBuf,
         genesis_sk_set: bls::SecretKeySet,
@@ -248,7 +248,7 @@ impl MyNode {
         let node = Self::new(
             comm,
             Arc::new(keypair),
-            reward_key,
+            reward_secret_key,
             network_knowledge,
             Some(section_key_share),
             used_space,

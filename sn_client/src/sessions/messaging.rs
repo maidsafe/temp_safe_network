@@ -331,7 +331,7 @@ impl Session {
         payload: Bytes,
         dst_section: bls::PublicKey,
         recipient: NodeId,
-    ) -> Result<QueryResponse> {
+    ) -> Result<(NodeId, QueryResponse)> {
         let endpoint = self.endpoint.clone();
 
         let chunk_addr = if let DataQuery::GetChunk(address) = query {
@@ -365,6 +365,7 @@ impl Session {
         let send_query_tasks = self.send_msg(vec![recipient], wire_msg).await?;
         self.check_query_responses(msg_id, vec![recipient], chunk_addr, send_query_tasks)
             .await
+            .map(|response| (recipient, response))
     }
 
     #[instrument(

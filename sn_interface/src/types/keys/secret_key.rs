@@ -82,3 +82,26 @@ impl Display for SecretKey {
         Debug::fmt(self, formatter)
     }
 }
+
+/// Construct a BLS secret key from a hex-encoded string.
+///
+/// It is often useful to parse such raw strings in user-facing apps like CLI.
+pub fn bls_secret_from_hex<T: AsRef<[u8]>>(hex: T) -> Result<bls::SecretKey> {
+    let bytes = hex::decode(hex).map_err(|err| {
+        Error::FailedToParse(format!(
+            "Couldn't parse BLS secret key bytes from hex: {err}",
+        ))
+    })?;
+    let bytes_fixed_len: [u8; bls::SK_SIZE] = bytes.as_slice().try_into()
+        .map_err(|_| Error::FailedToParse(format!(
+            "Couldn't parse BLS secret key bytes from hex. The provided string must represent exactly {} bytes.",
+            bls::SK_SIZE
+        )))?;
+    let pk = bls::SecretKey::from_bytes(bytes_fixed_len).map_err(|err| {
+        Error::FailedToParse(format!(
+            "Couldn't parse BLS secret key from fixed-length byte array: {err}",
+        ))
+    })?;
+
+    Ok(pk)
+}

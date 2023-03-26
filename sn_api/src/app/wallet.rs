@@ -20,11 +20,16 @@ use sn_dbc::{
     rng, Error as DbcError, Hash, Owner, OwnerOnce, PublicKey, RevealedAmount, SpentProof,
     SpentProofShare, TransactionBuilder,
 };
-use sn_interface::{elder_count, network_knowledge::supermajority};
+use sn_interface::{
+    elder_count,
+    network_knowledge::supermajority,
+    types::fees::{FeeCiphers, RequiredFee},
+};
 
 use bytes::Bytes;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use tracing::{debug, warn};
+use xor_name::XorName;
 
 /// Type tag to use for the Wallet stored on Register
 pub const WALLET_TYPE_TAG: u64 = 1_000;
@@ -32,6 +37,18 @@ pub const WALLET_TYPE_TAG: u64 = 1_000;
 /// Set of spendable DBCs mapped to their friendly name as defined/chosen by the user when
 /// depositing DBCs into a wallet.
 pub type WalletSpendableDbcs = BTreeMap<String, (Dbc, EntryHash)>;
+
+/// Convenience struct to avoid complex fn signatures.
+struct ReissueComponents {
+    input_dbcs_to_spend: Vec<Dbc>,
+    input_dbcs_entries_hash: BTreeSet<EntryHash>,
+    outputs_owners: Vec<(Token, OwnerOnce)>,
+    change_amount: Token,
+    /// This is the set of input dbc keys, each having a set of
+    /// Elder names and their respective fee ciphers.
+    #[cfg(not(feature = "data-network"))]
+    all_fee_cipher_params: BTreeMap<PublicKey, BTreeMap<XorName, (RequiredFee, OwnerOnce)>>,
+}
 
 // Number of attempts to make trying to spend inputs when reissuing DBCs
 // As the spend and query cmds are cascaded closely, there is high chance
@@ -319,7 +336,9 @@ impl Safe {
     ) -> Result<Vec<Dbc>> {
         let mut total_output_amount = Token::zero();
         let mut outputs_owners = Vec::<(Token, OwnerOnce)>::new();
-        for (amount, owner_pk) in outputs {
+        let mut rng = rng::thread_rng();
+
+        for (amount, base_owner_pk) in outputs {
             let output_amount = parse_tokens_amount(&amount)?;
             if output_amount.as_nano() == 0 {
                 return Err(Error::InvalidAmount(
@@ -337,12 +356,12 @@ impl Safe {
                     )
                     })?;
 
-            let output_owner = if let Some(pk) = owner_pk {
+            let output_owner = if let Some(pk) = base_owner_pk {
                 let owner = Owner::from(pk);
-                OwnerOnce::from_owner_base(owner, &mut rng::thread_rng())
+                OwnerOnce::from_owner_base(owner, &mut rng)
             } else {
-                let owner = Owner::from_random_secret_key(&mut rng::thread_rng());
-                OwnerOnce::from_owner_base(owner, &mut rng::thread_rng())
+                let owner = Owner::from_random_secret_key(&mut rng);
+                OwnerOnce::from_owner_base(owner, &mut rng)
             };
 
             outputs_owners.push((output_amount, output_owner));
@@ -354,10 +373,9 @@ impl Safe {
         // From the spendable dbcs, we select the number required to cover the
         // amount going to the output dbcs.
         #[cfg(feature = "data-network")]
-        let (input_dbcs_to_spend, input_dbcs_entries_hash, outputs_owners, change_amount) =
-            Self::select_inputs(spendable_dbcs, total_output_amount, outputs_owners)?;
+        let components = Self::select_inputs(spendable_dbcs, total_output_amount, outputs_owners)?;
         #[cfg(not(feature = "data-network"))]
-        let (input_dbcs_to_spend, input_dbcs_entries_hash, outputs_owners, change_amount) = {
+        let components = {
             let client = self.get_safe_client()?;
             Self::select_inputs_with_fees(
                 client,
@@ -368,9 +386,25 @@ impl Safe {
             .await?
         };
 
+        let ReissueComponents {
+            input_dbcs_to_spend,
+            input_dbcs_entries_hash,
+            outputs_owners,
+            change_amount,
+            #[cfg(not(feature = "data-network"))]
+            all_fee_cipher_params,
+        } = components;
+
         // We can now reissue the output DBCs
         let (output_dbcs, change_dbc) = self
-            .reissue_dbcs(input_dbcs_to_spend, outputs_owners, reason, change_amount)
+            .reissue_dbcs(
+                input_dbcs_to_spend,
+                outputs_owners,
+                change_amount,
+                reason,
+                #[cfg(not(feature = "data-network"))]
+                all_fee_cipher_params,
+            )
             .await?;
 
         if output_dbcs.is_empty() {
@@ -405,7 +439,7 @@ impl Safe {
         spendable_dbcs: WalletSpendableDbcs,
         total_output_amount: Token,
         outputs_owners: Vec<(Token, OwnerOnce)>,
-    ) -> Result<SelectedInputs> {
+    ) -> Result<ReissueComponents> {
         // We'll combine one or more input DBCs and reissue:
         // - one output DBC for the recipient,
         // - and a second DBC for the change, which will be stored in the source wallet.
@@ -453,12 +487,12 @@ impl Safe {
         // If not enough spendable was found, this check will return an error.
         Self::verify_amounts(total_input_amount, total_output_amount)?;
 
-        Ok((
+        Ok(ReissueComponents {
             input_dbcs_to_spend,
             input_dbcs_entries_hash,
             outputs_owners,
             change_amount,
-        ))
+        })
     }
 
     ///
@@ -468,7 +502,7 @@ impl Safe {
         spendable_dbcs: WalletSpendableDbcs,
         mut total_output_amount: Token,
         mut outputs_owners: Vec<(Token, OwnerOnce)>,
-    ) -> Result<SelectedInputs> {
+    ) -> Result<ReissueComponents> {
         // We'll combine one or more input DBCs and reissue:
         // - one output DBC for the recipient,
         // - and a second DBC for the change, which will be stored in the source wallet.
@@ -476,24 +510,48 @@ impl Safe {
         let mut input_dbcs_entries_hash = BTreeSet::<EntryHash>::new();
         let mut total_input_amount = Token::zero();
         let mut change_amount = total_output_amount;
+        let mut rng = rng::thread_rng();
+        #[cfg(not(feature = "data-network"))]
+        let mut all_fee_cipher_params = BTreeMap::new();
 
         for (name, (dbc, entry_hash)) in spendable_dbcs {
-            // TODO: Query the network, one section per input, for the current fee.
-            // Right now, now fees are added, as a dummy is used instead.
+            let revealed_bearer = dbc.as_revealed_input_bearer()?;
+            let input_key = revealed_bearer.public_key();
 
-            let input_key = dbc.as_revealed_input_bearer()?.public_key();
-            // each mint will have elder_count() instances to pay individually (for now, later they will be more)
-            let mint_fees: BTreeMap<PublicKey, Token> = client.get_mint_fees(input_key).await?;
-            let required_num_mints = supermajority(elder_count());
-            if required_num_mints > mint_fees.len() {
-                warn!("Not enough mints contacted for the section to spend the input. Found: {}, needed: {required_num_mints}", mint_fees.len());
+            // Each section will have elder_count() instances to pay individually (for now, later they will be more).
+            let elder_fees = client.get_section_fees(input_key).await?;
+            let num_responses = elder_fees.len();
+            let required_responses = supermajority(elder_count());
+            if required_responses > num_responses {
+                warn!("Not enough elders contacted for the section to spend the input. Got: {num_responses}, needed: {required_responses}");
+                continue;
+            }
+
+            // Fees that were not encrypted to us.
+            let mut invalid_fees = BTreeSet::new();
+            // As the mints encrypt the amount to our public key, we need to decrypt it.
+            let mut decrypted_elder_fees = vec![];
+
+            for (elder, fee) in elder_fees {
+                match fee.content.decrypt_amount(&revealed_bearer.secret_key) {
+                    Ok(amount) => decrypted_elder_fees.push(((elder, fee), amount)),
+                    Err(_) => {
+                        let _ = invalid_fees.insert(fee.content.elder_reward_key);
+                    }
+                }
+            }
+
+            let max_invalid_fees = elder_count() - required_responses;
+            if invalid_fees.len() > max_invalid_fees {
+                let valid_responses = num_responses - invalid_fees.len();
+                warn!("Not enough valid fees received from the section to spend the input. Found: {valid_responses}, needed: {required_responses}", );
                 continue;
             }
 
             // Total fee paid to all recipients in the section for this input.
-            let fee_per_input = mint_fees
-                .values()
-                .fold(Some(Token::zero()), |total, fee| {
+            let fee_per_input = decrypted_elder_fees
+                .iter()
+                .fold(Some(Token::zero()), |total, (_, fee)| {
                     total.and_then(|t| t.checked_add(*fee))
                 })
                 .ok_or_else(|| Error::DbcReissueError(
@@ -501,22 +559,34 @@ impl Safe {
                         .to_string(),
                 ))?;
 
-            // Add mints to outputs.
-            mint_fees.into_iter().for_each(|(pk, fee)| {
-                let owner = Owner::from(pk);
-                let owner_once = OwnerOnce::from_owner_base(owner, &mut rng::thread_rng());
-                outputs_owners.push((fee, owner_once));
-            });
+            #[cfg(not(feature = "data-network"))]
+            let mut fee_cipher_params = BTreeMap::new();
+
+            // Add elders to outputs and generate their fee ciphers.
+            decrypted_elder_fees
+                .iter()
+                .for_each(|((elder, required_fee), fee)| {
+                    let owner = Owner::from(required_fee.content.elder_reward_key);
+                    let owner_once = OwnerOnce::from_owner_base(owner, &mut rng);
+                    outputs_owners.push((*fee, owner_once.clone()));
+
+                    #[cfg(not(feature = "data-network"))]
+                    let _ =
+                        fee_cipher_params.insert(elder.name(), (required_fee.clone(), owner_once));
+                });
+
+            #[cfg(not(feature = "data-network"))]
+            let _ = all_fee_cipher_params.insert(input_key, fee_cipher_params);
 
             let dbc_balance = match dbc.revealed_amount_bearer() {
-                Ok(amount) => Token::from_nano(amount.value()),
+                Ok(revealed_amount) => Token::from_nano(revealed_amount.value()),
                 Err(err) => {
-                    warn!("Ignoring input DBC found in wallet (entry: {name}) due to not being a bearer: {err:?}");
+                    warn!("Ignoring input Dbc found in wallet (entry: {name}) due to not being a bearer: {err:?}");
                     continue;
                 }
             };
 
-            // Add this DBC as input to be spent.
+            // Add this Dbc as input to be spent.
             input_dbcs_to_spend.push(dbc);
             input_dbcs_entries_hash.insert(entry_hash);
 
@@ -565,12 +635,14 @@ impl Safe {
         // If not enough spendable was found, this check will return an error.
         Self::verify_amounts(total_input_amount, total_output_amount)?;
 
-        Ok((
+        Ok(ReissueComponents {
             input_dbcs_to_spend,
             input_dbcs_entries_hash,
             outputs_owners,
             change_amount,
-        ))
+            #[cfg(not(feature = "data-network"))]
+            all_fee_cipher_params,
+        })
     }
 
     // Make sure total input amount gathered with input DBCs are enough for the output amount
@@ -614,8 +686,12 @@ impl Safe {
         &self,
         input_dbcs: Vec<Dbc>,
         outputs: Vec<(Token, OwnerOnce)>,
-        reason: DbcReason,
         change_amount: Token,
+        reason: DbcReason,
+        #[cfg(not(feature = "data-network"))] all_fee_cipher_params: BTreeMap<
+            PublicKey,
+            BTreeMap<XorName, (RequiredFee, OwnerOnce)>,
+        >,
     ) -> Result<(Vec<(Dbc, OwnerOnce, RevealedAmount)>, Option<Dbc>)> {
         let mut tx_builder = TransactionBuilder::default()
             .add_inputs_dbc_bearer(input_dbcs.iter())?
@@ -628,23 +704,38 @@ impl Safe {
             tx_builder = tx_builder.add_output_by_amount(change_amount, change_owneronce.clone());
         }
 
+        let proof_key_verifier = SpentProofKeyVerifier { client };
         let inputs_spent_proofs: BTreeSet<SpentProof> = input_dbcs
             .iter()
             .flat_map(|dbc| dbc.inputs_spent_proofs.clone())
             .collect();
-
         let inputs_spent_transactions: BTreeSet<DbcTransaction> = input_dbcs
             .iter()
             .flat_map(|dbc| dbc.inputs_spent_transactions.clone())
             .collect();
 
-        let proof_key_verifier = SpentProofKeyVerifier { client };
-
-        // Let's build the output DBCs
+        // Finalize the tx builder to get the dbc builder.
         let mut dbc_builder = tx_builder.build(rng::thread_rng())?;
+
+        // Get fee outputs to generate the fee ciphers.
+        #[cfg(not(feature = "data-network"))]
+        let outputs = dbc_builder
+            .revealed_outputs
+            .iter()
+            .map(|output| (output.public_key, output.revealed_amount))
+            .collect();
 
         // Spend all the input DBCs, collecting the spent proof shares for each of them
         for (public_key, tx) in dbc_builder.inputs() {
+            // Generate the fee ciphers.
+            #[cfg(not(feature = "data-network"))]
+            let input_fee_ciphers = {
+                let fee_cipher_params = all_fee_cipher_params
+                    .get(&public_key)
+                    .ok_or(Error::DbcReissueError("Missing fee!".to_string()))?;
+                fee_ciphers(&outputs, fee_cipher_params)?
+            };
+
             let tx_hash = Hash::from(tx.hash());
             // TODO: spend DBCs concurrently spawning tasks
             let mut attempts = 0;
@@ -657,6 +748,8 @@ impl Safe {
                         reason,
                         inputs_spent_proofs.clone(),
                         inputs_spent_transactions.clone(),
+                        #[cfg(not(feature = "data-network"))]
+                        input_fee_ciphers.clone(),
                     )
                     .await?;
 
@@ -680,7 +773,6 @@ impl Safe {
                         dbc_builder = dbc_builder
                             .add_spent_proof_shares(shares_for_current_tx.into_iter())
                             .add_spent_transaction(tx);
-
                         break;
                     }
                     Err(err) if attempts == NUM_OF_DBC_REISSUE_ATTEMPTS => {
@@ -713,12 +805,33 @@ impl Safe {
     }
 }
 
-type SelectedInputs = (
-    Vec<Dbc>,
-    BTreeSet<EntryHash>,
-    Vec<(Token, OwnerOnce)>,
-    Token,
-);
+#[cfg(not(feature = "data-network"))]
+fn fee_ciphers(
+    outputs: &BTreeMap<PublicKey, RevealedAmount>,
+    fee_cipher_params: &BTreeMap<XorName, (RequiredFee, OwnerOnce)>,
+) -> Result<BTreeMap<XorName, FeeCiphers>> {
+    let mut input_fee_ciphers = BTreeMap::new();
+    for (elder_name, (required_fee, owner_once)) in fee_cipher_params {
+        // Encrypt the index to the _well-known reward key_.
+        let derivation_index_cipher = required_fee
+            .content
+            .elder_reward_key
+            .encrypt(owner_once.derivation_index);
+
+        let output_owner_pk = owner_once.as_owner().public_key();
+        let revealed_amount = outputs
+            .get(&output_owner_pk)
+            .ok_or(Error::DbcReissueError("Missing output!".to_string()))?;
+
+        // Encrypt the amount to the _derived key_ (i.e. new dbc id).
+        let amount_cipher = revealed_amount.encrypt(&output_owner_pk);
+        input_fee_ciphers.insert(
+            *elder_name,
+            FeeCiphers::new(amount_cipher, derivation_index_cipher),
+        );
+    }
+    Ok(input_fee_ciphers)
+}
 
 // Private helper to verify if a set of spent proof shares are valid for a given public_key and TX
 fn verify_spent_proof_shares_for_tx(

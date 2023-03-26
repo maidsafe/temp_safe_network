@@ -19,7 +19,12 @@ use async_once::AsyncOnce;
 use bls::SecretKey;
 use lazy_static::lazy_static;
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
-use std::{collections::HashMap, env::var, ops::Index, sync::Once};
+use std::{
+    collections::{BTreeMap, HashMap},
+    env::var,
+    ops::Index,
+    sync::Once,
+};
 use tokio::sync::Mutex;
 use tracing_subscriber::{fmt, EnvFilter};
 
@@ -99,11 +104,12 @@ async fn reissue_bearer_dbcs() -> Result<Vec<(Dbc, Token)>> {
     let total_output_amount: u64 = amounts.iter().sum();
     let change_amount = total_balance - total_output_amount;
 
-    let output_amounts: Vec<(Token, OwnerOnce)> = amounts
+    let outputs_owners: Vec<_> = amounts
         .into_iter()
         .map(|amount| {
-            let owner = Owner::from_random_secret_key(&mut rng::thread_rng());
-            let output_owner = OwnerOnce::from_owner_base(owner, &mut rng::thread_rng());
+            let mut rng = rng::thread_rng();
+            let owner = Owner::from_random_secret_key(&mut rng);
+            let output_owner = OwnerOnce::from_owner_base(owner, &mut rng);
             (Token::from_nano(amount), output_owner)
         })
         .collect();
@@ -112,9 +118,11 @@ async fn reissue_bearer_dbcs() -> Result<Vec<(Dbc, Token)>> {
     let (output_dbcs, _) = safe
         .reissue_dbcs(
             vec![GENESIS_DBC.clone()],
-            output_amounts,
-            DbcReason::none(),
+            outputs_owners,
             Token::from_nano(change_amount),
+            DbcReason::none(),
+            #[cfg(not(feature = "data-network"))]
+            BTreeMap::new(),
         )
         .await?;
 
