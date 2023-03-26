@@ -500,14 +500,16 @@ async fn handle_cmd(
     let (new_cmds, blocking_cmd) = process_cmd_non_blocking(cmd, context).await?;
 
     if let Some(blocking_cmd) = blocking_cmd {
+        trace!("Sending cmd {blocking_cmd:?} onto blocking_cmd_channel channel");
         if let Err(error) = blocking_cmd_channel.send((blocking_cmd, vec![])).await {
-            error!("Error sending msg onto cmd channel {error:?}");
+            error!("Error sending cmd onto blocking_cmd_channel channel {error:?}");
         }
         // early exit, no cmds produced here...
         return Ok(());
     }
 
     for cmd in new_cmds {
+        trace!("Sending cmd {cmd:?} onto flow_ctrl_cmd_sender channel");
         flow_ctrl_cmd_sender
             .send(FlowCtrlCmd::Handle(cmd))
             .await
