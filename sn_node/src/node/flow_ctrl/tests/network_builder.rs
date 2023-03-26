@@ -657,7 +657,7 @@ impl TestNetwork {
         let mut my_node = MyNode::new(
             comm.clone(),
             info.keypair.clone(),
-            bls::SecretKey::random().public_key(),
+            bls::SecretKey::random(),
             network_knowledge.clone(),
             sk_share.clone(),
             UsedSpace::new(min_capacity, max_capacity),

@@ -286,9 +286,7 @@ pub enum Error {
     #[error("A signed section authority provider was not found for section key {0:?}")]
     SignedSapNotFound(PublicKey),
     /// Occurs if a DBC spend command eventually fails after a number of retry attempts.
-    #[error(
-        "The DBC spend request failed after {attempts} attempts for public_key: {public_key:?}"
-    )]
+    #[error("The DBC spend request failed after {attempts} attempts for dbc key: {public_key:?}")]
     DbcSpendRetryAttemptsExceeded {
         /// Number of attemtps made
         attempts: u8,

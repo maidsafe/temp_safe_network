@@ -37,8 +37,8 @@ pub use errors::{Error, Result};
 pub use identities::{ClientId, NodeId, Participant};
 pub use keys::{
     keypair::{BlsKeypairShare, Encryption, Keypair, OwnerType, Signing},
-    public_key::{bls_from_hex, PublicKey},
-    secret_key::SecretKey,
+    public_key::PublicKey,
+    secret_key::{bls_secret_from_hex, SecretKey},
     signature::{Signature, SignatureShare},
 };
 

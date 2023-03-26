@@ -21,7 +21,7 @@ use crate::node::{
 };
 
 use sn_comms::{CommEvent, MsgReceived};
-use sn_dbc::Hash;
+use sn_dbc::{Hash, Owner, OwnerOnce, Token, TransactionBuilder};
 use sn_interface::{
     dbcs::{gen_genesis_dbc, DbcReason},
     elder_count, init_logger,
@@ -38,14 +38,14 @@ use sn_interface::{
         RelocationInfo, RelocationProof, SectionTreeUpdate, SectionsDAG, MIN_ADULT_AGE,
     },
     test_utils::*,
-    types::{keys::ed25519, Participant, PublicKey},
+    types::{fees::FeeCiphers, keys::ed25519, Participant, PublicKey},
 };
 
 use assert_matches::assert_matches;
 use eyre::{bail, eyre, Result};
 use rand::{rngs::StdRng, thread_rng, SeedableRng};
 use std::{
-    collections::{BTreeSet, HashSet},
+    collections::{BTreeMap, BTreeSet, HashSet},
     iter,
 };
 use test_utils::ProcessAndInspectCmds;
@@ -716,11 +716,75 @@ async fn spentbook_spend_client_message_should_replicate_to_adults_and_send_ack(
                 .sk_threshold_size(0),
         )
         .build()?;
-    let mut node = env.get_nodes(prefix, 1, 0, None)?.remove(0);
-    let sk_set = env.get_secret_key_set(prefix, None)?;
 
-    let (public_key, tx, spent_proofs, spent_transactions) =
-        dbc_utils::get_genesis_dbc_spend_info(&sk_set)?;
+    let mut node = env.get_nodes(prefix, 1, 0, None)?.remove(0);
+
+    let sk_set = env.get_secret_key_set(prefix, None)?;
+    let dbc = gen_genesis_dbc(&sk_set, &sk_set.secret_key())?;
+    let context = node.context();
+
+    let dbc_amount = dbc.revealed_amount_bearer()?;
+
+    let mut rng = thread_rng();
+    let change_owner = OwnerOnce::from_owner_base(dbc.owner_base().clone(), &mut rng);
+
+    #[cfg(feature = "data-network")]
+    let change_amount = Token::from_nano(dbc_amount.value());
+    #[cfg(not(feature = "data-network"))]
+    let change_amount = Token::from_nano(dbc_amount.value() - context.store_cost.as_nano());
+
+    #[cfg(not(feature = "data-network"))]
+    let fee_derived_owner = {
+        // Derive an owner (i.e. the id of the new dbc).
+        let fee_base_pk = context.reward_secret_key.public_key();
+        OwnerOnce::from_owner_base(Owner::from(fee_base_pk), &mut rng)
+    };
+
+    #[cfg(feature = "data-network")]
+    let outputs = vec![(change_amount, change_owner)];
+    #[cfg(not(feature = "data-network"))]
+    let outputs = {
+        vec![
+            (context.store_cost, fee_derived_owner.clone()),
+            (change_amount, change_owner),
+        ]
+    };
+
+    let mut tx_builder = TransactionBuilder::default().add_input_dbc_bearer(&dbc)?;
+    tx_builder = tx_builder.add_outputs_by_amount(outputs);
+
+    // Only after we have built the tx can we access the output with
+    // the blinding factor we need to encrypt.
+    let dbc_builder = tx_builder.build(&mut rng)?;
+
+    #[cfg(not(feature = "data-network"))]
+    let fee_ciphers = {
+        // Find the fee output.
+        let fee_derived_owner_pk = fee_derived_owner.as_owner().public_key();
+        let fee_output = dbc_builder
+            .revealed_outputs
+            .iter()
+            .find(|out| out.public_key == fee_derived_owner_pk)
+            .expect("Didn't find the Elder derived pk!");
+
+        // Encrypt the index to the _well-known reward key_.
+        let fee_base_pk = context.reward_secret_key.public_key();
+        let derivation_index_cipher = fee_base_pk.encrypt(fee_derived_owner.derivation_index);
+
+        // We must generate the revealed output (i.e. the blinding factor) to be both encrypted, and used in the dbc
+        // this is how the Elder can verify that the dbc contains sufficient amount, since the amount in the dbc is blinded.
+        let fee_derived_owner_pk = fee_derived_owner.as_owner().public_key();
+
+        // Encrypt the amount to the _derived key_ (i.e. new dbc id).
+        let amount_cipher = fee_output.revealed_amount.encrypt(&fee_derived_owner_pk);
+        BTreeMap::from([(
+            context.name,
+            FeeCiphers::new(amount_cipher, derivation_index_cipher),
+        )])
+    };
+
+    // We had one input only.
+    let (public_key, tx) = dbc_builder.inputs()[0].clone();
 
     let comm_rx = env.take_comm_rx(node.info().public_key());
     let mut cmds = ProcessAndInspectCmds::new_from_client_msg(
@@ -728,9 +792,11 @@ async fn spentbook_spend_client_message_should_replicate_to_adults_and_send_ack(
             public_key,
             tx: tx.clone(),
             reason: DbcReason::none(),
-            spent_proofs,
-            spent_transactions,
+            spent_proofs: dbc.inputs_spent_proofs.clone(),
+            spent_transactions: dbc.inputs_spent_transactions,
             network_knowledge: None,
+            #[cfg(not(feature = "data-network"))]
+            fee_ciphers,
         })),
         &mut node,
         comm_rx,
@@ -738,33 +804,40 @@ async fn spentbook_spend_client_message_should_replicate_to_adults_and_send_ack(
     .await?;
 
     while let Some(cmd) = cmds.next(&mut node).await? {
-        if let Cmd::SendAndForwardResponseToClient {
-            wire_msg, targets, ..
-        } = cmd
-        {
-            let msg = wire_msg.into_msg()?;
-            match msg {
-                NetworkMsg::Node(msg) => match msg {
-                    NodeMsg::NodeDataCmd(NodeDataCmd::StoreData(data)) => {
-                        assert_eq!(targets.len(), replication_count);
-                        let spent_proof_share =
-                            dbc_utils::get_spent_proof_share_from_replicated_data(data)?;
-                        assert_eq!(public_key.to_hex(), spent_proof_share.public_key().to_hex());
-                        assert_eq!(Hash::from(tx.hash()), spent_proof_share.transaction_hash());
-                        assert_eq!(
-                            sk_set.public_keys().public_key().to_hex(),
-                            spent_proof_share.spentbook_pks().public_key().to_hex()
-                        );
-                    }
+        match cmd {
+            Cmd::SendAndForwardResponseToClient {
+                wire_msg, targets, ..
+            } => {
+                let msg = wire_msg.into_msg()?;
+                match msg {
+                    NetworkMsg::Node(msg) => match msg {
+                        NodeMsg::NodeDataCmd(NodeDataCmd::StoreData(data)) => {
+                            assert_eq!(targets.len(), replication_count);
+                            let spent_proof_share =
+                                dbc_utils::get_spent_proof_share_from_replicated_data(data)?;
+                            assert_eq!(
+                                public_key.to_hex(),
+                                spent_proof_share.public_key().to_hex()
+                            );
+                            assert_eq!(Hash::from(tx.hash()), spent_proof_share.transaction_hash());
+                            assert_eq!(
+                                sk_set.public_keys().public_key().to_hex(),
+                                spent_proof_share.spentbook_pks().public_key().to_hex()
+                            );
+                        }
+                        _ => {
+                            bail!("Unexpected msg type when processing cmd")
+                        }
+                    },
                     _ => {
-                        bail!("Unexpected msg type when processing cmd")
+                        bail!("Unexpected Cmd type when processing cmd")
                     }
-                },
-                _ => {
-                    bail!("Unexpected Cmd type when processing cmd")
                 }
+                return Ok(());
             }
-            return Ok(());
+            other => {
+                println!("other cmd: {other:?}");
+            }
         }
     }
 
@@ -812,6 +885,8 @@ async fn spentbook_spend_transaction_with_no_inputs_should_return_spentbook_erro
             spent_proofs: new_dbc.inputs_spent_proofs.clone(),
             spent_transactions: new_dbc.inputs_spent_transactions,
             network_knowledge: None,
+            #[cfg(not(feature = "data-network"))]
+            fee_ciphers: BTreeMap::new(),
         })),
         &mut node,
         comm_rx,
@@ -916,6 +991,8 @@ async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node()
             spent_proofs: new_dbc2.inputs_spent_proofs,
             spent_transactions: new_dbc2.inputs_spent_transactions,
             network_knowledge: Some((proof_chain, sap)),
+            #[cfg(not(feature = "data-network"))]
+            fee_ciphers: BTreeMap::new(),
         })),
         &mut node,
         comm_rx,

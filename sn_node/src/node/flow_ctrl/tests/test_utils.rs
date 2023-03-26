@@ -450,7 +450,7 @@ pub(crate) fn build_a_node_instance(
     let node = MyNode::new(
         comm.clone(),
         info.keypair.clone(),
-        bls::SecretKey::random().public_key(),
+        bls::SecretKey::random(),
         network_knowledge.clone(),
         None,
         UsedSpace::new(min_capacity, max_capacity),
