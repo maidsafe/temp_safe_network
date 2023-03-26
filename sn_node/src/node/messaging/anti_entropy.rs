@@ -275,6 +275,12 @@ impl MyNode {
         let dst = wire_msg.dst;
         let msg_id = wire_msg.msg_id();
 
+        trace!(
+            "Sender's section key is at {:?}, meanwhile ours is at {:?}",
+            dst.section_key,
+            sap.section_key()
+        );
+
         // If the new SAP's section key is the same as the section key set when the
         // bounced message was originally sent, we just drop it.
         if dst.section_key == sap.section_key() {

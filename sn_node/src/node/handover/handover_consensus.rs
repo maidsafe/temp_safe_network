@@ -45,7 +45,7 @@ impl Handover {
     pub(crate) fn propose(&mut self, proposal: SapCandidate) -> Result<SignedVote<SapCandidate>> {
         let vote = Vote {
             gen: self.gen,
-            ballot: Ballot::Propose(proposal),
+            ballot: Ballot::Propose(proposal.clone()),
             faults: self.consensus.faults(),
         };
         let signed_vote = self.sign_vote(vote)?;
@@ -55,7 +55,10 @@ impl Handover {
                 &self.consensus.votes,
                 &self.consensus.processed_votes_cache,
             )
-            .map_err(|_| Error::FaultyProposal)?;
+            .map_err(|err| {
+                error!("Faulty proposal of {proposal:?} with error {err:?}");
+                Error::FaultyProposal
+            })?;
         self.cast_vote(signed_vote)
     }
 

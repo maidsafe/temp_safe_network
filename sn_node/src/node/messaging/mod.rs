@@ -153,6 +153,8 @@ impl MyNode {
             }
         };
 
+        debug!("{msg_id:?} got deserialized from wire_msg");
+
         // if we got here, we are the destination
         match msg_type {
             NetworkMsg::Node(msg) => Ok(vec![Cmd::ProcessNodeMsg {

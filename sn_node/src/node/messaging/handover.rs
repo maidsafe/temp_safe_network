@@ -54,7 +54,10 @@ impl MyNode {
             total_participants,
         ) {
             Ok(Some(sig)) => {
-                trace!("Handover request {msg_id:?} successfully aggregated");
+                trace!(
+                    "Handover request {msg_id:?} successfully aggregated among {:?}",
+                    sap.elders_set()
+                );
                 self.handle_request_handover_agreement(sap, sig)
             }
             Ok(None) => {
@@ -88,14 +91,14 @@ impl MyNode {
             );
             return Ok(vec![]);
         }
-        debug!("Handling section info with prefix: {:?}", sap.prefix());
+        debug!("handle_request_handover_agreement: {sap:?}");
 
         let membership_gen = sap.membership_gen();
         let signed_sap = SectionSigned::new(sap, sig);
 
         // handle regular elder handover (1 to 1), trigger handover consensus among elders
         if equal_prefix {
-            debug!("Propose elder handover to: {:?}", signed_sap.prefix());
+            debug!("Propose elder handover to: {:?}", signed_sap.value);
             return self.propose_handover_consensus(SapCandidate::ElderHandover(signed_sap));
         }
 
