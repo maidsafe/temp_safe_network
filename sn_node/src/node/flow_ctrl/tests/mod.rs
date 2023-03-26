@@ -760,6 +760,8 @@ async fn spentbook_spend_client_message_should_replicate_to_adults_and_send_ack(
     #[cfg(not(feature = "data-network"))]
     let fee_ciphers = {
         // Find the fee output.
+        // We must use the revealed output (i.e. the blinding factor) from the dbc builder so we can encrypt it.
+        // This is how the Elder can verify that the output to them contains sufficient amount, since that amount is blinded.
         let fee_derived_owner_pk = fee_derived_owner.as_owner().public_key();
         let fee_output = dbc_builder
             .revealed_outputs
@@ -771,12 +773,10 @@ async fn spentbook_spend_client_message_should_replicate_to_adults_and_send_ack(
         let fee_base_pk = context.reward_secret_key.public_key();
         let derivation_index_cipher = fee_base_pk.encrypt(fee_derived_owner.derivation_index);
 
-        // We must generate the revealed output (i.e. the blinding factor) to be both encrypted, and used in the dbc
-        // this is how the Elder can verify that the dbc contains sufficient amount, since the amount in the dbc is blinded.
-        let fee_derived_owner_pk = fee_derived_owner.as_owner().public_key();
-
         // Encrypt the amount to the _derived key_ (i.e. new dbc id).
+        let fee_derived_owner_pk = fee_derived_owner.as_owner().public_key();
         let amount_cipher = fee_output.revealed_amount.encrypt(&fee_derived_owner_pk);
+
         BTreeMap::from([(
             context.name,
             FeeCiphers::new(amount_cipher, derivation_index_cipher),
