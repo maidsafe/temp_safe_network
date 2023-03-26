@@ -1113,7 +1113,36 @@ needed, as they keypair itself contains the Arcs we need.
     - Self authentication Example
     - Example to demonstrate Storage API
 
+## v0.82.6 (2023-03-26)
+
+### Chore
+
+ - <csr-id-de3abf841789c5a696cd86a17d2c5743ad047c92/> bump sn_dbc to 11.0.0
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 1 commit contributed to the release.
+ - 3 days passed between releases.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Bump sn_dbc to 11.0.0 ([`de3abf8`](https://github.com/maidsafe/safe_network/commit/de3abf841789c5a696cd86a17d2c5743ad047c92))
+</details>
+
 ## v0.82.5 (2023-03-23)
+
+### Chore
+
+ - <csr-id-4cf0bf0e69f70c7303d4dcda581e5fbc54d0e51c/> sn_interface-0.20.8/sn_client-0.82.5/sn_node-0.80.2/sn_api-0.80.4
 
 ### Bug Fixes
 
@@ -1125,8 +1154,8 @@ needed, as they keypair itself contains the Arcs we need.
 
 <csr-read-only-do-not-edit/>
 
- - 1 commit contributed to the release.
- - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -1136,6 +1165,7 @@ needed, as they keypair itself contains the Arcs we need.
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Sn_interface-0.20.8/sn_client-0.82.5/sn_node-0.80.2/sn_api-0.80.4 ([`4cf0bf0`](https://github.com/maidsafe/safe_network/commit/4cf0bf0e69f70c7303d4dcda581e5fbc54d0e51c))
     - Couple fixes for readings members from section_peer ([`bd97c9a`](https://github.com/maidsafe/safe_network/commit/bd97c9aa64b7fc878bc5411b82f5105dce4b1e49))
 </details>
 
@@ -1144,6 +1174,7 @@ needed, as they keypair itself contains the Arcs we need.
 <csr-id-b0627339e2458fd762084cc4805d7adedfd8c05e/>
 <csr-id-29edfcea7d2cb1334422f2fe5dc90e72c7e5ac7c/>
 <csr-id-a5bb5e86518e23dcc59f252b231de89ed90efcf9/>
+<csr-id-22c6e341d28c913a3acaaeae0ceeb8c0a1ef4d4e/>
 
 ### Chore
 
