@@ -16,10 +16,10 @@ use sn_interface::{
     messaging::data::{
         DataCmd, DataQuery, Error as NetworkDataError, QueryResponse, SpendQuery, SpentbookCmd,
     },
-    types::SpentbookAddress,
+    types::{fees::FeeCiphers, SpentbookAddress},
 };
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use xor_name::XorName;
 
 // Maximum number of attempts when retrying a spend DBC operation with updated network knowledge.
@@ -48,6 +48,7 @@ impl Client {
         reason: DbcReason,
         spent_proofs: BTreeSet<SpentProof>,
         spent_transactions: BTreeSet<DbcTransaction>,
+        #[cfg(not(feature = "data-network"))] fee_ciphers: BTreeMap<XorName, FeeCiphers>,
     ) -> Result<()> {
         let mut network_knowledge = None;
         let mut attempts = 1;
@@ -64,6 +65,8 @@ impl Client {
                 spent_proofs: spent_proofs.clone(),
                 spent_transactions: spent_transactions.clone(),
                 network_knowledge,
+                #[cfg(not(feature = "data-network"))]
+                fee_ciphers: fee_ciphers.clone(),
             };
 
             let result = self.send_cmd(DataCmd::Spentbook(cmd)).await;
@@ -136,7 +139,7 @@ mod tests {
     use sn_interface::messaging::data::Error as ErrorMsg;
 
     use eyre::{bail, Result};
-    use std::collections::{BTreeSet, HashSet};
+    use std::collections::{BTreeMap, BTreeSet, HashSet};
     use tokio::time::Duration;
 
     const MAX_ATTEMPTS: u8 = 5;
@@ -207,6 +210,8 @@ mod tests {
                 DbcReason::none(),
                 genesis_dbc.inputs_spent_proofs,
                 genesis_dbc.inputs_spent_transactions,
+                #[cfg(not(feature = "data-network"))]
+                BTreeMap::new(),
             )
             .await?;
 
@@ -250,6 +255,8 @@ mod tests {
                 DbcReason::none(),
                 invalid_spent_proofs,
                 genesis_dbc.inputs_spent_transactions,
+                #[cfg(not(feature = "data-network"))]
+                BTreeMap::new(),
             )
             .await;
 
@@ -296,6 +303,8 @@ mod tests {
                 DbcReason::none(),
                 genesis_dbc.inputs_spent_proofs,
                 genesis_dbc.inputs_spent_transactions,
+                #[cfg(not(feature = "data-network"))]
+                BTreeMap::new(),
             )
             .await;
 
@@ -370,6 +379,8 @@ mod tests {
                 DbcReason::none(),
                 genesis_dbc.inputs_spent_proofs.clone(),
                 genesis_dbc.inputs_spent_transactions,
+                #[cfg(not(feature = "data-network"))]
+                BTreeMap::new(),
             )
             .await;
 
@@ -416,6 +427,8 @@ mod tests {
                 DbcReason::none(),
                 genesis_dbc.inputs_spent_proofs.clone(),
                 genesis_dbc.inputs_spent_transactions,
+                #[cfg(not(feature = "data-network"))]
+                BTreeMap::new(),
             )
             .await;
 
@@ -532,6 +545,8 @@ mod tests {
                         DbcReason::none(),
                         spent_proofs.clone(),
                         spent_transactions.clone(),
+                        #[cfg(not(feature = "data-network"))]
+                        BTreeMap::new(),
                     )
                     .await?;
 

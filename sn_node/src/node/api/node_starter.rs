@@ -7,7 +7,9 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{
-    cfg::keypair_storage::{get_reward_pk, store_network_keypair, store_new_reward_keypair},
+    cfg::keypair_storage::{
+        get_reward_secret_key, store_network_keypair, store_new_reward_keypair,
+    },
     flow_ctrl::{fault_detection::FaultsCmd, CmdCtrl, FlowCtrl},
     logging::log_system_details,
     CmdChannel, Config, Error, MyNode, NodeContext, NodeEventsChannel, Result,
@@ -52,19 +54,25 @@ pub async fn new_node(config: &Config, join_retry_timeout: Duration) -> Result<N
     let root_dir = root_dir_buf.as_path();
     fs::create_dir_all(root_dir).await?;
 
-    let reward_key = match get_reward_pk(root_dir).await? {
-        Some(public_key) => public_key,
+    let reward_secret_key = match get_reward_secret_key(root_dir).await? {
+        Some(secret_key) => secret_key,
         None => {
             let secret_key = bls::SecretKey::random();
-            let public_key = secret_key.public_key();
             store_new_reward_keypair(root_dir, &secret_key).await?;
-            public_key
+            secret_key
         }
     };
 
     let used_space = UsedSpace::new(config.min_capacity(), config.max_capacity());
 
-    start_node(config, used_space, root_dir, reward_key, join_retry_timeout).await
+    start_node(
+        config,
+        used_space,
+        root_dir,
+        reward_secret_key,
+        join_retry_timeout,
+    )
+    .await
 }
 
 // Private helper to create a new node using the given config and bootstraps it to the network.
@@ -72,7 +80,7 @@ async fn start_node(
     config: &Config,
     used_space: UsedSpace,
     root_storage_dir: &Path,
-    reward_key: bls::PublicKey,
+    reward_secret_key: bls::SecretKey,
     join_retry_timeout: Duration,
 ) -> Result<NodeRef> {
     let (fault_cmds_sender, fault_cmds_receiver) =
@@ -86,7 +94,7 @@ async fn start_node(
             comm,
             used_space,
             root_storage_dir,
-            reward_key,
+            reward_secret_key,
             fault_cmds_sender.clone(),
             events_channel.clone(),
         )
@@ -97,7 +105,7 @@ async fn start_node(
             comm,
             used_space,
             root_storage_dir,
-            reward_key,
+            reward_secret_key,
             fault_cmds_sender.clone(),
             events_channel.clone(),
         )
@@ -151,7 +159,7 @@ async fn start_genesis_node(
     comm: Comm,
     used_space: UsedSpace,
     root_storage_dir: &Path,
-    reward_key: bls::PublicKey,
+    reward_secret_key: bls::SecretKey,
     fault_cmds_sender: mpsc::Sender<FaultsCmd>,
     node_events_sender: NodeEventsChannel,
 ) -> Result<MyNode> {
@@ -171,7 +179,7 @@ async fn start_genesis_node(
     let (node, genesis_dbc) = MyNode::first_node(
         comm,
         keypair,
-        reward_key,
+        reward_secret_key,
         used_space.clone(),
         root_storage_dir.to_path_buf(),
         genesis_sk_set,
@@ -202,7 +210,7 @@ async fn start_normal_node(
     comm: Comm,
     used_space: UsedSpace,
     root_storage_dir: &Path,
-    reward_key: bls::PublicKey,
+    reward_secret_key: bls::SecretKey,
     fault_cmds_sender: mpsc::Sender<FaultsCmd>,
     node_events_sender: NodeEventsChannel,
 ) -> Result<MyNode> {
@@ -227,7 +235,7 @@ async fn start_normal_node(
     let node = MyNode::new(
         comm,
         Arc::new(keypair),
-        reward_key,
+        reward_secret_key,
         network_knowledge,
         None,
         used_space.clone(),
