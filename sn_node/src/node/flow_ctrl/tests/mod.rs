@@ -154,6 +154,7 @@ async fn handle_agreement_on_online() -> Result<()> {
 }
 
 #[tokio::test]
+#[ignore = "No longer promote elder when having enough"]
 async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
     init_logger();
     // Creates nodes where everybody has age 6 except one has 5.

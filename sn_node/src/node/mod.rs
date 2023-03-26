@@ -49,6 +49,7 @@ use sn_dbc::Dbc;
 use sn_fault_detection::IssueType;
 use sn_interface::{
     dbcs::gen_genesis_dbc,
+    elder_count,
     messaging::{
         signature_aggregator::{SignatureAggregator, TotalParticipationAggregator},
         system::{DkgSessionId, NodeMsg, SectionSigned},
@@ -413,10 +414,16 @@ impl MyNode {
             return vec![zero_dkg_id, one_dkg_id];
         }
 
+        let current_elders = BTreeSet::from_iter(sap.elders().copied());
+
+        // Do not carry out elder promotion when have enough elders.
+        if current_elders.len() >= elder_count() {
+            return vec![];
+        }
+
         // Candidates for elders out of all the nodes in the section, even out of the
         // relocating nodes if there would not be enough instead.
         let elder_candidates = elder_candidates(members.values().cloned(), &sap);
-        let current_elders = BTreeSet::from_iter(sap.elders().copied());
 
         info!(
             "ELDER CANDIDATES (current gen:{}) {}: {:?}",

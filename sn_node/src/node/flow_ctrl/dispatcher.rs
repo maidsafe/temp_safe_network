@@ -93,7 +93,7 @@ impl MyNode {
             Cmd::HandleDkgOutcome {
                 section_auth,
                 outcome,
-            } => node.handle_dkg_outcome(section_auth, outcome).await?,
+            } => node.handle_dkg_outcome(section_auth, outcome)?,
             Cmd::EnqueueDataForReplication {
                 recipient,
                 data_batch,
