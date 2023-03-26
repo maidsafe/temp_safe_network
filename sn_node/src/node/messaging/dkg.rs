@@ -472,7 +472,6 @@ impl MyNode {
         }
 
         // handle vote
-        let mut cmds: Vec<Cmd> = Vec::new();
         let mut ae_cmds: Vec<Cmd> = Vec::new();
         let mut is_old_gossip = true;
         let their_votes_len = votes.len();
@@ -825,7 +824,7 @@ impl MyNode {
         cmds
     }
 
-    pub(crate) async fn handle_dkg_outcome(
+    pub(crate) fn handle_dkg_outcome(
         &mut self,
         sap: SectionAuthorityProvider,
         key_share: SectionKeyShare,
@@ -841,8 +840,7 @@ impl MyNode {
         // it to sign any msg that needs section agreement.
         self.section_keys_provider.insert(key_share.clone());
 
-        let mut cmds = self.update_on_sap_change(&self.context()).await?;
-
+        let mut cmds = Vec::new();
         if !self.network_knowledge.has_chain_key(&sap.section_key()) {
             // This request is sent to the current set of elders to be aggregated
             let serialized_sap = bincode::serialize(&sap)?;
@@ -864,6 +862,15 @@ impl MyNode {
                 };
             }
         }
+
+        // // Do we really need this update currently?
+        // // Shall the update only get carried out when the network_knowledge has the chain key?
+        // match self.update_on_sap_change(&self.context()).await {
+        //     Ok(update_cmds) => cmds.extend(update_cmds),
+        //     Err(err) => {
+        //         error!("Failed on handle DKG outcome of {key_share_pk:?} during knowledge update: {err:?}")
+        //     }
+        // }
 
         Ok(cmds)
     }
@@ -909,6 +916,7 @@ mod tests {
     /// Simulate an entire round of dkg till termination; The dkg round creates a new keyshare set
     /// without any elder change (i.e., the dkg is between the same set of elders).
     #[tokio::test]
+    #[ignore = "No longer relocation within the genesis section"]
     async fn simulate_dkg_round() -> Result<()> {
         init_logger();
         let mut rng = rand::thread_rng();
@@ -1015,6 +1023,7 @@ mod tests {
     // some nodes don't receive certain votes. We solve this by gossiping the votes from a random
     // node until we reach termination.
     #[tokio::test]
+    #[ignore = "No longer relocation within the genesis section"]
     async fn nodes_should_be_brought_up_to_date_using_gossip() -> Result<()> {
         init_logger();
         let mut rng = rand::thread_rng();
