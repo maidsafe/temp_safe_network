@@ -38,6 +38,9 @@ pub const WALLET_TYPE_TAG: u64 = 1_000;
 /// depositing DBCs into a wallet.
 pub type WalletSpendableDbcs = BTreeMap<String, (Dbc, EntryHash)>;
 
+type ReissueCiphers = BTreeMap<PublicKey, BTreeMap<XorName, (RequiredFee, OwnerOnce)>>;
+type ReissueInputs = (Vec<Dbc>, Vec<(Token, OwnerOnce)>, Token, ReissueCiphers);
+
 /// Convenience struct to avoid complex fn signatures.
 struct ReissueComponents {
     input_dbcs_to_spend: Vec<Dbc>,
@@ -47,7 +50,7 @@ struct ReissueComponents {
     /// This is the set of input dbc keys, each having a set of
     /// Elder names and their respective fee ciphers.
     #[cfg(not(feature = "data-network"))]
-    all_fee_cipher_params: BTreeMap<PublicKey, BTreeMap<XorName, (RequiredFee, OwnerOnce)>>,
+    all_fee_cipher_params: ReissueCiphers,
 }
 
 // Number of attempts to make trying to spend inputs when reissuing DBCs
@@ -374,21 +377,14 @@ impl Safe {
         let safeurl = self.parse_and_resolve_url(wallet_url).await?;
         let spendable_dbcs = self.fetch_wallet(&safeurl).await?;
 
-        // From the spendable dbcs, we select the number required to cover the
-        // amount going to the output dbcs.
+        // From the spendable dbcs, we select those required to cover the output dbcs.
         #[cfg(feature = "data-network")]
-        let components = Self::select_inputs(spendable_dbcs, total_output_amount, outputs_owners)?;
+        let components =
+            Self::get_reissue_components(spendable_dbcs, total_output_amount, outputs_owners)?;
         #[cfg(not(feature = "data-network"))]
-        let components = {
-            let client = self.get_safe_client()?;
-            Self::select_inputs_with_fees(
-                client,
-                spendable_dbcs,
-                total_output_amount,
-                outputs_owners,
-            )
-            .await?
-        };
+        let components = self
+            .get_reissue_components_with_fee(spendable_dbcs, total_output_amount, outputs_owners)
+            .await?;
 
         let ReissueComponents {
             input_dbcs_to_spend,
@@ -401,7 +397,7 @@ impl Safe {
 
         // We can now reissue the output DBCs
         let (output_dbcs, change_dbc) = self
-            .reissue_dbcs(
+            .reissue_dbcs_with_fees(
                 input_dbcs_to_spend,
                 outputs_owners,
                 change_amount,
@@ -433,13 +429,43 @@ impl Safe {
         Ok(output_dbcs.into_iter().map(|(dbc, _, _)| dbc).collect())
     }
 
+    /// Reissue Dbcs from external (not in wallet) dbcs.
+    ///
+    /// This will pay transfer fees if not in data-network.
+    /// The input dbcs will be spent on the network, and the resulting
+    /// dbcs (and change dbc if any) are returned.
+    /// NB: We are skipping the DbcReason arg for now. It can be added later.
+    pub(super) async fn reissue_dbcs(
+        &self,
+        dbcs: Vec<Dbc>,
+        total_output_amount: Token,
+        outputs_owners: Vec<(Token, OwnerOnce)>,
+    ) -> Result<(Vec<(Dbc, OwnerOnce, RevealedAmount)>, Option<Dbc>)> {
+        // we need to get the fees into the outputs first
+        let (input_dbcs_to_spend, outputs_owners, change_amount, all_fee_cipher_params) = self
+            .select_inputs_with_fees(dbcs, total_output_amount, outputs_owners)
+            .await?;
+
+        // then we can reissue
+        self.reissue_dbcs_with_fees(
+            input_dbcs_to_spend,
+            outputs_owners,
+            change_amount,
+            DbcReason::none(),
+            #[cfg(not(feature = "data-network"))]
+            all_fee_cipher_params,
+        )
+        .await
+    }
+
     /// -------------------------------------------------
     ///  ------- Private helpers -------
     ///-------------------------------------------------
 
-    ///
+    /// A.1 First step in A-flow (data-network).
+    /// Used when reissuing from Wallet.
     #[cfg(feature = "data-network")]
-    fn select_inputs(
+    fn get_reissue_components(
         spendable_dbcs: WalletSpendableDbcs,
         total_output_amount: Token,
         outputs_owners: Vec<(Token, OwnerOnce)>,
@@ -499,28 +525,57 @@ impl Safe {
         })
     }
 
-    ///
-    /// NB: Upper layer should validate *estimated* fees against client preferences.
-    async fn select_inputs_with_fees(
-        client: &Client,
+    /// B.1 First step in B-flow (payment-network).
+    /// Used when reissuing from Wallet.
+    async fn get_reissue_components_with_fee(
+        &self,
         spendable_dbcs: WalletSpendableDbcs,
+        total_output_amount: Token,
+        outputs_owners: Vec<(Token, OwnerOnce)>,
+    ) -> Result<ReissueComponents> {
+        let dbcs = spendable_dbcs
+            .iter()
+            .map(|(_, (dbc, _))| dbc)
+            .cloned()
+            .collect();
+        let (input_dbcs_to_spend, outputs_owners, change_amount, all_fee_cipher_params) = self
+            .select_inputs_with_fees(dbcs, total_output_amount, outputs_owners)
+            .await?;
+        let input_dbc_keys = input_dbcs_to_spend.iter().map(|d| d.public_key()).collect();
+        let input_dbcs_entries_hash = Self::entry_hashes(input_dbc_keys, spendable_dbcs);
+        Ok(ReissueComponents {
+            input_dbcs_to_spend,
+            input_dbcs_entries_hash,
+            outputs_owners,
+            change_amount,
+            all_fee_cipher_params,
+        })
+    }
+
+    /// B.2 Second step in B-flow (payment-network).
+    async fn select_inputs_with_fees(
+        &self,
+        dbcs: Vec<Dbc>,
         mut total_output_amount: Token,
         mut outputs_owners: Vec<(Token, OwnerOnce)>,
-    ) -> Result<ReissueComponents> {
+    ) -> Result<ReissueInputs> {
         // We'll combine one or more input DBCs and reissue:
         // - one output DBC for the recipient,
         // - and a second DBC for the change, which will be stored in the source wallet.
         let mut input_dbcs_to_spend = Vec::<Dbc>::new();
-        let mut input_dbcs_entries_hash = BTreeSet::<EntryHash>::new();
         let mut total_input_amount = Token::zero();
         let mut change_amount = total_output_amount;
         let mut rng = rng::thread_rng();
         #[cfg(not(feature = "data-network"))]
         let mut all_fee_cipher_params = BTreeMap::new();
 
-        for (name, (dbc, entry_hash)) in spendable_dbcs {
+        let client = self.get_safe_client()?;
+
+        for dbc in dbcs {
             let revealed_bearer = dbc.as_revealed_input_bearer()?;
             let input_key = revealed_bearer.public_key();
+
+            // ------------ fee part start ----------------
 
             // Each section will have elder_count() instances to pay individually (for now, later they will be more).
             let elder_fees = client.get_section_fees(input_key).await?;
@@ -582,17 +637,21 @@ impl Safe {
             #[cfg(not(feature = "data-network"))]
             let _ = all_fee_cipher_params.insert(input_key, fee_cipher_params);
 
+            // ---------------- fee part end ----------------
+
             let dbc_balance = match dbc.revealed_amount_bearer() {
                 Ok(revealed_amount) => Token::from_nano(revealed_amount.value()),
                 Err(err) => {
-                    warn!("Ignoring input Dbc found in wallet (entry: {name}) due to not being a bearer: {err:?}");
+                    warn!(
+                        "Ignoring input Dbc (id: {input_key:?}) due to not being a bearer: {err:?}"
+                    );
                     continue;
                 }
             };
 
             // Add this Dbc as input to be spent.
-            input_dbcs_to_spend.push(dbc);
-            input_dbcs_entries_hash.insert(entry_hash);
+            input_dbcs_to_spend.push(dbc.clone());
+            // input_dbcs_entries_hash.insert(entry_hash);
 
             // Input amount increases with the amount of the dbc.
             total_input_amount = total_input_amount.checked_add(dbc_balance)
@@ -639,14 +698,27 @@ impl Safe {
         // If not enough spendable was found, this check will return an error.
         Self::verify_amounts(total_input_amount, total_output_amount)?;
 
-        Ok(ReissueComponents {
+        Ok((
             input_dbcs_to_spend,
-            input_dbcs_entries_hash,
             outputs_owners,
             change_amount,
             #[cfg(not(feature = "data-network"))]
             all_fee_cipher_params,
-        })
+        ))
+    }
+
+    fn entry_hashes(
+        input_dbc_keys: BTreeSet<PublicKey>,
+        spendable: WalletSpendableDbcs,
+    ) -> BTreeSet<EntryHash> {
+        spendable
+            .into_iter()
+            .filter_map(|(_, (dbc, entry_hash))| {
+                input_dbc_keys
+                    .contains(&dbc.public_key())
+                    .then_some(entry_hash)
+            })
+            .collect()
     }
 
     // Make sure total input amount gathered with input DBCs are enough for the output amount
@@ -684,9 +756,13 @@ impl Safe {
         Ok(())
     }
 
-    /// Reissue DBCs and log the spent input DBCs on the network. Return the output DBC and the
-    /// change DBC if there is one.
-    pub(super) async fn reissue_dbcs(
+    /// A.2 Second step in A-flow (data-network)
+    /// B.3 Third step in B-flow (payment-network).
+    ///
+    /// This will pay transfer fees if not in data-network.
+    /// The input dbcs will be spent on the network, and the resulting
+    /// dbcs (and change dbc if any) are returned.
+    async fn reissue_dbcs_with_fees(
         &self,
         input_dbcs: Vec<Dbc>,
         outputs: Vec<(Token, OwnerOnce)>,
@@ -1707,7 +1783,7 @@ mod tests {
         for (elder, fee) in elder_fees {
             match fee.content.decrypt_amount(&secret_key) {
                 Ok(amount) => decrypted_fees.push(amount),
-                Err(_) => Err(Error::DbcReissueError(format!(
+                Err(_) => Err(crate::Error::DbcReissueError(format!(
                     "Could not decrypt fee amount sent from {elder}."
                 )))?,
             }
@@ -1717,7 +1793,7 @@ mod tests {
             .fold(Some(Token::zero()), |total, fee| {
                 total.and_then(|t| t.checked_add(fee))
             })
-            .ok_or_else(|| Error::DbcReissueError(
+            .ok_or_else(|| crate::Error::DbcReissueError(
                 "Overflow occurred while summing the individual Elder's fees in order to calculate the total amount for the output DBCs."
                     .to_string(),
             ))?;
