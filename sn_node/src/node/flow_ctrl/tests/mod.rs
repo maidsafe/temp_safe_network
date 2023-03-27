@@ -17,11 +17,11 @@ use crate::node::{
         test_utils::{gen_info_with_comm, gen_node_infos_with_comm},
     },
     messaging::Recipients,
-    Cmd, Error, MyNode,
+    Cmd, Error, MyNode, NodeContext,
 };
 
 use sn_comms::{CommEvent, MsgReceived};
-use sn_dbc::{Hash, Owner, OwnerOnce, Token, TransactionBuilder};
+use sn_dbc::{DbcTransaction, Hash, Owner, OwnerOnce, Token, TransactionBuilder};
 use sn_interface::{
     dbcs::{gen_genesis_dbc, DbcReason},
     elder_count, init_logger,
@@ -723,68 +723,12 @@ async fn spentbook_spend_client_message_should_replicate_to_adults_and_send_ack(
     let dbc = gen_genesis_dbc(&sk_set, &sk_set.secret_key())?;
     let context = node.context();
 
-    let dbc_amount = dbc.revealed_amount_bearer()?;
-
-    let mut rng = thread_rng();
-    let change_owner = OwnerOnce::from_owner_base(dbc.owner_base().clone(), &mut rng);
-
-    #[cfg(feature = "data-network")]
-    let change_amount = Token::from_nano(dbc_amount.value());
-    #[cfg(not(feature = "data-network"))]
-    let change_amount = Token::from_nano(dbc_amount.value() - context.store_cost.as_nano());
-
-    #[cfg(not(feature = "data-network"))]
-    let fee_derived_owner = {
-        // Derive an owner (i.e. the id of the new dbc).
-        let fee_base_pk = context.reward_secret_key.public_key();
-        OwnerOnce::from_owner_base(Owner::from(fee_base_pk), &mut rng)
-    };
-
-    #[cfg(feature = "data-network")]
-    let outputs = vec![(change_amount, change_owner)];
-    #[cfg(not(feature = "data-network"))]
-    let outputs = {
-        vec![
-            (context.store_cost, fee_derived_owner.clone()),
-            (change_amount, change_owner),
-        ]
-    };
-
-    let mut tx_builder = TransactionBuilder::default().add_input_dbc_bearer(&dbc)?;
-    tx_builder = tx_builder.add_outputs_by_amount(outputs);
-
-    // Only after we have built the tx can we access the output with
-    // the blinding factor we need to encrypt.
-    let dbc_builder = tx_builder.build(&mut rng)?;
-
-    #[cfg(not(feature = "data-network"))]
-    let fee_ciphers = {
-        // Find the fee output.
-        // We must use the revealed output (i.e. the blinding factor) from the dbc builder so we can encrypt it.
-        // This is how the Elder can verify that the output to them contains sufficient amount, since that amount is blinded.
-        let fee_derived_owner_pk = fee_derived_owner.as_owner().public_key();
-        let fee_output = dbc_builder
-            .revealed_outputs
-            .iter()
-            .find(|out| out.public_key == fee_derived_owner_pk)
-            .expect("Didn't find the Elder derived pk!");
-
-        // Encrypt the index to the _well-known reward key_.
-        let fee_base_pk = context.reward_secret_key.public_key();
-        let derivation_index_cipher = fee_base_pk.encrypt(fee_derived_owner.derivation_index);
-
-        // Encrypt the amount to the _derived key_ (i.e. new dbc id).
-        let fee_derived_owner_pk = fee_derived_owner.as_owner().public_key();
-        let amount_cipher = fee_output.revealed_amount.encrypt(&fee_derived_owner_pk);
-
-        BTreeMap::from([(
-            context.name,
-            FeeCiphers::new(amount_cipher, derivation_index_cipher),
-        )])
-    };
-
-    // We had one input only.
-    let (public_key, tx) = dbc_builder.inputs()[0].clone();
+    let Spend {
+        public_key,
+        tx,
+        #[cfg(not(feature = "data-network"))]
+        fee_ciphers,
+    } = get_spend(dbc.clone(), context)?;
 
     let comm_rx = env.take_comm_rx(node.info().public_key());
     let mut cmds = ProcessAndInspectCmds::new_from_client_msg(
@@ -915,6 +859,78 @@ async fn spentbook_spend_transaction_with_no_inputs_should_return_spentbook_erro
                 &MessagingDataError::from(Error::SpentbookError(
                     "The DBC transaction must have at least one input.".to_string()
                 )),
+                "A different error was expected for this case: {error:?}"
+            );
+            return Ok(());
+        }
+    }
+
+    bail!("We expected an error to be returned");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn spentbook_spend_with_random_public_key_should_return_spentbook_error() -> Result<()> {
+    init_logger();
+    let prefix = Prefix::default();
+    let replication_count = 5;
+    std::env::set_var("SN_DATA_COPY_COUNT", replication_count.to_string());
+
+    let mut env = TestNetworkBuilder::new(thread_rng())
+        .sap(
+            TestSapBuilder::new(prefix)
+                .adult_count(6)
+                .sk_threshold_size(0),
+        )
+        .build()?;
+
+    let mut node = env.get_nodes(prefix, 1, 0, None)?.remove(0);
+
+    let sk_set = env.get_secret_key_set(prefix, None)?;
+    let dbc = gen_genesis_dbc(&sk_set, &sk_set.secret_key())?;
+    let context = node.context();
+
+    let Spend {
+        tx,
+        #[cfg(not(feature = "data-network"))]
+        fee_ciphers,
+        ..
+    } = get_spend(dbc.clone(), context)?;
+
+    // generate the random public key
+    let random_public_key = bls::SecretKey::random().public_key();
+
+    let comm_rx = env.take_comm_rx(node.info().public_key());
+    let mut cmds = ProcessAndInspectCmds::new_from_client_msg(
+        ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
+            public_key: random_public_key,
+            tx: tx.clone(),
+            reason: DbcReason::none(),
+            spent_proofs: dbc.inputs_spent_proofs.clone(),
+            spent_transactions: dbc.inputs_spent_transactions,
+            network_knowledge: None,
+            #[cfg(not(feature = "data-network"))]
+            fee_ciphers,
+        })),
+        &mut node,
+        comm_rx,
+    )
+    .await?;
+
+    while let Some(cmd) = cmds.next(&mut node).await? {
+        if let Cmd::SendDataResponse {
+            msg:
+                DataResponse::CmdResponse {
+                    response: CmdResponse::SpendKey(Err(error)),
+                    ..
+                },
+            ..
+        } = cmd
+        {
+            assert_eq!(
+                error,
+                &MessagingDataError::from(Error::SpentbookError(format!(
+                    "There are no amounts for the given public key {random_public_key:?}"
+                ))),
                 "A different error was expected for this case: {error:?}"
             );
             return Ok(());
@@ -1068,4 +1084,82 @@ fn single_src_node(name: XorName, dst: Dst, msg: NodeMsg) -> Result<WireMsg> {
     );
 
     Ok(wire_msg)
+}
+
+struct Spend {
+    public_key: bls::PublicKey,
+    tx: DbcTransaction,
+    #[cfg(not(feature = "data-network"))]
+    fee_ciphers: BTreeMap<XorName, FeeCiphers>,
+}
+
+fn get_spend(dbc: sn_dbc::Dbc, context: NodeContext) -> Result<Spend> {
+    let mut rng = thread_rng();
+    let dbc_amount = dbc.revealed_amount_bearer()?;
+    let change_owner = OwnerOnce::from_owner_base(dbc.owner_base().clone(), &mut rng);
+
+    #[cfg(feature = "data-network")]
+    let change_amount = Token::from_nano(dbc_amount.value());
+    #[cfg(not(feature = "data-network"))]
+    let change_amount = Token::from_nano(dbc_amount.value() - context.store_cost.as_nano());
+
+    #[cfg(not(feature = "data-network"))]
+    let fee_derived_owner = {
+        // Derive an owner (i.e. the id of the new dbc).
+        let fee_base_pk = context.reward_secret_key.public_key();
+        OwnerOnce::from_owner_base(Owner::from(fee_base_pk), &mut rng)
+    };
+
+    #[cfg(feature = "data-network")]
+    let outputs = vec![(change_amount, change_owner)];
+    #[cfg(not(feature = "data-network"))]
+    let outputs = {
+        vec![
+            (context.store_cost, fee_derived_owner.clone()),
+            (change_amount, change_owner),
+        ]
+    };
+
+    let mut tx_builder = TransactionBuilder::default().add_input_dbc_bearer(&dbc)?;
+    tx_builder = tx_builder.add_outputs_by_amount(outputs);
+
+    // Only after we have built the tx can we access the output with
+    // the blinding factor we need to encrypt.
+    let dbc_builder = tx_builder.build(&mut rng)?;
+
+    #[cfg(not(feature = "data-network"))]
+    let fee_ciphers = {
+        // Find the fee output.
+        // We must use the revealed output (i.e. the blinding factor) from the dbc builder so we can encrypt it.
+        // This is how the Elder can verify that the output to them contains sufficient amount, since that amount is blinded.
+        let fee_derived_owner_pk = fee_derived_owner.as_owner().public_key();
+        let fee_output = dbc_builder
+            .revealed_outputs
+            .iter()
+            .find(|out| out.public_key == fee_derived_owner_pk)
+            .expect("Didn't find the Elder derived pk!");
+
+        // Encrypt the index to the _well-known reward key_.
+        let fee_base_pk = context.reward_secret_key.public_key();
+        let derivation_index_cipher = fee_base_pk.encrypt(fee_derived_owner.derivation_index);
+
+        // Encrypt the amount to the _derived key_ (i.e. new dbc id).
+        let fee_derived_owner_pk = fee_derived_owner.as_owner().public_key();
+        let amount_cipher = fee_output.revealed_amount.encrypt(&fee_derived_owner_pk);
+
+        BTreeMap::from([(
+            context.name,
+            FeeCiphers::new(amount_cipher, derivation_index_cipher),
+        )])
+    };
+
+    // We had one input only.
+    let (public_key, tx) = dbc_builder.inputs()[0].clone();
+
+    Ok(Spend {
+        public_key,
+        tx,
+        #[cfg(not(feature = "data-network"))]
+        fee_ciphers,
+    })
 }
