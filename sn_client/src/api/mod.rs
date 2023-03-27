@@ -15,10 +15,12 @@ mod queries;
 mod register_apis;
 mod spend_queries;
 mod spentbook_apis;
+mod transfers;
 
 pub use client_builder::ClientBuilder;
 pub use file_apis::QueriedDataReplicas;
 pub use register_apis::RegisterWriteAheadLog;
+pub use transfers::{select_inputs as select_dbc_inputs, send_tokens, Error as TransferError};
 
 use crate::{
     errors::{Error, Result},
