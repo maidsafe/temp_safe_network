@@ -42,14 +42,13 @@ jobs:
   # (those that are not os dependent, so we only run once)
   merge-after-os-agnostic-only-tests:
     if: "!startsWith(github.event.head_commit.message, 'chore(release):') && needs.pre_job.outputs.should_skip != 'true'"
-    name: Allow merge if all ubuntu only tests pass
+    name: Allow merge if all os-agnostic code quality checks pass
     runs-on: ubuntu-latest
     needs:
       - cargo-udeps
       - lint
       - checks
       - build-arm
-      # - e2e-churn
     steps:
       - run: echo "All os agnostic checks passed, ready to merge"
 
