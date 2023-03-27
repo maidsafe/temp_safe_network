@@ -47,13 +47,12 @@ const NUM_OF_DBC_REISSUE_ATTEMPTS: u8 = 5;
 pub async fn send_tokens(
     client: &Client,
     dbcs: Vec<Dbc>,
-    total_output_amount: Token,
-    outputs_owners: Vec<(Token, OwnerOnce)>,
+    recipients: Vec<(Token, OwnerOnce)>,
 ) -> Result<(Vec<(Dbc, OwnerOnce, RevealedAmount)>, Option<Dbc>)> {
     // We need to select the necessary number of dbcs from those that we were passed.
     // This will also account for any fees.
     let (input_dbcs_to_spend, outputs_owners, change_amount, all_fee_cipher_params) =
-        select_inputs(client, dbcs, total_output_amount, outputs_owners).await?;
+        select_inputs(client, dbcs, recipients).await?;
 
     // then we can reissue
     reissue_dbcs(
@@ -74,14 +73,25 @@ pub async fn send_tokens(
 pub async fn select_inputs(
     client: &Client,
     dbcs: Vec<Dbc>,
-    mut total_output_amount: Token,
-    mut outputs_owners: Vec<(Token, OwnerOnce)>,
+    mut recipients: Vec<(Token, OwnerOnce)>,
 ) -> Result<ReissueInputs> {
     // We'll combine one or more input DBCs and reissue:
     // - one output DBC for the recipient,
     // - and a second DBC for the change, which will be stored in the source wallet.
     let mut input_dbcs_to_spend = Vec::<Dbc>::new();
     let mut total_input_amount = Token::zero();
+    let mut total_output_amount = recipients
+        .iter()
+        .fold(Some(Token::zero()), |total, (amount, _)| {
+            total.and_then(|t| t.checked_add(*amount))
+        })
+        .ok_or_else(|| {
+            Error::DbcReissueError(
+                "Overflow occurred while summing the output amounts for the output DBCs."
+                    .to_string(),
+            )
+        })?;
+
     let mut change_amount = total_output_amount;
     let mut rng = rng::thread_rng();
     #[cfg(not(feature = "data-network"))]
@@ -144,7 +154,7 @@ pub async fn select_inputs(
                 .for_each(|((elder, required_fee), fee)| {
                     let owner = Owner::from(required_fee.content.elder_reward_key);
                     let owner_once = OwnerOnce::from_owner_base(owner, &mut rng);
-                    outputs_owners.push((*fee, owner_once.clone()));
+                    recipients.push((*fee, owner_once.clone()));
 
                     #[cfg(not(feature = "data-network"))]
                     let _ =
@@ -218,7 +228,7 @@ pub async fn select_inputs(
 
     Ok((
         input_dbcs_to_spend,
-        outputs_owners,
+        recipients,
         change_amount,
         #[cfg(not(feature = "data-network"))]
         all_fee_cipher_params,

@@ -374,7 +374,7 @@ impl Safe {
 
         // From the spendable dbcs, we select those required to cover the output dbcs.
         let components = self
-            .get_reissue_components(spendable_dbcs, total_output_amount, outputs_owners)
+            .get_reissue_components(spendable_dbcs, outputs_owners)
             .await?;
 
         let ReissueComponents {
@@ -430,11 +430,10 @@ impl Safe {
     pub(super) async fn send_tokens(
         &self,
         dbcs: Vec<Dbc>,
-        total_output_amount: Token,
-        outputs_owners: Vec<(Token, OwnerOnce)>,
+        recipients: Vec<(Token, OwnerOnce)>,
     ) -> Result<(Vec<(Dbc, OwnerOnce, RevealedAmount)>, Option<Dbc>)> {
         let client = self.get_safe_client()?;
-        Ok(sn_client::api::send_tokens(client, dbcs, total_output_amount, outputs_owners).await?)
+        Ok(sn_client::api::send_tokens(client, dbcs, recipients).await?)
     }
 
     /// -------------------------------------------------
@@ -445,7 +444,6 @@ impl Safe {
     async fn get_reissue_components(
         &self,
         spendable_dbcs: WalletSpendableDbcs,
-        total_output_amount: Token,
         outputs_owners: Vec<(Token, OwnerOnce)>,
     ) -> Result<ReissueComponents> {
         let dbcs = spendable_dbcs
@@ -456,8 +454,7 @@ impl Safe {
 
         let client = self.get_safe_client()?;
         let (input_dbcs_to_spend, outputs_owners, change_amount, all_fee_cipher_params) =
-            sn_client::api::select_dbc_inputs(client, dbcs, total_output_amount, outputs_owners)
-                .await?;
+            sn_client::api::select_dbc_inputs(client, dbcs, outputs_owners).await?;
         let input_dbc_keys = input_dbcs_to_spend.iter().map(|d| d.public_key()).collect();
         let input_dbcs_entries_hash = Self::entry_hashes(input_dbc_keys, spendable_dbcs);
 
