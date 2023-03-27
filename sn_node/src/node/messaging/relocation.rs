@@ -23,7 +23,7 @@ use sn_interface::{
 };
 
 use std::collections::BTreeSet;
-use xor_name::XorName;
+use xor_name::{Prefix, XorName};
 
 // Relocation
 impl MyNode {
@@ -33,6 +33,16 @@ impl MyNode {
         excluded: BTreeSet<XorName>,
     ) -> Result<Vec<Cmd>> {
         info!("Try to find relocate nodes, excluded {excluded:?}");
+        // Do not carry out relocation within the genesis section.
+        // This is because the current CI doesn't support parse relocated node's info.
+        // Which will fail the `wait_for_all_nodes_to_join.sh` script check.
+        // TODO: consider make the script check support parse relocated node's info as well
+        //       to re-enable this feature.
+        if self.network_knowledge.prefix() == Prefix::default() {
+            warn!("Do not carry out relocation during the genesis section");
+            return Ok(vec![]);
+        }
+
         // Do not carry out relocation when there is not enough elder nodes.
         if self.network_knowledge.section_auth().elder_count() < elder_count() {
             warn!(
