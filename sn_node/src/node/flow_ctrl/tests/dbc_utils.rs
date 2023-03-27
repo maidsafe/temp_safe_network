@@ -10,9 +10,9 @@ use sn_dbc::{
     Dbc, DbcTransaction, Owner, OwnerOnce, PublicKey, SpentProof, SpentProofShare, Token,
     TransactionBuilder,
 };
+use sn_interface::{messaging::data::RegisterCmd, types::ReplicatedData};
 
 use eyre::{eyre, Result};
-use sn_interface::{messaging::data::RegisterCmd, types::ReplicatedData};
 use std::collections::BTreeSet;
 
 /// Get the spent proof share that's packaged inside the data that's to be replicated to the adults

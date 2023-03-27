@@ -315,12 +315,44 @@ impl MyNode {
 
     #[cfg(not(feature = "data-network"))]
     fn verify_fee(
-        _store_cost: sn_dbc::Token,
-        _reward_secret_key: &bls::SecretKey,
-        _tx: &DbcTransaction,
-        _our_name: XorName,
-        _fee_ciphers: BTreeMap<XorName, FeeCiphers>,
+        store_cost: sn_dbc::Token,
+        reward_secret_key: &bls::SecretKey,
+        tx: &DbcTransaction,
+        our_name: XorName,
+        fee_ciphers: BTreeMap<XorName, FeeCiphers>,
     ) -> Result<()> {
+        // find the ciphers for us
+        let fee_ciphers = fee_ciphers.get(&our_name).ok_or(Error::MissingFee)?;
+        // decrypt the ciphers
+        let (derived_key, revealed_amount) = fee_ciphers.decrypt(reward_secret_key)?;
+
+        // find the output for the derived key
+        let output_proof = match tx
+            .outputs
+            .iter()
+            .find(|proof| proof.public_key() == &derived_key)
+        {
+            Some(proof) => proof,
+            None => return Err(Error::MissingFee),
+        };
+
+        // blind the amount
+        let blinded_amount = revealed_amount.blinded_amount(&sn_dbc::PedersenGens::default());
+        // Since the output proof contains blinded amounts, we can only verify
+        // that the amount is what we expect by..
+        // 1. ..comparing equality to the blinded amount we build from the decrypted revealed amount (i.e. amount + blinding factor)..
+        if blinded_amount != output_proof.blinded_amount() {
+            return Err(Error::InvalidFeeBlindedAmount);
+        }
+        // .. and 2. checking that the revealed amount we have, (that we now know is what the output blinded amount contains, since the above check 1. passed),
+        // also is what we expect the amount to be.
+        // The basic rule for now is that if the paid fee is over 1% less than the required fee, we don't accept the fee.
+        // This is a temporary diff value/design.
+        // (And yes, this means that for now, the Client can try to get away cheaper by sending in up to 1% lower fee than they were asked for.)
+        if store_cost.as_nano() as f64 * 0.99 > revealed_amount.value() as f64 {
+            return Err(Error::FeeTooLow);
+        }
+
         Ok(())
     }
 
