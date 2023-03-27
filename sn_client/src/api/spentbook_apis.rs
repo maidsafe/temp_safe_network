@@ -476,10 +476,14 @@ mod tests {
         let output_owner = OwnerOnce::from_owner_base(dbc_owner, &mut rng::thread_rng());
         let dbc_builder = TransactionBuilder::default().add_input_dbc_bearer(&genesis_dbc)?;
 
+        // get fees
+
         let inputs_amount_sum = dbc_builder.inputs_amount_sum();
         let dbc_builder = dbc_builder
             .add_output_by_amount(inputs_amount_sum, output_owner)
             .build(rng::thread_rng())?;
+
+        // get outputs and produce fee ciphers
 
         assert_eq!(dbc_builder.inputs().len(), 1);
         let (public_key, tx) = dbc_builder.inputs()[0].clone();

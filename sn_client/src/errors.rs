@@ -8,6 +8,7 @@
 
 use crate::LinkError;
 
+use sn_dbc::PublicKey as DbcPublicKey;
 use sn_interface::{
     messaging::{
         data::{DataQuery, Error as ErrorMsg, QueryResponse},
@@ -18,7 +19,6 @@ use sn_interface::{
 };
 
 use bls::PublicKey;
-use sn_dbc::PublicKey as DbcPublicKey;
 use std::{io, time::Duration};
 use thiserror::Error;
 use xor_name::XorName;
@@ -149,6 +149,9 @@ pub enum Error {
         /// Address name of the chunk
         address: XorName,
     },
+    /// Transfer errors.
+    #[error(transparent)]
+    TransferError(#[from] crate::api::TransferError),
     /// Node closed the bi-stream we expected a response on
     #[error("The bi-stream we expected a msg response on, for {msg_id:?}, was closed by remote node: {node_id:?}")]
     ResponseStreamClosed {
