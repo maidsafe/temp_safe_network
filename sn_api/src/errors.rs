@@ -99,9 +99,6 @@ pub enum Error {
     /// InvalidMediaType
     #[error("InvalidMediaType: {0}")]
     InvalidMediaType(String),
-    /// Not enough balance to perform a transaction
-    #[error("Not enough balance: {0}")]
-    NotEnoughBalance(String),
     /// NrsNameAlreadyExists
     #[error("NrsNameAlreadyExists: {0}")]
     NrsNameAlreadyExists(String),
