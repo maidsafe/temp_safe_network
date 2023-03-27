@@ -91,9 +91,7 @@ async fn reissue_bearer_dbcs() -> Result<Vec<(Dbc, Token)>> {
         .map(|_| rng.gen_range(REISSUED_DBC_MIN_BALANCE..REISSUED_DBC_MAX_BALANCE))
         .collect();
 
-    let total_output_amount: u64 = amounts.iter().sum();
-
-    let outputs_owners: Vec<_> = amounts
+    let recipients: Vec<_> = amounts
         .into_iter()
         .map(|amount| {
             let mut rng = rng::thread_rng();
@@ -106,11 +104,7 @@ async fn reissue_bearer_dbcs() -> Result<Vec<(Dbc, Token)>> {
     let safe = new_safe_instance().await?;
 
     let (output_dbcs, _) = safe
-        .send_tokens(
-            vec![GENESIS_DBC.clone()],
-            Token::from_nano(total_output_amount),
-            outputs_owners,
-        )
+        .send_tokens(vec![GENESIS_DBC.clone()], recipients)
         .await?;
 
     Ok(output_dbcs
