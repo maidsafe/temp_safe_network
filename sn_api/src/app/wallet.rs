@@ -688,7 +688,7 @@ mod tests {
         new_safe_instance_with_dbc, new_safe_instance_with_dbc_owner, GENESIS_DBC,
     };
 
-    use sn_client::{Error as ClientError, ErrorMsg};
+    use sn_client::{api::TransferError, Error as ClientError, ErrorMsg};
     use sn_dbc::{Error as DbcError, Owner};
     use sn_interface::network_knowledge::DEFAULT_ELDER_COUNT;
 
@@ -1231,7 +1231,9 @@ mod tests {
             )
             .await
         {
-            Err(Error::NotEnoughBalance(msg)) => {
+            Err(Error::ClientError(ClientError::TransferError(
+                TransferError::NotEnoughBalance(msg),
+            ))) => {
                 assert_eq!(msg, dbc_balance.to_string());
                 Ok(())
             }
