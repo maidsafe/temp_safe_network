@@ -5,19 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.81.0 (2023-03-27)
+
 ## v0.80.5 (2023-03-26)
+
+<csr-id-de3abf841789c5a696cd86a17d2c5743ad047c92/>
 
 ### Chore
 
  - <csr-id-de3abf841789c5a696cd86a17d2c5743ad047c92/> bump sn_dbc to 11.0.0
 
+### Chore
+
+ - <csr-id-d045f53e8ac66542cd6d2cfc750368d5142bc98e/> sn_interface-0.20.11/sn_client-0.82.6/sn_node-0.80.5/sn_api-0.80.5/sn_cli-0.74.3
+
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 1 commit contributed to the release.
+ - 2 commits contributed to the release.
  - 3 days passed between releases.
- - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -27,10 +35,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Sn_interface-0.20.11/sn_client-0.82.6/sn_node-0.80.5/sn_api-0.80.5/sn_cli-0.74.3 ([`d045f53`](https://github.com/maidsafe/safe_network/commit/d045f53e8ac66542cd6d2cfc750368d5142bc98e))
     - Bump sn_dbc to 11.0.0 ([`de3abf8`](https://github.com/maidsafe/safe_network/commit/de3abf841789c5a696cd86a17d2c5743ad047c92))
 </details>
 
 ## v0.80.4 (2023-03-23)
+
+<csr-id-4cf0bf0e69f70c7303d4dcda581e5fbc54d0e51c/>
 
 ### Chore
 
