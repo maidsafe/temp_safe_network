@@ -14,9 +14,9 @@ use tracing::{debug, info, trace};
 
 use safenode::safe_node_server::{SafeNode, SafeNodeServer};
 use safenode::{
-    NodeEvent as RpcNodeEvent, NodeEventsRequest, NodeInfoRequest, NodeInfoResponse,
-    RestartRequest, RestartResponse, SectionMember, SectionMembersRequest, SectionMembersResponse,
-    StopRequest, StopResponse,
+    NodeEvent, NodeEventsRequest, NodeInfoRequest, NodeInfoResponse, RestartRequest,
+    RestartResponse, SectionMember, SectionMembersRequest, SectionMembersResponse, StopRequest,
+    StopResponse, UpdateRequest, UpdateResponse,
 };
 
 // this would include code generated from .proto file
@@ -36,7 +36,7 @@ struct SafeNodeRpcService {
 // Implementing RPC interface for service defined in .proto
 #[tonic::async_trait]
 impl SafeNode for SafeNodeRpcService {
-    type NodeEventsStream = ReceiverStream<Result<RpcNodeEvent, Status>>;
+    type NodeEventsStream = ReceiverStream<Result<NodeEvent, Status>>;
 
     async fn node_info(
         &self,
@@ -104,7 +104,7 @@ impl SafeNode for SafeNodeRpcService {
         let mut events_rx = self.node_ref.read().await.events_channel.subscribe();
         let _handle = tokio::spawn(async move {
             while let Ok(event) = events_rx.recv().await {
-                let event = RpcNodeEvent {
+                let event = NodeEvent {
                     event: format!("Event-{event}"),
                 };
 
@@ -128,8 +128,16 @@ impl SafeNode for SafeNodeRpcService {
             request.get_ref()
         );
 
-        let err = ErrReport::msg("Node has been stopped by an RPC request");
-        match self.ctl_tx.send(NodeCtl::Stop(err)).await {
+        let cause = if let Some(addr) = request.remote_addr() {
+            ErrReport::msg(format!(
+                "Node has been stopped by an RPC request from {addr}."
+            ))
+        } else {
+            ErrReport::msg("Node has been stopped by an RPC request from an unknown address.")
+        };
+
+        let delay = Duration::from_millis(request.get_ref().delay_millis);
+        match self.ctl_tx.send(NodeCtl::Stop { delay, cause }).await {
             Ok(()) => Ok(Response::new(StopResponse {})),
             Err(err) => Err(Status::new(
                 Code::Internal,
@@ -148,15 +156,32 @@ impl SafeNode for SafeNodeRpcService {
             request.get_ref()
         );
 
-        match self
-            .ctl_tx
-            .send(NodeCtl::Restart(Duration::from_secs(2)))
-            .await
-        {
+        let delay = Duration::from_millis(request.get_ref().delay_millis);
+        match self.ctl_tx.send(NodeCtl::Restart(delay)).await {
             Ok(()) => Ok(Response::new(RestartResponse {})),
             Err(err) => Err(Status::new(
                 Code::Internal,
                 format!("Failed to restart the node: {err}"),
+            )),
+        }
+    }
+
+    async fn update(
+        &self,
+        request: Request<UpdateRequest>,
+    ) -> Result<Response<UpdateResponse>, Status> {
+        trace!(
+            "RPC request received at {}: {:?}",
+            self.addr,
+            request.get_ref()
+        );
+
+        let delay = Duration::from_millis(request.get_ref().delay_millis);
+        match self.ctl_tx.send(NodeCtl::Update(delay)).await {
+            Ok(()) => Ok(Response::new(UpdateResponse {})),
+            Err(err) => Err(Status::new(
+                Code::Internal,
+                format!("Failed to update the node: {err}"),
             )),
         }
     }

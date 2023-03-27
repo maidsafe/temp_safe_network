@@ -36,4 +36,7 @@ service SafeNode {
 
   // Restart the node
   rpc Restart (RestartRequest) returns (RestartResponse);
+
+  // Update the node
+  rpc Update (UpdateRequest) returns (UpdateResponse);
 }
