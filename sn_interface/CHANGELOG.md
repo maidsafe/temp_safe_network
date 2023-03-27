@@ -6,19 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## v0.20.11 (2023-03-26)
-
-### Chore
-
- - <csr-id-de3abf841789c5a696cd86a17d2c5743ad047c92/> bump sn_dbc to 11.0.0
+## v0.20.12 (2023-03-27)
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
  - 1 commit contributed to the release.
- - 2 days passed between releases.
- - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 0 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -28,12 +23,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Feat(fees): add fee types - These types allow Elders to verify that a fee amount, and a sufficient amount, has been included in a spend output. ([`a04c3fc`](https://github.com/maidsafe/safe_network/commit/a04c3fcdb1bab421e417af3c666bbc09c2cfd1e5))
+</details>
+
+## v0.20.11 (2023-03-26)
+
+<csr-id-de3abf841789c5a696cd86a17d2c5743ad047c92/>
+
+### Chore
+
+ - <csr-id-de3abf841789c5a696cd86a17d2c5743ad047c92/> bump sn_dbc to 11.0.0
+
+### Chore
+
+ - <csr-id-d045f53e8ac66542cd6d2cfc750368d5142bc98e/> sn_interface-0.20.11/sn_client-0.82.6/sn_node-0.80.5/sn_api-0.80.5/sn_cli-0.74.3
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 2 days passed between releases.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Sn_interface-0.20.11/sn_client-0.82.6/sn_node-0.80.5/sn_api-0.80.5/sn_cli-0.74.3 ([`d045f53`](https://github.com/maidsafe/safe_network/commit/d045f53e8ac66542cd6d2cfc750368d5142bc98e))
     - Bump sn_dbc to 11.0.0 ([`de3abf8`](https://github.com/maidsafe/safe_network/commit/de3abf841789c5a696cd86a17d2c5743ad047c92))
 </details>
 
 ## v0.20.10 (2023-03-23)
 
 <csr-id-52d300a806c91f5a51bf08c2ee1f3be406254126/>
+<csr-id-f51e9df1b72800c1af4dd81c1a8671fb80607b04/>
 
 ### Chore
 
@@ -93,9 +121,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Sn_testnet-0.1.4/sn_interface-0.20.9/sn_node-0.80.3 ([`358174a`](https://github.com/maidsafe/safe_network/commit/358174ab1503fc8cf1b07ab66be397f3e853a14c))
     - Exposing a gRPC interface on safenode bin/app ([`16bb338`](https://github.com/maidsafe/safe_network/commit/16bb3389cdd665fe9a577587d9b7a6e8d21a3028))
 </details>
-
-<csr-unknown>
-The safenode RPC service code is generated automatically using gRPC (tonic crate)from a proto file with messages definitions added to sn_interface.The RPC is exposed at the same address as the node’s address used for network connections,but using the subsequent port number.A new final step was implemented for the sn_testnet tool, to run a check on the launched nodes,verifying their names and network knowledge are the expected for the launched testnet.The new sn_testnet tool step is run only if built with ‘verify-nodes’ feature.Running the verify-nodes check of sn_testnet in CI previous to sn_client e2e tests.<csr-unknown/>
 
 ## v0.20.8 (2023-03-23)
 
