@@ -15,6 +15,16 @@ edition = "2021"
 name = "safe"
 path = "src/main.rs"
 
+[features]
+default = [ "limit-client-upload-size" ]
+check-replicas = [ "sn_api/check-replicas" ]
+cmd-happy-path = [ "sn_api/cmd-happy-path" ]
+data-network = []
+query-happy-path = [ "sn_api/query-happy-path" ]
+msg-happy-path = [ "sn_api/msg-happy-path" ]
+limit-client-upload-size = ["sn_api/limit-client-upload-size"]
+node-ctl = ["prost", "futures-util", "tonic", "tonic-build"]
+
 [dependencies]
 ansi_term = "~0.12"
 bincode = "1.3.3"
@@ -25,12 +35,14 @@ comfy-table = "6.0"
 console = "0.15"
 dirs-next = "2.0.0"
 ed25519-dalek = { version = "1.0.1", features = ["serde"] }
+futures-util = { version = "~0.3.26", optional = true }
 hex = "~0.4"
 human-panic = "1.0.3"
 atty = "~0.2.14"
 num-traits = "~0.2"
 percent-encoding = "2.1.0"
 pretty-hex = "~0.2"
+prost = { version = "~0.11.8", optional = true }
 rand = "~0.8"
 rcgen = "~0.9"
 relative-path = "1.3.2"
@@ -45,6 +57,7 @@ serde_yaml = "~0.8"
 clap = { version = "3.0.0", features = ["derive", "env"] }
 clap_complete = { version = "3.0.0" }
 tokio = { version = "1.6.0", features = ["macros"] }
+tonic = { version = "~0.8.3", optional = true }
 tempfile = "3.2.0"
 tracing = "~0.1.26"
 tracing-subscriber = "0.3"
@@ -62,14 +75,8 @@ features = [
     "compression-zip-deflate"
 ]
 
-[features]
-default = [ "limit-client-upload-size" ]
-check-replicas = [ "sn_api/check-replicas" ]
-cmd-happy-path = [ "sn_api/cmd-happy-path" ]
-data-network = []
-query-happy-path = [ "sn_api/query-happy-path" ]
-msg-happy-path = [ "sn_api/msg-happy-path" ]
-limit-client-upload-size = ["sn_api/limit-client-upload-size"]
+[build-dependencies]
+tonic-build = { version = "0.8", optional = true }
 
 [dev-dependencies]
 assert_cmd = "2.0"

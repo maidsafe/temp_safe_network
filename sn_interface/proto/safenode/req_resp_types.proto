@@ -39,8 +39,20 @@ message NodeEvent {
   string event = 1;
 }
 
-message StopRequest {}
+message StopRequest {
+  uint64 delay_millis = 1;
+}
+
 message StopResponse {}
 
-message RestartRequest {}
+message RestartRequest {
+  uint64 delay_millis = 1;
+}
+
 message RestartResponse {}
+
+message UpdateRequest {
+  uint64 delay_millis = 1;
+}
+
+message UpdateResponse {}

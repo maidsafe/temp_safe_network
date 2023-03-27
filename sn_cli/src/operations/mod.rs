@@ -8,3 +8,5 @@
 
 pub mod auth_and_connect;
 pub mod config;
+#[cfg(feature = "node-ctl")]
+pub mod node;

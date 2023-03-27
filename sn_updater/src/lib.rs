@@ -41,6 +41,10 @@ pub enum UpdateType {
 /// * Determining the latest version from the latest release fails.
 /// * Downloading or installing the new binary fails.
 ///
+/// # Returns
+///
+/// 'true' if the binary was updated, 'false' otherwsie.
+///
 /// # Examples
 ///
 /// ```
@@ -53,7 +57,7 @@ pub fn update_binary(
     update_type: UpdateType,
     current_version: &str,
     confirm_update: bool,
-) -> Result<()> {
+) -> Result<bool> {
     let target_platform = get_target_platform();
     let bin_name = get_bin_name(&update_type, &target_platform);
     println!("Current version is: {current_version}");
@@ -72,16 +76,17 @@ pub fn update_binary(
         if confirm_update {
             println!("Proceed with the update? [y/n]");
             if !proceed()? {
-                return Ok(());
+                return Ok(false);
             }
         }
         let url = get_download_url(&update_type, &latest_version, &target_platform)?;
         download_and_install_bin(&url, std::env::current_exe()?)?;
+        Ok(true)
     } else {
         println!("Newer version is not available at this time.");
         println!("Everything is up to date.");
+        Ok(false)
     }
-    Ok(())
 }
 
 fn get_download_url(

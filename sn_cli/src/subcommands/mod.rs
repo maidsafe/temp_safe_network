@@ -14,6 +14,8 @@ pub mod dog;
 pub mod files;
 pub mod keys;
 pub mod networks;
+#[cfg(feature = "node-ctl")]
+pub mod node;
 pub mod nrs;
 pub mod safe_id;
 pub mod setup;
@@ -21,8 +23,9 @@ pub mod update;
 pub mod wallet;
 pub mod xorurl;
 
+pub(crate) mod helpers;
+
 mod files_get;
-mod helpers;
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub enum OutputFmt {
@@ -120,5 +123,15 @@ pub enum SubCommands {
         /// Do not prompt to confirm the update
         #[clap(short = 'y', long = "no-confirm")]
         no_confirm: bool,
+    },
+    #[cfg(feature = "node-ctl")]
+    #[clap(name = "node", global_settings(&[AppSettings::DisableVersion]))]
+    /// Commands to manage SAFE Network Nodes
+    Node {
+        /// Address of the node's RPC service, e.g. 127.0.0.1:12001.
+        addr: std::net::SocketAddr,
+        /// subcommands
+        #[clap(subcommand)]
+        cmd: node::NodeSubCommands,
     },
 }

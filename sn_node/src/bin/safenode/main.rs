@@ -61,10 +61,12 @@ const JOIN_DISALLOWED_RETRY_TIME_SEC: u64 = 60;
 // To be sent to the main thread in order to stop/restart the execution of the safenode app.
 enum NodeCtl {
     // Request to stop the exeution of the safenode app, providing an error as a reason for it.
-    Stop(Error),
+    Stop { delay: Duration, cause: Error },
     // Request to restart the exeution of the safenode app,
     // retrying to join the network, after the requested delay.
     Restart(Duration),
+    // Request to update the safenode app, and restart it, after the requested delay.
+    Update(Duration),
 }
 
 fn main() -> Result<()> {
@@ -108,9 +110,7 @@ fn create_runtime_and_node(config: &Config) -> Result<()> {
 
     if config.update() {
         match update(config.no_confirm()) {
-            Ok(()) => {
-                exit(0);
-            }
+            Ok(_) => exit(0),
             Err(e) => {
                 println!("{e:?}");
                 exit(1);
@@ -204,17 +204,38 @@ fn create_runtime_and_node(config: &Config) -> Result<()> {
             // otherwise both the node and the gRPC service (if enabled) will be running.
             // If there is an event that requires the node to restart we
             // do so by returning Ok(()).
-            match ctl_rx.recv().await {
-                None => Ok(()),
-                Some(NodeCtl::Restart(delay)) => {
-                    let msg = format!("Node is restartig in {delay:?} ...");
+            while let Some(node_ctl) = ctl_rx.recv().await {
+                match node_ctl {
+                NodeCtl::Restart(delay) => {
+                    let msg = format!("Node is restartig in {delay:?}...");
                     info!("{msg}");
                     println!("{msg} Node log path: {log_dir}");
                     sleep(delay);
-                    Ok(())
+                    break;
                 },
-                Some(NodeCtl::Stop(err)) => Err(err)
+                NodeCtl::Stop {delay, cause} => {
+                    let msg = format!("Node is stopping in {delay:?}...");
+                    info!("{msg}");
+                    println!("{msg} Node log path: {log_dir}");
+                    sleep(delay);
+                    return Err(cause);
+                }
+                NodeCtl::Update(delay) => {
+                    let msg = format!("Node is updating in {delay:?}...");
+                    info!("{msg}");
+                    println!("{msg} Node log path: {log_dir}");
+                    sleep(delay);
+                    match update(true) {
+                        Ok(true) => break, // binary updated, let's restart
+                        Ok(false) => continue, // binary was not updated, we don't need to restart
+                        Err(err) => {
+                            println!("Failed to update node: {err:?}");
+                            continue;
+                        }
+                    }
+                }}
             }
+            Ok(())
         })?;
 
         // actively shut down the runtime
@@ -249,7 +270,7 @@ fn setup_parking_lot() {
     });
 }
 
-fn update(no_confirm: bool) -> Result<()> {
+fn update(no_confirm: bool) -> Result<bool> {
     let current_version = env!("CARGO_PKG_VERSION");
     update_binary(UpdateType::Node, current_version, !no_confirm)
         .map_err(|e| eyre!(format!("Failed to update sn_node: {e}")))

@@ -11,6 +11,7 @@ use sn_updater::{update_binary, UpdateType};
 
 pub fn update_commander(no_confirm: bool) -> Result<()> {
     let current_version = env!("CARGO_PKG_VERSION");
-    update_binary(UpdateType::Safe, current_version, !no_confirm)
-        .map_err(|e| eyre!(format!("Failed to update safe: {e}")))
+    let _ = update_binary(UpdateType::Safe, current_version, !no_confirm)
+        .map_err(|e| eyre!(format!("Failed to update safe: {e}")))?;
+    Ok(())
 }
