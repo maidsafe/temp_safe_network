@@ -863,15 +863,6 @@ impl MyNode {
             }
         }
 
-        // // Do we really need this update currently?
-        // // Shall the update only get carried out when the network_knowledge has the chain key?
-        // match self.update_on_sap_change(&self.context()).await {
-        //     Ok(update_cmds) => cmds.extend(update_cmds),
-        //     Err(err) => {
-        //         error!("Failed on handle DKG outcome of {key_share_pk:?} during knowledge update: {err:?}")
-        //     }
-        // }
-
         Ok(cmds)
     }
 }
