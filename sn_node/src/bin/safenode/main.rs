@@ -50,7 +50,7 @@ use tokio::{
 use tracing::{self, error, info, warn};
 
 // Time we allow a node to keep attempting to join
-const JOIN_ATTEMPT_TIMEOUT_SEC: u64 = 60;
+const JOIN_RESEND_MSG_EVERY_SEC: u64 = 5;
 // Time between retry attempts after fail to join
 const JOIN_TIMEOUT_WAIT_BEFORE_RETRY_TIME_SEC: u64 = 5;
 // Time to wait before trying to join again when joins are not allowed
@@ -141,7 +141,7 @@ fn create_runtime_and_node(config: &Config) -> Result<()> {
 
         rt.block_on(async {
             info!("Initial node config: {config:?}");
-            let join_timeout = Duration::from_secs(JOIN_ATTEMPT_TIMEOUT_SEC);
+            let join_timeout = Duration::from_secs(JOIN_RESEND_MSG_EVERY_SEC);
             let node_ref = match new_node(config, join_timeout).await {
                 Ok(node_ref) => node_ref,
                 Err(NodeError::JoinTimeout) => {
