@@ -688,7 +688,7 @@ impl Safe {
         outputs: Vec<(Token, OwnerOnce)>,
         change_amount: Token,
         reason: DbcReason,
-        #[cfg(not(feature = "data-network"))] _all_fee_cipher_params: BTreeMap<
+        #[cfg(not(feature = "data-network"))] all_fee_cipher_params: BTreeMap<
             PublicKey,
             BTreeMap<XorName, (RequiredFee, OwnerOnce)>,
         >,
@@ -717,27 +717,24 @@ impl Safe {
         // Finalize the tx builder to get the dbc builder.
         let mut dbc_builder = tx_builder.build(rng::thread_rng())?;
 
-        // Enable this when fees are verified, and tests fixed.
-        // // Get fee outputs to generate the fee ciphers.
-        // #[cfg(not(feature = "data-network"))]
-        // let outputs = dbc_builder
-        //     .revealed_outputs
-        //     .iter()
-        //     .map(|output| (output.public_key, output.revealed_amount))
-        //     .collect();
+        // Get fee outputs to generate the fee ciphers.
+        #[cfg(not(feature = "data-network"))]
+        let outputs = dbc_builder
+            .revealed_outputs
+            .iter()
+            .map(|output| (output.public_key, output.revealed_amount))
+            .collect();
 
         // Spend all the input DBCs, collecting the spent proof shares for each of them
         for (public_key, tx) in dbc_builder.inputs() {
             // Generate the fee ciphers.
-            let input_fee_ciphers = BTreeMap::new();
-            // Enable this when fees are verified, and tests fixed.
-            // #[cfg(not(feature = "data-network"))]
-            // let input_fee_ciphers = {
-            //     let fee_cipher_params = all_fee_cipher_params
-            //         .get(&public_key)
-            //         .ok_or(Error::DbcReissueError("Missing fee!".to_string()))?;
-            //     fee_ciphers(&outputs, fee_cipher_params)?
-            // };
+            #[cfg(not(feature = "data-network"))]
+            let input_fee_ciphers = {
+                let fee_cipher_params = all_fee_cipher_params
+                    .get(&public_key)
+                    .ok_or(Error::DbcReissueError("Missing fee!".to_string()))?;
+                fee_ciphers(&outputs, fee_cipher_params)?
+            };
 
             let tx_hash = Hash::from(tx.hash());
             // TODO: spend DBCs concurrently spawning tasks
@@ -808,7 +805,6 @@ impl Safe {
     }
 }
 
-#[allow(unused)]
 #[cfg(not(feature = "data-network"))]
 fn fee_ciphers(
     outputs: &BTreeMap<PublicKey, RevealedAmount>,
