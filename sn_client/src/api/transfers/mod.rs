@@ -98,14 +98,29 @@ pub async fn select_inputs(
     let mut all_fee_cipher_params = BTreeMap::new();
 
     for dbc in dbcs {
-        let revealed_bearer = dbc.as_revealed_input_bearer().map_err(Error::DbcError)?;
+        let revealed_bearer = match dbc.as_revealed_input_bearer().map_err(Error::DbcError) {
+            Ok(revealed) => revealed,
+            Err(error) => {
+                error!(
+                    "Could not get the secret key from dbc {:?}, it is not a bearer! {error}",
+                    dbc.public_key()
+                );
+                continue;
+            }
+        };
         let input_key = revealed_bearer.public_key();
 
         // ------------ fee part start ----------------
         #[cfg(not(feature = "data-network"))]
         let fee_per_input = {
             // Each section will have elder_count() instances to pay individually (for now, later they will be more).
-            let elder_fees = client.get_section_fees(input_key).await?;
+            let elder_fees = match client.get_section_fees(input_key).await {
+                Ok(fees) => fees,
+                Err(error) => {
+                    error!("Could not get fees for input dbc: {input_key:?}: {error}");
+                    continue;
+                }
+            };
             let num_responses = elder_fees.len();
             let required_responses = supermajority(elder_count());
             if required_responses > num_responses {
@@ -121,7 +136,8 @@ pub async fn select_inputs(
             for (elder, fee) in elder_fees {
                 match fee.content.decrypt_amount(&revealed_bearer.secret_key) {
                     Ok(amount) => decrypted_elder_fees.push(((elder, fee), amount)),
-                    Err(_) => {
+                    Err(error) => {
+                        error!("Decrypting the fee content from {elder} failed! {error}");
                         let _ = invalid_fees.insert(fee.content.elder_reward_key);
                     }
                 }
