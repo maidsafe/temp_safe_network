@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{NodeState, MembershipProposal};
+use super::NodeState;
 
 use crate::network_knowledge::{Error, Result};
 use crate::types::utils::calc_age;
@@ -35,11 +35,11 @@ impl Display for ChurnId {
 /// The relocation trigger is sent by the elder nodes to the relocating nodes.
 /// This is then used by the relocating nodes to request the Section to propose a relocation membership change.
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Debug)]
-pub struct RelocationTrigger(Decision<MembershipProposal>);
+pub struct RelocationTrigger(Decision<NodeState>);
 
 impl RelocationTrigger {
     /// We are relocating to the section that matches `dst_name`.
-    pub fn new(decision: Decision<MembershipProposal>) -> Self {
+    pub fn new(decision: Decision<NodeState>) -> Self {
         Self(decision)
     }
 
@@ -74,7 +74,7 @@ impl RelocationTrigger {
 /// over the fact that the section considered the node to be relocated.
 #[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
 pub struct RelocationInfo {
-    signed_relocation: Decision<MembershipProposal>,
+    signed_relocation: Decision<NodeState>,
     pk: bls::PublicKey,
     new_name: XorName,
 }
@@ -97,7 +97,7 @@ pub struct RelocationProof {
 
 impl RelocationInfo {
     pub fn new(
-        signed_relocation: Decision<MembershipProposal>,
+        signed_relocation: Decision<NodeState>,
         pk: bls::PublicKey,
         new_name: XorName,
     ) -> Self {
@@ -166,7 +166,7 @@ impl RelocationProof {
         self.info.signed_relocation.proposal.age()
     }
 
-    pub fn signed_relocation(&self) -> &Decision<MembershipProposal> {
+    pub fn signed_relocation(&self) -> &Decision<NodeState> {
         &self.info.signed_relocation
     }
 

@@ -147,7 +147,7 @@ pub fn init_logger_2() {
 
     INIT.call_once(|| {
         let env_filter = EnvFilter::from_default_env()
-            .add_directive("sn_consensus::mvba::abba=info".parse().unwrap())
+            .add_directive("sn_consensus=trace".parse().unwrap())
             .add_directive("sn_node=info".parse().unwrap());
 
         tracing_subscriber::fmt::fmt()

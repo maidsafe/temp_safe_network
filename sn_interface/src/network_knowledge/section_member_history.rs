@@ -15,8 +15,6 @@ use sn_consensus::mvba::Decision;
 use std::collections::{BTreeMap, BTreeSet};
 use xor_name::{Prefix, XorName};
 
-use super::node_state::MembershipProposal;
-
 // Number of Elder churn events before a Left/Relocated member
 // can be removed from the section members archive.
 #[cfg(not(test))]
@@ -30,9 +28,9 @@ pub(super) struct SectionMemberHistory {
     /// Initial members snapshot at the time of SAP change
     initial_members: BTreeSet<NodeState>,
     /// Decisions received during the current SAP so far
-    decisions: Vec<Decision<MembershipProposal>>,
+    decisions: Vec<Decision<NodeState>>,
     /// Archived decisions containing left nodes, to avoid re-join with same id.
-    archive: BTreeMap<XorName, Decision<MembershipProposal>>,
+    archive: BTreeMap<XorName, Decision<NodeState>>,
 }
 
 impl SectionMemberHistory {
@@ -51,7 +49,7 @@ impl SectionMemberHistory {
     }
 
     /// Returns section decisions since last SAP change
-    pub(crate) fn section_decisions(&self) -> Vec<Decision<MembershipProposal>> {
+    pub(crate) fn section_decisions(&self) -> Vec<Decision<NodeState>> {
         self.decisions.clone()
     }
 
@@ -77,7 +75,7 @@ impl SectionMemberHistory {
         }
 
         for i in 0..gen as usize {
-            let node_state = &self.decisions[i].proposal.1;
+            let node_state = &self.decisions[i].proposal;
 
             trace!("SectionPeers::members checking against {node_state:?}");
             match node_state.state() {
@@ -97,7 +95,7 @@ impl SectionMemberHistory {
     pub(super) fn archived_members(&self) -> BTreeSet<NodeState> {
         let mut node_state_list = BTreeSet::new();
         for (name, decision) in self.archive.iter() {
-            let node_state = decision.proposal.1.clone();
+            let node_state = decision.proposal.clone();
             if node_state.name() == *name {
                 let _ = node_state_list.insert(node_state.clone());
             }
@@ -131,9 +129,9 @@ impl SectionMemberHistory {
     pub(super) fn update(
         &mut self,
         section_key: &PublicKey,
-        new_decision: Decision<MembershipProposal>,
+        new_decision: Decision<NodeState>,
     ) -> Result<bool> {
-        let incoming_generation = new_decision.proposal.0 as usize;
+        let incoming_generation = new_decision.proof.domain.seq;
 
         trace!(
             "incoming_generation {incoming_generation:?} self.decisions.len() {:?}",
@@ -141,7 +139,7 @@ impl SectionMemberHistory {
         );
 
         // Reject Decision when contains a Joined entry of any initial members
-        let node_state = &new_decision.proposal.1;
+        let node_state = &new_decision.proposal;
         if node_state.state() == MembershipState::Joined
             && self.initial_members.contains(node_state)
         {
@@ -175,7 +173,7 @@ impl SectionMemberHistory {
     pub(super) fn update_peers(
         &mut self,
         section_key: &PublicKey,
-        peers: Vec<Decision<MembershipProposal>>,
+        peers: Vec<Decision<NodeState>>,
     ) -> bool {
         let mut there_was_an_update = false;
 
@@ -222,7 +220,7 @@ impl SectionMemberHistory {
 mod tests {
     use super::{SectionMemberHistory, SectionsDAG};
     use crate::{
-        network_knowledge::{node_state::MembershipProposal, MembershipState, NodeState},
+        network_knowledge::{node_state::NodeState, MembershipState},
         test_utils::{
             assert_lists, create_relocation_trigger, gen_addr, section_decision, TestKeys,
         },
@@ -432,7 +430,7 @@ mod tests {
         num_nodes: usize,
         membership_state: MembershipState,
         secret_key_set: &bls::SecretKeySet,
-    ) -> Result<Vec<Decision<MembershipProposal>>> {
+    ) -> Result<Vec<Decision<NodeState>>> {
         let mut rng = thread_rng();
         let mut decisions = Vec::new();
         for gen in start_gen..(start_gen + num_nodes as u64) {

@@ -15,10 +15,11 @@ use sn_consensus::mvba::Decision;
 use sn_interface::{
     elder_count,
     messaging::system::NodeMsg,
-    network_knowledge::{
-        node_state::{RelocationInfo, MembershipProposal}, Error, MembershipState, NodeState, RelocationProof,
-    },
     network_knowledge::{node_state::RelocationTrigger, RelocationState},
+    network_knowledge::{
+        node_state::{NodeState, RelocationInfo},
+        Error, MembershipState, RelocationProof,
+    },
     types::{keys::ed25519, log_markers::LogMarker, Participant},
 };
 
@@ -115,7 +116,7 @@ impl MyNode {
     /// Join the destination section as a relocated node
     pub(crate) fn relocate(
         &mut self,
-        signed_relocation: Decision<MembershipProposal>,
+        signed_relocation: Decision<NodeState>,
         pk: &bls::PublicKey,
     ) -> Result<Option<Cmd>> {
         // should be unreachable, but a sanity check
@@ -187,7 +188,7 @@ impl MyNode {
     pub(crate) fn finalise_relocation(
         &mut self,
         context: &NodeContext,
-        decision: Decision<MembershipProposal>,
+        decision: Decision<NodeState>,
     ) {
         info!(
             "{} for node: {:?}: Age is: {:?}",
@@ -243,7 +244,7 @@ mod tests {
             system::{JoinResponse, NodeMsg},
             AntiEntropyKind, AntiEntropyMsg, NetworkMsg,
         },
-        network_knowledge::{recommended_section_size, MyNodeInfo, NodeState, MIN_ADULT_AGE, node_state::MembershipProposal},
+        network_knowledge::{recommended_section_size, MyNodeInfo, NodeState, MIN_ADULT_AGE},
         test_utils::{
             gen_node_id_in_prefix, prefix, section_decision, try_create_relocation_trigger,
             TestSapBuilder,
@@ -269,7 +270,7 @@ mod tests {
         gen: u64,
         age: u8,
         prefix: Prefix,
-    ) -> Result<(Decision<MembershipProposal>, MyNodeInfo, Comm, Receiver<CommEvent>)> {
+    ) -> Result<(Decision<NodeState>, MyNodeInfo, Comm, Receiver<CommEvent>)> {
         loop {
             let (info, comm, comm_rx) = gen_info_with_comm(MIN_ADULT_AGE, Some(prefix));
             if let Some((_trigger, decision)) =

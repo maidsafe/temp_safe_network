@@ -23,12 +23,10 @@ pub mod test_utils {
     use crate::{
         messaging::system::{SectionSig, SectionSigned},
         network_knowledge::{SectionAuthUtils, SectionKeyShare},
-        test_utils::section_decision,
     };
     use bls::{blstrs::Scalar, poly::Poly, SecretKey, SecretKeySet, Signature};
     use eyre::{eyre, Context, Result};
     use serde::Serialize;
-    use sn_consensus::mvba::Decision;
 
     use std::collections::{BTreeMap, BTreeSet};
 

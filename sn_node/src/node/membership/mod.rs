@@ -16,8 +16,8 @@ use sn_consensus::mvba::{
 use sn_interface::{
     messaging::system::DkgSessionId,
     network_knowledge::{
-        node_state::MembershipProposal, partition_by_prefix, recommended_section_size,
-        MembershipState, NodeState, SectionAuthorityProvider,
+        node_state::NodeState, partition_by_prefix, recommended_section_size, MembershipState,
+        SectionAuthorityProvider,
     },
 };
 use std::{
@@ -35,7 +35,7 @@ pub enum Error {
     #[error("Consensus error {0}")]
     Consensus(#[from] sn_consensus::mvba::error::Error),
     #[error("We are behind the voter, caller should request anti-entropy")]
-    RequestAntiEntropy,
+    RequestAntiEntropy, // TODO: we can remove it
     #[error("Invalid proposal")]
     InvalidProposal,
     #[error("Invalid generation {0}")]
@@ -152,16 +152,21 @@ pub(crate) fn elder_candidates(
 
 #[derive(Clone)]
 pub(crate) struct Membership {
-    consensus: Arc<Mutex<Consensus<MembershipProposal>>>,
+    //We wrap the Consensus under Arc<Mutex<...>>, because it can't be cloned itself.
+    consensus_guard: Arc<Mutex<Consensus<NodeState>>>,
     bootstrap_members: BTreeSet<NodeState>,
     pub(crate) gen: Generation, // current generation
-    history: BTreeMap<Generation, Decision<MembershipProposal>>,
+    secret_key: (NodeId, SecretKeyShare),
+    elders: PublicKeySet,
+    elders_id: Vec<NodeId>,
+    n_elders: usize,
+    history: BTreeMap<Generation, Decision<NodeState>>,
     // last membership vote timestamp
     last_received_vote_time: Option<Instant>,
-    outgoings: Vec<Outgoing<MembershipProposal>>,
+    outgoing_log: Vec<Outgoing<NodeState>>,
 }
 
-fn checker(_: NodeId, _: &MembershipProposal) -> bool {
+fn checker(_: NodeId, _: &NodeState) -> bool {
     // We need to pass current state:
     //   1- Clone: 3rd  argument as Any
     //   2- Closure: To not pass 3rd argument?
@@ -176,35 +181,42 @@ impl Membership {
         secret_key: (NodeId, SecretKeyShare),
         elders: PublicKeySet,
         n_elders: usize,
+        gen: u64,
         bootstrap_members: BTreeSet<NodeState>,
     ) -> Self {
         trace!("Membership - Creating new membership instance");
-        let domain = Domain::new("membership", 0);
+
+        let domain = Domain::new("membership", gen as usize);
         let mut elders_id = Vec::new();
         for i in 0..n_elders {
             elders_id.push(i);
         }
 
-        let consensus = Arc::new(Mutex::new(Consensus::init(
+        let mut consensus_guard = Arc::new(Mutex::new(Consensus::init(
             domain,
             secret_key.0,
-            secret_key.1,
-            elders,
-            elders_id,
+            secret_key.1.clone(),
+            elders.clone(),
+            elders_id.clone(),
             checker,
         )));
+
         Membership {
-            consensus,
+            consensus_guard,
             bootstrap_members,
-            gen: 0,
+            gen,
+            secret_key,
+            elders,
+            elders_id,
+            n_elders,
             history: BTreeMap::default(),
             last_received_vote_time: None,
-            outgoings: Vec::new(),
+            outgoing_log: Vec::new(),
         }
     }
 
     pub(crate) fn section_key_set(&self) -> PublicKeySet {
-        self.consensus.lock().unwrap().pub_key_set() // TODO: no unwrap
+        self.elders.clone()
     }
 
     pub(crate) fn last_received_vote_time(&self) -> Option<Instant> {
@@ -217,7 +229,11 @@ impl Membership {
 
     #[cfg(test)]
     pub(crate) fn is_churn_in_progress(&self) -> bool {
-        self.consensus.lock().unwrap().decided_proposal().is_none() // TODO: no unwrap
+        self.consensus_guard
+            .lock()
+            .unwrap()
+            .decided_proposal()
+            .is_none() // TODO: no unwrap
     }
 
     #[cfg(test)]
@@ -296,7 +312,7 @@ impl Membership {
         }
 
         for (history_gen, decision) in &self.history {
-            let node_state = &decision.proposal.1;
+            let node_state = &decision.proposal;
             match node_state.state() {
                 MembershipState::Joined => {
                     let _ = members.insert(node_state.name(), node_state.clone());
@@ -321,79 +337,122 @@ impl Membership {
         &mut self,
         node_state: NodeState,
         prefix: &Prefix,
-    ) -> Result<Vec<Outgoing<MembershipProposal>>> {
-        let proposal = MembershipProposal(self.gen + 1, node_state);
-        self.validate_proposals(&proposal, prefix)?;
+    ) -> Result<Vec<Outgoing<NodeState>>> {
+        // TODO: no unwrap
+        if self.gen > 0 && self
+            .consensus_guard
+            .lock()
+            .unwrap()
+            .decided_proposal()
+            .is_none()
+        {
+            error!("proposing a new node_state without consensus on the previous one can lead to unforeseen issues.");
+            // let's panic here on debug mode
+            debug_assert!(true);
+        }
 
-        let outgoings = self.consensus.lock().unwrap().propose(proposal)?;
-        self.outgoings.append(&mut outgoings.clone());
+        self.gen += 1;
+        let domain = Domain::new("membership", self.gen as usize);
+        let mut consensus = Consensus::init(
+            domain,
+            self.secret_key.0,
+            self.secret_key.1.clone(),
+            self.elders.clone(),
+            self.elders_id.clone(),
+            checker,
+        );
 
-        Ok(outgoings)
+        // clear all outgoings, this prevents to send expired messages
+        self.outgoing_log.clear();
+
+        let domain = consensus.domain();
+        self.validate_proposals(domain, &node_state, prefix)?;
+
+        let outgoings = consensus.propose(node_state)?;
+        self.outgoing_log.append(&mut outgoings.clone());
+
+        self.consensus_guard = Arc::new(Mutex::new(consensus));
+
+        return Ok(outgoings);
     }
 
-    pub(crate) fn anti_entropy(
-        &self,
-        _from_gen: Generation,
-    ) -> Option<Outgoing<MembershipProposal>> {
-        if self.outgoings.is_empty() {
+    // A comment on anti_entropy function
+    //
+    // Handling anti_entropy can be done when we receive any message, technically in handle_signed_vote
+    // We can always add one random message from the message log.
+    // Whenever the protocol is decided, we can always send the decided proposal with the proof.
+    //
+    // This will simplified other part of the code (we can remove `MembershipAE(Generation)` from `NodeMsg`)
+    pub(crate) fn anti_entropy(&self, _from_gen: Generation) -> Option<Outgoing<NodeState>> {
+        if self.outgoing_log.is_empty() {
             return None;
         }
         let index: usize = rand::random();
-        let outgoing = self.outgoings[index].clone();
+        let outgoing = self.outgoing_log[index].clone();
 
         Some(outgoing)
     }
 
     #[allow(dead_code)]
     pub(crate) fn id(&self) -> NodeId {
-        self.consensus.lock().unwrap().self_id()
+        self.consensus_guard.lock().unwrap().self_id() // TODO: no unwrap
     }
 
     pub(crate) fn handle_signed_vote(
         &mut self,
-        bundle: Bundle<MembershipProposal>,
+        bundle: Bundle<NodeState>,
         _prefix: &Prefix,
-    ) -> Result<(
-        Vec<Outgoing<MembershipProposal>>,
-        Option<Decision<MembershipProposal>>,
-    )> {
-        let outgoings = self.consensus.lock().unwrap().process_bundle(&bundle)?;
-        self.outgoings.append(&mut outgoings.clone());
+    ) -> Result<(Vec<Outgoing<NodeState>>, Option<Decision<NodeState>>)> {
+        let domain = bundle.domain();
+        if domain.seq as u64 != self.gen {
+            panic!("invalid gen, implement later")
+        }
 
-        let decision_opt = self.consensus.lock().unwrap().decided_proposal();
+        let mut consensus = self.consensus_guard.lock().unwrap();
+
+        let decision_opt = consensus.decided_proposal();
         if let Some(decision) = &decision_opt {
             info!(
                 "Membership - updated generation from {:?} to {:?}",
-                self.gen,
-                decision.proposal.gen()
+                self.gen, decision.proof.domain.seq
             );
 
-            self.gen = decision.proposal.gen()
-        }
+            self.gen = decision.proof.domain.seq as u64 + 1;
+            return Ok((vec![], decision_opt));
+        } else {
+            let consensus_outgoing = consensus.process_bundle(&bundle)?;
 
-        Ok((outgoings, decision_opt))
+            let mut outgoings = vec![];
+            outgoings.append(&mut consensus_outgoing.clone());
+            if !self.outgoing_log.is_empty() {
+                let index: usize = rand::random();
+                // outgoings.push(self.outgoing_log[index % self.outgoing_log.len()].clone());
+            }
+
+            self.outgoing_log.append(&mut outgoings.clone());
+
+            return Ok((outgoings, None));
+        }
     }
 
     /// Returns true if the proposal is valid
-    fn validate_proposals(&self, proposal: &MembershipProposal, prefix: &Prefix) -> Result<()> {
-        if proposal.gen() != self.gen + 1 {
-            return Err(Error::InvalidGeneration(proposal.gen()));
+    fn validate_proposals(
+        &self,
+        domain: &Domain,
+        proposal: &NodeState,
+        prefix: &Prefix,
+    ) -> Result<()> {
+        let proposal_tag = domain.seq as u64;
+        if proposal_tag != self.gen {
+            return Err(Error::InvalidGeneration(proposal_tag));
         }
-        let members = BTreeMap::from_iter(self.section_members(proposal.gen() - 1)?.into_iter());
+        let members = BTreeMap::from_iter(self.section_members(proposal_tag- 1)?.into_iter());
         let archived_members = self.archived_members();
 
-        if let Err(err) =
-            proposal
-                .node_state()
-                .validate_node_state(prefix, &members, &archived_members)
-        {
+        if let Err(err) = proposal.validate_node_state(prefix, &members, &archived_members) {
             warn!("Failed to validate {proposal:?} with error {:?}", err);
             // TODO: certain errors need AE?
-            warn!(
-                "Members at generation {} are: {:?}",
-                proposal.gen() - 1,
-                members
-            );
+            warn!("Members at generation {} are: {:?}", proposal_tag - 1, members);
             warn!("Archived members are {:?}", archived_members);
             return Err(Error::NetworkKnowledge(err));
         }

@@ -1,4 +1,7 @@
-use super::{node_state::{RelocationTrigger, MembershipProposal}, NodeState, SectionKeysProvider};
+use super::{
+    node_state::{NodeState, RelocationTrigger},
+    SectionKeysProvider,
+};
 use crate::{
     dbcs::DbcReason,
     network_knowledge::{section_keys::build_spent_proof_share, Error, MyNodeInfo, MIN_ADULT_AGE},
@@ -7,7 +10,6 @@ use crate::{
 };
 use eyre::{eyre, Result};
 
-use serde::Serialize;
 use sn_consensus::mvba::{mock_decision, tag::Domain, Decision};
 use sn_dbc::{
     get_public_commitments_from_transaction, Commitment, Dbc, DbcTransaction, Owner, OwnerOnce,
@@ -104,10 +106,10 @@ pub fn section_decision(
     proposer: usize,
     gen: u64,
     node_state: NodeState,
-) -> core::result::Result<Decision<MembershipProposal>, Error> {
-    let domain = Domain::new("test".to_string(), 0);
+) -> core::result::Result<Decision<NodeState>, Error> {
+    let domain = Domain::new("test".to_string(), gen as usize);
     let sk = secret_key_set.secret_key();
-    let proposal = MembershipProposal(gen, node_state);
+    let proposal = node_state;
     Ok(mock_decision(domain, proposal, proposer, &sk)?)
 }
 
@@ -251,11 +253,11 @@ pub fn try_create_relocation_trigger(
     sk_set: &bls::SecretKeySet,
     gen: u64,
     age: u8,
-) -> Result<Option<(RelocationTrigger, Decision<MembershipProposal>)>> {
+) -> Result<Option<(RelocationTrigger, Decision<NodeState>)>> {
     use super::relocation_check;
 
     let node_state = NodeState::joined(node_id, None);
-    let decision = section_decision(sk_set, 0, gen,  node_state)?;
+    let decision = section_decision(sk_set, 0, gen, node_state)?;
     let relocation_trigger = RelocationTrigger::new(decision.clone());
     let churn_id = relocation_trigger.churn_id();
 
@@ -275,7 +277,7 @@ pub fn create_relocation_trigger(
     sk_set: &bls::SecretKeySet,
     gen: u64,
     age: u8,
-) -> Result<(RelocationTrigger, Decision<MembershipProposal>)> {
+) -> Result<(RelocationTrigger, Decision<NodeState>)> {
     loop {
         let node_id = gen_node_id(MIN_ADULT_AGE);
         if let Some((trigger, decision)) = try_create_relocation_trigger(node_id, sk_set, gen, age)?

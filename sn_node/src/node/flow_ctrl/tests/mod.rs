@@ -257,7 +257,8 @@ async fn handle_join_request_of_rejoined_node() -> Result<()> {
     // A rejoining node will always be rejected
     assert!(join_cmd.is_none()); // no cmd signals this membership proposal was dropped.
 
-    // We can't say that because we propose an invalid proposal
+    // We should re-propose. The consensus is not decided yet
+    //
     // the whole churn is stopped
     // assert!(!node
     //     .membership

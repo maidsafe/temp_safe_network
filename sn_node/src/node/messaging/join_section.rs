@@ -117,9 +117,15 @@ mod tests {
             let my_node = &node.read().await.node;
             let network_knowledge = my_node.network_knowledge().clone();
             if !network_knowledge.is_adult(&joining_node_name) {
-                info!("The node should've joined: {joining_node_name:?}, {:?}", my_node.name());
+                info!(
+                    "The node should've joined: {joining_node_name:?}, {:?}",
+                    my_node.name()
+                );
             } else {
-                info!("The node joined: {joining_node_name:?}, {:?}", my_node.name());
+                info!(
+                    "The node joined: {joining_node_name:?}, {:?}",
+                    my_node.name()
+                );
             }
         }
 

@@ -163,7 +163,6 @@ impl MyNode {
         // block off the write lock
         let updated = {
             if let Some(membership) = node.context().membership {
-                let gen = membership.gen;
                 let already_updated = node.network_knowledge.section_key() == sap.section_key();
 
                 let updated_knowledge = node
@@ -171,7 +170,7 @@ impl MyNode {
                     .update_sap_knowledge_if_valid(section_tree_update, &starting_context.name)?;
                 let updated_members = if updated_knowledge || already_updated {
                     node.network_knowledge
-                        .update_section_member_knowledge(gen, section_decisions)?
+                        .update_section_member_knowledge(section_decisions)?
                 } else {
                     false
                 };

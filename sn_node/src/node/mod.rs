@@ -173,6 +173,7 @@ impl MyNode {
                 (key.index, key.secret_key_share),
                 key.public_key_set,
                 n_elders,
+                0,
                 bootstrap_members,
             ))
         } else {
@@ -472,7 +473,7 @@ impl MyNode {
         self.best_elder_candidates_at_gen(gen)
     }
 
-    fn initialize_membership(&mut self, key: SectionKeyShare) -> bool {
+    fn initialize_membership(&mut self, _key: SectionKeyShare) -> bool {
         let sap = self.network_knowledge.signed_sap().value;
 
         // IDEMPOTENCY CHECK: Check if this membership instance has already been
@@ -483,14 +484,6 @@ impl MyNode {
                 return false;
             }
         }
-
-        self.membership = Some(Membership::from(
-            (key.index, key.secret_key_share),
-            key.public_key_set,
-            sap.elders().count(),
-            BTreeSet::from_iter(sap.members().cloned()),
-        ));
-
         true
     }
 

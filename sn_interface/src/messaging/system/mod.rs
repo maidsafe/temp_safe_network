@@ -12,8 +12,8 @@ mod node_msgs;
 mod section_sig;
 
 use crate::messaging::AuthorityProof;
-use crate::network_knowledge::node_state::{RelocationTrigger, MembershipProposal};
-use crate::network_knowledge::{NodeState, RelocationProof, SapCandidate};
+use crate::network_knowledge::node_state::{NodeState, RelocationTrigger};
+use crate::network_knowledge::{RelocationProof, SapCandidate};
 use crate::SectionAuthorityProvider;
 
 pub use dkg::DkgSessionId;
@@ -36,7 +36,7 @@ use std::{
 use xor_name::XorName;
 
 /// List of section decisions since the last SAP change
-pub type SectionDecisions = Vec<Decision<MembershipProposal>>;
+pub type SectionDecisions = Vec<Decision<NodeState>>;
 
 #[derive(Clone, PartialEq, Serialize, Deserialize, custom_debug::Debug)]
 #[allow(clippy::large_enum_variant, clippy::derive_partial_eq_without_eq)]
@@ -55,9 +55,9 @@ pub enum NodeMsg {
     /// Sent from the section of a node that is undergoing the relocation process, containing the
     /// signed membership change. This is used by the node to complete the relocation by including
     /// it in a `proof` when joining the new section.
-    CompleteRelocation(Decision<MembershipProposal>),
+    CompleteRelocation(Decision<NodeState>),
     /// Membership Votes, in order they should be processed in.
-    MembershipVotes(Vec<Bundle<MembershipProposal>>),
+    MembershipVotes(Vec<Bundle<NodeState>>),
     /// Membership Anti-Entropy request
     MembershipAE(Generation),
     /// Try to join a section in the network.
