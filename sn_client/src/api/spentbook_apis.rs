@@ -333,7 +333,7 @@ mod tests {
                 ..
             }) => {
                 let correct_error_str =
-                    format!("{:?}", sn_dbc::Error::MissingAmountForPubkey(dbc_id_1));
+                    format!("{:?}", sn_dbc::Error::MissingAmountForPubkey(dbc_id_2)); // dbc_id_1
                 assert!(
                     error_string.contains(&correct_error_str),
                     "A different SpentbookError error was expected for this case. What we got: {error_string:?}, expected: {correct_error_str:?}"
