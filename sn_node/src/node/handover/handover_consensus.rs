@@ -43,6 +43,12 @@ impl Handover {
     }
 
     pub(crate) fn propose(&mut self, proposal: SapCandidate) -> Result<SignedVote<SapCandidate>> {
+        // Do not cast a vote equals to self sap
+        if self.consensus.elders == proposal.public_key_set() {
+            error!("Cannot casting a proposal {proposal:?} as we are already on it");
+            return Err(Error::FaultyProposal);
+        }
+
         let vote = Vote {
             gen: self.gen,
             ballot: Ballot::Propose(proposal.clone()),

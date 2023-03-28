@@ -89,6 +89,14 @@ impl SapCandidate {
             }
         }
     }
+
+    pub fn public_key_set(&self) -> PublicKeySet {
+        match self {
+            SapCandidate::ElderHandover(sap) => sap.public_key_set(),
+            // TODO: consider return both?
+            SapCandidate::SectionSplit(sap1, _sap2) => sap1.public_key_set(),
+        }
+    }
 }
 
 impl Debug for SectionAuthorityProvider {
