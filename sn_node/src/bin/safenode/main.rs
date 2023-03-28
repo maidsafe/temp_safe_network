@@ -50,9 +50,9 @@ use tokio::{
 use tracing::{self, error, info, warn};
 
 // Time we allow a node to keep attempting to join
-const JOIN_ATTEMPT_TIMEOUT_SEC: u64 = 30;
+const JOIN_ATTEMPT_TIMEOUT_SEC: u64 = 5;
 // Time between retry attempts after fail to join
-const JOIN_TIMEOUT_WAIT_BEFORE_RETRY_TIME_SEC: u64 = 10;
+const JOIN_TIMEOUT_WAIT_BEFORE_RETRY_TIME_SEC: u64 = 5;
 // Time to wait before trying to join again when joins are not allowed
 const JOIN_DISALLOWED_RETRY_TIME_SEC: u64 = 60;
 
