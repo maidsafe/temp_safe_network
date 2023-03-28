@@ -5,12 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.8.0 (2023-03-28)
+
 ## v0.7.0 (2023-03-27)
+
+### Chore
+
+ - <csr-id-0e9db2da4ed28d36d8ee866c9e941ab39e155e28/> sn_updater-0.2.0/sn_interface-0.21.0/sn_comms-0.7.0/sn_client-0.83.0/sn_node-0.81.0/sn_api-0.81.0/sn_cli-0.75.0
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 1 commit contributed to the release.
+ - 4 days passed between releases.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Sn_updater-0.2.0/sn_interface-0.21.0/sn_comms-0.7.0/sn_client-0.83.0/sn_node-0.81.0/sn_api-0.81.0/sn_cli-0.75.0 ([`0e9db2d`](https://github.com/maidsafe/safe_network/commit/0e9db2da4ed28d36d8ee866c9e941ab39e155e28))
+</details>
 
 ## v0.6.4 (2023-03-22)
 
 <csr-id-b0627339e2458fd762084cc4805d7adedfd8c05e/>
 <csr-id-a5bb5e86518e23dcc59f252b231de89ed90efcf9/>
+<csr-id-22c6e341d28c913a3acaaeae0ceeb8c0a1ef4d4e/>
 
 ### Chore
 
