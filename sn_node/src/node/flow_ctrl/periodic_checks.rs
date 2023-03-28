@@ -18,7 +18,7 @@ use sn_interface::{
 use std::{collections::BTreeSet, time::Duration};
 use tokio::{sync::mpsc::Sender, time::Instant};
 
-const PROBE_INTERVAL: Duration = Duration::from_secs(300);
+const PROBE_INTERVAL: Duration = Duration::from_secs(20);
 const REQUEST_TO_RELOCATE_TIMEOUT_SEC: Duration = Duration::from_secs(7);
 const JOIN_AS_RELOCATED_TIMEOUT_SEC: Duration = Duration::from_secs(5);
 const MISSING_VOTE_INTERVAL: Duration = Duration::from_secs(5);
@@ -28,7 +28,7 @@ const FAULT_CHECK_INTERVAL: Duration = Duration::from_secs(5);
 // 30 adult nodes checked per minute., so each node should be queried 10x in 10 mins
 // Which should hopefully trigger fault if we're not getting responses back
 // const ADULT_HEALTH_CHECK_INTERVAL: Duration = Duration::from_secs(2);
-const ELDER_PROBE_INTERVAL: Duration = Duration::from_secs(10);
+const ELDER_PROBE_INTERVAL: Duration = Duration::from_secs(3);
 
 pub(super) struct PeriodicChecksTimestamps {
     last_probe: Instant,
