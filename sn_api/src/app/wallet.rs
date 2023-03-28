@@ -420,8 +420,10 @@ impl Safe {
         Ok(output_dbcs.into_iter().map(|(dbc, _, _)| dbc).collect())
     }
 
-    /// Send the tokens to the provided owners, using the provided dbcs.
+    /// Send the tokens to the specified destination keys, using the provided dbcs.
     /// This is used with external Dbcs, i.e. not selecting dbcs from the wallet.
+    /// The new dbcs that are created, one per specified destination, will have the
+    /// unique id which is the public key of the `OwnerOnce` instances provided.
     ///
     /// Transfer fees will be paid if not in data-network.
     /// The input dbcs will be spent on the network, and the resulting
@@ -1064,7 +1066,7 @@ mod tests {
 
         // 2 dbc inputs = 2 fees
         let fee_1 = get_spend_fee(&safe, &dbc1).await?;
-        let fee_2 = get_spend_fee(&safe, &dbc1).await?;
+        let fee_2 = get_spend_fee(&safe, &dbc2).await?;
         let total_fee = fee_1.as_nano() + fee_2.as_nano();
 
         // we arbitrarily expect a change as big as the fees here
@@ -1457,7 +1459,7 @@ mod tests {
 
         // 2 dbc inputs = 2 fees
         let fee_1 = get_spend_fee(&safe, &dbc1).await?;
-        let fee_2 = get_spend_fee(&safe, &dbc1).await?;
+        let fee_2 = get_spend_fee(&safe, &dbc2).await?;
         let total_fee = fee_1.as_nano() + fee_2.as_nano();
 
         let expected_change = 1000;
