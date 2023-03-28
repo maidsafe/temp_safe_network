@@ -39,7 +39,7 @@ struct NodeInfo {
 }
 
 pub async fn run(logs_path: &Path, node_count: u32, nodes_launch_interval: u64) -> Result<()> {
-    sleep(Duration::from_millis(nodes_launch_interval)).await;
+    sleep(Duration::from_millis(nodes_launch_interval * 2)).await;
     println!();
     println!("======== Verifying nodes ========");
 
@@ -52,10 +52,9 @@ pub async fn run(logs_path: &Path, node_count: u32, nodes_launch_interval: u64) 
     let mut nodes = nodes_info_from_logs(logs_path)?;
 
     println!("Number of nodes: {}", nodes.len());
-    assert_eq!(
-        expected_node_count,
-        nodes.len(),
-        "Unexpected number of joined nodes. Expected {}, we have {}",
+    assert!(
+        expected_node_count <= nodes.len(), // we could have nodes restart if they are booted over DKG rounds eg.
+        "Unexpectedly low number of joined nodes. Expected {}, we have {}",
         expected_node_count,
         nodes.len()
     );
