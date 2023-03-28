@@ -37,8 +37,9 @@ type ReissueInputs = (Vec<Dbc>, Vec<(Token, OwnerOnce)>, Token, ReissueCiphers);
 // Hence the max number of attempts set to a higher value.
 const NUM_OF_DBC_REISSUE_ATTEMPTS: u8 = 5;
 
-/// Send the tokens to the provided owners, using the provided dbcs.
-/// This is used with external Dbcs, i.e. not selecting dbcs from the wallet.
+/// Send the tokens to the specified destination keys, using the provided dbcs.
+/// The new dbcs that are created, one per specified destination, will have the
+/// unique id which is the public key of the `OwnerOnce` instances provided.
 ///
 /// Transfer fees will be paid if not in data-network.
 /// The input dbcs will be spent on the network, and the resulting
@@ -76,8 +77,8 @@ pub async fn select_inputs(
     mut recipients: Vec<(Token, OwnerOnce)>,
 ) -> Result<ReissueInputs> {
     // We'll combine one or more input DBCs and reissue:
-    // - one output DBC for the recipient,
-    // - and a second DBC for the change, which will be stored in the source wallet.
+    // - one output DBC per recipient,
+    // - and a single DBC for the change - if any - which will be returned from this function.
     let mut input_dbcs_to_spend = Vec::<Dbc>::new();
     let mut total_input_amount = Token::zero();
     let mut total_output_amount = recipients
@@ -130,7 +131,7 @@ pub async fn select_inputs(
 
             // Fees that were not encrypted to us.
             let mut invalid_fees = BTreeSet::new();
-            // As the mints encrypt the amount to our public key, we need to decrypt it.
+            // As the Elders encrypt the amount to our public key, we need to decrypt it.
             let mut decrypted_elder_fees = vec![];
 
             for (elder, fee) in elder_fees {
