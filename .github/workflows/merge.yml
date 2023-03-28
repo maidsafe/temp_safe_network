@@ -304,7 +304,7 @@ jobs:
         timeout-minutes: 60
 
       - name: Start a local network
-        run: cargo run --release --bin testnet --features verify-nodes -- --interval 35000 --node-path ./target/release/safenode
+        run: cargo run --release --bin testnet --features verify-nodes -- --interval 55000 --node-path ./target/release/safenode
         id: section-startup
         env:
           RUST_LOG: "safenode,sn_node,sn_comms,sn_consensus,sn_fault_detection,sn_interface=trace"
@@ -454,7 +454,7 @@ jobs:
         timeout-minutes: 60
 
       - name: Start a local network
-        run: cargo run --release --bin testnet --features verify-nodes -- --interval 35000 --node-path ./target/release/safenode
+        run: cargo run --release --bin testnet --features verify-nodes -- --interval 55000 --node-path ./target/release/safenode
         id: section-startup
         env:
           RUST_LOG: "safenode,sn_node,sn_comms,sn_consensus,sn_fault_detection,sn_interface=trace"
@@ -857,7 +857,7 @@ jobs:
         timeout-minutes: 60
 
       - name: Start a local network
-        run: cargo run --release --bin testnet --features verify-nodes -- --interval 35000 --node-path ./target/release/safenode
+        run: cargo run --release --bin testnet --features verify-nodes -- --interval 55000 --node-path ./target/release/safenode
         id: section-startup
         env:
           RUST_LOG: "safenode,sn_node,sn_comms,sn_consensus,sn_fault_detection,sn_interface=trace"
@@ -991,7 +991,7 @@ jobs:
         timeout-minutes: 60
 
       - name: Start a local network
-        run: cargo run --release --bin testnet --features verify-nodes -- --interval 35000 --node-path ./target/release/safenode
+        run: cargo run --release --bin testnet --features verify-nodes -- --interval 55000 --node-path ./target/release/safenode
         id: section-startup
         env:
           RUST_LOG: "safenode,sn_node,sn_comms,sn_consensus,sn_fault_detection,sn_interface=trace"
