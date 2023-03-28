@@ -189,7 +189,7 @@ impl MyNode {
                         Err(super::Error::RejoinRequired(RejoinReason::JoinsDisallowed))
                     }
                     JoinResponse::Approved(decision) => {
-                        info!("{}", LogMarker::ReceivedJoinApproval);
+                        debug!("{}", LogMarker::ReceivedJoinApproval);
                         let target_sap = context.network_knowledge.signed_sap();
 
                         if let Err(e) = decision.validate(&target_sap.public_key_set().public_key())
@@ -209,7 +209,7 @@ impl MyNode {
                             return Ok(vec![]);
                         }
 
-                        info!(
+                        debug!(
                             "=========>> This node ({:?} @ {:?}) has been approved to join the section at {:?}!", context.name, context.info.addr,
                             target_sap.prefix(),
                         );

@@ -217,7 +217,7 @@ impl SectionTree {
         let proof_chain = section_tree_update.proof_chain;
 
         if self.sections_dag.has_key(&signed_sap.value.section_key()) {
-            warn!(
+            debug!(
                 "Dropping SectionTree update as already have the incoming SAP {:?}",
                 signed_sap.value
             );

@@ -16,8 +16,8 @@ use sn_consensus::mvba::{
 use sn_interface::{
     messaging::system::DkgSessionId,
     network_knowledge::{
-        partition_by_prefix, recommended_section_size, MembershipState, NodeState,
-        SectionAuthorityProvider, node_state::MembershipProposal,
+        node_state::MembershipProposal, partition_by_prefix, recommended_section_size,
+        MembershipState, NodeState, SectionAuthorityProvider,
     },
 };
 use std::{
@@ -320,16 +320,21 @@ impl Membership {
     pub(crate) fn propose(
         &mut self,
         node_state: NodeState,
-        _prefix: &Prefix,
+        prefix: &Prefix,
     ) -> Result<Vec<Outgoing<MembershipProposal>>> {
-        let proposal = MembershipProposal(self.gen +1 , node_state);
+        let proposal = MembershipProposal(self.gen + 1, node_state);
+        self.validate_proposals(&proposal, prefix)?;
+
         let outgoings = self.consensus.lock().unwrap().propose(proposal)?;
         self.outgoings.append(&mut outgoings.clone());
 
         Ok(outgoings)
     }
 
-    pub(crate) fn anti_entropy(&self, _from_gen: Generation) -> Option<Outgoing<MembershipProposal>> {
+    pub(crate) fn anti_entropy(
+        &self,
+        _from_gen: Generation,
+    ) -> Option<Outgoing<MembershipProposal>> {
         if self.outgoings.is_empty() {
             return None;
         }
@@ -348,44 +353,50 @@ impl Membership {
         &mut self,
         bundle: Bundle<MembershipProposal>,
         _prefix: &Prefix,
-    ) -> Result<(Vec<Outgoing<MembershipProposal>>, Option<Decision<MembershipProposal>>)> {
+    ) -> Result<(
+        Vec<Outgoing<MembershipProposal>>,
+        Option<Decision<MembershipProposal>>,
+    )> {
         let outgoings = self.consensus.lock().unwrap().process_bundle(&bundle)?;
         self.outgoings.append(&mut outgoings.clone());
 
-        let decision = self.consensus.lock().unwrap().decided_proposal();
+        let decision_opt = self.consensus.lock().unwrap().decided_proposal();
+        if let Some(decision) = &decision_opt {
+            info!(
+                "Membership - updated generation from {:?} to {:?}",
+                self.gen,
+                decision.proposal.gen()
+            );
 
-        Ok((outgoings, decision))
+            self.gen = decision.proposal.gen()
+        }
+
+        Ok((outgoings, decision_opt))
     }
 
     /// Returns true if the proposal is valid
-    #[allow(dead_code)]
-    fn validate_proposals(&self, _signed_vote: &Bundle<NodeState>, _prefix: &Prefix) -> Result<()> {
-        // check we're section the vote is for our current membership state
-        // signed_vote.validate_signature(&self.consensus.elders)?;
+    fn validate_proposals(&self, proposal: &MembershipProposal, prefix: &Prefix) -> Result<()> {
+        if proposal.gen() != self.gen + 1 {
+            return Err(Error::InvalidGeneration(proposal.gen()));
+        }
+        let members = BTreeMap::from_iter(self.section_members(proposal.gen() - 1)?.into_iter());
+        let archived_members = self.archived_members();
 
-        // // ensure we have a consensus instance for this votes generations
-        // let _ = self
-        //     .consensus_at_gen(signed_vote.vote.gen)
-        //     .map_err(|_| Error::RequestAntiEntropy)?;
-
-        // let members =
-        //     BTreeMap::from_iter(self.section_members(signed_vote.vote.gen - 1)?.into_iter());
-
-        // let archived_members = self.archived_members();
-
-        // for proposal in signed_vote.proposals() {
-        //     if let Err(err) = proposal.validate_node_state(prefix, &members, &archived_members) {
-        //         warn!("Failed to validate {proposal:?} with error {:?}", err);
-        //         // TODO: certain errors need AE?
-        //         warn!(
-        //             "Members at generation {} are: {:?}",
-        //             signed_vote.vote.gen - 1,
-        //             members
-        //         );
-        //         warn!("Archived members are {:?}", archived_members);
-        //         return Err(Error::NetworkKnowledge(err));
-        //     }
-        // }
+        if let Err(err) =
+            proposal
+                .node_state()
+                .validate_node_state(prefix, &members, &archived_members)
+        {
+            warn!("Failed to validate {proposal:?} with error {:?}", err);
+            // TODO: certain errors need AE?
+            warn!(
+                "Members at generation {} are: {:?}",
+                proposal.gen() - 1,
+                members
+            );
+            warn!("Archived members are {:?}", archived_members);
+            return Err(Error::NetworkKnowledge(err));
+        }
 
         Ok(())
     }

@@ -84,7 +84,7 @@ impl NodeContext {
         let _handle = tokio::spawn(async move {
             if let Err(error) = dysf_sender.send(FaultsCmd::TrackIssue(name, issue)).await {
                 // Log the issue, and error. We need to be wary of actually hitting this.
-                warn!("Could not send FaultsCmd through dysfunctional_cmds_tx: {error}");
+                debug!("Could not send FaultsCmd through dysfunctional_cmds_tx: {error}");
             }
         });
     }

@@ -35,11 +35,21 @@ pub enum MembershipState {
     Relocated(Box<RelocationTrigger>),
 }
 
+// TODO
+// make the fields private and capsulated
+
 /// Information about a member of our section.
 #[derive(Debug, Clone, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct MembershipProposal(pub u64, pub NodeState);
 
 impl MembershipProposal {
+    pub fn gen(&self) -> u64 {
+        self.0
+    }
+    pub fn node_state(&self) -> &NodeState {
+        &self.1
+    }
+
     pub fn name(&self) -> XorName {
         self.1.name()
     }

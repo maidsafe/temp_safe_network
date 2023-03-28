@@ -162,31 +162,35 @@ impl MyNode {
 
         // block off the write lock
         let updated = {
-            let gen = node.context().membership.unwrap().gen; // TODO: no unwrap
-            let already_updated = node.network_knowledge.section_key() == sap.section_key();
+            if let Some(membership) = node.context().membership {
+                let gen = membership.gen;
+                let already_updated = node.network_knowledge.section_key() == sap.section_key();
 
-            let updated_knowledge = node
-                .network_knowledge
-                .update_sap_knowledge_if_valid(section_tree_update, &starting_context.name)?;
-            let updated_members = if updated_knowledge || already_updated {
-                node.network_knowledge
-                    .update_section_member_knowledge(gen, section_decisions)?
+                let updated_knowledge = node
+                    .network_knowledge
+                    .update_sap_knowledge_if_valid(section_tree_update, &starting_context.name)?;
+                let updated_members = if updated_knowledge || already_updated {
+                    node.network_knowledge
+                        .update_section_member_knowledge(gen, section_decisions)?
+                } else {
+                    false
+                };
+
+                if updated_members {
+                    node.remove_dkg_sessions_with_missing_members();
+                }
+
+                if updated_knowledge {
+                    debug!("net knowledge updated");
+                    cmds.extend(node.update_on_sap_change(&starting_context).await?);
+
+                    trace!("updated for section change");
+                }
+
+                updated_knowledge || updated_members
             } else {
                 false
-            };
-
-            if updated_members {
-                node.remove_dkg_sessions_with_missing_members();
             }
-
-            if updated_knowledge {
-                debug!("net knowledge updated");
-                cmds.extend(node.update_on_sap_change(&starting_context).await?);
-
-                trace!("updated for section change");
-            }
-
-            updated_knowledge || updated_members
         };
 
         let latest_context = node.context();

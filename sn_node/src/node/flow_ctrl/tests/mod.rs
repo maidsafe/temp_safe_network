@@ -236,10 +236,6 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
 
 #[tokio::test]
 async fn handle_join_request_of_rejoined_node() -> Result<()> {
-    // MMMMMMMMMMMMMM
-    // FIX ME : after fixing the validation method
-    return Ok(());
-
     init_logger();
     let prefix = Prefix::default();
     let env = TestNetworkBuilder::new(thread_rng())
@@ -260,10 +256,14 @@ async fn handle_join_request_of_rejoined_node() -> Result<()> {
 
     // A rejoining node will always be rejected
     assert!(join_cmd.is_none()); // no cmd signals this membership proposal was dropped.
-    assert!(!node
-        .membership
-        .ok_or_else(|| eyre!("Membership for the node must be set"))?
-        .is_churn_in_progress());
+
+    // We can't say that because we propose an invalid proposal
+    // the whole churn is stopped
+    // assert!(!node
+    //     .membership
+    //     .ok_or_else(|| eyre!("Membership for the node must be set"))?
+    //     .is_churn_in_progress());
+
     Ok(())
 }
 

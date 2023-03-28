@@ -732,7 +732,7 @@ impl MyNode {
         let _handle = tokio::spawn(async move {
             if let Err(error) = fault_sender.send(FaultsCmd::TrackIssue(name, issue)).await {
                 // Log the issue, and error. We need to be wary of actually hitting this.
-                warn!("Could not send FaultsCmd through fault_cmds_tx: {error}");
+                debug!("Could not send FaultsCmd through fault_cmds_tx: {error}");
             }
         });
     }
@@ -749,7 +749,7 @@ impl MyNode {
                 .send(FaultsCmd::UntrackIssue(name, issue))
                 .await
             {
-                warn!("Could not send FaultsCmd through fault_cmds_tx: {error}");
+                debug!("Could not send FaultsCmd through fault_cmds_tx: {error}");
             }
         });
     }

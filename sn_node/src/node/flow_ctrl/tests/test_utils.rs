@@ -273,25 +273,25 @@ impl TestMsgTracker {
         } = cmd
         {
             let recp = recipients.clone().into_iter().map(|p| p.name()).collect();
-            info!("Tracking {msg_id:?} for {recp:?}, cmd {cmd}");
+            debug!("Tracking {msg_id:?} for {recp:?}, cmd {cmd}");
             let _ = self.tracker.insert(*msg_id, recp);
         } else if let Cmd::SendMsgEnqueueAnyResponse {
             msg_id, recipients, ..
         } = cmd
         {
             let recp = recipients.iter().map(|p| p.name()).collect();
-            info!("Tracking {msg_id:?} for {recp:?}, cmd {cmd}");
+            debug!("Tracking {msg_id:?} for {recp:?}, cmd {cmd}");
             let _ = self.tracker.insert(*msg_id, recp);
         } else if let Cmd::SendNodeMsgResponse {
             msg_id, node_id, ..
         } = cmd
         {
-            info!("Tracking {msg_id:?} for {node_id:?}, cmd {cmd}");
+            debug!("Tracking {msg_id:?} for {node_id:?}, cmd {cmd}");
             let _ = self
                 .tracker
                 .insert(*msg_id, BTreeSet::from([node_id.name()]));
         } else if let Cmd::UpdateCallerOnStream { caller, msg_id, .. } = cmd {
-            info!("Tracking {msg_id:?} for {caller:?}, cmd {cmd}");
+            debug!("Tracking {msg_id:?} for {caller:?}, cmd {cmd}");
             let _ = self
                 .tracker
                 .insert(*msg_id, BTreeSet::from([caller.name()]));
@@ -300,7 +300,7 @@ impl TestMsgTracker {
 
     // Untrack the msg when we receive a MsgReceived
     pub(crate) fn untrack(&mut self, msg_id: MsgId, our_name: &XorName) -> bool {
-        info!("Untracking {msg_id:?} for {our_name:?}");
+        debug!("Untracking {msg_id:?} for {our_name:?}");
         let removed;
         if let Entry::Occupied(mut entry) = self.tracker.entry(msg_id) {
             let nodes = entry.get_mut();

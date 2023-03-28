@@ -132,8 +132,29 @@ pub fn init_logger() {
             // NOTE: uncomment this line for pretty printed log output.
             //.pretty()
             .with_ansi(false)
+            .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
             .with_target(false)
             .event_format(LogFormatter::default())
+            .try_init()
+            .unwrap_or_else(|_| println!("Error initializing logger"));
+    });
+}
+
+// TODO: wil be removed after code review, Just for my tests (Mostafa)
+#[cfg(feature = "test-utils")]
+pub fn init_logger_2() {
+    use tracing_subscriber::EnvFilter;
+
+    INIT.call_once(|| {
+        let env_filter = EnvFilter::from_default_env()
+            .add_directive("sn_consensus::mvba::abba=info".parse().unwrap())
+            .add_directive("sn_node=info".parse().unwrap());
+
+        tracing_subscriber::fmt::fmt()
+            .with_max_level(tracing::Level::INFO)
+            .with_env_filter(env_filter)
+            .with_target(true)
+            .without_time()
             .try_init()
             .unwrap_or_else(|_| println!("Error initializing logger"));
     });

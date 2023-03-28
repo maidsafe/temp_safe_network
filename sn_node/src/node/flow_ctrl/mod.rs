@@ -696,7 +696,7 @@ async fn process_cmd_non_blocking(
                     new_cmds.extend(cmds);
                 }
                 NodeMsg::NodeDataCmd(NodeDataCmd::ReplicateDataBatch(data_collection)) => {
-                    info!("ReplicateDataBatch MsgId: {:?}", msg_id);
+                    debug!("ReplicateDataBatch MsgId: {:?}", msg_id);
                     let cmds =
                         MyNode::replicate_data_batch(&context, node_id, data_collection).await?;
                     new_cmds.extend(cmds);
@@ -704,7 +704,7 @@ async fn process_cmd_non_blocking(
                 NodeMsg::NodeDataCmd(NodeDataCmd::SendAnyMissingRelevantData(
                     known_data_addresses,
                 )) => {
-                    info!(
+                    debug!(
                         "{:?} MsgId: {:?}",
                         LogMarker::RequestForAnyMissingData,
                         msg_id

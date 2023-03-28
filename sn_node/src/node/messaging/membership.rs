@@ -20,7 +20,10 @@ use sn_consensus::mvba::{
 };
 use sn_interface::{
     messaging::system::{JoinResponse, NodeMsg},
-    network_knowledge::{node_state::{RelocationTrigger, MembershipProposal}, MembershipState, NodeState},
+    network_knowledge::{
+        node_state::{MembershipProposal, RelocationTrigger},
+        MembershipState, NodeState,
+    },
     types::{log_markers::LogMarker, NodeId, Participant},
 };
 
@@ -102,9 +105,8 @@ impl MyNode {
         let mut cmds = vec![];
 
         for signed_vote in bundles {
-            let vote_broadcast = None;
             if let Some(membership) = self.membership.as_mut() {
-                let (_vote_response, decision) = match membership
+                let (outgoings, decision) = match membership
                     .handle_signed_vote(signed_vote, &prefix)
                 {
                     Ok(result) => result,
@@ -128,16 +130,26 @@ impl MyNode {
                     }
                 };
 
-                // match vote_response {
-                //     VoteResponse::Broadcast(response_vote) => {
-                //         vote_broadcast = Some(NodeMsg::MembershipVotes(vec![response_vote]));
-                //     }
-                //     VoteResponse::WaitingForMoreVotes => {
-                //         // do nothing
-                //     }
-                // };
+                let mut bundles = vec![];
+                for outgoing in outgoings {
+                    match outgoing {
+                        Gossip(bundle) => {
+                            bundles.push(bundle);
+                        }
+                        Direct(_, bundle) => {
+                            bundles.push(bundle);
+                        }
+                    }
+                }
+
+                cmds.push(MyNode::send_to_elders(
+                    context,
+                    NodeMsg::MembershipVotes(bundles),
+                ));
 
                 if let Some(decision) = decision {
+                    info!("{node_id} decided for membership proposal {:?}", decision.proposal);
+
                     cmds.push(Cmd::HandleMembershipDecision(decision));
                 }
             } else {
@@ -145,10 +157,6 @@ impl MyNode {
                     "Attempted to handle membership vote when we don't yet have a membership instance"
                 );
             };
-
-            if let Some(vote_msg) = vote_broadcast {
-                cmds.push(MyNode::send_to_elders(context, vote_msg));
-            }
         }
 
         Ok(cmds)
@@ -216,9 +224,10 @@ impl MyNode {
         if node_state.state() == MembershipState::Joined {
             cmds.extend(self.handle_node_joined(decision.clone()).await);
             cmds.push(self.send_node_approvals(decision.clone()));
+
+            let _res = excluded_from_relocation.insert(node_state.name());
         } else {
             cmds.extend(self.handle_node_left(decision.clone()).into_iter());
-            let _res = excluded_from_relocation.insert(node_state.name());
         }
 
         // Do not disable node joins in first section.
@@ -328,7 +337,10 @@ impl MyNode {
         Cmd::send_msg(msg, Recipients::Multiple(nodes))
     }
 
-    pub(crate) fn handle_node_left(&mut self, decision: Decision<MembershipProposal>) -> Option<Cmd> {
+    pub(crate) fn handle_node_left(
+        &mut self,
+        decision: Decision<MembershipProposal>,
+    ) -> Option<Cmd> {
         let node_state = decision.proposal.1.clone();
         info!(
             "{}: {}",

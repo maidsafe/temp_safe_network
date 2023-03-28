@@ -1,0 +1,8 @@
+ INFO sn_node::node::messaging::join_section::tests: The node joined: 501e71(01010000).., 01d8e2(00000001)..
+ INFO sn_node::node::messaging::join_section::tests: The node joined: 501e71(01010000).., 226281(00100010)..
+ INFO sn_node::node::messaging::join_section::tests: The node joined: 501e71(01010000).., 22c65c(00100010)..
+ INFO sn_node::node::messaging::join_section::tests: The node joined: 501e71(01010000).., 40a628(01000000)..
+ INFO sn_node::node::messaging::join_section::tests: The node should've joined: 501e71(01010000).., 501e71(01010000)..
+ INFO sn_node::node::messaging::join_section::tests: The node joined: 501e71(01010000).., bc3466(10111100)..
+ INFO sn_node::node::messaging::join_section::tests: The node joined: 501e71(01010000).., d4bd02(11010100)..
+ INFO sn_node::node::messaging::join_section::tests: The node joined: 501e71(01010000).., de307c(11011110)..

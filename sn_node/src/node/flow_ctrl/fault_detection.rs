@@ -77,14 +77,14 @@ impl FlowCtrl {
             .send(FaultsCmd::GetFaultyNodes)
             .await
         {
-            warn!("Could not send FaultsCmd through fault_cmds_tx: {error}");
+            debug!("Could not send FaultsCmd through fault_cmds_tx: {error}");
             vec![]
         } else {
             // read the rx channel to get the faulty nodes
             if let Some(faulty_nodes) = self.fault_channels.faulty_nodes_receiver.recv().await {
                 faulty_nodes
             } else {
-                warn!("faulty_nodes_rx channel closed?");
+                debug!("faulty_nodes_rx channel closed?");
                 vec![]
             }
         }
