@@ -59,7 +59,7 @@ const JOIN_DISALLOWED_RETRY_TIME_SEC: u64 = 60;
 #[derive(Debug)]
 #[allow(dead_code)]
 // To be sent to the main thread in order to stop/restart the execution of the safenode app.
-enum NodeCtl {
+enum NodeCtrl {
     // Request to stop the exeution of the safenode app, providing an error as a reason for it.
     Stop { delay: Duration, cause: Error },
     // Request to restart the exeution of the safenode app,
@@ -182,12 +182,12 @@ fn create_runtime_and_node(config: &Config) -> Result<()> {
             }
 
             // Node is running
-            let (ctl_tx, mut ctl_rx) = mpsc::channel::<NodeCtl>(5);
+            let (ctrl_tx, mut ctrl_rx) = mpsc::channel::<NodeCtrl>(5);
 
             let node_ref = Arc::new(RwLock::new(node_ref));
 
             // Monitor NodeEvents just in case we need to rejoin
-            monitor_node_events(node_ref.clone(), ctl_tx.clone(), log_dir.clone());
+            monitor_node_events(node_ref.clone(), ctrl_tx.clone(), log_dir.clone());
 
             // Start up gRPC interface
             #[cfg(feature = "rpc-service")]
@@ -197,30 +197,30 @@ fn create_runtime_and_node(config: &Config) -> Result<()> {
                 // ... and let's use subsequent port number to the one used by sn_node.
                 addr.set_port(addr.port() + 1);
 
-                rpc::start_rpc_service(addr, log_dir.clone(), node_ref, ctl_tx);
+                rpc::start_rpc_service(addr, log_dir.clone(), node_ref, ctrl_tx);
             }
 
             // We'll block here until there is a reason reported to restart/stop,
             // otherwise both the node and the gRPC service (if enabled) will be running.
             // If there is an event that requires the node to restart we
             // do so by returning Ok(()).
-            while let Some(node_ctl) = ctl_rx.recv().await {
-                match node_ctl {
-                NodeCtl::Restart(delay) => {
+            while let Some(node_ctrl) = ctrl_rx.recv().await {
+                match node_ctrl {
+                NodeCtrl::Restart(delay) => {
                     let msg = format!("Node is restartig in {delay:?}...");
                     info!("{msg}");
                     println!("{msg} Node log path: {log_dir}");
                     sleep(delay);
                     break;
                 },
-                NodeCtl::Stop {delay, cause} => {
+                NodeCtrl::Stop {delay, cause} => {
                     let msg = format!("Node is stopping in {delay:?}...");
                     info!("{msg}");
                     println!("{msg} Node log path: {log_dir}");
                     sleep(delay);
                     return Err(cause);
                 }
-                NodeCtl::Update(delay) => {
+                NodeCtrl::Update(delay) => {
                     let msg = format!("Node is updating in {delay:?}...");
                     info!("{msg}");
                     println!("{msg} Node log path: {log_dir}");
@@ -311,7 +311,7 @@ fn gen_completions_for_shell(shell: Shell, mut cmd: clap::Command) -> Result<Vec
 
 fn monitor_node_events(
     node_ref: Arc<RwLock<NodeRef>>,
-    ctl_tx: mpsc::Sender<NodeCtl>,
+    ctrl_tx: mpsc::Sender<NodeCtrl>,
     log_dir: String,
 ) {
     let _handle = tokio::spawn(async move {
@@ -326,12 +326,12 @@ fn monitor_node_events(
                 }
                 NodeEvent::RejoinRequired(reason) => {
                     error!("Rejoin reason: {reason:?}");
-                    let ctl_msg = match reason {
+                    let ctrl_msg = match reason {
                         RejoinReason::RemovedFromSection => {
                             let msg = "Restarting node since it has been removed from section...";
                             println!("{msg} Node log path: {log_dir}");
                             info!("{msg}");
-                            NodeCtl::Restart(Duration::from_secs(2))
+                            NodeCtrl::Restart(Duration::from_secs(2))
                         }
                         RejoinReason::JoinsDisallowed => {
                             let delay = JOIN_DISALLOWED_RETRY_TIME_SEC;
@@ -341,11 +341,11 @@ fn monitor_node_events(
                             );
                             println!("{message} Node log path: {log_dir}");
                             info!("{message}");
-                            NodeCtl::Restart(Duration::from_secs(delay))
+                            NodeCtrl::Restart(Duration::from_secs(delay))
                         }
                     };
 
-                    if let Err(err) = ctl_tx.send(ctl_msg).await {
+                    if let Err(err) = ctrl_tx.send(ctrl_msg).await {
                         error!(
                             "Failed to send node control msg to safenode bin main thread: {err}"
                         );

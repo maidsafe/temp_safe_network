@@ -23,7 +23,7 @@ data-network = []
 query-happy-path = [ "sn_api/query-happy-path" ]
 msg-happy-path = [ "sn_api/msg-happy-path" ]
 limit-client-upload-size = ["sn_api/limit-client-upload-size"]
-node-ctl = ["prost", "futures-util", "tonic", "tonic-build"]
+node-ctrl = ["prost", "futures-util", "tonic", "tonic-build"]
 
 [dependencies]
 ansi_term = "~0.12"
