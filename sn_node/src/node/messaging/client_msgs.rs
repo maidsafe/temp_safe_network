@@ -63,7 +63,7 @@ impl MyNode {
             // The required fee content is encrypted to that dbc id, and so only the holder of the dbc secret
             // key can unlock the contents.
             let required_fee =
-                RequiredFee::new(context.store_cost, dbc_id, &context.reward_secret_key);
+                RequiredFee::new(context.current_fee(), dbc_id, &context.reward_secret_key);
             NodeQueryResponse::GetFees(Ok(required_fee))
         } else {
             context
@@ -262,7 +262,7 @@ impl MyNode {
         // verify that fee is paid to us
         #[cfg(not(feature = "data-network"))]
         MyNode::verify_fee(
-            context.store_cost,
+            context.current_fee(),
             context.reward_secret_key.as_ref(),
             tx,
             context.name,
