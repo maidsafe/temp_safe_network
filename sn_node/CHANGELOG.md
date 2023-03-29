@@ -5,13 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.80.6 (2023-03-27)
+## v0.82.1 (2023-03-29)
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 1 commit contributed to the release.
+ - 3 commits contributed to the release.
  - 0 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
@@ -22,12 +22,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Fix(test): re-add the removed spentbook test - Move fee generating code into reused helper. ([`83ca2bc`](https://github.com/maidsafe/safe_network/commit/83ca2bc3569736af17613abca6ff3dafdee33fd8))
+    - Refactor(wallet): make sure all apis pay fee - All the public reissue apis now handle fees when payment network. - This fixes the tests where the genesis dbc reissuing to all test dbcs failed. ([`7638349`](https://github.com/maidsafe/safe_network/commit/76383494446133618957a08732b470ff70ba6278))
+    - Feat(fees): verify amount at elder - An Elder now verifies that a spend contains an output for them with correct amount. ([`5f6c75c`](https://github.com/maidsafe/safe_network/commit/5f6c75c3ef5f0c896b38aecffb4aa406dfe23ca6))
+</details>
+
+## v0.80.6 (2023-03-27)
+
+### Chore
+
+ - <csr-id-9d2ffe6d74c06a7f90884c4ad365892613b48a65/> sn_interface-0.20.12/sn_node-0.80.6
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Sn_interface-0.20.12/sn_node-0.80.6 ([`9d2ffe6`](https://github.com/maidsafe/safe_network/commit/9d2ffe6d74c06a7f90884c4ad365892613b48a65))
     - Feat(fees): add fee types - These types allow Elders to verify that a fee amount, and a sufficient amount, has been included in a spend output. ([`a04c3fc`](https://github.com/maidsafe/safe_network/commit/a04c3fcdb1bab421e417af3c666bbc09c2cfd1e5))
 </details>
 
 ## v0.80.5 (2023-03-26)
 
 <csr-id-de3abf841789c5a696cd86a17d2c5743ad047c92/>
+<csr-id-d045f53e8ac66542cd6d2cfc750368d5142bc98e/>
 
 ### Chore
 
@@ -264,6 +292,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Clarify naming ([`a5bb5e8`](https://github.com/maidsafe/safe_network/commit/a5bb5e86518e23dcc59f252b231de89ed90efcf9))
     - Push replication send msgs onto flowctrl channel ([`6c4f873`](https://github.com/maidsafe/safe_network/commit/6c4f873df4ee253b2023e85b1b90baaabd49e109))
     - Node to update its own members list upon being relocated ([`39b432d`](https://github.com/maidsafe/safe_network/commit/39b432d365ec745dc31147ca91df23284c1011ac))
+</details>
+
+## v0.82.0 (2023-03-28)
+
+### Chore
+
+ - <csr-id-2eb838e882e60c2645653815ac136508df373cb1/> sn_interface-0.22.0/sn_comms-0.8.0/sn_client-0.84.0/sn_node-0.82.0/sn_api-0.82.0/sn_cli-0.76.0
+ - <csr-id-3e97ea42c81c22f68bcb2a2d4ce7a9930a74e3cf/> bump sn_dbc to 12.0.0
+
+### Refactor (BREAKING)
+
+ - <csr-id-231c396f116761c6060e32ffc000c1ddddd429f2/> simplify getfees query
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 4 commits contributed to the release.
+ - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Sn_interface-0.22.0/sn_comms-0.8.0/sn_client-0.84.0/sn_node-0.82.0/sn_api-0.82.0/sn_cli-0.76.0 ([`2eb838e`](https://github.com/maidsafe/safe_network/commit/2eb838e882e60c2645653815ac136508df373cb1))
+    - Feat(fees): include ciphers for elders in spend - The ciphers over derivation index and blinding factor is now included in the spend request sent to elders. - NB: The elders do not yet verify that they have been paid. ([`cc569d4`](https://github.com/maidsafe/safe_network/commit/cc569d4395c03a0c7171e8ea63e317756e88cf48))
+    - Simplify getfees query ([`231c396`](https://github.com/maidsafe/safe_network/commit/231c396f116761c6060e32ffc000c1ddddd429f2))
+    - Bump sn_dbc to 12.0.0 ([`3e97ea4`](https://github.com/maidsafe/safe_network/commit/3e97ea42c81c22f68bcb2a2d4ce7a9930a74e3cf))
+</details>
+
+## v0.81.0 (2023-03-27)
+
+### Chore
+
+ - <csr-id-0e9db2da4ed28d36d8ee866c9e941ab39e155e28/> sn_updater-0.2.0/sn_interface-0.21.0/sn_comms-0.7.0/sn_client-0.83.0/sn_node-0.81.0/sn_api-0.81.0/sn_cli-0.75.0
+
+### New Features (BREAKING)
+
+ - <csr-id-94d20504b58cb09a203ffd9c03fdcab07a810d0b/> new cmds to interact with a safenode RPC service
+   - The new `node` CLI subcommand is made available only when building
+   with `node-ctl` feature flag.
+   - Adding a new RPC service to safenode to request it to update itself.
+   - Migrate sn_api and sn_cli CI tests to use sn_testnet 'verify-nodes' feature.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Sn_updater-0.2.0/sn_interface-0.21.0/sn_comms-0.7.0/sn_client-0.83.0/sn_node-0.81.0/sn_api-0.81.0/sn_cli-0.75.0 ([`0e9db2d`](https://github.com/maidsafe/safe_network/commit/0e9db2da4ed28d36d8ee866c9e941ab39e155e28))
+    - New cmds to interact with a safenode RPC service ([`94d2050`](https://github.com/maidsafe/safe_network/commit/94d20504b58cb09a203ffd9c03fdcab07a810d0b))
 </details>
 
 ## v0.80.0 (2023-03-16)
