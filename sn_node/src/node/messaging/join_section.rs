@@ -508,9 +508,9 @@ mod tests {
 
                 if let Some((joining_node_name, handle_ref)) = &joining_node_handle {
                     if joining_node_name == name && handle_ref.is_finished() {
-                        // let (_, handle) =
-                        //     joining_node_handle.take().expect("join_handle is present");
-                        // assert!(handle.await??.is_empty());
+                        let (_, handle) =
+                            joining_node_handle.take().expect("join_handle is present");
+                        assert!(handle.await??.is_empty());
                     }
                 }
 

@@ -130,6 +130,7 @@ pub fn init_logger() {
     use tracing_subscriber::EnvFilter;
 
     INIT.call_once(|| {
+        // customizing logs
         let env_filter = EnvFilter::from_default_env()
             .add_directive("sn_consensus=info".parse().expect("invalid directive"))
             .add_directive("sn_node=info".parse().expect("invalid directive"));
@@ -137,8 +138,8 @@ pub fn init_logger() {
         tracing_subscriber::fmt::fmt()
             .with_max_level(tracing::Level::INFO)
             .with_env_filter(env_filter)
-            .with_target(false)
-            // .event_format(LogFormatter::default())
+            // .with_target(false) // Printing target module
+            // .event_format(LogFormatter::default())// Not colorful logs
             .without_time()
             .try_init()
             .unwrap_or_else(|_| println!("Error initializing logger"));
