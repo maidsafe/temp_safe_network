@@ -5,18 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.82.3 (2023-03-29)
-
-### Bug Fixes
-
- - <csr-id-15c1d35e604765450a1e33d626b550faa41fb451/> not to cast outdated membership vote
+## v0.82.4 (2023-03-29)
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
  - 1 commit contributed to the release.
- - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 0 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -26,12 +22,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Chore: rename ctl to more commonly used ctrl - In our code we use the abbreviation `ctrl`for `control`. - When googling the two, it is clear that `ctrl` is the more commonly used abbreviation. ([`f4b35c3`](https://github.com/maidsafe/safe_network/commit/f4b35c33e8c9189878de773ebb1c835c8814f004))
+</details>
+
+## v0.82.3 (2023-03-29)
+
+### Chore
+
+ - <csr-id-243aea91735db2085fe968f5daa113ec903611b8/> sn_node-0.82.3
+
+### Bug Fixes
+
+ - <csr-id-15c1d35e604765450a1e33d626b550faa41fb451/> not to cast outdated membership vote
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Sn_node-0.82.3 ([`243aea9`](https://github.com/maidsafe/safe_network/commit/243aea91735db2085fe968f5daa113ec903611b8))
     - Not to cast outdated membership vote ([`15c1d35`](https://github.com/maidsafe/safe_network/commit/15c1d35e604765450a1e33d626b550faa41fb451))
 </details>
 
 ## v0.82.2 (2023-03-29)
 
 <csr-id-4e54e547e46c18b1dc9cd2343d7c5a4f2d09f4a4/>
+<csr-id-1aeaafa940fc9ada35cfbcfc95f28c7478d4a2da/>
 
 ### Chore
 
@@ -168,9 +194,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Sn_updater-0.2.0/sn_interface-0.21.0/sn_comms-0.7.0/sn_client-0.83.0/sn_node-0.81.0/sn_api-0.81.0/sn_cli-0.75.0 ([`0e9db2d`](https://github.com/maidsafe/safe_network/commit/0e9db2da4ed28d36d8ee866c9e941ab39e155e28))
     - New cmds to interact with a safenode RPC service ([`94d2050`](https://github.com/maidsafe/safe_network/commit/94d20504b58cb09a203ffd9c03fdcab07a810d0b))
 </details>
-
-<csr-unknown>
-Adding a new RPC service to safenode to request it to update itself.Migrate sn_api and sn_cli CI tests to use sn_testnet ‘verify-nodes’ feature.<csr-unknown/>
 
 ## v0.80.6 (2023-03-27)
 
