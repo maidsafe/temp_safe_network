@@ -90,11 +90,12 @@ impl SapCandidate {
         }
     }
 
-    pub fn public_key_set(&self) -> PublicKeySet {
+    pub fn public_key_sets(&self) -> BTreeSet<PublicKeySet> {
         match self {
-            SapCandidate::ElderHandover(sap) => sap.public_key_set(),
-            // TODO: consider return both?
-            SapCandidate::SectionSplit(sap1, _sap2) => sap1.public_key_set(),
+            SapCandidate::ElderHandover(sap) => BTreeSet::from_iter([sap.public_key_set()]),
+            SapCandidate::SectionSplit(sap1, sap2) => {
+                BTreeSet::from_iter([sap1.public_key_set(), sap2.public_key_set()])
+            }
         }
     }
 }
