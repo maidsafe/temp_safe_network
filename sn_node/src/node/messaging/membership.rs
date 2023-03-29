@@ -69,24 +69,21 @@ impl MyNode {
         }
     }
 
+    // TODO: Why do we need it?
     /// Get our latest vote if any at this generation, and get cmds to resend to all elders
     /// (which should in turn trigger them to resend their votes)
     #[instrument(skip_all)]
-    pub(crate) fn membership_gossip_votes(context: &NodeContext) -> Option<Cmd> {
+    pub(crate) fn membership_gossip_votes(context: &NodeContext) -> Vec<Cmd> {
+        let mut cmds = vec![];
         if let Some(membership) = &context.membership {
             trace!("{}", LogMarker::GossippingMembershipVotes);
-            if let Some(ae_outgoings) = membership.anti_entropy(membership.generation()) {
-                let bundle = match ae_outgoings {
-                    Gossip(bundle) => bundle,
-                    Direct(_node_id, bundle) => bundle,
-                };
-
-                let cmd = MyNode::send_to_elders(context, NodeMsg::MembershipVotes(vec![bundle]));
-                return Some(cmd);
+            let ae_decisions = membership.anti_entropy(membership.generation());
+            for decision in ae_decisions {
+                cmds.push(Cmd::HandleMembershipDecision(decision));
             }
         }
 
-        None
+        cmds
     }
 
     pub(crate) fn handle_membership_votes(
@@ -169,33 +166,22 @@ impl MyNode {
         membership_context: &Option<Membership>,
         node_id: NodeId,
         gen: Generation,
-    ) -> Option<Cmd> {
+    ) -> Vec<Cmd> {
         debug!(
             "{:?} membership anti-entropy request for gen {gen:?} from {node_id}",
             LogMarker::MembershipAeRequestReceived,
         );
 
+        let mut cmds = vec![];
         if let Some(membership) = membership_context {
-            match membership.anti_entropy(gen) {
-                Some(catchup_votes) => {
-                    trace!("Sending catchup votes to {node_id:?}");
-                    let bundle = match catchup_votes {
-                        Gossip(bundle) => bundle,
-                        Direct(_node_id, bundle) => bundle,
-                    };
-                    Some(Cmd::send_msg(
-                        NodeMsg::MembershipVotes(vec![bundle]),
-                        Recipients::Single(Participant::from_node(node_id)),
-                    ))
-                }
-                None => None,
+            trace!("{}", LogMarker::GossippingMembershipVotes);
+            let ae_decisions = membership.anti_entropy(membership.generation());
+            for decision in ae_decisions {
+                cmds.push(Cmd::HandleMembershipDecision(decision));
             }
-        } else {
-            error!(
-                "Attempted to handle membership anti-entropy when we don't yet have a membership instance"
-            );
-            None
         }
+
+        cmds
     }
 
     pub(crate) async fn handle_membership_decision(
@@ -203,7 +189,7 @@ impl MyNode {
         gen: u64,
         decision: Decision<NodeState>,
     ) -> Result<Vec<Cmd>> {
-        info!("{}", LogMarker::AgreementOfMembership);
+        debug!("{}", LogMarker::AgreementOfMembership);
         let mut cmds = vec![];
         let node_state = decision.proposal.clone();
 
@@ -218,7 +204,8 @@ impl MyNode {
             }
             Ok(updated) => {
                 if !updated {
-                    debug!("decision {decision:?} didn't update the members");
+                    debug!("decision {decision:?} processed before");
+                    return Ok(vec![]);
                 }
             }
         }

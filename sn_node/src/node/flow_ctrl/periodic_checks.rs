@@ -300,11 +300,8 @@ impl FlowCtrl {
                 // we want to resend the prev vote
                 if time.elapsed() >= MISSING_VOTE_INTERVAL {
                     debug!("Vote consensus appears stalled...");
-                    if let Some(cmd) = MyNode::membership_gossip_votes(context) {
-                        trace!("Vote resending cmd: {cmd:?}");
+                    cmds.extend(MyNode::membership_gossip_votes(context));
 
-                        cmds.push(cmd);
-                    }
                     // we may also be behind, so lets request AE incase that is the case!
                     let msg = NodeMsg::MembershipAE(membership.generation());
                     cmds.push(MyNode::send_to_elders(context, msg));

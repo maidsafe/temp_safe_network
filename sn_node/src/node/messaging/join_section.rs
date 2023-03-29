@@ -45,7 +45,7 @@ mod tests {
 
     use sn_comms::CommEvent;
     use sn_interface::{
-        elder_count, init_logger, init_logger_2,
+        elder_count, init_logger,
         messaging::{system::JoinResponse, MsgId, NetworkMsg},
         network_knowledge::NetworkKnowledge,
         test_utils::TestSapBuilder,
@@ -64,7 +64,7 @@ mod tests {
 
     #[tokio::test]
     async fn join_happy_path_completes() -> Result<()> {
-        init_logger_2();
+        init_logger();
         let prefix = Prefix::default();
         let elder_count = elder_count();
         let adult_count = 0;
@@ -117,7 +117,7 @@ mod tests {
             let my_node = &node.read().await.node;
             let network_knowledge = my_node.network_knowledge().clone();
             if !network_knowledge.is_adult(&joining_node_name) {
-                info!(
+                panic!(
                     "The node should've joined: {joining_node_name:?}, {:?}",
                     my_node.name()
                 );
@@ -367,7 +367,7 @@ mod tests {
 
     #[tokio::test]
     async fn join_with_old_sap_succeeds() -> Result<()> {
-        init_logger_2();
+        init_logger();
         let prefix = Prefix::default();
         let elder_count = elder_count() - 1;
         let adult_count = 0;
@@ -416,9 +416,18 @@ mod tests {
         .await?;
         // Check if the node has joined
         for node in node_instances.values() {
-            let network_knowledge = node.read().await.node.network_knowledge().clone();
+            let my_node = &node.read().await.node;
+            let network_knowledge = my_node.network_knowledge().clone();
             if !network_knowledge.is_elder(&joining_node_name) {
-                panic!("The node should've joined as an elder");
+                panic!(
+                    "The node should've joined: {joining_node_name:?}, {:?}",
+                    my_node.name()
+                );
+            } else {
+                info!(
+                    "The node joined: {joining_node_name:?}, {:?}",
+                    my_node.name()
+                );
             }
         }
 

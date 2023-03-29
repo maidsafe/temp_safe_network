@@ -116,28 +116,28 @@ impl MyNode {
     /// Join the destination section as a relocated node
     pub(crate) fn relocate(
         &mut self,
-        signed_relocation: Decision<NodeState>,
+        decision: Decision<NodeState>,
         pk: &bls::PublicKey,
     ) -> Result<Option<Cmd>> {
         // should be unreachable, but a sanity check
-        if !signed_relocation.validate(pk).unwrap_or(false) {
+        if !decision.validate(pk).unwrap_or(false) {
             warn!("Relocate: Could not verify section signature of our relocation");
             return Err(super::Error::InvalidSignature);
         }
-        if self.name() != signed_relocation.proposal.node_id().name() {
+        if self.name() != decision.proposal.node_id().name() {
             // not for us, drop it
             warn!("Relocate: The received section signed relocation is not for us.");
             return Ok(None);
         }
 
         let dst_section = if let MembershipState::Relocated(relocation_trigger) =
-            signed_relocation.proposal.state()
+            decision.proposal.state()
         {
             relocation_trigger.dst_section(self.name())
         } else {
             warn!(
                 "Relocate: Ignoring msg containing invalid NodeState: {:?}",
-                signed_relocation.proposal.state()
+                decision.proposal.state()
             );
             return Ok(None);
         };
@@ -156,7 +156,7 @@ impl MyNode {
         );
         let new_name = ed25519::name(&new_keypair.public);
 
-        let info = RelocationInfo::new(signed_relocation, *pk, new_name);
+        let info = RelocationInfo::new(decision, *pk, new_name);
         let serialized_info = bincode::serialize(&info)?;
         // we verify that this new name was actually created by the old name
         let node_sig = ed25519::sign(&serialized_info, &original_info.keypair);
@@ -594,7 +594,7 @@ mod tests {
             for (key, test_node) in node_instances.iter() {
                 let mut node = test_node.write().await;
                 let name = key.1;
-                info!("\n\n NODE: {}", name);
+                // info!("\n\n NODE: {}", name);
                 let comm_rx = comm_receivers
                     .get_mut(key)
                     .ok_or_else(|| eyre!("comm_rx should be present"))?;
@@ -613,7 +613,7 @@ mod tests {
 
                 while let Some(msg) = get_next_msg(comm_rx).await {
                     for cmd in node.test_handle_msg(msg, Some(name)).await? {
-                        info!("Got cmd {}", cmd);
+                        debug!("Got cmd {}", cmd);
                         if let Cmd::SendMsg { .. } = &cmd {
                             assert!(node.process_cmd(cmd).await?.is_empty());
                         } else if let Cmd::SendMsgEnqueueAnyResponse { .. } = &cmd {

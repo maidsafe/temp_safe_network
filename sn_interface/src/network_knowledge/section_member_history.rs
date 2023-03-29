@@ -131,7 +131,7 @@ impl SectionMemberHistory {
         section_key: &PublicKey,
         new_decision: Decision<NodeState>,
     ) -> Result<bool> {
-        let incoming_generation = new_decision.proof.domain.seq;
+        let incoming_generation = new_decision.domain.seq;
 
         trace!(
             "incoming_generation {incoming_generation:?} self.decisions.len() {:?}",

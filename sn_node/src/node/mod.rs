@@ -787,7 +787,7 @@ impl MyNode {
         mut current_members: BTreeSet<NodeId>,
     ) {
         let relocated_members = archived_members.iter().filter_map(|state| {
-            // TODO: figure out how to retain the section sign key info within Decsion
+            // TODO: figure out how to retain the section sign key info within Decision
             if state.is_relocated() {
                 Some(*state.node_id())
             } else {

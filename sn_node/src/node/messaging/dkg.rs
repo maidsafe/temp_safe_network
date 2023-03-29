@@ -934,7 +934,7 @@ mod tests {
                 while let Some(msg) = get_next_msg(comm_rx).await {
                     let cmds = test_node.test_handle_msg(msg, None).await?;
                     for cmd in cmds {
-                        info!("Got cmd {}", cmd);
+                        debug!("Got cmd {}", cmd);
                         if let Cmd::SendMsg { .. } = &cmd {
                             assert!(test_node.process_cmd(cmd).await?.is_empty());
                         } else if let Cmd::HandleDkgOutcome {
@@ -992,7 +992,7 @@ mod tests {
 
                 while let Some(msg) = get_next_msg(comm_rx).await {
                     for mut cmd in test_node.test_handle_msg(msg, None).await? {
-                        info!("Got cmd {}", cmd);
+                        debug!("Got cmd {}", cmd);
                         if let Cmd::SendMsg { .. } = cmd {
                             cmd.filter_recipients(BTreeSet::from([dead_node]))?;
                             assert!(test_node.process_cmd(cmd).await?.is_empty());
@@ -1043,7 +1043,7 @@ mod tests {
 
                 while let Some(msg) = get_next_msg(comm_rx).await {
                     for mut cmd in test_node.test_handle_msg(msg, None).await? {
-                        info!("Got cmd {}", cmd);
+                        debug!("Got cmd {}", cmd);
                         if let Cmd::SendMsg { ref recipients, .. } = cmd {
                             // (1/node_count) chance to drop a msg
                             if rng.gen::<usize>() % node_count == 0 {
@@ -1099,7 +1099,7 @@ mod tests {
                 );
                 let cmds = MyNode::dkg_gossip_msgs(&random_node.node.context());
                 for cmd in cmds {
-                    info!("Got cmd {}", cmd);
+                    debug!("Got cmd {}", cmd);
                     assert_matches!(&cmd, Cmd::SendMsg { .. });
                     assert!(random_node.process_cmd(cmd).await?.is_empty());
                 }

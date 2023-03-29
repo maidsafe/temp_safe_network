@@ -74,7 +74,7 @@ impl RelocationTrigger {
 /// over the fact that the section considered the node to be relocated.
 #[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
 pub struct RelocationInfo {
-    signed_relocation: Decision<NodeState>,
+    decision: Decision<NodeState>,
     pk: bls::PublicKey,
     new_name: XorName,
 }
@@ -97,12 +97,12 @@ pub struct RelocationProof {
 
 impl RelocationInfo {
     pub fn new(
-        signed_relocation: Decision<NodeState>,
+        desicion: Decision<NodeState>,
         pk: bls::PublicKey,
         new_name: XorName,
     ) -> Self {
         Self {
-            signed_relocation,
+            decision: desicion,
             pk,
             new_name,
         }
@@ -128,7 +128,7 @@ impl RelocationProof {
     /// Calling context will need to verify that said section key is also a known section.
     pub fn verify(&self) -> Result<()> {
         // the key that we use to verify the sig over the new name, must match the name of the relocated node
-        if self.old_key_name() != self.info.signed_relocation.proposal.name() {
+        if self.old_key_name() != self.info.decision.proposal.name() {
             return Err(Error::InvalidRelocationProof);
         }
         let serialized_info =
@@ -138,7 +138,7 @@ impl RelocationProof {
             .map_err(|_err| Error::InvalidRelocationProof)?;
         if !self
             .info
-            .signed_relocation
+            .decision
             .validate(&self.info.pk)
             .unwrap_or(false)
         {
@@ -159,15 +159,15 @@ impl RelocationProof {
 
     /// Previous name of the relocating node.
     pub fn previous_name(&self) -> XorName {
-        self.info.signed_relocation.proposal.name()
+        self.info.decision.proposal.name()
     }
     /// Previous age of the relocating node.
     pub fn previous_age(&self) -> u8 {
-        self.info.signed_relocation.proposal.age()
+        self.info.decision.proposal.age()
     }
 
     pub fn signed_relocation(&self) -> &Decision<NodeState> {
-        &self.info.signed_relocation
+        &self.info.decision
     }
 
     // ed25519_dalek::Signature has overly verbose debug output, so we provide our own

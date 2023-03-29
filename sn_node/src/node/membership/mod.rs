@@ -42,6 +42,8 @@ pub enum Error {
     InvalidGeneration(u64),
     #[error("Network Knowledge error {0:?}")]
     NetworkKnowledge(#[from] sn_interface::network_knowledge::Error),
+    #[error("Custom {0}")]
+    Custom(String),
 }
 
 pub(crate) type Result<T> = std::result::Result<T, Error>;
@@ -159,8 +161,7 @@ pub(crate) struct Membership {
     secret_key: (NodeId, SecretKeyShare),
     elders: PublicKeySet,
     elders_id: Vec<NodeId>,
-    n_elders: usize,
-    history: BTreeMap<Generation, Decision<NodeState>>,
+    history: BTreeMap<Generation, Decision<NodeState>>, // TODO: we can use vector here
     // last membership vote timestamp
     last_received_vote_time: Option<Instant>,
     outgoing_log: Vec<Outgoing<NodeState>>,
@@ -192,7 +193,7 @@ impl Membership {
             elders_id.push(i);
         }
 
-        let mut consensus_guard = Arc::new(Mutex::new(Consensus::init(
+        let consensus_guard = Arc::new(Mutex::new(Consensus::init(
             domain,
             secret_key.0,
             secret_key.1.clone(),
@@ -208,7 +209,6 @@ impl Membership {
             secret_key,
             elders,
             elders_id,
-            n_elders,
             history: BTreeMap::default(),
             last_received_vote_time: None,
             outgoing_log: Vec::new(),
@@ -339,12 +339,13 @@ impl Membership {
         prefix: &Prefix,
     ) -> Result<Vec<Outgoing<NodeState>>> {
         // TODO: no unwrap
-        if self.gen > 0 && self
-            .consensus_guard
-            .lock()
-            .unwrap()
-            .decided_proposal()
-            .is_none()
+        if self.gen > 0
+            && self
+                .consensus_guard
+                .lock()
+                .unwrap()
+                .decided_proposal()
+                .is_none()
         {
             error!("proposing a new node_state without consensus on the previous one can lead to unforeseen issues.");
             // let's panic here on debug mode
@@ -376,21 +377,18 @@ impl Membership {
         return Ok(outgoings);
     }
 
-    // A comment on anti_entropy function
-    //
-    // Handling anti_entropy can be done when we receive any message, technically in handle_signed_vote
-    // We can always add one random message from the message log.
-    // Whenever the protocol is decided, we can always send the decided proposal with the proof.
-    //
+    // TODO: it is not covered by tests. why?
     // This will simplified other part of the code (we can remove `MembershipAE(Generation)` from `NodeMsg`)
-    pub(crate) fn anti_entropy(&self, _from_gen: Generation) -> Option<Outgoing<NodeState>> {
-        if self.outgoing_log.is_empty() {
-            return None;
-        }
-        let index: usize = rand::random();
-        let outgoing = self.outgoing_log[index].clone();
+    pub(crate) fn anti_entropy(&self, from_gen: Generation) -> Vec<Decision<NodeState>> {
+        panic!("not covered by tests");
+        let msgs = self
+            .history
+            .iter() // history is a BTreeSet, .iter() is ordered by generation
+            .filter(|(gen, _)| **gen >= from_gen)
+            .map(|(_, decision)| decision.clone())
+            .collect::<Vec<_>>();
 
-        Some(outgoing)
+        msgs
     }
 
     #[allow(dead_code)]
@@ -403,35 +401,56 @@ impl Membership {
         bundle: Bundle<NodeState>,
         _prefix: &Prefix,
     ) -> Result<(Vec<Outgoing<NodeState>>, Option<Decision<NodeState>>)> {
-        let domain = bundle.domain();
-        if domain.seq as u64 != self.gen {
-            panic!("invalid gen, implement later")
-        }
-
-        let mut consensus = self.consensus_guard.lock().unwrap();
-
-        let decision_opt = consensus.decided_proposal();
-        if let Some(decision) = &decision_opt {
-            info!(
-                "Membership - updated generation from {:?} to {:?}",
-                self.gen, decision.proof.domain.seq
-            );
-
-            self.gen = decision.proof.domain.seq as u64 + 1;
-            return Ok((vec![], decision_opt));
-        } else {
-            let consensus_outgoing = consensus.process_bundle(&bundle)?;
-
-            let mut outgoings = vec![];
-            outgoings.append(&mut consensus_outgoing.clone());
-            if !self.outgoing_log.is_empty() {
-                let index: usize = rand::random();
-                // outgoings.push(self.outgoing_log[index % self.outgoing_log.len()].clone());
+        let bundle_gen = bundle.domain().seq as u64;
+        if bundle_gen < self.gen {
+            // The node is behind us, send him decided proposal
+            match self.history.get(&bundle_gen) {
+                Some(decision) => {
+                    return Ok((vec![], Some(decision.clone())));
+                }
+                None => {
+                    return Err(Error::Custom(
+                        "we don't have a decided proposal".to_string(),
+                    ))
+                }
             }
+        } else if bundle_gen > self.gen {
+            // we are behind of the network, should ask for missed proposal
 
-            self.outgoing_log.append(&mut outgoings.clone());
+            // TODO: how?
+            return Ok((vec![], None));
+        } else {
+            // we are at the same generation
+            let mut consensus = self.consensus_guard.lock().unwrap();
 
-            return Ok((outgoings, None));
+            let decision_opt = consensus.decided_proposal();
+            if let Some(decision) = &decision_opt {
+                info!(
+                    "Membership - updated generation from {:?} to {:?}",
+                    self.gen, decision.domain.seq
+                );
+                if let Some(old_decision) = self.history.insert(self.gen, decision.clone()) {
+                    error!("there is an old decision for {} generation: old: {old_decision:?}, new: {decision:?}", self.gen);
+                }
+                self.gen = decision.domain.seq as u64 + 1;
+                return Ok((vec![], decision_opt));
+            } else {
+                let consensus_outgoing = consensus.process_bundle(&bundle)?;
+
+                let mut outgoings = vec![];
+                outgoings.append(&mut consensus_outgoing.clone());
+                if !self.outgoing_log.is_empty() {
+                    // TODO:
+                    // Why uncommenting this line cause test failure?
+
+                    //let index: usize = rand::random();
+                    // outgoings.push(self.outgoing_log[index % self.outgoing_log.len()].clone());
+                }
+
+                self.outgoing_log.append(&mut outgoings.clone());
+
+                return Ok((outgoings, None));
+            }
         }
     }
 
@@ -446,13 +465,17 @@ impl Membership {
         if proposal_tag != self.gen {
             return Err(Error::InvalidGeneration(proposal_tag));
         }
-        let members = BTreeMap::from_iter(self.section_members(proposal_tag- 1)?.into_iter());
+        let members = BTreeMap::from_iter(self.section_members(proposal_tag - 1)?.into_iter());
         let archived_members = self.archived_members();
 
         if let Err(err) = proposal.validate_node_state(prefix, &members, &archived_members) {
             warn!("Failed to validate {proposal:?} with error {:?}", err);
             // TODO: certain errors need AE?
-            warn!("Members at generation {} are: {:?}", proposal_tag - 1, members);
+            warn!(
+                "Members at generation {} are: {:?}",
+                proposal_tag - 1,
+                members
+            );
             warn!("Archived members are {:?}", archived_members);
             return Err(Error::NetworkKnowledge(err));
         }
