@@ -4,19 +4,15 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
-## v0.74.3 (2023-03-26)
-
-### Chore
-
- - <csr-id-de3abf841789c5a696cd86a17d2c5743ad047c92/> bump sn_dbc to 11.0.0
+## v0.76.1 (2023-03-29)
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
  - 1 commit contributed to the release.
- - 3 days passed between releases.
- - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 1 day passed between releases.
+ - 0 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -26,6 +22,38 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Chore: rename ctl to more commonly used ctrl - In our code we use the abbreviation `ctrl`for `control`. - When googling the two, it is clear that `ctrl` is the more commonly used abbreviation. ([`f4b35c3`](https://github.com/maidsafe/safe_network/commit/f4b35c33e8c9189878de773ebb1c835c8814f004))
+</details>
+
+## v0.74.3 (2023-03-26)
+
+<csr-id-de3abf841789c5a696cd86a17d2c5743ad047c92/>
+
+### Chore
+
+ - <csr-id-de3abf841789c5a696cd86a17d2c5743ad047c92/> bump sn_dbc to 11.0.0
+
+### Chore
+
+ - <csr-id-d045f53e8ac66542cd6d2cfc750368d5142bc98e/> sn_interface-0.20.11/sn_client-0.82.6/sn_node-0.80.5/sn_api-0.80.5/sn_cli-0.74.3
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 3 days passed between releases.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Sn_interface-0.20.11/sn_client-0.82.6/sn_node-0.80.5/sn_api-0.80.5/sn_cli-0.74.3 ([`d045f53`](https://github.com/maidsafe/safe_network/commit/d045f53e8ac66542cd6d2cfc750368d5142bc98e))
     - Bump sn_dbc to 11.0.0 ([`de3abf8`](https://github.com/maidsafe/safe_network/commit/de3abf841789c5a696cd86a17d2c5743ad047c92))
 </details>
 
@@ -33,6 +61,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 <csr-id-b0627339e2458fd762084cc4805d7adedfd8c05e/>
 <csr-id-29edfcea7d2cb1334422f2fe5dc90e72c7e5ac7c/>
+<csr-id-22c6e341d28c913a3acaaeae0ceeb8c0a1ef4d4e/>
 
 ### Chore
 
@@ -99,6 +128,66 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
     - Revert "chore(release): sn_interface-0.20.6/sn_comms-0.6.3/sn_client-0.82.3/sn_node-0.79.0/sn_cli-0.74.1" ([`a24dca6`](https://github.com/maidsafe/safe_network/commit/a24dca63d1fde8c5e13fa7bbfadf71cda15af5c5))
     - Sn_interface-0.20.6/sn_comms-0.6.3/sn_client-0.82.3/sn_node-0.79.0/sn_cli-0.74.1 ([`807d69e`](https://github.com/maidsafe/safe_network/commit/807d69ef609decfe94230e2086144afc5cc56d7b))
     - Safenode renaming ([`1a8b9c9`](https://github.com/maidsafe/safe_network/commit/1a8b9c9ba5b98c0f1176a0ccbce53d4acea8c84c))
+</details>
+
+## v0.76.0 (2023-03-28)
+
+### Chore
+
+ - <csr-id-2eb838e882e60c2645653815ac136508df373cb1/> sn_interface-0.22.0/sn_comms-0.8.0/sn_client-0.84.0/sn_node-0.82.0/sn_api-0.82.0/sn_cli-0.76.0
+ - <csr-id-3e97ea42c81c22f68bcb2a2d4ce7a9930a74e3cf/> bump sn_dbc to 12.0.0
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Sn_interface-0.22.0/sn_comms-0.8.0/sn_client-0.84.0/sn_node-0.82.0/sn_api-0.82.0/sn_cli-0.76.0 ([`2eb838e`](https://github.com/maidsafe/safe_network/commit/2eb838e882e60c2645653815ac136508df373cb1))
+    - Bump sn_dbc to 12.0.0 ([`3e97ea4`](https://github.com/maidsafe/safe_network/commit/3e97ea42c81c22f68bcb2a2d4ce7a9930a74e3cf))
+</details>
+
+## v0.75.0 (2023-03-27)
+
+### Chore
+
+ - <csr-id-0e9db2da4ed28d36d8ee866c9e941ab39e155e28/> sn_updater-0.2.0/sn_interface-0.21.0/sn_comms-0.7.0/sn_client-0.83.0/sn_node-0.81.0/sn_api-0.81.0/sn_cli-0.75.0
+
+### New Features (BREAKING)
+
+ - <csr-id-94d20504b58cb09a203ffd9c03fdcab07a810d0b/> new cmds to interact with a safenode RPC service
+   - The new `node` CLI subcommand is made available only when building
+   with `node-ctl` feature flag.
+   - Adding a new RPC service to safenode to request it to update itself.
+   - Migrate sn_api and sn_cli CI tests to use sn_testnet 'verify-nodes' feature.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 1 day passed between releases.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Sn_updater-0.2.0/sn_interface-0.21.0/sn_comms-0.7.0/sn_client-0.83.0/sn_node-0.81.0/sn_api-0.81.0/sn_cli-0.75.0 ([`0e9db2d`](https://github.com/maidsafe/safe_network/commit/0e9db2da4ed28d36d8ee866c9e941ab39e155e28))
+    - New cmds to interact with a safenode RPC service ([`94d2050`](https://github.com/maidsafe/safe_network/commit/94d20504b58cb09a203ffd9c03fdcab07a810d0b))
 </details>
 
 ## v0.74.0 (2023-03-16)
