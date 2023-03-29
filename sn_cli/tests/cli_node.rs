@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-// Relaxing rules for this file since these tests are only run when 'node-ctl' feature flag is set.
+// Relaxing rules for this file since these tests are only run when 'node-ctrl' feature flag is set.
 #![allow(dead_code, unused_imports)]
 
 use color_eyre::{eyre::eyre, Result};
@@ -16,7 +16,7 @@ use sn_cmd_test_utilities::util::{safe_cmd_stdout, use_isolated_safe_config_dir}
 const GENESIS_NODE_RPC_ADDR: &str = "127.0.0.1:12001";
 
 #[test]
-#[cfg(feature = "node-ctl")]
+#[cfg(feature = "node-ctrl")]
 fn node_info() -> Result<()> {
     let config_dir = use_isolated_safe_config_dir()?;
     let output = safe_cmd_stdout(
@@ -39,7 +39,7 @@ fn node_info() -> Result<()> {
 }
 
 #[test]
-#[cfg(feature = "node-ctl")]
+#[cfg(feature = "node-ctrl")]
 fn node_section_members() -> Result<()> {
     let config_dir = use_isolated_safe_config_dir()?;
 
