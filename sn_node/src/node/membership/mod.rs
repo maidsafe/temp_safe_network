@@ -152,7 +152,10 @@ impl Membership {
         n_elders: usize,
         bootstrap_members: BTreeSet<NodeState>,
     ) -> Self {
-        trace!("Membership - Creating new membership instance");
+        trace!(
+            "Membership - Creating new membership instance on sap changed to: {:?}",
+            elders.public_key()
+        );
         Membership {
             consensus: Consensus::from(secret_key, elders, n_elders),
             bootstrap_members,
@@ -355,10 +358,7 @@ impl Membership {
         let consensus = self.consensus_at_gen_mut(vote_gen)?;
         let is_fresh_vote = !consensus.processed_votes_cache.contains(&signed_vote.sig);
 
-        info!(
-            "Membership - accepted signed vote from voter {:?}",
-            signed_vote.voter
-        );
+        info!("Membership - accepted signed vote {signed_vote:?}");
         let vote_response = consensus.handle_signed_vote(signed_vote)?;
 
         debug!("Membership - Vote response: {vote_response:?}");
@@ -423,6 +423,21 @@ impl Membership {
         signed_vote: &SignedVote<NodeState>,
         prefix: &Prefix,
     ) -> Result<()> {
+        // Avoid casting an outdated vote
+        let vote_gen = signed_vote.vote.gen;
+        if vote_gen > 1 {
+            if let Some((prev_decision, _prev_consensus)) = self.history.get(&(vote_gen - 1)) {
+                if signed_vote
+                    .proposals()
+                    .iter()
+                    .all(|node_state| prev_decision.proposals.contains_key(node_state))
+                {
+                    warn!("Proposal has already consensused: {:?}", signed_vote.vote);
+                    return Err(Error::InvalidProposal);
+                }
+            }
+        }
+
         // check we're section the vote is for our current membership state
         signed_vote.validate_signature(&self.consensus.elders)?;
 
