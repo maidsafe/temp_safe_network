@@ -38,6 +38,17 @@ build-release-artifacts arch:
     rustup target add x86_64-unknown-linux-musl
   fi
 
+  if [[ "$arch" == "x86_64-pc-windows-msvc" ]]; then
+    curl -OL https://github.com/protocolbuffers/protobuf/releases/download/v22.2/protoc-22.2-win64.zip
+    unzip protoc-22.2-win64.zip
+    ./bin/protoc.exe --version
+    export PROTOC=`pwd`/bin/protoc.exe
+  elif [[ "$arch" == "x86_64-apple-darwin" ]]; then
+    brew install protobuf && protoc --version
+  elif [[ "$arch" == "x86_64-unknown-linux-musl" ]]; then
+    sudo apt install -y protobuf-compiler libprotobuf-dev && protoc --version
+  fi
+
   rm -rf artifacts
   mkdir artifacts
   cargo clean
@@ -47,8 +58,8 @@ build-release-artifacts arch:
     cross build --release --target $arch --bin safe --features limit-client-upload-size,data-network
     cross build --release --target $arch --bin testnet
   else
-    cargo build --release --target $arch --bin safenode --features otlp
-    cargo build --release --target $arch --bin safe --features limit-client-upload-size,data-network
+    cargo build --release --target $arch --bin safenode --features otlp,rpc-service
+    cargo build --release --target $arch --bin safe --features limit-client-upload-size,data-network,node-ctrl
     cargo build --release --target $arch --bin testnet
   fi
 
