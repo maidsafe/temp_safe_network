@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-#[cfg(feature = "node-ctl")]
+#[cfg(feature = "node-ctrl")]
 use crate::subcommands::node::node_commander;
 #[cfg(feature = "data-network")]
 use crate::subcommands::{dog::dog_commander, files::files_commander, nrs::nrs_commander};
@@ -149,7 +149,7 @@ async fn process_commands(mut safe: &mut Safe, args: CmdArgs, config: &mut Confi
                 .await
             }
         }
-        #[cfg(feature = "node-ctl")]
+        #[cfg(feature = "node-ctrl")]
         SubCommands::Node { cmd, addr } => node_commander(cmd, addr, output_fmt).await,
         other => {
             // Set dry run mode in Safe instance as per arg provide
