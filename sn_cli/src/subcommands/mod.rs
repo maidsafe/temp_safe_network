@@ -14,7 +14,7 @@ pub mod dog;
 pub mod files;
 pub mod keys;
 pub mod networks;
-#[cfg(feature = "node-ctl")]
+#[cfg(feature = "node-ctrl")]
 pub mod node;
 pub mod nrs;
 pub mod safe_id;
@@ -124,7 +124,7 @@ pub enum SubCommands {
         #[clap(short = 'y', long = "no-confirm")]
         no_confirm: bool,
     },
-    #[cfg(feature = "node-ctl")]
+    #[cfg(feature = "node-ctrl")]
     #[clap(name = "node", global_settings(&[AppSettings::DisableVersion]))]
     /// Commands to manage SAFE Network Nodes
     Node {

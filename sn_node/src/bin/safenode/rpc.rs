@@ -1,4 +1,4 @@
-use super::NodeCtl;
+use super::NodeCtrl;
 
 use sn_node::node::NodeRef;
 
@@ -30,7 +30,7 @@ struct SafeNodeRpcService {
     addr: SocketAddr,
     log_dir: String,
     node_ref: Arc<RwLock<NodeRef>>,
-    ctl_tx: Sender<NodeCtl>,
+    ctrl_tx: Sender<NodeCtrl>,
 }
 
 // Implementing RPC interface for service defined in .proto
@@ -137,7 +137,7 @@ impl SafeNode for SafeNodeRpcService {
         };
 
         let delay = Duration::from_millis(request.get_ref().delay_millis);
-        match self.ctl_tx.send(NodeCtl::Stop { delay, cause }).await {
+        match self.ctrl_tx.send(NodeCtrl::Stop { delay, cause }).await {
             Ok(()) => Ok(Response::new(StopResponse {})),
             Err(err) => Err(Status::new(
                 Code::Internal,
@@ -157,7 +157,7 @@ impl SafeNode for SafeNodeRpcService {
         );
 
         let delay = Duration::from_millis(request.get_ref().delay_millis);
-        match self.ctl_tx.send(NodeCtl::Restart(delay)).await {
+        match self.ctrl_tx.send(NodeCtrl::Restart(delay)).await {
             Ok(()) => Ok(Response::new(RestartResponse {})),
             Err(err) => Err(Status::new(
                 Code::Internal,
@@ -177,7 +177,7 @@ impl SafeNode for SafeNodeRpcService {
         );
 
         let delay = Duration::from_millis(request.get_ref().delay_millis);
-        match self.ctl_tx.send(NodeCtl::Update(delay)).await {
+        match self.ctrl_tx.send(NodeCtrl::Update(delay)).await {
             Ok(()) => Ok(Response::new(UpdateResponse {})),
             Err(err) => Err(Status::new(
                 Code::Internal,
@@ -191,14 +191,14 @@ pub(super) fn start_rpc_service(
     addr: SocketAddr,
     log_dir: String,
     node_ref: Arc<RwLock<NodeRef>>,
-    ctl_tx: Sender<NodeCtl>,
+    ctrl_tx: Sender<NodeCtrl>,
 ) {
     // creating a service
     let service = SafeNodeRpcService {
         addr,
         log_dir,
         node_ref,
-        ctl_tx,
+        ctrl_tx,
     };
     info!("RPC Server listening on {addr}");
     println!("RPC Server listening on {addr}");
