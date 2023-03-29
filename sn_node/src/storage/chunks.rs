@@ -24,7 +24,6 @@ use tokio::{
     fs::{create_dir_all, metadata, read, remove_file, File},
     io::AsyncWriteExt,
 };
-use tracing::info;
 use xor_name::XorName;
 
 const CHUNKS_STORE_DIR_NAME: &str = "chunks";
@@ -122,7 +121,7 @@ impl ChunkStorage {
         let filepath = self.chunk_addr_to_filepath(addr)?;
 
         if filepath.exists() {
-            info!(
+            debug!(
                 "{}: Chunk data already exists, not storing: {:?}",
                 self, addr
             );

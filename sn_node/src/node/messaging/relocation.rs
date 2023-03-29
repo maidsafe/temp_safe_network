@@ -130,17 +130,16 @@ impl MyNode {
             return Ok(None);
         }
 
-        let dst_section = if let MembershipState::Relocated(relocation_trigger) =
-            decision.proposal.state()
-        {
-            relocation_trigger.dst_section(self.name())
-        } else {
-            warn!(
-                "Relocate: Ignoring msg containing invalid NodeState: {:?}",
-                decision.proposal.state()
-            );
-            return Ok(None);
-        };
+        let dst_section =
+            if let MembershipState::Relocated(relocation_trigger) = decision.proposal.state() {
+                relocation_trigger.dst_section(self.name())
+            } else {
+                warn!(
+                    "Relocate: Ignoring msg containing invalid NodeState: {:?}",
+                    decision.proposal.state()
+                );
+                return Ok(None);
+            };
 
         debug!("Relocate: Received decision to relocate to other section at {dst_section}");
 
@@ -594,7 +593,6 @@ mod tests {
             for (key, test_node) in node_instances.iter() {
                 let mut node = test_node.write().await;
                 let name = key.1;
-                // info!("\n\n NODE: {}", name);
                 let comm_rx = comm_receivers
                     .get_mut(key)
                     .ok_or_else(|| eyre!("comm_rx should be present"))?;

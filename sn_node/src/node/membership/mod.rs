@@ -377,10 +377,8 @@ impl Membership {
         return Ok(outgoings);
     }
 
-    // TODO: it is not covered by tests. why?
     // This will simplified other part of the code (we can remove `MembershipAE(Generation)` from `NodeMsg`)
     pub(crate) fn anti_entropy(&self, from_gen: Generation) -> Vec<Decision<NodeState>> {
-        panic!("not covered by tests");
         let msgs = self
             .history
             .iter() // history is a BTreeSet, .iter() is ordered by generation
@@ -405,20 +403,16 @@ impl Membership {
         if bundle_gen < self.gen {
             // The node is behind us, send him decided proposal
             match self.history.get(&bundle_gen) {
-                Some(decision) => {
-                    return Ok((vec![], Some(decision.clone())));
-                }
-                None => {
-                    return Err(Error::Custom(
-                        "we don't have a decided proposal".to_string(),
-                    ))
-                }
+                Some(decision) => Ok((vec![], Some(decision.clone()))),
+                None => Err(Error::Custom(format!(
+                    "we don't have the decided proposal for {bundle_gen} generation"
+                ))),
             }
         } else if bundle_gen > self.gen {
             // we are behind of the network, should ask for missed proposal
 
             // TODO: how?
-            return Ok((vec![], None));
+            Ok((vec![], None))
         } else {
             // we are at the same generation
             let mut consensus = self.consensus_guard.lock().unwrap();
@@ -433,7 +427,7 @@ impl Membership {
                     error!("there is an old decision for {} generation: old: {old_decision:?}, new: {decision:?}", self.gen);
                 }
                 self.gen = decision.domain.seq as u64 + 1;
-                return Ok((vec![], decision_opt));
+                Ok((vec![], decision_opt))
             } else {
                 let consensus_outgoing = consensus.process_bundle(&bundle)?;
 
@@ -443,13 +437,14 @@ impl Membership {
                     // TODO:
                     // Why uncommenting this line cause test failure?
 
-                    //let index: usize = rand::random();
+                    // Adding a random message, in case of message loss in the network
+                    // let index: usize = rand::random();
                     // outgoings.push(self.outgoing_log[index % self.outgoing_log.len()].clone());
                 }
 
                 self.outgoing_log.append(&mut outgoings.clone());
 
-                return Ok((outgoings, None));
+                Ok((outgoings, None))
             }
         }
     }

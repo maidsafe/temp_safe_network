@@ -96,11 +96,7 @@ pub struct RelocationProof {
 }
 
 impl RelocationInfo {
-    pub fn new(
-        desicion: Decision<NodeState>,
-        pk: bls::PublicKey,
-        new_name: XorName,
-    ) -> Self {
+    pub fn new(desicion: Decision<NodeState>, pk: bls::PublicKey, new_name: XorName) -> Self {
         Self {
             decision: desicion,
             pk,
@@ -136,12 +132,7 @@ impl RelocationProof {
         self.self_old_key
             .verify(&serialized_info, &self.self_sig)
             .map_err(|_err| Error::InvalidRelocationProof)?;
-        if !self
-            .info
-            .decision
-            .validate(&self.info.pk)
-            .unwrap_or(false)
-        {
+        if !self.info.decision.validate(&self.info.pk).unwrap_or(false) {
             Err(Error::InvalidRelocationProof)
         } else {
             Ok(())

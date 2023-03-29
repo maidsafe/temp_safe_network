@@ -929,7 +929,6 @@ mod tests {
                 let comm_rx = comm_receivers
                     .get_mut(&name)
                     .ok_or_else(|| eyre!("comm_rx should be present"))?;
-                info!("\n\n NODE: {name}");
 
                 while let Some(msg) = get_next_msg(comm_rx).await {
                     let cmds = test_node.test_handle_msg(msg, None).await?;
@@ -988,7 +987,6 @@ mod tests {
                 let comm_rx = comm_receivers
                     .get_mut(&name)
                     .ok_or_else(|| eyre!("comm_rx should be present"))?;
-                info!("\n\n NODE: {name}");
 
                 while let Some(msg) = get_next_msg(comm_rx).await {
                     for mut cmd in test_node.test_handle_msg(msg, None).await? {
@@ -1037,7 +1035,6 @@ mod tests {
                 let comm_rx = comm_receivers
                     .get_mut(&name)
                     .ok_or_else(|| eyre!("comm_rx should be present"))?;
-                info!("\n\n NODE: {name}");
                 // sleep for sometime to get the msgs
                 tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
 
