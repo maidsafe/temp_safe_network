@@ -10,7 +10,7 @@ use core::fmt::Debug;
 use sn_consensus::mvba::{
     bundle::{Bundle, Outgoing},
     consensus::Consensus,
-    tag::Domain,
+    tag::{Domain, Tag},
     Decision, NodeId,
 };
 use sn_interface::{
@@ -146,16 +146,55 @@ pub(crate) fn elder_candidates(
         .collect()
 }
 
-// 1- Proposal is a `NodeState`
-// 2- Define Decision in sn_consensus
-// 3- We can define Generic for proposal in Consensus<T>
-//       * We don't need Ser/Des
-//
+#[derive(Clone)]
+struct ValidatorContext {
+    gen: u64,
+    prefix: Prefix,
+    section_members: BTreeMap<XorName, NodeState>,
+    archived_members: BTreeSet<XorName>,
+}
+
+fn proposal_validator(
+    context: &ValidatorContext,
+    domain: &Domain,
+    _node_id: NodeId,
+    proposal: &NodeState,
+) -> bool {
+    // We need to pass current state:
+    //   1- Clone: 3rd  argument as Any
+    //   2- Closure: To not pass 3rd argument?
+    //   3- Generic: 3rd  argument as generic
+
+    // cast any to something that possible to cast
+
+    let proposal_tag = domain.seq as u64;
+    if proposal_tag != context.gen {
+        return false;
+    }
+    let members = BTreeMap::from_iter(context.section_members.clone().into_iter());
+    let archived_members = &context.archived_members;
+
+    if let Err(err) = proposal.validate_node_state(&context.prefix, &members, &archived_members) {
+        warn!("Failed to validate {proposal:?} with error {:?}", err);
+        // TODO: certain errors need AE?
+        warn!(
+            "Members at generation {} are: {:?}",
+            proposal_tag - 1,
+            members
+        );
+        warn!("Archived members are {:?}", archived_members);
+        return false;
+    }
+
+    true
+}
 
 #[derive(Clone)]
 pub(crate) struct Membership {
     //We wrap the Consensus under Arc<Mutex<...>>, because it can't be cloned itself.
-    consensus_guard: Arc<Mutex<Consensus<NodeState>>>,
+    consensus_guard_opt:
+        Option<Arc<Mutex<(ValidatorContext, Consensus<ValidatorContext, NodeState>)>>>,
+    self_id: NodeId,
     bootstrap_members: BTreeSet<NodeState>,
     pub(crate) gen: Generation, // current generation
     secret_key: (NodeId, SecretKeyShare),
@@ -165,16 +204,6 @@ pub(crate) struct Membership {
     // last membership vote timestamp
     last_received_vote_time: Option<Instant>,
     outgoing_log: Vec<Outgoing<NodeState>>,
-}
-
-fn checker(_: NodeId, _: &NodeState) -> bool {
-    // We need to pass current state:
-    //   1- Clone: 3rd  argument as Any
-    //   2- Closure: To not pass 3rd argument?
-    //   3- Generic: 3rd  argument as generic
-
-    // cast any to something that possible to cast
-    true
 }
 
 impl Membership {
@@ -187,23 +216,14 @@ impl Membership {
     ) -> Self {
         trace!("Membership - Creating new membership instance");
 
-        let domain = Domain::new("membership", gen as usize);
         let mut elders_id = Vec::new();
         for i in 0..n_elders {
             elders_id.push(i);
         }
 
-        let consensus_guard = Arc::new(Mutex::new(Consensus::init(
-            domain,
-            secret_key.0,
-            secret_key.1.clone(),
-            elders.clone(),
-            elders_id.clone(),
-            checker,
-        )));
-
         Membership {
-            consensus_guard,
+            consensus_guard_opt: None,
+            self_id: secret_key.0,
             bootstrap_members,
             gen,
             secret_key,
@@ -229,11 +249,7 @@ impl Membership {
 
     #[cfg(test)]
     pub(crate) fn is_churn_in_progress(&self) -> bool {
-        self.consensus_guard
-            .lock()
-            .unwrap()
-            .decided_proposal()
-            .is_none() // TODO: no unwrap
+        self.consensus_guard_opt.is_some()
     }
 
     #[cfg(test)]
@@ -307,7 +323,7 @@ impl Membership {
                 .map(|n| (n.name(), n)),
         );
 
-        if gen == 0 {
+        if gen == 1 {
             return Ok(members);
         }
 
@@ -339,20 +355,21 @@ impl Membership {
         prefix: &Prefix,
     ) -> Result<Vec<Outgoing<NodeState>>> {
         // TODO: no unwrap
-        if self.gen > 0
-            && self
-                .consensus_guard
-                .lock()
-                .unwrap()
-                .decided_proposal()
-                .is_none()
-        {
-            error!("proposing a new node_state without consensus on the previous one can lead to unforeseen issues.");
-            // let's panic here on debug mode
-            debug_assert!(true);
+        if self.consensus_guard_opt.is_some() {
+            return Err(Error::Custom(format!(
+                "double proposing for the same generation {}",
+                self.gen
+            )));
         }
 
         self.gen += 1;
+        let validator_context = ValidatorContext {
+            gen: self.gen,
+            prefix: prefix.clone(),
+            archived_members: self.archived_members(),
+            section_members: self.section_members(self.gen)?,
+        };
+
         let domain = Domain::new("membership", self.gen as usize);
         let mut consensus = Consensus::init(
             domain,
@@ -360,19 +377,20 @@ impl Membership {
             self.secret_key.1.clone(),
             self.elders.clone(),
             self.elders_id.clone(),
-            checker,
+            proposal_validator,
+            validator_context.clone(),
         );
 
         // clear all outgoings, this prevents to send expired messages
         self.outgoing_log.clear();
 
         let domain = consensus.domain();
-        self.validate_proposals(domain, &node_state, prefix)?;
+        self.validate_proposals(&validator_context, &domain, &node_state, prefix)?;
 
         let outgoings = consensus.propose(node_state)?;
         self.outgoing_log.append(&mut outgoings.clone());
 
-        self.consensus_guard = Arc::new(Mutex::new(consensus));
+        self.consensus_guard_opt = Some(Arc::new(Mutex::new((validator_context, consensus))));
 
         return Ok(outgoings);
     }
@@ -389,9 +407,8 @@ impl Membership {
         msgs
     }
 
-    #[allow(dead_code)]
-    pub(crate) fn id(&self) -> NodeId {
-        self.consensus_guard.lock().unwrap().self_id() // TODO: no unwrap
+    pub(crate) fn id(&self) -> &NodeId {
+        &self.self_id
     }
 
     pub(crate) fn handle_signed_vote(
@@ -414,65 +431,62 @@ impl Membership {
             // TODO: how?
             Ok((vec![], None))
         } else {
-            // we are at the same generation
-            let mut consensus = self.consensus_guard.lock().unwrap();
+            let mut outgoings = Vec::new();
+            let mut decision_opt = None;
 
-            let decision_opt = consensus.decided_proposal();
-            if let Some(decision) = &decision_opt {
-                info!(
-                    "Membership - updated generation from {:?} to {:?}",
-                    self.gen, decision.domain.seq
-                );
-                if let Some(old_decision) = self.history.insert(self.gen, decision.clone()) {
-                    error!("there is an old decision for {} generation: old: {old_decision:?}, new: {decision:?}", self.gen);
+            {
+                let consensus_guard = self.consensus_guard_opt.as_mut().unwrap();
+                let consensus = &mut consensus_guard.lock().unwrap().1; // TODO: no unwrap
+
+                let cons_decision_opt = consensus.decided_proposal();
+                if let Some(decision) = &cons_decision_opt {
+                    info!(
+                        "Membership - updated generation from {:?} to {:?}",
+                        self.gen, decision.domain.seq
+                    );
+                    if let Some(old_decision) = self.history.insert(self.gen, decision.clone()) {
+                        error!("there is an old decision for {} generation: old: {old_decision:?}, new: {decision:?}", self.gen);
+                    }
+                    self.gen = decision.domain.seq as u64 + 1;
+
+                    decision_opt = cons_decision_opt.clone();
+                } else {
+                    let consensus_outgoing = consensus.process_bundle(&bundle)?;
+
+                    outgoings.append(&mut consensus_outgoing.clone());
+                    if !self.outgoing_log.is_empty() {
+                        // TODO:
+                        // Why uncommenting this line cause test failure?
+
+                        // Adding a random message, in case of message loss in the network
+                        // let index: usize = rand::random();
+                        // outgoings.push(self.outgoing_log[index % self.outgoing_log.len()].clone());
+                    }
+
+                    self.outgoing_log.append(&mut outgoings.clone());
                 }
-                self.gen = decision.domain.seq as u64 + 1;
-                Ok((vec![], decision_opt))
-            } else {
-                let consensus_outgoing = consensus.process_bundle(&bundle)?;
-
-                let mut outgoings = vec![];
-                outgoings.append(&mut consensus_outgoing.clone());
-                if !self.outgoing_log.is_empty() {
-                    // TODO:
-                    // Why uncommenting this line cause test failure?
-
-                    // Adding a random message, in case of message loss in the network
-                    // let index: usize = rand::random();
-                    // outgoings.push(self.outgoing_log[index % self.outgoing_log.len()].clone());
-                }
-
-                self.outgoing_log.append(&mut outgoings.clone());
-
-                Ok((outgoings, None))
             }
+
+            if decision_opt.is_some() {
+                self.consensus_guard_opt = None;
+            }
+
+            Ok((outgoings, decision_opt))
         }
     }
 
     /// Returns true if the proposal is valid
     fn validate_proposals(
         &self,
+        validator_context: &ValidatorContext,
         domain: &Domain,
         proposal: &NodeState,
         prefix: &Prefix,
     ) -> Result<()> {
-        let proposal_tag = domain.seq as u64;
-        if proposal_tag != self.gen {
-            return Err(Error::InvalidGeneration(proposal_tag));
-        }
-        let members = BTreeMap::from_iter(self.section_members(proposal_tag - 1)?.into_iter());
-        let archived_members = self.archived_members();
-
-        if let Err(err) = proposal.validate_node_state(prefix, &members, &archived_members) {
-            warn!("Failed to validate {proposal:?} with error {:?}", err);
-            // TODO: certain errors need AE?
-            warn!(
-                "Members at generation {} are: {:?}",
-                proposal_tag - 1,
-                members
-            );
-            warn!("Archived members are {:?}", archived_members);
-            return Err(Error::NetworkKnowledge(err));
+        if !proposal_validator(validator_context, domain, self.self_id, proposal) {
+            return Err(Error::Custom(format!(
+                "our proposal is invalid: {proposal:?}"
+            )));
         }
 
         Ok(())
@@ -481,40 +495,40 @@ impl Membership {
 
 #[cfg(test)]
 mod tests {
-    // use super::Error;
-    // use crate::node::flow_ctrl::tests::network_builder::TestNetworkBuilder;
-    // use sn_interface::{
-    //     network_knowledge::NodeState,
-    //     test_utils::{gen_node_id, TestSapBuilder},
-    // };
+    use super::Error;
+    use crate::node::flow_ctrl::tests::network_builder::TestNetworkBuilder;
+    use sn_interface::{
+        network_knowledge::NodeState,
+        test_utils::{gen_node_id, TestSapBuilder},
+    };
 
-    // use assert_matches::assert_matches;
-    // use eyre::Result;
-    // use rand::thread_rng;
-    // use xor_name::Prefix;
+    use assert_matches::assert_matches;
+    use eyre::Result;
+    use rand::thread_rng;
+    use xor_name::Prefix;
 
-    // #[tokio::test]
-    // async fn multiple_proposals_in_a_single_generation_should_not_be_possible() -> Result<()> {
-    //     let prefix = Prefix::default();
-    //     let env = TestNetworkBuilder::new(thread_rng())
-    //         .sap(TestSapBuilder::new(prefix))
-    //         .build()?;
+    #[tokio::test]
+    async fn multiple_proposals_in_a_single_generation_should_not_be_possible() -> Result<()> {
+        let prefix = Prefix::default();
+        let env = TestNetworkBuilder::new(thread_rng())
+            .sap(TestSapBuilder::new(prefix))
+            .build()?;
 
-    //     let mut membership = env
-    //         .get_nodes(prefix, 1, 0, None)?
-    //         .remove(0)
-    //         .membership
-    //         .expect("Membership for the elder should've been initialized");
+        let mut membership = env
+            .get_nodes(prefix, 1, 0, None)?
+            .remove(0)
+            .membership
+            .expect("Membership for the elder should've been initialized");
 
-    //     let state1 = NodeState::joined(gen_node_id(5), None);
-    //     let state2 = NodeState::joined(gen_node_id(5), None);
+        let state1 = NodeState::joined(gen_node_id(5), None);
+        let state2 = NodeState::joined(gen_node_id(5), None);
 
-    //     let _ = membership.propose(state1, &prefix)?;
-    //     assert_matches!(
-    //         membership.propose(state2, &prefix),
-    //         Err(Error::InvalidProposal)
-    //     );
+        let _ = membership.propose(state1, &prefix)?;
+        assert_matches!(
+            membership.propose(state2, &prefix),
+            Err(Error::InvalidProposal)
+        );
 
-    //     Ok(())
-    // }
+        Ok(())
+    }
 }

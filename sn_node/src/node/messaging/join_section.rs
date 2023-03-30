@@ -170,10 +170,17 @@ mod tests {
             .iter()
             .find(|cmd| matches!(cmd, Cmd::SendMsg { .. }));
         assert_matches!(some_cmd, Some(Cmd::SendMsg {
-            msg: NetworkMsg::Node(_msg),
+            msg: NetworkMsg::Node(msg),
             recipients,
             ..
         }) => {
+            // verify the msg
+            assert_matches!(msg, NodeMsg::MembershipVotes(bundles) => {
+                let bundle = bundles.first().expect("A bundle should exist.");
+                let domain = bundle.domain();
+                assert_eq!(elder.context().membership.unwrap().gen, domain.seq as u64);
+            });
+
             // verify the recipients
             assert_matches!(recipients, Recipients::Multiple(recipients) => {
                 let recipient = recipients.first().expect("A recipient should exist.");
