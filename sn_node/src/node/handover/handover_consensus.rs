@@ -45,8 +45,15 @@ impl Handover {
     pub(crate) fn propose(&mut self, proposal: SapCandidate) -> Result<SignedVote<SapCandidate>> {
         // Do not cast a vote equals to self sap
         if proposal.public_key_sets().contains(&self.consensus.elders) {
-            error!("Cannot casting a proposal {proposal:?} as we are already on it");
-            return Err(Error::FaultyProposal);
+            // During split, when existing elders falls into the same sibling section after split,
+            // the split handover vote will contain the existing elders.
+            // Hence the proposal shall be allowed.
+            // As there is `pending_split_sections` barrier, the case of an outdated split handover
+            // vote shall be super rare.
+            if proposal.public_key_sets().len() == 1 {
+                error!("Cannot casting a proposal {proposal:?} as we are already on it");
+                return Err(Error::FaultyProposal);
+            }
         }
 
         let vote = Vote {
