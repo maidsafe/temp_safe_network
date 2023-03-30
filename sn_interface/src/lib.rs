@@ -33,6 +33,8 @@ pub mod dbcs;
 pub mod messaging;
 // Knowledge of the safe network
 pub mod network_knowledge;
+// Cost of write ops on the safe network.
+pub mod op_cost;
 // Types on the safe network
 pub mod types;
 // Statemap states

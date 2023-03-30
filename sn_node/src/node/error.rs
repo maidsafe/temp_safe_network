@@ -10,7 +10,7 @@ use super::{flow_ctrl::RejoinReason, Prefix};
 
 use crate::node::handover::Error as HandoverError;
 
-use sn_dbc::Error as DbcError;
+use sn_dbc::{Error as DbcError, Token};
 use sn_interface::{
     dbcs::Error as GenesisError,
     messaging::{data::Error as ErrorMsg, system::DkgSessionId},
@@ -69,8 +69,8 @@ pub enum Error {
     MissingFee,
     #[error("Invalid fee blinded amount.")]
     InvalidFeeBlindedAmount,
-    #[error("Too low amount for the transfer fee.")]
-    FeeTooLow,
+    #[error("Too low amount for the transfer fee: {paid}. Min required: {required}.")]
+    FeeTooLow { paid: Token, required: Token },
     #[error("The secret key share is missing for public key {0:?}")]
     MissingSecretKeyShare(bls::PublicKey),
     #[error("Messaging protocol error: {0}")]
