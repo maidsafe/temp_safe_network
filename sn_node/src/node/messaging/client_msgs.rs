@@ -10,7 +10,7 @@ use crate::node::{flow_ctrl::cmds::Cmd, Error, MyNode, NodeContext, Result};
 
 use sn_dbc::{
     get_blinded_amounts_from_transaction, BlindedAmount, DbcTransaction, PublicKey, SpentProof,
-    SpentProofShare,
+    SpentProofShare, Token,
 };
 use sn_interface::{
     dbcs::DbcReason,
@@ -62,8 +62,12 @@ impl MyNode {
             // The client is asking for the fee to spend a specific dbc, and including the id of that dbc.
             // The required fee content is encrypted to that dbc id, and so only the holder of the dbc secret
             // key can unlock the contents.
-            let required_fee =
-                RequiredFee::new(context.store_cost, dbc_id, &context.reward_secret_key);
+            let amount = context.current_fee().as_nano() as f64 * 1.1;
+            let required_fee = RequiredFee::new(
+                Token::from_nano(amount as u64),
+                dbc_id,
+                &context.reward_secret_key,
+            );
             NodeQueryResponse::GetFees(Ok(required_fee))
         } else {
             context
@@ -262,7 +266,7 @@ impl MyNode {
         // verify that fee is paid to us
         #[cfg(not(feature = "data-network"))]
         MyNode::verify_fee(
-            context.store_cost,
+            context.current_fee(),
             context.reward_secret_key.as_ref(),
             tx,
             context.name,
@@ -315,7 +319,7 @@ impl MyNode {
 
     #[cfg(not(feature = "data-network"))]
     fn verify_fee(
-        store_cost: sn_dbc::Token,
+        store_cost: Token,
         reward_secret_key: &bls::SecretKey,
         tx: &DbcTransaction,
         our_name: XorName,
@@ -346,11 +350,16 @@ impl MyNode {
         }
         // .. and 2. checking that the revealed amount we have, (that we now know is what the output blinded amount contains, since the above check 1. passed),
         // also is what we expect the amount to be.
-        // The basic rule for now is that if the paid fee is over 1% less than the required fee, we don't accept the fee.
+        // The basic rule for now is that if the paid fee is over 10% less than the required fee, we don't accept the fee.
         // This is a temporary diff value/design.
-        // (And yes, this means that for now, the Client can try to get away cheaper by sending in up to 1% lower fee than they were asked for.)
-        if store_cost.as_nano() as f64 * 0.99 > revealed_amount.value() as f64 {
-            return Err(Error::FeeTooLow);
+        // (And yes, this means that for now, the Client can try to get away cheaper by sending in up to 10% lower fee than they were asked for.)
+        let paid = revealed_amount.value();
+        let required = (store_cost.as_nano() as f64 * 0.90) as u64;
+        if required > paid {
+            return Err(Error::FeeTooLow {
+                paid: Token::from_nano(paid),
+                required: Token::from_nano(required),
+            });
         }
 
         Ok(())

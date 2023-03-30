@@ -1099,10 +1099,13 @@ fn get_spend(dbc: sn_dbc::Dbc, context: NodeContext) -> Result<Spend> {
     let dbc_amount = dbc.revealed_amount_bearer()?;
     let change_owner = OwnerOnce::from_owner_base(dbc.owner_base().clone(), &mut rng);
 
+    #[cfg(not(feature = "data-network"))]
+    let fee = context.current_fee();
+
     #[cfg(feature = "data-network")]
     let change_amount = Token::from_nano(dbc_amount.value());
     #[cfg(not(feature = "data-network"))]
-    let change_amount = Token::from_nano(dbc_amount.value() - context.store_cost.as_nano());
+    let change_amount = Token::from_nano(dbc_amount.value() - fee.as_nano());
 
     #[cfg(not(feature = "data-network"))]
     let fee_derived_owner = {
@@ -1116,7 +1119,7 @@ fn get_spend(dbc: sn_dbc::Dbc, context: NodeContext) -> Result<Spend> {
     #[cfg(not(feature = "data-network"))]
     let outputs = {
         vec![
-            (context.store_cost, fee_derived_owner.clone()),
+            (fee, fee_derived_owner.clone()),
             (change_amount, change_owner),
         ]
     };
