@@ -30,7 +30,6 @@ pub struct NodeContext {
     pub(crate) info: MyNodeInfo,
     pub(crate) keypair: Arc<Keypair>,
     pub(crate) reward_secret_key: Arc<bls::SecretKey>,
-    pub(crate) store_cost: sn_dbc::Token,
     pub(crate) network_knowledge: NetworkKnowledge,
     pub(crate) section_keys_provider: SectionKeysProvider,
     #[debug(skip)]
@@ -86,5 +85,15 @@ impl NodeContext {
                 warn!("Could not send FaultsCmd through dysfunctional_cmds_tx: {error}");
             }
         });
+    }
+
+    /// Calculate current fee for payments or storing data.
+    pub(crate) fn current_fee(&self) -> sn_dbc::Token {
+        use sn_interface::{messaging::data::DataCmd, op_cost::required_tokens};
+        let bytes = std::mem::size_of::<DataCmd>();
+        let prefix_len = self.network_knowledge.prefix().bit_count();
+        let num_storage_nodes = self.network_knowledge.members().len() as u8;
+        let percent_filled = self.data_storage.used_space_ratio();
+        required_tokens(bytes, prefix_len, num_storage_nodes, percent_filled)
     }
 }
