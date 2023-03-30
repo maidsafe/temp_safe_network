@@ -5,14 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.82.4 (2023-03-29)
+## v0.82.5 (2023-03-30)
+
+### Bug Fixes
+
+ - <csr-id-c74b1ff022d62067cfe6c6c5ed3880aefe82e149/> check current elders against all pks in case of split
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
  - 1 commit contributed to the release.
- - 0 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -22,10 +26,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Check current elders against all pks in case of split ([`c74b1ff`](https://github.com/maidsafe/safe_network/commit/c74b1ff022d62067cfe6c6c5ed3880aefe82e149))
+</details>
+
+## v0.82.4 (2023-03-29)
+
+### Chore
+
+ - <csr-id-787347eda7a075092a1682cc38d64e06c0fa80f8/> sn_node-0.82.4/sn_cli-0.76.1
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Sn_node-0.82.4/sn_cli-0.76.1 ([`787347e`](https://github.com/maidsafe/safe_network/commit/787347eda7a075092a1682cc38d64e06c0fa80f8))
     - Chore: rename ctl to more commonly used ctrl - In our code we use the abbreviation `ctrl`for `control`. - When googling the two, it is clear that `ctrl` is the more commonly used abbreviation. ([`f4b35c3`](https://github.com/maidsafe/safe_network/commit/f4b35c33e8c9189878de773ebb1c835c8814f004))
 </details>
 
 ## v0.82.3 (2023-03-29)
+
+<csr-id-243aea91735db2085fe968f5daa113ec903611b8/>
 
 ### Chore
 
