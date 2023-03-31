@@ -5,19 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.15.5 (2023-02-28)
+## v0.15.6 (2023-03-31)
 
-### Refactor
+### Chore
 
- - <csr-id-3fda80a40c508d16fbe097091252a98b01f8f339/> remove unused pub fn/methods
+ - <csr-id-169f7c2a4d2a30c32381ef7e2e7b6e09243b8164/> remove env filter where not needed
+
+### Other
+
+ - <csr-id-9f6760f5c341e9d2925c3f99ebdf93f8e23162d1/> cleanup some deps
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 1 commit contributed to the release.
- - 20 days passed between releases.
- - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits contributed to the release.
+ - 30 days passed between releases.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -27,12 +31,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Remove env filter where not needed ([`169f7c2`](https://github.com/maidsafe/safe_network/commit/169f7c2a4d2a30c32381ef7e2e7b6e09243b8164))
+    - Cleanup some deps ([`9f6760f`](https://github.com/maidsafe/safe_network/commit/9f6760f5c341e9d2925c3f99ebdf93f8e23162d1))
+</details>
+
+## v0.15.5 (2023-02-28)
+
+<csr-id-3fda80a40c508d16fbe097091252a98b01f8f339/>
+
+### Refactor
+
+ - <csr-id-3fda80a40c508d16fbe097091252a98b01f8f339/> remove unused pub fn/methods
+
+### Chore
+
+ - <csr-id-558061d5eea7bc1f0feac310afb91ef9ca7c681e/> sn_interface-0.19.1/sn_fault_detection-0.15.5/sn_node-0.77.1/sn_cli-0.72.1
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 20 days passed between releases.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Sn_interface-0.19.1/sn_fault_detection-0.15.5/sn_node-0.77.1/sn_cli-0.72.1 ([`558061d`](https://github.com/maidsafe/safe_network/commit/558061d5eea7bc1f0feac310afb91ef9ca7c681e))
     - Remove unused pub fn/methods ([`3fda80a`](https://github.com/maidsafe/safe_network/commit/3fda80a40c508d16fbe097091252a98b01f8f339))
 </details>
 
 ## v0.15.4 (2023-02-07)
 
 <csr-id-677ef5cc8b1935b94641c61c53429faf2c58c261/>
+<csr-id-3c34a731eca9d5b37d2574e3e16c7f089c7cc8b2/>
 
 ### Chore
 
