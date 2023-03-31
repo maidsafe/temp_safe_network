@@ -20,7 +20,7 @@ use sn_dbc::{
     rng, Error as DbcError, Hash, Owner, OwnerOnce, PublicKey, RevealedAmount, SpentProof,
     SpentProofShare, TransactionBuilder,
 };
-use sn_interface::types::fees::{FeeCiphers, RequiredFee};
+use sn_interface::types::fees::{FeeCiphers, RequiredFee, SpendPriority};
 
 use bytes::Bytes;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
@@ -302,6 +302,7 @@ impl Safe {
         amount: &str,
         owner_public_key: Option<bls::PublicKey>,
         reason: DbcReason,
+        priority: SpendPriority,
     ) -> Result<Dbc> {
         debug!(
             "Reissuing DBC from wallet at {} for an amount of {} tokens",
@@ -314,6 +315,7 @@ impl Safe {
                     .into_iter()
                     .collect(),
                 reason,
+                priority,
             )
             .await?;
 
@@ -335,6 +337,7 @@ impl Safe {
         wallet_url: &str,
         outputs: Vec<(String, Option<bls::PublicKey>)>,
         reason: DbcReason,
+        priority: SpendPriority,
     ) -> Result<Vec<Dbc>> {
         let mut total_output_amount = Token::zero();
         let mut outputs_owners = Vec::<(Token, OwnerOnce)>::new();
@@ -374,7 +377,7 @@ impl Safe {
 
         // From the spendable dbcs, we select those required to cover the output dbcs.
         let components = self
-            .get_reissue_components(spendable_dbcs, outputs_owners)
+            .get_reissue_components(spendable_dbcs, outputs_owners, priority)
             .await?;
 
         let ReissueComponents {
@@ -433,9 +436,10 @@ impl Safe {
         &self,
         dbcs: Vec<Dbc>,
         recipients: Vec<(Token, OwnerOnce)>,
+        priority: SpendPriority,
     ) -> Result<(Vec<(Dbc, OwnerOnce, RevealedAmount)>, Option<Dbc>)> {
         let client = self.get_safe_client()?;
-        Ok(sn_client::api::send_tokens(client, dbcs, recipients).await?)
+        Ok(sn_client::api::send_tokens(client, dbcs, recipients, priority).await?)
     }
 
     /// -------------------------------------------------
@@ -447,6 +451,7 @@ impl Safe {
         &self,
         spendable_dbcs: WalletSpendableDbcs,
         outputs_owners: Vec<(Token, OwnerOnce)>,
+        priority: SpendPriority,
     ) -> Result<ReissueComponents> {
         let dbcs = spendable_dbcs
             .iter()
@@ -456,7 +461,7 @@ impl Safe {
 
         let client = self.get_safe_client()?;
         let (input_dbcs_to_spend, outputs_owners, change_amount, all_fee_cipher_params) =
-            sn_client::api::select_dbc_inputs(client, dbcs, outputs_owners).await?;
+            sn_client::api::select_dbc_inputs(client, dbcs, outputs_owners, priority).await?;
         let input_dbc_keys = input_dbcs_to_spend.iter().map(|d| d.public_key()).collect();
         let input_dbcs_entries_hash = Self::entry_hashes(input_dbc_keys, spendable_dbcs);
 
@@ -772,6 +777,7 @@ mod tests {
                 "2.35",
                 Some(sk.public_key()),
                 DbcReason::none(),
+                SpendPriority::Normal,
             )
             .await?;
         safe.wallet_deposit(
@@ -801,7 +807,13 @@ mod tests {
         safe.wallet_deposit(&wallet_xorurl, Some("my-dbc"), &dbc, None)
             .await?;
         let owned_dbc = safe
-            .wallet_reissue(&wallet_xorurl, "2.35", Some(pk), DbcReason::none())
+            .wallet_reissue(
+                &wallet_xorurl,
+                "2.35",
+                Some(pk),
+                DbcReason::none(),
+                SpendPriority::Normal,
+            )
             .await?;
         let result = safe
             .wallet_deposit(&wallet_xorurl, Some("owned-dbc"), &owned_dbc, None)
@@ -829,7 +841,13 @@ mod tests {
         safe.wallet_deposit(&wallet_xorurl, Some("my-dbc"), &dbc, None)
             .await?;
         let owned_dbc = safe
-            .wallet_reissue(&wallet_xorurl, "2.35", Some(pk), DbcReason::none())
+            .wallet_reissue(
+                &wallet_xorurl,
+                "2.35",
+                Some(pk),
+                DbcReason::none(),
+                SpendPriority::Normal,
+            )
             .await?;
         let result = safe
             .wallet_deposit(&wallet_xorurl, Some("owned-dbc"), &owned_dbc, Some(sk2))
@@ -884,6 +902,7 @@ mod tests {
                 "2.35",
                 Some(sk.public_key()),
                 DbcReason::none(),
+                SpendPriority::Normal,
             )
             .await?;
         // Deposit the owned DBC in another wallet because it's easier to ensure this owned DBC
@@ -898,7 +917,13 @@ mod tests {
         .await?;
 
         let result = safe
-            .wallet_reissue(&wallet2_xorurl, "2", None, DbcReason::none())
+            .wallet_reissue(
+                &wallet2_xorurl,
+                "2",
+                None,
+                DbcReason::none(),
+                SpendPriority::Normal,
+            )
             .await;
         match result {
             Ok(_) => {
@@ -1065,8 +1090,8 @@ mod tests {
             .await?;
 
         // 2 dbc inputs = 2 fees
-        let fee_1 = get_spend_fee(&safe, &dbc1).await?;
-        let fee_2 = get_spend_fee(&safe, &dbc2).await?;
+        let fee_1 = get_spend_fee(&safe, &dbc1, SpendPriority::Normal).await?;
+        let fee_2 = get_spend_fee(&safe, &dbc2, SpendPriority::Normal).await?;
         let total_fee = fee_1.as_nano() + fee_2.as_nano();
 
         // we arbitrarily expect a change as big as the fees here
@@ -1081,6 +1106,7 @@ mod tests {
                 &amount_to_reissue.to_string(),
                 None,
                 DbcReason::none(),
+                SpendPriority::Normal,
             )
             .await?;
 
@@ -1117,10 +1143,16 @@ mod tests {
             .await?;
 
         // 1 input dbc = 1 fee
-        let fee = get_spend_fee(&safe, &dbc).await?;
+        let fee = get_spend_fee(&safe, &dbc, SpendPriority::Normal).await?;
 
         let output_dbc = safe
-            .wallet_reissue(&wallet_xorurl, "1", None, DbcReason::none())
+            .wallet_reissue(
+                &wallet_xorurl,
+                "1",
+                None,
+                DbcReason::none(),
+                SpendPriority::Normal,
+            )
             .await?;
 
         let output_balance = output_dbc
@@ -1162,7 +1194,13 @@ mod tests {
             .await?;
 
         let _ = safe
-            .wallet_reissue(&wallet_xorurl, "1", None, DbcReason::none())
+            .wallet_reissue(
+                &wallet_xorurl,
+                "1",
+                None,
+                DbcReason::none(),
+                SpendPriority::Normal,
+            )
             .await?;
         let wallet_balances = safe.wallet_get(&wallet_xorurl).await?;
 
@@ -1186,7 +1224,13 @@ mod tests {
         let pk = bls::SecretKey::random().public_key();
         let owner = Owner::from(pk);
         let output_dbc = safe
-            .wallet_reissue(&wallet_xorurl, "1", Some(pk), DbcReason::none())
+            .wallet_reissue(
+                &wallet_xorurl,
+                "1",
+                Some(pk),
+                DbcReason::none(),
+                SpendPriority::Normal,
+            )
             .await?;
 
         // We have verified transaction details in other tests. In this test, we're just concerned
@@ -1208,7 +1252,13 @@ mod tests {
         let just_any_xorname = XorName::from_content(&[1, 2, 3, 4]);
         let any_reason = DbcReason::from(just_any_xorname);
         let output_dbc = safe
-            .wallet_reissue(&wallet_xorurl, "1", Some(pk), any_reason)
+            .wallet_reissue(
+                &wallet_xorurl,
+                "1",
+                Some(pk),
+                any_reason,
+                SpendPriority::Normal,
+            )
             .await?;
 
         assert_eq!(Some(any_reason.into()), output_dbc.reason());
@@ -1230,6 +1280,7 @@ mod tests {
                 &Token::from_nano(dbc_balance.as_nano() + 1).to_string(),
                 None,
                 DbcReason::none(),
+                SpendPriority::Normal,
             )
             .await
         {
@@ -1250,7 +1301,13 @@ mod tests {
         let wallet_xorurl = safe.wallet_create().await?;
 
         match safe
-            .wallet_reissue(&wallet_xorurl, "0", None, DbcReason::none())
+            .wallet_reissue(
+                &wallet_xorurl,
+                "0",
+                None,
+                DbcReason::none(),
+                SpendPriority::Normal,
+            )
             .await
         {
             Err(Error::InvalidAmount(msg)) => {
@@ -1281,11 +1338,17 @@ mod tests {
             .await?;
 
         // 1 input dbc = 1 fee
-        let fee = get_spend_fee(&safe, &dbc).await?;
+        let fee = get_spend_fee(&safe, &dbc, SpendPriority::Normal).await?;
 
         // Now check we can still reissue from the wallet and the corrupted entry is ignored
         let _ = safe
-            .wallet_reissue(&wallet_xorurl, "0.4", None, DbcReason::none())
+            .wallet_reissue(
+                &wallet_xorurl,
+                "0.4",
+                None,
+                DbcReason::none(),
+                SpendPriority::Normal,
+            )
             .await?;
         let current_balance = safe.wallet_balance(&wallet_xorurl).await?;
         assert_eq!(
@@ -1304,7 +1367,7 @@ mod tests {
         safe.wallet_deposit(&wallet_xorurl, Some("my-first-dbc"), &dbc, None)
             .await?;
 
-        let fee = get_spend_fee(&safe, &dbc).await?;
+        let fee = get_spend_fee(&safe, &dbc, SpendPriority::Normal).await?;
 
         // Now check that after reissuing with the total balance,
         // there is no change deposited in the wallet, i.e. wallet is empty with 0 balance
@@ -1314,6 +1377,7 @@ mod tests {
                 &Token::from_nano(dbc_balance.as_nano() - fee.as_nano()).to_string(), // send all, leave enough to pay the fee amount
                 None,
                 DbcReason::none(),
+                SpendPriority::Normal,
             )
             .await?;
 
@@ -1338,7 +1402,13 @@ mod tests {
             .await?;
 
         let output_dbc = safe
-            .wallet_reissue(&wallet1_xorurl, "0.25", None, DbcReason::none())
+            .wallet_reissue(
+                &wallet1_xorurl,
+                "0.25",
+                None,
+                DbcReason::none(),
+                SpendPriority::Normal,
+            )
             .await?;
 
         safe.wallet_deposit(&wallet2_xorurl, Some("reissued-dbc"), &output_dbc, None)
@@ -1403,7 +1473,13 @@ mod tests {
 
         // It shall detect no spent proofs for this TX, thus fail to reissue
         match safe
-            .wallet_reissue(&wallet_xorurl, "0.1", None, DbcReason::none())
+            .wallet_reissue(
+                &wallet_xorurl,
+                "0.1",
+                None,
+                DbcReason::none(),
+                SpendPriority::Normal,
+            )
             .await
         {
             Err(Error::ClientError(ClientError::CmdError {
@@ -1458,8 +1534,8 @@ mod tests {
             .await?;
 
         // 2 dbc inputs = 2 fees
-        let fee_1 = get_spend_fee(&safe, &dbc1).await?;
-        let fee_2 = get_spend_fee(&safe, &dbc2).await?;
+        let fee_1 = get_spend_fee(&safe, &dbc1, SpendPriority::Normal).await?;
+        let fee_2 = get_spend_fee(&safe, &dbc2, SpendPriority::Normal).await?;
         let total_fee = fee_1.as_nano() + fee_2.as_nano();
 
         let expected_change = 1000;
@@ -1489,7 +1565,12 @@ mod tests {
             .collect();
 
         let output_dbcs = safe
-            .wallet_reissue_many(&wallet_xorurl, outputs_owners, DbcReason::none())
+            .wallet_reissue_many(
+                &wallet_xorurl,
+                outputs_owners,
+                DbcReason::none(),
+                SpendPriority::Normal,
+            )
             .await?;
 
         #[cfg(feature = "data-network")]
@@ -1531,11 +1612,11 @@ mod tests {
         Ok(())
     }
 
-    async fn get_spend_fee(safe: &Safe, dbc: &Dbc) -> Result<Token> {
+    async fn get_spend_fee(safe: &Safe, dbc: &Dbc, priority: SpendPriority) -> Result<Token> {
         let secret_key = dbc.as_revealed_input_bearer()?.secret_key;
         let dbc_id = secret_key.public_key(); // this is same as dbc.public_key()
         let client = safe.get_safe_client()?;
-        let elder_fees = client.get_section_fees(dbc_id).await?;
+        let elder_fees = client.get_section_fees(dbc_id, priority).await?;
         let mut decrypted_fees = vec![];
 
         for (elder, fee) in elder_fees {

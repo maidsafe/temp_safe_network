@@ -12,7 +12,7 @@ use crate::{Safe, SafeUrl};
 
 use sn_client::utils::test_utils::read_genesis_dbc_from_first_node;
 use sn_dbc::{rng, Dbc, Owner, OwnerOnce, Token};
-use sn_interface::types::Keypair;
+use sn_interface::types::{fees::SpendPriority, Keypair};
 
 use anyhow::{anyhow, Context, Result};
 use async_once::AsyncOnce;
@@ -104,7 +104,11 @@ async fn reissue_bearer_dbcs() -> Result<Vec<(Dbc, Token)>> {
     let safe = new_safe_instance().await?;
 
     let (output_dbcs, _) = safe
-        .send_tokens(vec![GENESIS_DBC.clone()], recipients)
+        .send_tokens(
+            vec![GENESIS_DBC.clone()],
+            recipients,
+            SpendPriority::Highest,
+        )
         .await?;
 
     Ok(output_dbcs

@@ -42,14 +42,18 @@
 ///         they can still not verify the amounts by this. So that example is still not feasible. TBD.
 mod errors;
 mod fee_ciphers;
+mod priority;
 mod required_fee;
 mod required_fee_content;
+mod spend_queue;
 
 pub use self::{
     errors::{Error, Result},
     fee_ciphers::FeeCiphers,
+    priority::SpendPriority,
     required_fee::RequiredFee,
     required_fee_content::RequiredFeeContent,
+    spend_queue::{SpendQ, SpendQSnapshot, SpendQStats},
 };
 
 #[cfg(test)]

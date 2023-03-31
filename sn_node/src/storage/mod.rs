@@ -187,9 +187,15 @@ impl DataStorage {
                 }
             }
             // this should be unreachable
-            DataQuery::Spentbook(SpendQuery::GetFees(dbc_id)) => {
+            DataQuery::Spentbook(SpendQuery::GetFees { dbc_id, priority }) => {
                 NodeQueryResponse::GetFees(Err(sn_interface::messaging::data::Error::DataNotFound(
-                    DataAddress::Spentbook(SpendQuery::GetFees(*dbc_id).dst_address()),
+                    DataAddress::Spentbook(
+                        SpendQuery::GetFees {
+                            dbc_id: *dbc_id,
+                            priority: *priority,
+                        }
+                        .dst_address(),
+                    ),
                 )))
             }
         }

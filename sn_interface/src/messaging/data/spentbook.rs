@@ -11,7 +11,10 @@ use super::{CmdResponse, Error, QueryResponse};
 use crate::dbcs::DbcReason;
 use crate::messaging::system::SectionSigned;
 use crate::network_knowledge::{SectionAuthorityProvider, SectionsDAG};
-use crate::types::{fees::FeeCiphers, SpentbookAddress};
+use crate::types::{
+    fees::{FeeCiphers, SpendPriority},
+    SpentbookAddress,
+};
 
 use sn_dbc::{DbcTransaction, PublicKey, SpentProof};
 
@@ -24,7 +27,10 @@ use xor_name::XorName;
 pub enum SpendQuery {
     /// Query for the individual reward keys and their respective
     /// fee amount for processing a `Spend` of a Dbc with the given id.
-    GetFees(PublicKey),
+    GetFees {
+        dbc_id: PublicKey,
+        priority: SpendPriority,
+    },
     /// Query for the set of spent proofs if the provided public key has already been spent with a Tx.
     GetSpentProofShares(SpentbookAddress),
 }
@@ -74,7 +80,7 @@ impl SpendQuery {
     /// Request variant.
     pub fn to_error_response(&self, error: Error) -> QueryResponse {
         match self {
-            Self::GetFees(_) => QueryResponse::GetFees(Err(error)),
+            Self::GetFees { .. } => QueryResponse::GetFees(Err(error)),
             Self::GetSpentProofShares(_) => QueryResponse::GetSpentProofShares(Err(error)),
         }
     }
@@ -82,7 +88,7 @@ impl SpendQuery {
     /// Returns the dst address for the request.
     pub fn dst_address(&self) -> SpentbookAddress {
         match self {
-            Self::GetFees(dbc_id) => {
+            Self::GetFees { dbc_id, .. } => {
                 SpentbookAddress::new(XorName::from_content(&dbc_id.to_bytes()))
             }
             Self::GetSpentProofShares(address) => *address,

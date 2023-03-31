@@ -11,11 +11,13 @@ use super::{
     OutputFmt,
 };
 use crate::operations::config::Config;
+
+use sn_api::{wallet::DbcReason, Error as ApiError, Safe, SpendPriority};
+use sn_dbc::{Dbc, Error as DbcError};
+
 use bls::{PublicKey, SecretKey};
 use clap::Subcommand;
 use color_eyre::{eyre::eyre, eyre::Error, Help, Result};
-use sn_api::{wallet::DbcReason, Error as ApiError, Safe};
-use sn_dbc::{Dbc, Error as DbcError};
 use std::path::{Path, PathBuf};
 use tokio::fs;
 
@@ -233,7 +235,13 @@ pub async fn wallet_commander(
                 None
             };
             let dbc = safe
-                .wallet_reissue(&from, &amount, pk, reason.unwrap_or_default())
+                .wallet_reissue(
+                    &from,
+                    &amount,
+                    pk,
+                    reason.unwrap_or_default(),
+                    SpendPriority::Normal,
+                )
                 .await?;
             let dbc_hex = dbc.to_hex()?;
 

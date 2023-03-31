@@ -8,7 +8,10 @@
 
 use crate::node::{Cmd, Error, MyNode, Result};
 
-use sn_interface::network_knowledge::SectionTreeUpdate;
+use sn_interface::{
+    messaging::data::{CmdResponse, DataResponse},
+    network_knowledge::SectionTreeUpdate,
+};
 
 use std::time::Instant;
 
@@ -118,9 +121,40 @@ impl MyNode {
                 node.joins_allowed_until_split = joins_allowed_until_split;
                 vec![]
             }
+            Cmd::EnqueueSpend {
+                fee_paid,
+                spent_share,
+                send_stream,
+                correlation_id,
+                client_id,
+            } => {
+                // Push the spend onto the pool, it will be prioritised by fee.
+                node.spend_q.push(spent_share, fee_paid.as_nano());
+
+                // We will ack back to Client.
+                let mut cmds = vec![Cmd::send_data_response(
+                    DataResponse::CmdResponse {
+                        response: CmdResponse::SpendKey(Ok(())),
+                        correlation_id,
+                    },
+                    correlation_id,
+                    client_id,
+                    send_stream,
+                )];
+
+                // We follow the spend queue tps setting, as to not be overwhelmed by spends
+                // and and to actually enforce the prioritisation of spends.
+                if node.spend_q.elapsed() {
+                    // then pop next in queue TODO: don't push for every spend! we need to keep a balance
+                    if let Some((spent_share, _)) = node.spend_q.pop() {
+                        cmds.extend(MyNode::send_spent_share(spent_share, context)?);
+                    }
+                }
+
+                cmds
+            }
             cmd => {
                 error!("This cmd should not be handled in the blocking loop. Move it to FlowCtrlCmd channel: {cmd:?}");
-
                 vec![]
             }
         };

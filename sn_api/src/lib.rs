@@ -23,7 +23,9 @@ mod errors;
 mod safeurl;
 
 // re-export these useful types from sn_data_types
-pub use sn_interface::types::{DataAddress, Keypair, PublicKey, RegisterAddress, SecretKey};
+pub use sn_interface::types::{
+    fees::SpendPriority, DataAddress, Keypair, PublicKey, RegisterAddress, SecretKey,
+};
 
 #[cfg(feature = "app")]
 pub use app::*;

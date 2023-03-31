@@ -60,9 +60,8 @@ use sn_interface::{
         SectionAuthorityProvider, SectionKeyShare, SectionKeysProvider, SectionTree, SectionsDAG,
         GENESIS_DBC_SK,
     },
-    types::{keys::ed25519::Digest256, log_markers::LogMarker, DataAddress, NodeId},
+    types::{fees::SpendQ, keys::ed25519::Digest256, log_markers::LogMarker, DataAddress, NodeId},
 };
-use xor_name::{Prefix, XorName};
 
 use bls::PublicKey;
 use ed25519_dalek::Keypair;
@@ -73,6 +72,7 @@ use std::{
     sync::Arc,
 };
 use tokio::sync::mpsc::Sender;
+use xor_name::{Prefix, XorName};
 
 /// Standard channel size, to allow for large swings in throughput
 pub static STANDARD_CHANNEL_SIZE: usize = 100_000;
@@ -96,6 +96,7 @@ pub(crate) struct MyNode {
     pub(crate) data_storage: DataStorage, // Adult only before cache
     pub(crate) keypair: Arc<Keypair>,
     pub(crate) reward_secret_key: Arc<bls::SecretKey>,
+    pub(crate) spend_q: SpendQ<sn_dbc::SpentProofShare>,
     // Network resources
     pub(crate) section_keys_provider: SectionKeysProvider,
     pub(crate) network_knowledge: NetworkKnowledge,
@@ -137,6 +138,7 @@ impl MyNode {
             dkg_voter: self.dkg_voter.clone(),
             dkg_sessions_info: self.dkg_sessions_info.clone(),
             reward_secret_key: self.reward_secret_key.clone(),
+            spend_q_snapshot: self.spend_q.snapshot(),
             network_knowledge: self.network_knowledge().clone(),
             section_keys_provider: self.section_keys_provider.clone(),
             comm: self.comm.clone(),
@@ -204,6 +206,9 @@ impl MyNode {
             root_storage_dir,
             keypair,
             reward_secret_key: Arc::new(reward_secret_key),
+            spend_q: SpendQ::with_fee(
+                context::op_cost(&network_knowledge, &data_storage).as_nano(),
+            ),
             network_knowledge,
             section_keys_provider,
             dkg_sessions_info: HashMap::default(),

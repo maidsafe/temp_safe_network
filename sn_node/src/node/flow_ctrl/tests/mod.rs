@@ -38,7 +38,11 @@ use sn_interface::{
         RelocationInfo, RelocationProof, SectionTreeUpdate, SectionsDAG, MIN_ADULT_AGE,
     },
     test_utils::*,
-    types::{fees::FeeCiphers, keys::ed25519, Participant, PublicKey},
+    types::{
+        fees::{FeeCiphers, SpendPriority},
+        keys::ed25519,
+        Participant, PublicKey,
+    },
 };
 
 use assert_matches::assert_matches;
@@ -1100,7 +1104,7 @@ fn get_spend(dbc: sn_dbc::Dbc, context: NodeContext) -> Result<Spend> {
     let change_owner = OwnerOnce::from_owner_base(dbc.owner_base().clone(), &mut rng);
 
     #[cfg(not(feature = "data-network"))]
-    let fee = context.current_fee();
+    let fee = context.current_fee(&SpendPriority::Normal);
 
     #[cfg(feature = "data-network")]
     let change_amount = Token::from_nano(dbc_amount.value());

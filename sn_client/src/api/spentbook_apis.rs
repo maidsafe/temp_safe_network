@@ -129,14 +129,18 @@ impl Client {
 
 #[cfg(test)]
 mod tests {
-    use crate::api::send_tokens;
-    use crate::utils::test_utils::{
-        create_test_client_with, init_logger, read_genesis_dbc_from_first_node,
+    use crate::{
+        api::send_tokens,
+        utils::test_utils::{
+            create_test_client_with, init_logger, read_genesis_dbc_from_first_node,
+        },
+        Client,
     };
-    use crate::Client;
-    use eyre::{bail, Result};
+
     use sn_dbc::{rng, OwnerOnce, Token};
-    use sn_interface::messaging::data::Error as ErrorMsg;
+    use sn_interface::{messaging::data::Error as ErrorMsg, types::fees::SpendPriority};
+
+    use eyre::{bail, Result};
 
     const ONE_BN_NANOS: u64 = 1_000_000_000;
 
@@ -158,7 +162,13 @@ mod tests {
         let recipients = vec![(Token::from_nano(half_amount), recipient)];
 
         // Send the tokens..
-        let (_, change) = send_tokens(&client, vec![genesis_dbc], recipients).await?;
+        let (_, change) = send_tokens(
+            &client,
+            vec![genesis_dbc],
+            recipients,
+            SpendPriority::Normal,
+        )
+        .await?;
 
         // We only assert that we have some change back
         // since we don't need/want to account for the fees here.
@@ -200,7 +210,13 @@ mod tests {
             .collect();
 
         // Send the tokens..
-        let result = send_tokens(&client, vec![genesis_dbc], recipients).await;
+        let result = send_tokens(
+            &client,
+            vec![genesis_dbc],
+            recipients,
+            SpendPriority::Normal,
+        )
+        .await;
 
         match result {
             Ok(_) => bail!("We expected an error to be returned"),
@@ -241,7 +257,13 @@ mod tests {
         let genesis_dbc_owner_pk = genesis_dbc.owner_base().public_key();
 
         // Send the tokens..
-        let result = send_tokens(&client, vec![genesis_dbc], recipients).await;
+        let result = send_tokens(
+            &client,
+            vec![genesis_dbc],
+            recipients,
+            SpendPriority::Normal,
+        )
+        .await;
 
         match result {
             Ok(_) => bail!("We expected an error to be returned"),
@@ -281,6 +303,7 @@ mod tests {
             &client,
             vec![genesis_dbc.clone()],
             vec![(Token::from_nano(ONE_BN_NANOS), recipient_1)],
+            SpendPriority::Normal,
         )
         .await?;
 
@@ -302,6 +325,7 @@ mod tests {
             &client,
             vec![output_dbc_1],
             vec![(Token::from_nano(ONE_BN_NANOS / 2), recipient_2)],
+            SpendPriority::Normal,
         )
         .await?;
 
@@ -323,6 +347,7 @@ mod tests {
             &client,
             vec![output_dbc_2],
             vec![(Token::from_nano(ONE_BN_NANOS / 4), recipient_3)],
+            SpendPriority::Normal,
         )
         .await;
 
