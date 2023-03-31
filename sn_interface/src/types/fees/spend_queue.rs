@@ -49,7 +49,9 @@ pub struct SpendQ<T: Eq + Hash> {
 #[derive(Clone, custom_debug::Debug)]
 pub struct SpendQSnapshot {
     #[debug(skip)]
+    #[cfg(test)]
     queue: Vec<u64>,
+    stats: SpendQStats,
 }
 
 /// Stats of the spend queue, listing the number of spends currently queued,
@@ -66,10 +68,14 @@ pub struct SpendQSnapshot {
 /// will be used.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct SpendQStats {
+    pub highest: u64,
     pub high: u64,
-    pub low: u64,
-    pub len: usize,
+    pub medium_high: u64,
     pub avg: u64,
+    pub medium_low: u64,
+    pub low: u64,
+    pub lowest: u64,
+    pub len: usize,
     pub std_dev: u64,
 }
 
@@ -83,69 +89,77 @@ impl SpendQStats {
     /// This is a temporary diff value/design.
     /// (And yes, this means that for now, the Client can try to get away cheaper by sending in up to 10% less than lowest priority fee.)
     pub fn validate_fee(&self, fee_paid: u64) -> (bool, u64) {
-        // There should be no way that `std_dev` could be larger than or equal to `low`.
-        debug!("validate_fee: low {}, std_dev {}", self.low, self.std_dev);
-        let lowest = ((self.low - self.std_dev) as f64 / 0.90) as u64;
+        // add some margin
+        let lowest = (self.lowest as f64 / 0.90) as u64;
         debug!("validate_fee: lowest {lowest}");
         let valid = fee_paid >= lowest;
         (valid, lowest)
     }
 
-    /// Derive a fee to pay based on the sender priority
-    /// and current state of the spend queue.
-    pub fn derive_fee(&self, priority: &SpendPriority) -> u64 {
-        let medium_high = (self.high + self.avg) / 2;
-        let medium_low = (self.low + self.avg) / 2;
-        let highest = self.high + self.std_dev;
-
-        use std::cmp::Ordering::*;
-        let lowest = match self.std_dev.cmp(&self.low) {
-            Greater => (2 * self.low) - self.std_dev,
-            Less => self.low - self.std_dev,
-            Equal => self.low / 2,
-        };
-
-        debug!("derive_fee: high {}, low {}, medium_high {medium_high}, medium_low {medium_low}, highest {highest}, lowest {lowest}, std_dev {}, avg {}", self.high, self.low, self.std_dev, self.avg);
-
-        // There should be no way that `std_dev` could be larger than or equal to `low`.
+    /// Map the priority to a fee to pay, based on
+    /// current state of the spend queue.
+    pub fn map_to_fee(&self, priority: &SpendPriority) -> u64 {
         match priority {
-            SpendPriority::Highest => highest,
+            SpendPriority::Highest => self.highest,
             SpendPriority::High => self.high,
-            SpendPriority::MediumHigh => medium_high,
+            SpendPriority::MediumHigh => self.medium_high,
             SpendPriority::Normal => self.avg,
-            SpendPriority::MediumLow => medium_low,
+            SpendPriority::MediumLow => self.medium_low,
             SpendPriority::Low => self.low,
-            SpendPriority::Lowest => lowest,
+            SpendPriority::Lowest => self.lowest,
         }
     }
 }
 
 impl SpendQSnapshot {
+    pub fn new(queue: Vec<u64>) -> Self {
+        let default_val = 4;
+
+        let high = queue.first().copied().unwrap_or(2 * default_val);
+        let low = queue.last().copied().unwrap_or(default_val / 2);
+        let (avg, std_dev, len) = calc_stats(&queue);
+
+        let medium_high = (high + avg) / 2;
+        let medium_low = (low + avg) / 2;
+        let highest = high + std_dev;
+
+        use std::cmp::Ordering::*;
+        let lowest = match std_dev.cmp(&low) {
+            Less => low - std_dev,
+            _ => u64::min(low, (2 * std_dev) / 3),
+        };
+
+        debug!(
+            "stats: highest {highest}, high {high}, medium_high {medium_high}, avg {avg}, medium_low {medium_low}, low {low}, lowest {lowest}, std_dev {std_dev}, len {len}, queue {:?}",
+            queue
+        );
+
+        Self {
+            #[cfg(test)]
+            queue,
+            stats: SpendQStats {
+                highest,
+                high,
+                medium_high,
+                avg,
+                medium_low,
+                low,
+                lowest,
+                len,
+                std_dev,
+            },
+        }
+    }
+
     /// This is not meant to return 100% consistent state,
     /// but an approximation which is good enough.
     ///
-    /// If the queue becomes empty, the last value popped will be used
-    /// for `high`, `low` and `avg`, with a zero `std_dev`.
+    /// If the queue becomes empty, the last three values popped will be used
+    /// for these calcs.
     /// Before any item has been pushed to spend queue, the value with which
-    /// the spend queue was instantiated will be used. And if spend queue was
-    /// instantiated with no value, the passed in fallback value (current op_cost)
-    /// will be used, until the very first item has been pushed to spend queue.
+    /// the spend queue was instantiated will be used.
     pub fn stats(&self) -> SpendQStats {
-        let default_val = 4;
-        let high = self.queue.first().copied().unwrap_or(2 * default_val);
-        let low = self.queue.last().copied().unwrap_or(default_val / 2);
-        let (avg, std_dev, len) = calc_stats(&self.queue);
-        debug!(
-            "stats: high {high}, low {low}, avg {avg}, std_dev {std_dev}, len {len}, queue {:?}",
-            self.queue
-        );
-        SpendQStats {
-            high,
-            low,
-            len,
-            avg,
-            std_dev,
-        }
+        self.stats
     }
 }
 
@@ -158,9 +172,7 @@ impl<T: Eq + Hash> SpendQ<T> {
         let default_val = u64::max(4, current_fee);
         Self {
             queue: PriorityQueue::new(),
-            snapshot: SpendQSnapshot {
-                queue: vec![2 * default_val, default_val, default_val / 2],
-            },
+            snapshot: SpendQSnapshot::new(vec![2 * default_val, default_val, default_val / 2]),
             last_pop: Instant::now(),
         }
     }
@@ -213,8 +225,10 @@ impl<T: Eq + Hash> SpendQ<T> {
     // Makes sure at least 3 items are in the snapshot.
     fn set_snapshot(&mut self) {
         let mut queue: Vec<_> = self.queue.iter().map(|(_, fee)| *fee).collect();
+
         queue.sort();
         queue.reverse(); // highest first
+
         let queue = if self.queue.is_empty() {
             // this should be unreachable
             let default_val = 4;
@@ -229,7 +243,7 @@ impl<T: Eq + Hash> SpendQ<T> {
             queue
         };
 
-        self.snapshot = SpendQSnapshot { queue };
+        self.snapshot = SpendQSnapshot::new(queue);
     }
 
     #[cfg(test)]
@@ -285,7 +299,7 @@ mod tests {
     fn spendq_snapshot_is_sorted_highest_first() -> Result<()> {
         let mut spendq = SpendQ::<usize>::with_fee(0);
 
-        for i in 0..10 {
+        for i in 1..11 {
             let rand_item: usize = rand::random();
             spendq.push(rand_item, i);
         }
@@ -301,7 +315,7 @@ mod tests {
         assert_ne!(non_sorted_vec, sorted_vec);
 
         // this is the expected outcome, largest value first
-        let expected_vec = vec![9, 8, 7, 6, 5, 4, 3, 2, 1, 0];
+        let expected_vec = vec![10, 9, 8, 7, 6, 5, 4, 3, 2, 1];
         assert_eq!(sorted_vec, expected_vec);
 
         Ok(())

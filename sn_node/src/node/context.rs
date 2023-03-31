@@ -98,7 +98,7 @@ impl NodeContext {
     /// Calculate current fee for payments or storing data.
     pub(crate) fn current_fee(&self, priority: &SpendPriority) -> Token {
         let spend_q_stats = self.spend_q_snapshot.stats();
-        Token::from_nano(spend_q_stats.derive_fee(priority))
+        Token::from_nano(spend_q_stats.map_to_fee(priority))
     }
 
     pub(crate) fn validate_fee(&self, fee_paid: Token) -> (bool, Token) {
