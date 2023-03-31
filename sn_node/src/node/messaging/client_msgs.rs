@@ -64,6 +64,10 @@ impl MyNode {
             // The required fee content is encrypted to that dbc id, and so only the holder of the dbc secret
             // key can unlock the contents.
             let amount = context.current_fee(priority).as_nano() as f64 * 1.1;
+            debug!(
+                "Returned amount for priority {priority:?}: {} as u64, {} as f64",
+                amount as u64, amount
+            );
             let required_fee = RequiredFee::new(
                 Token::from_nano(amount as u64),
                 dbc_id,

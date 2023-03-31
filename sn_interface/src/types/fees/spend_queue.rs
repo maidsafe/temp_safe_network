@@ -84,7 +84,9 @@ impl SpendQStats {
     /// (And yes, this means that for now, the Client can try to get away cheaper by sending in up to 10% less than lowest priority fee.)
     pub fn validate_fee(&self, fee_paid: u64) -> (bool, u64) {
         // There should be no way that `std_dev` could be larger than or equal to `low`.
+        debug!("validate_fee: low {}, std_dev {}", self.low, self.std_dev);
         let lowest = ((self.low - self.std_dev) as f64 / 0.90) as u64;
+        debug!("validate_fee: lowest {lowest}");
         let valid = fee_paid >= lowest;
         (valid, lowest)
     }
@@ -96,6 +98,9 @@ impl SpendQStats {
         let medium_low = (self.low + self.avg) / 2;
         let highest = self.high + self.std_dev;
         let lowest = self.low - self.std_dev;
+
+        debug!("derive_fee: high {}, low {}, medium_high {medium_high}, medium_low {medium_low}, highest {highest}, lowest {lowest}, std_dev {}, avg {}", self.high, self.low, self.std_dev, self.avg);
+
         // There should be no way that `std_dev` could be larger than or equal to `low`.
         match priority {
             SpendPriority::Highest => highest,
@@ -124,6 +129,10 @@ impl SpendQSnapshot {
         let high = self.queue.first().copied().unwrap_or(2 * default_val);
         let low = self.queue.last().copied().unwrap_or(default_val / 2);
         let (avg, std_dev, len) = calc_stats(&self.queue);
+        debug!(
+            "stats: high {high}, low {low}, avg {avg}, std_dev {std_dev}, len {len}, queue {:?}",
+            self.queue
+        );
         SpendQStats {
             high,
             low,
@@ -139,6 +148,7 @@ impl<T: Eq + Hash> SpendQ<T> {
     /// that will populate the stats, by which fee can be derived.
     /// The snapshot will have non zero values, replaced when values are pushed onto the spend queue.
     pub fn with_fee(current_fee: u64) -> Self {
+        debug!("Starting fee: current_fee {current_fee}.");
         let default_val = u64::max(4, current_fee);
         Self {
             queue: PriorityQueue::new(),
