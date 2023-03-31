@@ -5,18 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.1.5 (2023-03-31)
+## v0.1.4 (2023-03-23)
 
-### Chore
+### New Features
 
- - <csr-id-169f7c2a4d2a30c32381ef7e2e7b6e09243b8164/> remove env filter where not needed
+ - <csr-id-16bb3389cdd665fe9a577587d9b7a6e8d21a3028/> exposing a gRPC interface on safenode bin/app
+   - The safenode RPC service is exposed only when built with 'rpc-service' feature.
+   - The safenode RPC service code is generated automatically using gRPC (`tonic` crate)
+   from a `proto` file with messages definitions added to sn_interface.
+   - The RPC is exposed at the same address as the node's address used for network connections,
+   but using the subsequent port number.
+   - A new final step was implemented for the sn_testnet tool, to run a check on the launched nodes,
+   verifying their names and network knowledge are the expected for the launched testnet.
+   - The new sn_testnet tool step is run only if built with 'verify-nodes' feature.
+   - Running the `verify-nodes` check of sn_testnet in CI previous to sn_client e2e tests.
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
  - 1 commit contributed to the release.
- - 7 days passed between releases.
  - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
@@ -27,44 +35,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
-    - Remove env filter where not needed ([`169f7c2`](https://github.com/maidsafe/safe_network/commit/169f7c2a4d2a30c32381ef7e2e7b6e09243b8164))
-</details>
-
-## v0.1.4 (2023-03-23)
-
-### Chore
-
- - <csr-id-358174ab1503fc8cf1b07ab66be397f3e853a14c/> sn_testnet-0.1.4/sn_interface-0.20.9/sn_node-0.80.3
-
-### New Features
-
- - <csr-id-16bb3389cdd665fe9a577587d9b7a6e8d21a3028/> exposing a gRPC interface on safenode bin/app
-   - The safenode RPC service is exposed only when built with 'rpc-service' feature.
-- The safenode RPC service code is generated automatically using gRPC (`tonic` crate)
-   from a `proto` file with messages definitions added to sn_interface.
-- The RPC is exposed at the same address as the node's address used for network connections,
-   but using the subsequent port number.
-- A new final step was implemented for the sn_testnet tool, to run a check on the launched nodes,
-   verifying their names and network knowledge are the expected for the launched testnet.
-- The new sn_testnet tool step is run only if built with 'verify-nodes' feature.
-- Running the `verify-nodes` check of sn_testnet in CI previous to sn_client e2e tests.
-
-### Commit Statistics
-
-<csr-read-only-do-not-edit/>
-
- - 2 commits contributed to the release.
- - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' were seen in commit messages
-
-### Commit Details
-
-<csr-read-only-do-not-edit/>
-
-<details><summary>view details</summary>
-
- * **Uncategorized**
-    - Sn_testnet-0.1.4/sn_interface-0.20.9/sn_node-0.80.3 ([`358174a`](https://github.com/maidsafe/safe_network/commit/358174ab1503fc8cf1b07ab66be397f3e853a14c))
     - Exposing a gRPC interface on safenode bin/app ([`16bb338`](https://github.com/maidsafe/safe_network/commit/16bb3389cdd665fe9a577587d9b7a6e8d21a3028))
 </details>
 
@@ -76,7 +46,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <csr-id-807d69ef609decfe94230e2086144afc5cc56d7b/>
 <csr-id-1a8b9c9ba5b98c0f1176a0ccbce53d4acea8c84c/>
 <csr-id-d3c6c9727a69389f4204b746c54a537cd783232c/>
-<csr-id-22c6e341d28c913a3acaaeae0ceeb8c0a1ef4d4e/>
 
 ### Chore
 
