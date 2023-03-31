@@ -6,41 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## v0.22.4 (2023-03-31)
-
-### Chore
-
- - <csr-id-841eaff15bab9cab5454b2b42790e48df5a316e1/> remove qp2p dep
-
-### Other
-
- - <csr-id-9f6760f5c341e9d2925c3f99ebdf93f8e23162d1/> cleanup some deps
-
-### Commit Statistics
-
-<csr-read-only-do-not-edit/>
-
- - 2 commits contributed to the release.
- - 1 day passed between releases.
- - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' were seen in commit messages
-
-### Commit Details
-
-<csr-read-only-do-not-edit/>
-
-<details><summary>view details</summary>
-
- * **Uncategorized**
-    - Cleanup some deps ([`9f6760f`](https://github.com/maidsafe/safe_network/commit/9f6760f5c341e9d2925c3f99ebdf93f8e23162d1))
-    - Remove qp2p dep ([`841eaff`](https://github.com/maidsafe/safe_network/commit/841eaff15bab9cab5454b2b42790e48df5a316e1))
-</details>
-
 ## v0.22.3 (2023-03-30)
-
-### Chore
-
- - <csr-id-350fcec1913f38a63620f4d51486809e429e7d88/> sn_interface-0.22.3/sn_node-0.82.5
 
 ### Bug Fixes
 
@@ -50,8 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
- - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 1 commit contributed to the release.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -61,13 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
-    - Sn_interface-0.22.3/sn_node-0.82.5 ([`350fcec`](https://github.com/maidsafe/safe_network/commit/350fcec1913f38a63620f4d51486809e429e7d88))
     - Check current elders against all pks in case of split ([`c74b1ff`](https://github.com/maidsafe/safe_network/commit/c74b1ff022d62067cfe6c6c5ed3880aefe82e149))
 </details>
 
 ## v0.22.2 (2023-03-29)
-
-<csr-id-1aeaafa940fc9ada35cfbcfc95f28c7478d4a2da/>
 
 ### Chore
 
@@ -174,6 +137,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-94d20504b58cb09a203ffd9c03fdcab07a810d0b/> new cmds to interact with a safenode RPC service
    - The new `node` CLI subcommand is made available only when building
    with `node-ctl` feature flag.
+- Adding a new RPC service to safenode to request it to update itself.
+- Migrate sn_api and sn_cli CI tests to use sn_testnet 'verify-nodes' feature.
 
 ### Commit Statistics
 
@@ -193,9 +158,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Sn_updater-0.2.0/sn_interface-0.21.0/sn_comms-0.7.0/sn_client-0.83.0/sn_node-0.81.0/sn_api-0.81.0/sn_cli-0.75.0 ([`0e9db2d`](https://github.com/maidsafe/safe_network/commit/0e9db2da4ed28d36d8ee866c9e941ab39e155e28))
     - New cmds to interact with a safenode RPC service ([`94d2050`](https://github.com/maidsafe/safe_network/commit/94d20504b58cb09a203ffd9c03fdcab07a810d0b))
 </details>
-
-<csr-unknown>
-Adding a new RPC service to safenode to request it to update itself.Migrate sn_api and sn_cli CI tests to use sn_testnet ‘verify-nodes’ feature.<csr-unknown/>
 
 ## v0.20.12 (2023-03-27)
 

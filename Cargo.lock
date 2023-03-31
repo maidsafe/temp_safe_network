@@ -4277,7 +4277,7 @@ dependencies = [
 
 [[package]]
 name = "sn_fault_detection"
-version = "0.15.6"
+version = "0.15.5"
 dependencies = [
  "eyre",
  "itertools",
@@ -4291,7 +4291,7 @@ dependencies = [
 
 [[package]]
 name = "sn_interface"
-version = "0.22.4"
+version = "0.22.3"
 dependencies = [
  "assert_matches",
  "bincode",
@@ -4338,7 +4338,7 @@ dependencies = [
 
 [[package]]
 name = "sn_node"
-version = "0.82.6"
+version = "0.82.5"
 dependencies = [
  "assert_matches",
  "base64 0.13.1",
@@ -4430,7 +4430,7 @@ dependencies = [
 
 [[package]]
 name = "sn_testnet"
-version = "0.1.5"
+version = "0.1.4"
 dependencies = [
  "assert_fs",
  "clap",
