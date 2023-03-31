@@ -55,19 +55,21 @@ impl MyNode {
         send_stream: SendStream,
         context: NodeContext,
     ) -> Vec<Cmd> {
-        let response = if let DataQuery::Spentbook(SpendQuery::GetFees(dbc_id)) = query {
+        let response = if let DataQuery::Spentbook(SpendQuery::GetFees { dbc_id, priority }) = query
+        {
             // We receive this directly from client, as an Elder, since `is_spend` is set to true (that is a very
             // messy/confusing pattern, to be fixed).
 
             // The client is asking for the fee to spend a specific dbc, and including the id of that dbc.
             // The required fee content is encrypted to that dbc id, and so only the holder of the dbc secret
             // key can unlock the contents.
-            let amount = context.current_fee().as_nano() as f64 * 1.1;
+            let amount = context.current_fee(priority).as_nano() as f64 * 1.1;
             let required_fee = RequiredFee::new(
                 Token::from_nano(amount as u64),
                 dbc_id,
                 &context.reward_secret_key,
             );
+
             NodeQueryResponse::GetFees(Ok(required_fee))
         } else {
             context
@@ -177,15 +179,26 @@ impl MyNode {
                     }
                 }
 
-                // first we validate it here at the Elder
-                let spent_share = match MyNode::validate_spentbook_cmd(cmd, &context) {
-                    Ok(share) => share,
+                // First we validate it here at the Elder.
+                let (fee_paid, spent_share) = match MyNode::validate_spentbook_cmd(cmd, &context) {
+                    Ok((fee_paid, share)) => (fee_paid, share),
                     Err(e) => {
                         return MyNode::send_error(msg_id, data_cmd, e, send_stream, client_id)
                     }
                 };
 
-                // then we forward it to data holders
+                // Then, if payment-network, we enqueue the spend.
+                #[cfg(not(feature = "data-network"))]
+                return Ok(vec![Cmd::EnqueueSpend {
+                    fee_paid,
+                    spent_share,
+                    send_stream,
+                    client_id,
+                    correlation_id: msg_id,
+                }]);
+
+                // Else if data-network, then we forward it to data holders.
+                #[cfg(feature = "data-network")]
                 return MyNode::forward_spent_share(
                     msg_id,
                     spent_share,
@@ -225,7 +238,10 @@ impl MyNode {
         Ok(vec![cmd])
     }
 
-    fn validate_spentbook_cmd(cmd: SpentbookCmd, context: &NodeContext) -> Result<SpentProofShare> {
+    fn validate_spentbook_cmd(
+        cmd: SpentbookCmd,
+        context: &NodeContext,
+    ) -> Result<(Token, SpentProofShare)> {
         let SpentbookCmd::Spend {
             public_key,
             tx,
@@ -239,6 +255,18 @@ impl MyNode {
 
         info!("Processing spend request for dbc key: {public_key:?}");
 
+        // verify that fee is paid to us
+        #[cfg(not(feature = "data-network"))]
+        let fee_paid = MyNode::validate_fee(
+            context,
+            context.reward_secret_key.as_ref(),
+            &tx,
+            context.name,
+            fee_ciphers,
+        )?;
+        #[cfg(feature = "data-network")]
+        let fee_paid = Token::zero();
+
         let spent_proof_share = MyNode::gen_spent_proof_share(
             &public_key,
             &tx,
@@ -246,11 +274,9 @@ impl MyNode {
             &spent_proofs,
             &spent_transactions,
             context,
-            #[cfg(not(feature = "data-network"))]
-            fee_ciphers,
         )?;
 
-        Ok(spent_proof_share)
+        Ok((fee_paid, spent_proof_share))
     }
 
     /// Generate a spent proof share from the information provided by the client.
@@ -261,18 +287,7 @@ impl MyNode {
         spent_proofs: &BTreeSet<SpentProof>,
         spent_transactions: &BTreeSet<DbcTransaction>,
         context: &NodeContext,
-        #[cfg(not(feature = "data-network"))] fee_ciphers: BTreeMap<XorName, FeeCiphers>,
     ) -> Result<SpentProofShare> {
-        // verify that fee is paid to us
-        #[cfg(not(feature = "data-network"))]
-        MyNode::verify_fee(
-            context.current_fee(),
-            context.reward_secret_key.as_ref(),
-            tx,
-            context.name,
-            fee_ciphers,
-        )?;
-
         // verify the spent proofs
         MyNode::verify_spent_proofs(spent_proofs, &context.network_knowledge)?;
 
@@ -318,13 +333,13 @@ impl MyNode {
     }
 
     #[cfg(not(feature = "data-network"))]
-    fn verify_fee(
-        store_cost: Token,
+    fn validate_fee(
+        context: &NodeContext,
         reward_secret_key: &bls::SecretKey,
         tx: &DbcTransaction,
         our_name: XorName,
         fee_ciphers: BTreeMap<XorName, FeeCiphers>,
-    ) -> Result<()> {
+    ) -> Result<Token> {
         // find the ciphers for us
         let fee_ciphers = fee_ciphers.get(&our_name).ok_or(Error::MissingFee)?;
         // decrypt the ciphers
@@ -350,19 +365,14 @@ impl MyNode {
         }
         // .. and 2. checking that the revealed amount we have, (that we now know is what the output blinded amount contains, since the above check 1. passed),
         // also is what we expect the amount to be.
-        // The basic rule for now is that if the paid fee is over 10% less than the required fee, we don't accept the fee.
-        // This is a temporary diff value/design.
-        // (And yes, this means that for now, the Client can try to get away cheaper by sending in up to 10% lower fee than they were asked for.)
-        let paid = revealed_amount.value();
-        let required = (store_cost.as_nano() as f64 * 0.90) as u64;
-        if required > paid {
-            return Err(Error::FeeTooLow {
-                paid: Token::from_nano(paid),
-                required: Token::from_nano(required),
-            });
+        let paid = Token::from_nano(revealed_amount.value());
+        let (valid, required) = context.validate_fee(paid);
+
+        if !valid {
+            return Err(Error::FeeTooLow { paid, required });
         }
 
-        Ok(())
+        Ok(paid)
     }
 
     // Verify spent proof signatures are valid, and each spent proof is signed by a known section key.

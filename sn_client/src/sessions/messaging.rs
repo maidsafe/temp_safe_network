@@ -345,7 +345,7 @@ impl Session {
             payload,
             MsgKind::Client {
                 auth,
-                is_spend: matches!(query, DataQuery::Spentbook(SpendQuery::GetFees(_))),
+                is_spend: matches!(query, DataQuery::Spentbook(SpendQuery::GetFees { .. })),
                 query_index: None,
             },
             Dst {
@@ -414,7 +414,7 @@ impl Session {
         };
         let kind = MsgKind::Client {
             auth,
-            is_spend: matches!(query, DataQuery::Spentbook(SpendQuery::GetFees(_))),
+            is_spend: matches!(query, DataQuery::Spentbook(SpendQuery::GetFees { .. })),
             query_index: Some(query_node_index),
         };
         let wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);

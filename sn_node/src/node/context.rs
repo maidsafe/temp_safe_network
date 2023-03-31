@@ -12,10 +12,14 @@ use super::{
 
 use ed25519_dalek::Keypair;
 use sn_comms::Comm;
+use sn_dbc::Token;
 use sn_fault_detection::IssueType;
 use sn_interface::{
     network_knowledge::{MyNodeInfo, NetworkKnowledge, RelocationState, SectionKeysProvider},
-    types::keys::ed25519::Digest256,
+    types::{
+        fees::{SpendPriority, SpendQSnapshot},
+        keys::ed25519::Digest256,
+    },
 };
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 use tokio::sync::mpsc::Sender;
@@ -28,7 +32,9 @@ pub struct NodeContext {
     pub(crate) data_storage: DataStorage,
     pub(crate) name: XorName,
     pub(crate) info: MyNodeInfo,
+    #[debug(skip)]
     pub(crate) keypair: Arc<Keypair>,
+    #[debug(skip)]
     pub(crate) reward_secret_key: Arc<bls::SecretKey>,
     pub(crate) network_knowledge: NetworkKnowledge,
     pub(crate) section_keys_provider: SectionKeysProvider,
@@ -45,6 +51,8 @@ pub struct NodeContext {
     #[debug(skip)]
     pub(crate) fault_cmds_sender: Sender<FaultsCmd>,
     pub(crate) relocation_state: RelocationState,
+    #[debug(skip)]
+    pub(super) spend_q_snapshot: SpendQSnapshot,
 }
 
 impl NodeContext {
@@ -88,12 +96,23 @@ impl NodeContext {
     }
 
     /// Calculate current fee for payments or storing data.
-    pub(crate) fn current_fee(&self) -> sn_dbc::Token {
-        use sn_interface::{messaging::data::DataCmd, op_cost::required_tokens};
-        let bytes = std::mem::size_of::<DataCmd>();
-        let prefix_len = self.network_knowledge.prefix().bit_count();
-        let num_storage_nodes = self.network_knowledge.members().len() as u8;
-        let percent_filled = self.data_storage.used_space_ratio();
-        required_tokens(bytes, prefix_len, num_storage_nodes, percent_filled)
+    pub(crate) fn current_fee(&self, priority: &SpendPriority) -> Token {
+        let spend_q_stats = self.spend_q_snapshot.stats();
+        Token::from_nano(spend_q_stats.derive_fee(priority))
     }
+
+    pub(crate) fn validate_fee(&self, fee_paid: Token) -> (bool, Token) {
+        let spend_q_stats = self.spend_q_snapshot.stats();
+        let (valid, lowest) = spend_q_stats.validate_fee(fee_paid.as_nano());
+        (valid, Token::from_nano(lowest))
+    }
+}
+
+pub(super) fn op_cost(network_knowledge: &NetworkKnowledge, data_storage: &DataStorage) -> Token {
+    use sn_interface::{messaging::data::DataCmd, op_cost::required_tokens};
+    let bytes = std::mem::size_of::<DataCmd>();
+    let prefix_len = network_knowledge.prefix().bit_count();
+    let num_storage_nodes = network_knowledge.members().len() as u8;
+    let percent_filled = data_storage.used_space_ratio();
+    required_tokens(bytes, prefix_len, num_storage_nodes, percent_filled)
 }

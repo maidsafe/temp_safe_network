@@ -19,7 +19,7 @@ use sn_interface::{
     dbcs::DbcReason,
     elder_count,
     network_knowledge::supermajority,
-    types::fees::{FeeCiphers, RequiredFee},
+    types::fees::{FeeCiphers, RequiredFee, SpendPriority},
 };
 
 use bls::PublicKey;
@@ -49,11 +49,12 @@ pub async fn send_tokens(
     client: &Client,
     dbcs: Vec<Dbc>,
     recipients: Vec<(Token, OwnerOnce)>,
+    priority: SpendPriority,
 ) -> Result<(Vec<(Dbc, OwnerOnce, RevealedAmount)>, Option<Dbc>)> {
     // We need to select the necessary number of dbcs from those that we were passed.
     // This will also account for any fees.
     let (input_dbcs_to_spend, outputs_owners, change_amount, all_fee_cipher_params) =
-        select_inputs(client, dbcs, recipients).await?;
+        select_inputs(client, dbcs, recipients, priority).await?;
 
     // then we can reissue
     reissue_dbcs(
@@ -75,6 +76,7 @@ pub async fn select_inputs(
     client: &Client,
     dbcs: Vec<Dbc>,
     mut recipients: Vec<(Token, OwnerOnce)>,
+    priority: SpendPriority,
 ) -> Result<ReissueInputs> {
     // We'll combine one or more input DBCs and reissue:
     // - one output DBC per recipient,
@@ -115,7 +117,7 @@ pub async fn select_inputs(
         #[cfg(not(feature = "data-network"))]
         let fee_per_input = {
             // Each section will have elder_count() instances to pay individually (for now, later they will be more).
-            let elder_fees = match client.get_section_fees(input_key).await {
+            let elder_fees = match client.get_section_fees(input_key, priority).await {
                 Ok(fees) => fees,
                 Err(error) => {
                     error!("Could not get fees for input dbc: {input_key:?}: {error}");

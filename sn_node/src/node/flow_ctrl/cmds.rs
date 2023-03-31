@@ -10,6 +10,7 @@ use crate::node::{messaging::Recipients, XorName};
 
 use qp2p::SendStream;
 use sn_consensus::Decision;
+use sn_dbc::SpentProofShare;
 use sn_fault_detection::IssueType;
 use sn_interface::{
     messaging::{
@@ -204,6 +205,14 @@ pub enum Cmd {
     },
     /// Proposes nodes as offline
     ProposeVoteNodesOffline(BTreeSet<XorName>),
+    /// Enqueues a valid spend, with the valid paid fee, in the spend queue.
+    EnqueueSpend {
+        fee_paid: sn_dbc::Token,
+        spent_share: SpentProofShare,
+        send_stream: SendStream,
+        correlation_id: MsgId,
+        client_id: ClientId,
+    },
 }
 
 impl Cmd {
@@ -281,6 +290,7 @@ impl Cmd {
             Cmd::SetJoinsAllowed { .. } => State::Data,
             Cmd::SetJoinsAllowedUntilSplit { .. } => State::Data,
             Cmd::TryJoinNetwork => State::Join,
+            Cmd::EnqueueSpend { .. } => State::Spend,
         }
     }
 }
@@ -333,6 +343,17 @@ impl fmt::Display for Cmd {
             }
             Cmd::UpdateCallerOnStream { caller, kind, .. } => {
                 write!(f, "UpdateCallerOnStream {caller:?}: {kind:?}")
+            }
+            Cmd::EnqueueSpend {
+                fee_paid,
+                spent_share,
+                ..
+            } => {
+                write!(
+                    f,
+                    "EnqueueSpend {fee_paid:?}: {:?}",
+                    spent_share.public_key()
+                )
             }
         }
     }

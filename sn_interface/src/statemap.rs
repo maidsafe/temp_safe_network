@@ -61,6 +61,7 @@ pub enum State {
     Propose,
     Node,
     Data,
+    Spend,
 }
 
 impl State {

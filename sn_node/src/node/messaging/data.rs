@@ -141,18 +141,49 @@ impl MyNode {
     }
 
     /// Select targets to send out the SpentProofShare for storing to spentbook
+    /// on storage nodes. The Client will have to monitor the section to see when the spend is confirmed.
+    pub(crate) fn send_spent_share(
+        share: SpentProofShare,
+        context: NodeContext,
+    ) -> Result<Vec<Cmd>> {
+        let msg_id = MsgId::new();
+        debug!(
+            "{msg_id:?} Sending SpentProofShare {} of spend {:?} to Spentbook at data holders.",
+            share.spentbook_sig_share.threshold_crypto().0,
+            share.content.public_key
+        );
+
+        let reg_cmd = gen_register_cmd(share, &context)?;
+        let name = reg_cmd.name();
+        let msg = NodeMsg::NodeDataCmd(NodeDataCmd::StoreData(ReplicatedData::SpentbookWrite(
+            reg_cmd,
+        )));
+
+        let recipients = MyNode::target_data_holders(&context, name, None);
+        debug!(
+            "{msg_id:?} Forwarding SpentProofShare for Spentbook to data holders: {recipients:?}"
+        );
+
+        Ok(vec![Cmd::SendMsgEnqueueAnyResponse {
+            msg,
+            msg_id,
+            recipients,
+        }])
+    }
+
+    /// Select targets to send out the SpentProofShare for storing to spentbook
     /// on storage nodes. The response is then forwarded back on to the client.
+    #[cfg(feature = "data-network")]
     pub(crate) fn forward_spent_share(
         msg_id: MsgId,
         share: SpentProofShare,
-        public_key: bls::PublicKey,
         client_id: ClientId,
         client_stream: SendStream,
         context: NodeContext,
     ) -> Result<Vec<Cmd>> {
         debug!("{msg_id:?} Forwarding SpentProofShare for Spentbook.");
 
-        let reg_cmd = gen_register_cmd(share, public_key, &context)?;
+        let reg_cmd = gen_register_cmd(share, &context)?;
         let name = reg_cmd.name();
         let node_msg = NodeMsg::NodeDataCmd(NodeDataCmd::StoreData(
             ReplicatedData::SpentbookWrite(reg_cmd),
@@ -289,11 +320,7 @@ impl MyNode {
 
 /// Generate the RegisterCmd to write the SpentProofShare as an entry in the Spentbook
 /// (Register).
-fn gen_register_cmd(
-    spent_proof_share: SpentProofShare,
-    public_key: bls::PublicKey,
-    context: &NodeContext,
-) -> Result<RegisterCmd> {
+fn gen_register_cmd(spent_share: SpentProofShare, context: &NodeContext) -> Result<RegisterCmd> {
     let mut permissions = BTreeMap::new();
     let _ = permissions.insert(User::Anyone, Permissions::new(true));
 
@@ -304,12 +331,12 @@ fn gen_register_cmd(
 
     let mut register = Register::new(
         owner,
-        XorName::from_content(&public_key.to_bytes()),
+        XorName::from_content(&spent_share.content.public_key.to_bytes()),
         SPENTBOOK_TYPE_TAG,
         policy,
     );
     let mut entry = vec![].writer();
-    rmp_serde::encode::write(&mut entry, &spent_proof_share).map_err(|err| {
+    rmp_serde::encode::write(&mut entry, &spent_share).map_err(|err| {
         Error::SpentbookError(format!(
             "Failed to serialise SpentProofShare to insert it into the spentbook (Register): {err:?}",
         ))

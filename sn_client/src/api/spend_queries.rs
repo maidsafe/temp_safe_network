@@ -15,7 +15,10 @@ use sn_interface::{
         data::{ClientMsg, DataQuery, Error as ErrorMsg, QueryResponse, SpendQuery},
         ClientAuth, WireMsg,
     },
-    types::{fees::RequiredFee, NodeId},
+    types::{
+        fees::{RequiredFee, SpendPriority},
+        NodeId,
+    },
 };
 
 use backoff::{backoff::Backoff, ExponentialBackoff};
@@ -30,8 +33,9 @@ impl Client {
     pub async fn get_section_fees(
         &self,
         dbc_id: PublicKey,
+        priority: SpendPriority,
     ) -> Result<BTreeMap<NodeId, RequiredFee>> {
-        let fee_query = DataQuery::Spentbook(SpendQuery::GetFees(dbc_id));
+        let fee_query = DataQuery::Spentbook(SpendQuery::GetFees { dbc_id, priority });
 
         let (_, elders) = self
             .session
