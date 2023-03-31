@@ -5,18 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.82.5 (2023-03-30)
+## v0.82.6 (2023-03-31)
+
+### Chore
+
+ - <csr-id-995f26ec09b5a22910e7b7f747e32ac7a426bd06/> sn_testnet-0.1.5/sn_interface-0.22.4/sn_fault_detection-0.15.6/sn_node-0.82.6
+
+### New Features
+
+ - <csr-id-f1de619190d28cc72ae7cdfd49bbb02b5676be1c/> impl supply/demand-adjusted fee
 
 ### Bug Fixes
 
- - <csr-id-c74b1ff022d62067cfe6c6c5ed3880aefe82e149/> check current elders against all pks in case of split
+ - <csr-id-41ccde7ec4e7b5918ce25c074e724491d6db845a/> avoid block handover vote for split
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 1 commit contributed to the release.
- - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 4 commits contributed to the release.
+ - 1 day passed between releases.
+ - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -26,10 +35,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Revert "chore(release): sn_testnet-0.1.5/sn_interface-0.22.4/sn_fault_detection-0.15.6/sn_node-0.82.6" ([`7bcc470`](https://github.com/maidsafe/safe_network/commit/7bcc470018c003581606815363494ed43ffe47ff))
+    - Impl supply/demand-adjusted fee ([`f1de619`](https://github.com/maidsafe/safe_network/commit/f1de619190d28cc72ae7cdfd49bbb02b5676be1c))
+    - Sn_testnet-0.1.5/sn_interface-0.22.4/sn_fault_detection-0.15.6/sn_node-0.82.6 ([`995f26e`](https://github.com/maidsafe/safe_network/commit/995f26ec09b5a22910e7b7f747e32ac7a426bd06))
+    - Avoid block handover vote for split ([`41ccde7`](https://github.com/maidsafe/safe_network/commit/41ccde7ec4e7b5918ce25c074e724491d6db845a))
+</details>
+
+## v0.82.5 (2023-03-30)
+
+### Chore
+
+ - <csr-id-350fcec1913f38a63620f4d51486809e429e7d88/> sn_interface-0.22.3/sn_node-0.82.5
+
+### Bug Fixes
+
+ - <csr-id-c74b1ff022d62067cfe6c6c5ed3880aefe82e149/> check current elders against all pks in case of split
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Sn_interface-0.22.3/sn_node-0.82.5 ([`350fcec`](https://github.com/maidsafe/safe_network/commit/350fcec1913f38a63620f4d51486809e429e7d88))
     - Check current elders against all pks in case of split ([`c74b1ff`](https://github.com/maidsafe/safe_network/commit/c74b1ff022d62067cfe6c6c5ed3880aefe82e149))
 </details>
 
 ## v0.82.4 (2023-03-29)
+
+<csr-id-787347eda7a075092a1682cc38d64e06c0fa80f8/>
 
 ### Chore
 
