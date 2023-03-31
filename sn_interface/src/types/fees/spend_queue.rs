@@ -97,7 +97,13 @@ impl SpendQStats {
         let medium_high = (self.high + self.avg) / 2;
         let medium_low = (self.low + self.avg) / 2;
         let highest = self.high + self.std_dev;
-        let lowest = self.low - self.std_dev;
+
+        use std::cmp::Ordering::*;
+        let lowest = match self.std_dev.cmp(&self.low) {
+            Greater => (2 * self.low) - self.std_dev,
+            Less => self.low - self.std_dev,
+            Equal => self.low / 2,
+        };
 
         debug!("derive_fee: high {}, low {}, medium_high {medium_high}, medium_low {medium_low}, highest {highest}, lowest {lowest}, std_dev {}, avg {}", self.high, self.low, self.std_dev, self.avg);
 
