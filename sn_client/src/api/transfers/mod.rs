@@ -81,6 +81,7 @@ pub async fn send_tokens(
     client: &Client,
     dbcs: Vec<Dbc>,
     recipients: Vec<(Token, OwnerOnce)>,
+    reason: DbcReason,
     priority: SpendPriority,
 ) -> Result<ReissueOutputs> {
     let mut attempts = 0;
@@ -93,7 +94,7 @@ pub async fn send_tokens(
         let reissue_inputs = select_inputs(client, &dbcs, recipients.clone(), priority).await?;
 
         // then we can reissue
-        match reissue_dbcs(client, reissue_inputs, DbcReason::none()).await {
+        match reissue_dbcs(client, reissue_inputs, reason).await {
             Ok(outputs) => return Ok(outputs),
             Err(super::Error::TransferError(crate::api::TransferError::FeeTooLow(required))) => {
                 max_required = required;

@@ -138,7 +138,9 @@ mod tests {
     };
 
     use sn_dbc::{rng, OwnerOnce, Token};
-    use sn_interface::{messaging::data::Error as ErrorMsg, types::fees::SpendPriority};
+    use sn_interface::{
+        dbcs::DbcReason, messaging::data::Error as ErrorMsg, types::fees::SpendPriority,
+    };
 
     use eyre::{bail, Result};
 
@@ -166,6 +168,7 @@ mod tests {
             &client,
             vec![genesis_dbc],
             recipients,
+            DbcReason::none(),
             SpendPriority::Normal,
         )
         .await?;
@@ -214,6 +217,7 @@ mod tests {
             &client,
             vec![genesis_dbc],
             recipients,
+            DbcReason::none(),
             SpendPriority::Normal,
         )
         .await;
@@ -261,6 +265,7 @@ mod tests {
             &client,
             vec![genesis_dbc],
             recipients,
+            DbcReason::none(),
             SpendPriority::Normal,
         )
         .await;
@@ -303,6 +308,7 @@ mod tests {
             &client,
             vec![genesis_dbc.clone()],
             vec![(Token::from_nano(ONE_BN_NANOS), recipient_1)],
+            DbcReason::none(),
             SpendPriority::Normal,
         )
         .await?;
@@ -326,6 +332,7 @@ mod tests {
             &client,
             vec![output_dbc_1],
             vec![(Token::from_nano(ONE_BN_NANOS / 2), recipient_2)],
+            DbcReason::none(),
             SpendPriority::Normal,
         )
         .await?;
@@ -349,6 +356,7 @@ mod tests {
             &client,
             vec![output_dbc_2],
             vec![(Token::from_nano(ONE_BN_NANOS / 4), recipient_3)],
+            DbcReason::none(),
             SpendPriority::Normal,
         )
         .await;

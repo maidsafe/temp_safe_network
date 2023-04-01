@@ -271,9 +271,9 @@ impl Session {
                 }
                 Err(error) => {
                     use sn_interface::types::DataError::FeeTooLow;
-                    let _ = match error {
-                        FeeTooLow { required, .. } => fee_too_low_errors.insert(required),
-                        _ => continue,
+                    if let FeeTooLow { required, .. } = error {
+                        let _ = fee_too_low_errors.insert(required);
+                        continue;
                     };
                     let _ = received_errors.insert(src);
                     error!(

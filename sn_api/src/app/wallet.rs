@@ -315,7 +315,7 @@ impl Safe {
         &self,
         wallet_url: &str,
         outputs: Vec<(String, Option<bls::PublicKey>)>,
-        _reason: DbcReason,
+        reason: DbcReason,
         priority: SpendPriority,
     ) -> Result<(Vec<Dbc>, Token)> {
         let mut total_output_amount = Token::zero();
@@ -366,7 +366,9 @@ impl Safe {
             spent_dbcs,
             #[cfg(not(feature = "data-network"))]
             fees_paid,
-        } = self.send_tokens(dbcs, outputs_owners, priority).await?;
+        } = self
+            .send_tokens(dbcs, outputs_owners, reason, priority)
+            .await?;
 
         #[cfg(feature = "data-network")]
         let fees_paid = Token::zero();
@@ -410,10 +412,11 @@ impl Safe {
         &self,
         dbcs: Vec<Dbc>,
         recipients: Vec<(Token, OwnerOnce)>,
+        reason: DbcReason,
         priority: SpendPriority,
     ) -> Result<ReissueOutputs> {
         let client = self.get_safe_client()?;
-        Ok(sn_client::api::send_tokens(client, dbcs, recipients, priority).await?)
+        Ok(sn_client::api::send_tokens(client, dbcs, recipients, reason, priority).await?)
     }
 
     /// -------------------------------------------------
@@ -947,7 +950,7 @@ mod tests {
         let output_balance = output_dbc
             .revealed_amount_bearer()
             .map_err(|err| anyhow!("Couldn't read balance from output DBC: {:?}", err))?;
-        assert_eq!(output_balance.value(), 1_000_000_000 - fees_paid.as_nano());
+        assert_eq!(output_balance.value(), 1_000_000_000);
 
         let change_amount =
             Token::from_nano(dbc_balance.as_nano() - 1_000_000_000 - fees_paid.as_nano());
