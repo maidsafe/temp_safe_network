@@ -1334,47 +1334,68 @@ mod tests {
         safe.wallet_deposit(&wallet_xorurl, Some("deposited-dbc-2"), &dbc2, None)
             .await?;
 
-        // 2 dbc inputs = 2 fees
-        let fee_1 = get_spend_fee(&safe, &dbc1, SpendPriority::Normal).await?;
-        let fee_2 = get_spend_fee(&safe, &dbc2, SpendPriority::Normal).await?;
-        let total_fee = fee_1.as_nano() + fee_2.as_nano();
+        let mut send_attempts = 0;
+        let (output_dbcs, _fees_paid, output_amounts, expected_change) = loop {
+            // 2 dbc inputs = 2 fees
+            let fee_1 = get_spend_fee(&safe, &dbc1, SpendPriority::Normal).await?;
+            let fee_2 = get_spend_fee(&safe, &dbc2, SpendPriority::Normal).await?;
+            let total_fee = fee_1.as_nano() + fee_2.as_nano();
 
-        let expected_change = 1000;
-        let change_plus_fees = 1000 + total_fee;
+            let expected_change = 1000;
+            let change_plus_fees = 1000 + total_fee;
 
-        let amount_to_reissue =
-            Token::from_nano(dbc1_balance.as_nano() + dbc2_balance.as_nano() - change_plus_fees);
-        // let's partition the total amount to reissue in a few amounts
-        // We subtract `total_fee` + `expected_change` + the sum of the four last outputs (400) from our total available.
-        // That ensures that we will reissue all we have except for `expected_change` and `total_fee`.
-        let output_amounts = vec![
-            dbc1_balance.as_nano() - total_fee,
-            dbc2_balance.as_nano() - (expected_change + 400),
-            150,
-            100,
-            60,
-            90,
-        ];
-        assert_eq!(
-            amount_to_reissue.as_nano(),
-            output_amounts.iter().sum::<u64>()
-        );
+            let amount_to_reissue = Token::from_nano(
+                dbc1_balance.as_nano() + dbc2_balance.as_nano() - change_plus_fees,
+            );
+            // The total amount is partitioned to reissue multiple amounts.
+            // We subtract `total_fee` + `expected_change` + the sum of the four last outputs (400) from our total available.
+            // That ensures that we will reissue all we have except for `expected_change` and `total_fee`.
+            let output_amounts = vec![
+                dbc1_balance.as_nano() - total_fee,
+                dbc2_balance.as_nano() - (expected_change + 400),
+                150,
+                100,
+                60,
+                90,
+            ];
+            assert_eq!(
+                amount_to_reissue.as_nano(),
+                output_amounts.iter().sum::<u64>()
+            );
 
-        let outputs_owners = output_amounts
-            .iter()
-            .map(|amount| (Token::from_nano(*amount).to_string(), None))
-            .collect();
+            let outputs_owners = output_amounts
+                .iter()
+                .map(|amount| (Token::from_nano(*amount).to_string(), None))
+                .collect();
 
-        // TODO: Verify that we can work with fees like this. What is actually paid may differ from what we queried above!
-
-        let (output_dbcs, _fees_paid) = safe
-            .wallet_reissue_many(
-                &wallet_xorurl,
-                outputs_owners,
-                DbcReason::none(),
-                SpendPriority::Normal,
-            )
-            .await?;
+            match safe
+                .wallet_reissue_many(
+                    &wallet_xorurl,
+                    outputs_owners,
+                    DbcReason::none(),
+                    SpendPriority::Normal,
+                )
+                .await
+            {
+                Ok((output_dbcs, fees_paid)) => {
+                    break (output_dbcs, fees_paid, output_amounts, expected_change);
+                }
+                Err(Error::ClientError(ClientError::TransferError(
+                    TransferError::NotEnoughBalance(balance),
+                ))) => {
+                    debug!("Not enough balance: {balance}. This is because fees have changed since we queried to setup this test.");
+                    if send_attempts >= 5 {
+                        Err(Error::ClientError(ClientError::TransferError(
+                            TransferError::NotEnoughBalance(balance),
+                        )))?;
+                    }
+                    debug!("Retrying reissue..");
+                    send_attempts += 1;
+                    continue;
+                }
+                error => error?,
+            };
+        };
 
         #[cfg(feature = "data-network")]
         let expected_fee_outputs = 0; // currently, no transfer fee in data-network
