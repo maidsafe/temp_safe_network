@@ -104,11 +104,7 @@ async fn reissue_bearer_dbcs() -> Result<Vec<(Dbc, Token)>> {
     let safe = new_safe_instance().await?;
 
     let (output_dbcs, _) = safe
-        .send_tokens(
-            vec![GENESIS_DBC.clone()],
-            recipients,
-            SpendPriority::Highest,
-        )
+        .send_tokens(vec![GENESIS_DBC.clone()], recipients, SpendPriority::Normal)
         .await?;
 
     Ok(output_dbcs
