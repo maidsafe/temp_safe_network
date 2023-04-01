@@ -21,7 +21,9 @@ use crate::node::{
 };
 
 use sn_comms::{CommEvent, MsgReceived};
-use sn_dbc::{DbcTransaction, Hash, Owner, OwnerOnce, Token, TransactionBuilder};
+#[cfg(feature = "data-network")]
+use sn_dbc::Hash;
+use sn_dbc::{DbcTransaction, Owner, OwnerOnce, Token, TransactionBuilder};
 use sn_interface::{
     dbcs::{gen_genesis_dbc, DbcReason},
     elder_count, init_logger,
@@ -754,6 +756,12 @@ async fn spentbook_spend_client_message_should_replicate_to_adults_and_send_ack(
 
     while let Some(cmd) = cmds.next(&mut node).await? {
         match cmd {
+            #[cfg(not(feature = "data-network"))]
+            Cmd::EnqueueSpend { spent_share, .. } => {
+                assert_eq!(spent_share.public_key(), &public_key);
+                return Ok(());
+            }
+            #[cfg(feature = "data-network")]
             Cmd::SendAndForwardResponseToClient {
                 wire_msg, targets, ..
             } => {

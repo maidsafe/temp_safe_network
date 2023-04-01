@@ -90,10 +90,10 @@ impl SpendQStats {
     /// (And yes, this means that for now, the Client can try to get away cheaper by sending in up to 10% less than lowest priority fee.)
     pub fn validate_fee(&self, fee_paid: u64) -> (bool, u64) {
         // add some margin
-        let lowest = (self.lowest as f64 / 0.90) as u64;
-        debug!("validate_fee: lowest {lowest}");
-        let valid = fee_paid >= lowest;
-        (valid, lowest)
+        let lowest_w_margin = (self.lowest as f64 * 0.90) as u64;
+        debug!("validate_fee: lowest {lowest_w_margin}");
+        let valid = fee_paid >= lowest_w_margin;
+        (valid, lowest_w_margin)
     }
 
     /// Map the priority to a fee to pay, based on
