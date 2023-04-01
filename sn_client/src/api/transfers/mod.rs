@@ -56,6 +56,8 @@ pub struct ReissueOutputs {
     pub outputs: Vec<(Dbc, OwnerOnce, RevealedAmount)>,
     /// The dbc holding surplus amount after spending the necessary input dbcs.
     pub change: Option<Dbc>,
+    /// The dbcs we spent when reissuing.
+    pub spent_dbcs: BTreeSet<PublicKey>,
     /// Total fees to paid for this tx.
     #[cfg(not(feature = "data-network"))]
     pub fees_paid: Token,
@@ -333,8 +335,11 @@ async fn reissue_dbcs(
         .map(|output| (output.public_key, output.revealed_amount))
         .collect();
 
+    let inputs = dbc_builder.inputs();
+    let spent_dbcs = inputs.iter().map(|(key, _)| key).cloned().collect();
+
     // Spend all the input DBCs, collecting the spent proof shares for each of them
-    for (public_key, tx) in dbc_builder.inputs() {
+    for (public_key, tx) in inputs {
         // Generate the fee ciphers.
         #[cfg(not(feature = "data-network"))]
         let input_fee_ciphers = {
@@ -414,6 +419,7 @@ async fn reissue_dbcs(
     Ok(ReissueOutputs {
         outputs: output_dbcs,
         change: change_dbc,
+        spent_dbcs,
         #[cfg(not(feature = "data-network"))]
         fees_paid,
     })
