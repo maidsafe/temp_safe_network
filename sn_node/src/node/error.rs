@@ -244,6 +244,7 @@ impl From<Error> for ErrorMsg {
                 ErrorMsg::SpentProofUnknownSectionKey(unknown_section_key)
             }
             Error::NetworkData(error) => error.into(),
+            Error::FeeTooLow { paid, required } => ErrorMsg::FeeTooLow { paid, required },
             other => ErrorMsg::InvalidOperation(format!("Failed to perform operation: {other:?}")),
         }
     }

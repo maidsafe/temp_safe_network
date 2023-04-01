@@ -235,6 +235,8 @@ impl Session {
         let mut received_errors = BTreeSet::default();
         let mut failures = BTreeSet::default();
 
+        let mut fee_too_low_errors = BTreeSet::new();
+
         while let Some(msg_resp) = send_cmd_tasks.join_next().await {
             debug!("Handling msg_resp sent to ack wait channel: {msg_resp:?}");
             let (src, result) = match msg_resp {
@@ -268,6 +270,11 @@ impl Session {
                     }
                 }
                 Err(error) => {
+                    use sn_interface::types::DataError::FeeTooLow;
+                    let _ = match error {
+                        FeeTooLow { required, .. } => fee_too_low_errors.insert(required),
+                        _ => continue,
+                    };
                     let _ = received_errors.insert(src);
                     error!(
                         "Received error {error:?} of cmd {msg_id:?} from {src:?}, so far {} respones and {} of them are errors",
@@ -284,6 +291,22 @@ impl Session {
                     }
                 }
             }
+        }
+
+        if fee_too_low_errors.len() > 2 {
+            use crate::api::TransferError::FeeTooLow;
+            use sn_dbc::Token;
+            let highest = fee_too_low_errors
+                .into_iter()
+                .map(|fee| fee.as_nano())
+                .sum();
+            return Err(Error::TransferError(FeeTooLow(Token::from_nano(highest))));
+        } else if !fee_too_low_errors.is_empty()
+            && received_acks.len() >= expected_acks - fee_too_low_errors.len()
+        {
+            trace!("{msg_id:?} Good! We're at or above required acks.");
+            trace!("{msg_id:?} (We had < 3 fees too low, and the rest OK, so that's fine.)");
+            return Ok(());
         }
 
         debug!("ACKs for {msg_id:?} received from: {received_acks:?}");

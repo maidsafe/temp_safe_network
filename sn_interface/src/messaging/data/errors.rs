@@ -11,6 +11,7 @@ use crate::types::{
     DataAddress,
 };
 use serde::{Deserialize, Serialize};
+use sn_dbc::Token;
 use std::result;
 use thiserror::Error;
 use xor_name::Prefix;
@@ -53,6 +54,9 @@ pub enum Error {
     /// Invalid Operation
     #[error("Invalid operation: {0}")]
     InvalidOperation(String),
+    /// Not enough was paid in fees for the Elders to process the spend.
+    #[error("Too low amount for the transfer fee: {paid}. Min required: {required}.")]
+    FeeTooLow { paid: Token, required: Token },
     /// A DBC spend request could not be processed because the processing section was unaware of
     /// the section that signed one of the input spent proofs.
     #[error("Spent proof is signed by section key {0:?} that is unknown to the current section")]

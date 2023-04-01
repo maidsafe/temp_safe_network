@@ -934,12 +934,7 @@ mod tests {
         safe.wallet_deposit(&wallet_xorurl, Some("deposited-dbc-1"), &dbc, None)
             .await?;
 
-        // 1 input dbc = 1 fee
-        let fee = get_spend_fee(&safe, &dbc, SpendPriority::Normal).await?;
-
-        // TODO: Verify that we can work with fees like this. What is actually paid may differ from what we queried above!
-
-        let (output_dbc, _fees_paid) = safe
+        let (output_dbc, fees_paid) = safe
             .wallet_reissue(
                 &wallet_xorurl,
                 "1",
@@ -952,9 +947,10 @@ mod tests {
         let output_balance = output_dbc
             .revealed_amount_bearer()
             .map_err(|err| anyhow!("Couldn't read balance from output DBC: {:?}", err))?;
-        assert_eq!(output_balance.value(), 1_000_000_000);
+        assert_eq!(output_balance.value(), 1_000_000_000 - fees_paid.as_nano());
 
-        let change_amount = Token::from_nano(dbc_balance.as_nano() - 1_000_000_000 - fee.as_nano()); // 1 dbc input = 1 fee
+        let change_amount =
+            Token::from_nano(dbc_balance.as_nano() - 1_000_000_000 - fees_paid.as_nano());
         let current_balance = safe.wallet_balance(&wallet_xorurl).await?;
 
         assert_eq!(current_balance, change_amount);

@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use sn_dbc::Error as DbcError;
+use sn_dbc::{Error as DbcError, Token};
 
 use thiserror::Error;
 
@@ -20,6 +20,9 @@ pub enum Error {
     /// Not enough balance to perform a transaction
     #[error("Not enough balance: {0}")]
     NotEnoughBalance(String),
+    /// Not enough was paid in fees for the Elders to process the spend.
+    #[error("Too low amount for the transfer. Highest required fee: {0:?}.")]
+    FeeTooLow(Token),
     /// DbcError
     #[error("DbcError: {0}")]
     DbcError(#[from] DbcError),

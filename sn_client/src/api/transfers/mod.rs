@@ -83,12 +83,29 @@ pub async fn send_tokens(
     recipients: Vec<(Token, OwnerOnce)>,
     priority: SpendPriority,
 ) -> Result<ReissueOutputs> {
-    // We need to select the necessary number of dbcs from those that we were passed.
-    // This will also account for any fees.
-    let reissue_inputs = select_inputs(client, dbcs, recipients, priority).await?;
+    let mut attempts = 0;
+    let mut max_required = Token::zero();
 
-    // then we can reissue
-    reissue_dbcs(client, reissue_inputs, DbcReason::none()).await
+    // We reuse this reissue attempts const, for retrials when fee was too low.
+    while NUM_OF_DBC_REISSUE_ATTEMPTS > attempts {
+        // We need to select the necessary number of dbcs from those that we were passed.
+        // This will also account for any fees.
+        let reissue_inputs = select_inputs(client, &dbcs, recipients.clone(), priority).await?;
+
+        // then we can reissue
+        match reissue_dbcs(client, reissue_inputs, DbcReason::none()).await {
+            Ok(outputs) => return Ok(outputs),
+            Err(super::Error::TransferError(crate::api::TransferError::FeeTooLow(required))) => {
+                max_required = required;
+                attempts += 1;
+            }
+            error => return error,
+        }
+    }
+
+    Err(super::Error::TransferError(
+        crate::api::TransferError::FeeTooLow(max_required),
+    ))
 }
 
 /// Select the necessary number of dbcs out of those passed in,
@@ -96,7 +113,7 @@ pub async fn send_tokens(
 /// This will also account for any fees.
 pub async fn select_inputs(
     client: &Client,
-    dbcs: Vec<Dbc>,
+    dbcs: &Vec<Dbc>,
     mut outputs: Vec<(Token, OwnerOnce)>,
     priority: SpendPriority,
 ) -> Result<ReissueInputs> {
