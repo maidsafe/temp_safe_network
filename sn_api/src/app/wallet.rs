@@ -15,7 +15,10 @@ use crate::{
     Error, Result, Safe,
 };
 
-use sn_client::Client;
+use sn_client::{
+    api::{ReissueInputs, ReissueOutputs},
+    Client,
+};
 use sn_dbc::{
     rng, Error as DbcError, Hash, Owner, OwnerOnce, PublicKey, RevealedAmount, SpentProof,
     SpentProofShare, TransactionBuilder,
@@ -34,18 +37,10 @@ pub const WALLET_TYPE_TAG: u64 = 1_000;
 /// depositing DBCs into a wallet.
 pub type WalletSpendableDbcs = BTreeMap<String, (Dbc, EntryHash)>;
 
-type ReissueCiphers = BTreeMap<PublicKey, BTreeMap<XorName, (RequiredFee, OwnerOnce)>>;
-
 /// Convenience struct to avoid complex fn signatures.
 struct ReissueComponents {
-    input_dbcs_to_spend: Vec<Dbc>,
+    reissue_inputs: ReissueInputs,
     input_dbcs_entries_hash: BTreeSet<EntryHash>,
-    outputs_owners: Vec<(Token, OwnerOnce)>,
-    change_amount: Token,
-    /// This is the set of input dbc keys, each having a set of
-    /// Elder names and their respective fee ciphers.
-    #[cfg(not(feature = "data-network"))]
-    all_fee_cipher_params: ReissueCiphers,
 }
 
 // Number of attempts to make trying to spend inputs when reissuing DBCs
@@ -303,12 +298,12 @@ impl Safe {
         owner_public_key: Option<bls::PublicKey>,
         reason: DbcReason,
         priority: SpendPriority,
-    ) -> Result<Dbc> {
+    ) -> Result<(Dbc, Token)> {
         debug!(
             "Reissuing DBC from wallet at {} for an amount of {} tokens",
             wallet_url, amount
         );
-        let dbcs = self
+        let (dbcs, fees_paid) = self
             .wallet_reissue_many(
                 wallet_url,
                 [(amount.to_string(), owner_public_key)]
@@ -319,11 +314,14 @@ impl Safe {
             )
             .await?;
 
-        dbcs.into_iter()
-            .next()
-            .ok_or_else(|| Error::DbcReissueError(
-                "Unexpectedly failed to generate output DBC. No balance were removed from the wallet.".to_string(),
-            ))
+        let single_dbc = dbcs.into_iter().next().ok_or_else(|| {
+            Error::DbcReissueError(
+                "Unexpectedly failed to generate output DBC. No tokens were spent from the wallet."
+                    .to_string(),
+            )
+        })?;
+
+        Ok((single_dbc, fees_paid))
     }
 
     /// Reissue several DBCs from a wallet.
@@ -338,7 +336,7 @@ impl Safe {
         outputs: Vec<(String, Option<bls::PublicKey>)>,
         reason: DbcReason,
         priority: SpendPriority,
-    ) -> Result<Vec<Dbc>> {
+    ) -> Result<(Vec<Dbc>, Token)> {
         let mut total_output_amount = Token::zero();
         let mut outputs_owners = Vec::<(Token, OwnerOnce)>::new();
         let mut rng = rng::thread_rng();
@@ -381,19 +379,27 @@ impl Safe {
             .await?;
 
         let ReissueComponents {
-            input_dbcs_to_spend,
             input_dbcs_entries_hash,
-            outputs_owners,
-            change_amount,
-            #[cfg(not(feature = "data-network"))]
-            all_fee_cipher_params,
+            reissue_inputs:
+                ReissueInputs {
+                    input_dbcs,
+                    outputs,
+                    change_amount,
+                    #[cfg(not(feature = "data-network"))]
+                    fees_paid,
+                    #[cfg(not(feature = "data-network"))]
+                    all_fee_cipher_params,
+                },
         } = components;
+
+        #[cfg(feature = "data-network")]
+        let fees_paid = Token::zero();
 
         // We can now reissue the output DBCs
         let (output_dbcs, change_dbc) = self
             .reissue_dbcs(
-                input_dbcs_to_spend,
-                outputs_owners,
+                input_dbcs,
+                outputs,
                 change_amount,
                 reason,
                 #[cfg(not(feature = "data-network"))]
@@ -420,7 +426,8 @@ impl Safe {
         self.multimap_remove(&safeurl.to_string(), input_dbcs_entries_hash)
             .await?;
 
-        Ok(output_dbcs.into_iter().map(|(dbc, _, _)| dbc).collect())
+        let output_dbcs = output_dbcs.into_iter().map(|(dbc, _, _)| dbc).collect();
+        Ok((output_dbcs, fees_paid))
     }
 
     /// Send the tokens to the specified destination keys, using the provided dbcs.
@@ -437,7 +444,7 @@ impl Safe {
         dbcs: Vec<Dbc>,
         recipients: Vec<(Token, OwnerOnce)>,
         priority: SpendPriority,
-    ) -> Result<(Vec<(Dbc, OwnerOnce, RevealedAmount)>, Option<Dbc>)> {
+    ) -> Result<ReissueOutputs> {
         let client = self.get_safe_client()?;
         Ok(sn_client::api::send_tokens(client, dbcs, recipients, priority).await?)
     }
@@ -460,17 +467,18 @@ impl Safe {
             .collect();
 
         let client = self.get_safe_client()?;
-        let (input_dbcs_to_spend, outputs_owners, change_amount, all_fee_cipher_params) =
+        let reissue_inputs =
             sn_client::api::select_dbc_inputs(client, dbcs, outputs_owners, priority).await?;
-        let input_dbc_keys = input_dbcs_to_spend.iter().map(|d| d.public_key()).collect();
+        let input_dbc_keys = reissue_inputs
+            .input_dbcs
+            .iter()
+            .map(|d| d.public_key())
+            .collect();
         let input_dbcs_entries_hash = Self::entry_hashes(input_dbc_keys, spendable_dbcs);
 
         Ok(ReissueComponents {
-            input_dbcs_to_spend,
+            reissue_inputs,
             input_dbcs_entries_hash,
-            outputs_owners,
-            change_amount,
-            all_fee_cipher_params,
         })
     }
 
@@ -771,7 +779,7 @@ mod tests {
 
         safe.wallet_deposit(&wallet_xorurl, Some("my-dbc"), &dbc, None)
             .await?;
-        let owned_dbc = safe
+        let (owned_dbc, _fees_paid) = safe
             .wallet_reissue(
                 &wallet_xorurl,
                 "2.35",
@@ -806,7 +814,7 @@ mod tests {
 
         safe.wallet_deposit(&wallet_xorurl, Some("my-dbc"), &dbc, None)
             .await?;
-        let owned_dbc = safe
+        let (owned_dbc, _fees_paid) = safe
             .wallet_reissue(
                 &wallet_xorurl,
                 "2.35",
@@ -840,7 +848,7 @@ mod tests {
 
         safe.wallet_deposit(&wallet_xorurl, Some("my-dbc"), &dbc, None)
             .await?;
-        let owned_dbc = safe
+        let (owned_dbc, _fees_paid) = safe
             .wallet_reissue(
                 &wallet_xorurl,
                 "2.35",
@@ -896,7 +904,7 @@ mod tests {
 
         safe.wallet_deposit(&wallet_xorurl, Some("my-dbc"), &dbc, None)
             .await?;
-        let owned_dbc = safe
+        let (owned_dbc, _fees_paid) = safe
             .wallet_reissue(
                 &wallet_xorurl,
                 "2.35",
@@ -1094,13 +1102,15 @@ mod tests {
         let fee_2 = get_spend_fee(&safe, &dbc2, SpendPriority::Normal).await?;
         let total_fee = fee_1.as_nano() + fee_2.as_nano();
 
+        // TODO: Verify that we can work with fees like this. What is actually paid may differ from what we queried above!
+
         // we arbitrarily expect a change as big as the fees here
         let expected_change = total_fee;
         let change_plus_fees = 2 * total_fee;
 
         let amount_to_reissue =
             Token::from_nano(dbc1_balance.as_nano() + dbc2_balance.as_nano() - change_plus_fees);
-        let output_dbc = safe
+        let (output_dbc, _fees_paid) = safe
             .wallet_reissue(
                 &wallet_xorurl,
                 &amount_to_reissue.to_string(),
@@ -1145,7 +1155,9 @@ mod tests {
         // 1 input dbc = 1 fee
         let fee = get_spend_fee(&safe, &dbc, SpendPriority::Normal).await?;
 
-        let output_dbc = safe
+        // TODO: Verify that we can work with fees like this. What is actually paid may differ from what we queried above!
+
+        let (output_dbc, _fees_paid) = safe
             .wallet_reissue(
                 &wallet_xorurl,
                 "1",
@@ -1223,7 +1235,8 @@ mod tests {
 
         let pk = bls::SecretKey::random().public_key();
         let owner = Owner::from(pk);
-        let output_dbc = safe
+
+        let (output_dbc, _fees_paid) = safe
             .wallet_reissue(
                 &wallet_xorurl,
                 "1",
@@ -1251,7 +1264,8 @@ mod tests {
         let pk = bls::SecretKey::random().public_key();
         let just_any_xorname = XorName::from_content(&[1, 2, 3, 4]);
         let any_reason = DbcReason::from(just_any_xorname);
-        let output_dbc = safe
+
+        let (output_dbc, _fees_paid) = safe
             .wallet_reissue(
                 &wallet_xorurl,
                 "1",
@@ -1340,8 +1354,10 @@ mod tests {
         // 1 input dbc = 1 fee
         let fee = get_spend_fee(&safe, &dbc, SpendPriority::Normal).await?;
 
+        // TODO: Verify that we can work with fees like this. What is actually paid may differ from what we queried above!
+
         // Now check we can still reissue from the wallet and the corrupted entry is ignored
-        let _ = safe
+        let (_output_dbc, _fees_paid) = safe
             .wallet_reissue(
                 &wallet_xorurl,
                 "0.4",
@@ -1350,10 +1366,12 @@ mod tests {
                 SpendPriority::Normal,
             )
             .await?;
+        // The actual fees paid can change between asking for the fee in this test block
+        // and querying for it again when doing the actual reissue.
         let current_balance = safe.wallet_balance(&wallet_xorurl).await?;
-        assert_eq!(
-            current_balance,
-            Token::from_nano(dbc_balance.as_nano() - 400_000_000 - fee.as_nano())
+        assert!(
+            current_balance
+                <= Token::from_nano(dbc_balance.as_nano() - 400_000_000 - fee.as_nano())
         );
 
         Ok(())
@@ -1371,7 +1389,10 @@ mod tests {
 
         // Now check that after reissuing with the total balance,
         // there is no change deposited in the wallet, i.e. wallet is empty with 0 balance
-        let _ = safe
+
+        // TODO: Verify that we can work with fees like this. What is actually paid may differ from what we queried above!
+
+        let (_output_dbc, _fees_paid) = safe
             .wallet_reissue(
                 &wallet_xorurl,
                 &Token::from_nano(dbc_balance.as_nano() - fee.as_nano()).to_string(), // send all, leave enough to pay the fee amount
@@ -1401,7 +1422,9 @@ mod tests {
         safe.wallet_deposit(&wallet1_xorurl, Some("deposited-dbc"), &dbc, None)
             .await?;
 
-        let output_dbc = safe
+        // TODO: Verify that we can work with fees like this. What is actually paid may differ from what we queried above!
+
+        let (output_dbc, _fees_paid) = safe
             .wallet_reissue(
                 &wallet1_xorurl,
                 "0.25",
@@ -1564,7 +1587,9 @@ mod tests {
             .map(|amount| (Token::from_nano(*amount).to_string(), None))
             .collect();
 
-        let output_dbcs = safe
+        // TODO: Verify that we can work with fees like this. What is actually paid may differ from what we queried above!
+
+        let (output_dbcs, _fees_paid) = safe
             .wallet_reissue_many(
                 &wallet_xorurl,
                 outputs_owners,

@@ -10,7 +10,7 @@ pub use sn_interface::test_utils::TestSectionTree;
 
 use crate::{Safe, SafeUrl};
 
-use sn_client::utils::test_utils::read_genesis_dbc_from_first_node;
+use sn_client::{api::ReissueOutputs, utils::test_utils::read_genesis_dbc_from_first_node};
 use sn_dbc::{rng, Dbc, Owner, OwnerOnce, Token};
 use sn_interface::types::{fees::SpendPriority, Keypair};
 
@@ -103,11 +103,11 @@ async fn reissue_bearer_dbcs() -> Result<Vec<(Dbc, Token)>> {
 
     let safe = new_safe_instance().await?;
 
-    let (output_dbcs, _) = safe
+    let ReissueOutputs { outputs, .. } = safe
         .send_tokens(vec![GENESIS_DBC.clone()], recipients, SpendPriority::Normal)
         .await?;
 
-    Ok(output_dbcs
+    Ok(outputs
         .into_iter()
         .map(|(dbc, _, amount)| (dbc, Token::from_nano(amount.value())))
         .collect())

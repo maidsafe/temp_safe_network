@@ -29,7 +29,37 @@ use xor_name::XorName;
 pub use errors::Error;
 
 type ReissueCiphers = BTreeMap<PublicKey, BTreeMap<XorName, (RequiredFee, OwnerOnce)>>;
-type ReissueInputs = (Vec<Dbc>, Vec<(Token, OwnerOnce)>, Token, ReissueCiphers);
+
+///
+#[derive(Debug)]
+pub struct ReissueInputs {
+    /// The dbcs to spend, as to send tokens.
+    pub input_dbcs: Vec<Dbc>,
+    /// The dbcs that will be created, holding the tokens to send.
+    pub outputs: Vec<(Token, OwnerOnce)>,
+    /// Any surplus amount after spending the necessary input dbcs.
+    pub change_amount: Token,
+    /// Total fees to pay for spending the inputs.
+    #[cfg(not(feature = "data-network"))]
+    pub fees_paid: Token,
+    /// This is the set of input dbc keys, each having a set of
+    /// Elder names and their respective fee ciphers.
+    /// Sent together with spends, so that Elders can verify their fee payments.
+    #[cfg(not(feature = "data-network"))]
+    pub all_fee_cipher_params: ReissueCiphers,
+}
+
+/// The results of reissuing dbcs.
+#[derive(Debug)]
+pub struct ReissueOutputs {
+    /// The dbcs holding the tokens that were sent.
+    pub outputs: Vec<(Dbc, OwnerOnce, RevealedAmount)>,
+    /// The dbc holding surplus amount after spending the necessary input dbcs.
+    pub change: Option<Dbc>,
+    /// Total fees to paid for this tx.
+    #[cfg(not(feature = "data-network"))]
+    pub fees_paid: Token,
+}
 
 // Number of attempts to make trying to spend inputs when reissuing DBCs
 // As the spend and query cmds are cascaded closely, there is high chance
@@ -50,23 +80,13 @@ pub async fn send_tokens(
     dbcs: Vec<Dbc>,
     recipients: Vec<(Token, OwnerOnce)>,
     priority: SpendPriority,
-) -> Result<(Vec<(Dbc, OwnerOnce, RevealedAmount)>, Option<Dbc>)> {
+) -> Result<ReissueOutputs> {
     // We need to select the necessary number of dbcs from those that we were passed.
     // This will also account for any fees.
-    let (input_dbcs_to_spend, outputs_owners, change_amount, all_fee_cipher_params) =
-        select_inputs(client, dbcs, recipients, priority).await?;
+    let reissue_inputs = select_inputs(client, dbcs, recipients, priority).await?;
 
     // then we can reissue
-    reissue_dbcs(
-        client,
-        input_dbcs_to_spend,
-        outputs_owners,
-        change_amount,
-        DbcReason::none(),
-        #[cfg(not(feature = "data-network"))]
-        all_fee_cipher_params,
-    )
-    .await
+    reissue_dbcs(client, reissue_inputs, DbcReason::none()).await
 }
 
 /// Select the necessary number of dbcs out of those passed in,
@@ -75,15 +95,15 @@ pub async fn send_tokens(
 pub async fn select_inputs(
     client: &Client,
     dbcs: Vec<Dbc>,
-    mut recipients: Vec<(Token, OwnerOnce)>,
+    mut outputs: Vec<(Token, OwnerOnce)>,
     priority: SpendPriority,
 ) -> Result<ReissueInputs> {
     // We'll combine one or more input DBCs and reissue:
     // - one output DBC per recipient,
     // - and a single DBC for the change - if any - which will be returned from this function.
-    let mut input_dbcs_to_spend = Vec::<Dbc>::new();
+    let mut input_dbcs = Vec::<Dbc>::new();
     let mut total_input_amount = Token::zero();
-    let mut total_output_amount = recipients
+    let mut total_output_amount = outputs
         .iter()
         .fold(Some(Token::zero()), |total, (amount, _)| {
             total.and_then(|t| t.checked_add(*amount))
@@ -99,6 +119,8 @@ pub async fn select_inputs(
     let mut rng = rng::thread_rng();
     #[cfg(not(feature = "data-network"))]
     let mut all_fee_cipher_params = BTreeMap::new();
+    #[cfg(not(feature = "data-network"))]
+    let mut fees_paid = Token::zero();
 
     for dbc in dbcs {
         let revealed_bearer = match dbc.as_revealed_input_bearer().map_err(Error::DbcError) {
@@ -164,7 +186,6 @@ pub async fn select_inputs(
                         .to_string(),
                 ))?;
 
-            #[cfg(not(feature = "data-network"))]
             let mut fee_cipher_params = BTreeMap::new();
 
             // Add elders to outputs and generate their fee ciphers.
@@ -173,15 +194,19 @@ pub async fn select_inputs(
                 .for_each(|((elder, required_fee), fee)| {
                     let owner = Owner::from(required_fee.content.elder_reward_key);
                     let owner_once = OwnerOnce::from_owner_base(owner, &mut rng);
-                    recipients.push((*fee, owner_once.clone()));
+                    outputs.push((*fee, owner_once.clone()));
 
-                    #[cfg(not(feature = "data-network"))]
                     let _ =
                         fee_cipher_params.insert(elder.name(), (required_fee.clone(), owner_once));
                 });
 
-            #[cfg(not(feature = "data-network"))]
             let _ = all_fee_cipher_params.insert(input_key, fee_cipher_params);
+
+            fees_paid = fees_paid.checked_add(fee_per_input).ok_or_else(|| {
+                Error::DbcReissueError(
+                    "Overflow occurred while summing all the input fees.".to_string(),
+                )
+            })?;
 
             fee_per_input
         };
@@ -196,7 +221,7 @@ pub async fn select_inputs(
         };
 
         // Add this Dbc as input to be spent.
-        input_dbcs_to_spend.push(dbc.clone());
+        input_dbcs.push(dbc.clone());
 
         // Input amount increases with the amount of the dbc.
         total_input_amount = total_input_amount.checked_add(dbc_balance)
@@ -245,13 +270,15 @@ pub async fn select_inputs(
     // If not enough spendable was found, this check will return an error.
     verify_amounts(total_input_amount, total_output_amount)?;
 
-    Ok((
-        input_dbcs_to_spend,
-        recipients,
+    Ok(ReissueInputs {
+        input_dbcs,
+        outputs,
         change_amount,
         #[cfg(not(feature = "data-network"))]
+        fees_paid,
+        #[cfg(not(feature = "data-network"))]
         all_fee_cipher_params,
-    ))
+    })
 }
 
 /// The input dbcs will be spent on the network, and the resulting
@@ -259,15 +286,19 @@ pub async fn select_inputs(
 /// This will pay transfer fees if not in data-network.
 async fn reissue_dbcs(
     client: &Client,
-    input_dbcs: Vec<Dbc>,
-    outputs: Vec<(Token, OwnerOnce)>,
-    change_amount: Token,
+    reissue_inputs: ReissueInputs,
     reason: DbcReason,
-    #[cfg(not(feature = "data-network"))] all_fee_cipher_params: BTreeMap<
-        PublicKey,
-        BTreeMap<XorName, (RequiredFee, OwnerOnce)>,
-    >,
-) -> Result<(Vec<(Dbc, OwnerOnce, RevealedAmount)>, Option<Dbc>)> {
+) -> Result<ReissueOutputs> {
+    let ReissueInputs {
+        input_dbcs,
+        outputs,
+        change_amount,
+        #[cfg(not(feature = "data-network"))]
+        fees_paid,
+        #[cfg(not(feature = "data-network"))]
+        all_fee_cipher_params,
+    } = reissue_inputs;
+
     let mut tx_builder = TransactionBuilder::default()
         .add_inputs_dbc_bearer(input_dbcs.iter())
         .map_err(Error::DbcError)?
@@ -380,7 +411,12 @@ async fn reissue_dbcs(
         }
     });
 
-    Ok((output_dbcs, change_dbc))
+    Ok(ReissueOutputs {
+        outputs: output_dbcs,
+        change: change_dbc,
+        #[cfg(not(feature = "data-network"))]
+        fees_paid,
+    })
 }
 
 /// This will encrypt the necessary components of a fee payment,

@@ -20,7 +20,10 @@ mod transfers;
 pub use client_builder::ClientBuilder;
 pub use file_apis::QueriedDataReplicas;
 pub use register_apis::RegisterWriteAheadLog;
-pub use transfers::{select_inputs as select_dbc_inputs, send_tokens, Error as TransferError};
+pub use transfers::{
+    select_inputs as select_dbc_inputs, send_tokens, Error as TransferError, ReissueInputs,
+    ReissueOutputs,
+};
 
 use crate::{
     errors::{Error, Result},

@@ -234,7 +234,7 @@ pub async fn wallet_commander(
             } else {
                 None
             };
-            let dbc = safe
+            let (dbc, fees_paid) = safe
                 .wallet_reissue(
                     &from,
                     &amount,
@@ -267,6 +267,8 @@ pub async fn wallet_commander(
 
             if OutputFmt::Pretty == output_fmt {
                 println!("Reissued DBC with {amount} safecoins.");
+                println!("Paid {fees_paid} safecoins in fees.");
+
                 if print_out_dbc {
                     println!("-------- DBC DATA --------");
                     println!("{dbc_hex}");

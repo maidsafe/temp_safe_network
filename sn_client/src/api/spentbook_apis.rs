@@ -162,7 +162,7 @@ mod tests {
         let recipients = vec![(Token::from_nano(half_amount), recipient)];
 
         // Send the tokens..
-        let (_, change) = send_tokens(
+        let reissue_outputs = send_tokens(
             &client,
             vec![genesis_dbc],
             recipients,
@@ -172,7 +172,7 @@ mod tests {
 
         // We only assert that we have some change back
         // since we don't need/want to account for the fees here.
-        assert!(change.is_some());
+        assert!(reissue_outputs.change.is_some());
 
         Ok(())
     }
@@ -299,7 +299,7 @@ mod tests {
         let dbc_id_1 = recipient_1.as_owner().public_key();
 
         // Send the tokens..
-        let (outputs_1, _) = send_tokens(
+        let reissue_outputs_1 = send_tokens(
             &client,
             vec![genesis_dbc.clone()],
             vec![(Token::from_nano(ONE_BN_NANOS), recipient_1)],
@@ -307,7 +307,8 @@ mod tests {
         )
         .await?;
 
-        let output_dbc_1 = match outputs_1
+        let output_dbc_1 = match reissue_outputs_1
+            .outputs
             .iter()
             .find(|(dbc, _, _)| dbc.public_key() == dbc_id_1)
         {
@@ -321,7 +322,7 @@ mod tests {
         let dbc_id_2 = recipient_2.as_owner().public_key();
 
         // Send the tokens..
-        let (outputs_2, _) = send_tokens(
+        let reissue_outputs_2 = send_tokens(
             &client,
             vec![output_dbc_1],
             vec![(Token::from_nano(ONE_BN_NANOS / 2), recipient_2)],
@@ -329,7 +330,8 @@ mod tests {
         )
         .await?;
 
-        let mut output_dbc_2 = match outputs_2
+        let mut output_dbc_2 = match reissue_outputs_2
+            .outputs
             .iter()
             .find(|(dbc, _, _)| dbc.public_key() == dbc_id_2)
         {
