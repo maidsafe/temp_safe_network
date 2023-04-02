@@ -131,7 +131,7 @@ impl MyNode {
                 // Push the spend onto the pool, it will be prioritised by fee.
                 node.spend_q.push(spent_share, fee_paid.as_nano());
 
-                // We will ack back to Client.
+                // Then ack back to Client.
                 let mut cmds = vec![Cmd::send_data_response(
                     DataResponse::CmdResponse {
                         response: CmdResponse::SpendKey(Ok(())),
@@ -143,9 +143,11 @@ impl MyNode {
                 )];
 
                 // We follow the spend queue tps setting, as to not be overwhelmed by spends
-                // and and to actually enforce the prioritisation of spends.
+                // and and to enable the market mechanism and price discovery, by slightly
+                // increase the chances of some queue to form. NB: We also have a "sticky" pricing
+                // which keeps the n latest fees paid, as to have a reasonable price also if/when the
+                // queue is empty.
                 if node.spend_q.elapsed() {
-                    // then pop next in queue TODO: don't push for every spend! we need to keep a balance
                     if let Some((spent_share, _)) = node.spend_q.pop() {
                         cmds.extend(MyNode::send_spent_share(spent_share, context)?);
                     }
