@@ -117,6 +117,17 @@ impl Client {
     pub async fn get_spend(&self, public_key: PublicKey) -> Result<Vec<DbcSpendInfo>> {
         let address = SpendAddress::new(XorName::from_content(&public_key.to_bytes()));
         let query = DataQuery::Spentbook(SpendQuery::GetSpend(address));
+
+        #[cfg(feature = "check-replicas")]
+        match self.send_spend_query(query.clone()).await? {
+            QueryResponse::GetSpend(res) => res.map_err(|err| Error::ErrorMsg { source: err }),
+            other => Err(Error::UnexpectedQueryResponse {
+                query,
+                response: other,
+            }),
+        }
+
+        #[cfg(not(feature = "check-replicas"))]
         match self.send_query(query.clone()).await? {
             QueryResponse::GetSpend(res) => res.map_err(|err| Error::ErrorMsg { source: err }),
             other => Err(Error::UnexpectedQueryResponse {

@@ -29,6 +29,14 @@ use tracing::{debug, info_span};
 impl Client {
     /// Send a Query to the network and await a response.
     /// Queries are automatically retried using exponential backoff if the timeout is hit.
+    #[cfg(feature = "check-replicas")]
+    #[instrument(skip(self), level = "debug")]
+    pub async fn send_spend_query(&self, query: DataQuery) -> Result<QueryResponse> {
+        self.send_query_with_retry(query, true).await
+    }
+
+    /// Send a Query to the network and await a response.
+    /// Queries are automatically retried using exponential backoff if the timeout is hit.
     #[cfg(not(feature = "check-replicas"))]
     #[instrument(skip(self), level = "debug")]
     pub async fn send_query(&self, query: DataQuery) -> Result<QueryResponse> {
@@ -161,6 +169,10 @@ impl Client {
             signature,
         };
 
+        if matches!(
+            query,
+            DataQuery::Spentbook(sn_interface::messaging::data::SpendQuery::GetFees { .. })
+        ) {}
         self.session
             .send_query(query, query_index, auth, serialised_query, dst_section_info)
             .await
