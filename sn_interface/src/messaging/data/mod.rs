@@ -28,7 +28,7 @@ pub use self::{
 use crate::types::{
     fees::RequiredFee,
     register::{Entry, EntryHash, Permissions, Policy, Register, User},
-    Chunk, Spend,
+    Chunk, DbcSpendInfo,
 };
 use crate::{messaging::MsgId, types::ReplicatedData};
 
@@ -142,7 +142,7 @@ pub enum QueryResponse {
     // ===== Spentbook Data =====
     //
     /// Response to [`SpendQuery::GetSpend`].
-    GetSpend(Result<Spend>),
+    GetSpend(Result<Vec<DbcSpendInfo>>),
     //
     /// Response to [`SpendQuery::GetFees`].
     GetFees(Result<RequiredFee>),

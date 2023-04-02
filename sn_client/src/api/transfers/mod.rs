@@ -371,11 +371,21 @@ async fn reissue_dbcs(
         };
 
         let tx_hash = Hash::from(tx.hash());
-        trace!("Input #{index} tx_hash: {tx_hash:?}");
+        let mut hash = [0; 32];
+        hash.copy_from_slice(tx.hash().as_ref());
+        let tx_id = XorName(hash);
+
+        trace!("Input #{index} tx_id: {tx_id}, tx_hash: {tx_hash:?}.");
 
         // TODO: spend DBCs concurrently spawning tasks
         let mut attempts = 0;
         loop {
+            if attempts == NUM_OF_DBC_REISSUE_ATTEMPTS {
+                return Err(crate::Error::DbcSpendRetryAttemptsExceeded {
+                    attempts,
+                    public_key,
+                });
+            }
             attempts += 1;
             client
                 .spend_dbc(
@@ -389,19 +399,53 @@ async fn reissue_dbcs(
                 )
                 .await?;
 
-            let spend = client.get_spend(public_key).await?;
-            trace!(
-                "Spend #{index} tx_hash: {:?}",
-                spend.proof().content.transaction_hash
-            );
+            let spend_infos = client.get_spend(public_key).await?;
 
-            // // TODO: we temporarilly filter the spent proof shares which correspond to the TX we
-            // // are spending now. This is because current implementation of Spentbook allows
-            // // double spents, so we may be retrieving spent proof shares for others spent TXs.
-            // let shares_for_current_tx: HashSet<SpentProofShare> = spent_proof_shares
-            //     .into_iter()
-            //     .filter(|proof_share| proof_share.content.transaction_hash == tx_hash)
-            //     .collect();
+            trace!("Spend infos: {spend_infos:?}");
+
+            if spend_infos.is_empty() {
+                continue;
+            }
+
+            // There will be one DbcSpendInfo per dbc id per node.
+            // Each such info can contain several tx ids, if the dbc owner tried to spend it
+            // multiple times with different txs. That could have been double spend attempts, or
+            // updating a fee when the spend was rejected by some Elder, and we sent an updated tx to other
+            // Elders who accepted the previous tx. Or updating a fee for a spend in the priority queue, if some
+            // of the Elders had already processed the previous spend from the queue.
+            let infos: Vec<_> = spend_infos
+                .into_iter()
+                .filter_map(|i| i.tx_spend_map.get(&tx_id).cloned())
+                .collect();
+
+            // Accepting double spend.
+            // TODO: We temporarily filter the spends which correspond to the TX we
+            // are spending now. This is because current implementation of our tests depend on
+            // double spends to be allowed, because the test setup doesn't coordinate which spends
+            // it has spent from the first set reissued from the genesis dbc. Therefore, it often
+            // tries to spend dbcs that were already spent in another test. So, we must allow double spends
+            // now, until those tests have been refactored. Then we can use the commented out block just
+            // below this one.
+            let spend = match infos.first() {
+                Some((_, spend)) => spend.clone(),
+                None => continue,
+            };
+
+            // // Double spend elimination.
+            // // Only select them if they were the first to be spent.
+            // // (The index denotes in which order it was seen by a node.)
+            // let first_spends: Vec<_> = infos.into_iter()
+            //         .filter(|(i, _)| i == &0)
+            //         .collect();
+            // // if a supermajority saw this tx as spent first, then it is valid
+            // let spend = if first_spends.len() >= supermajority(elder_count()) {
+            //     match first_spends.first() {
+            //         Some((_, spend)) => spend.clone(),
+            //         None => continue,
+            //     }
+            // } else {
+            //     continue;
+            // };
 
             match spend.proof().verify(tx_hash, &proof_key_verifier) {
                 Ok(()) => {

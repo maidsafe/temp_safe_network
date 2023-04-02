@@ -138,11 +138,20 @@ impl Safe {
     /// Verify if the provided DBC's public_key has been already spent on the network.
     pub async fn is_dbc_spent(&self, public_key: PublicKey) -> Result<bool> {
         let client = self.get_safe_client()?;
-        if let Ok(spend) = client.get_spend(public_key).await {
-            let proof_key_verifier = SpentProofKeyVerifier { client };
-            let tx_hash = spend.proof().transaction_hash();
-            let is_spent = spend.proof().verify(tx_hash, &proof_key_verifier).is_ok();
-            Ok(is_spent)
+        if let Ok(spend_infos) = client.get_spend(public_key).await {
+            for spend in spend_infos.into_iter().flat_map(|c| {
+                c.tx_spend_map
+                    .values()
+                    .map(|(_, s)| s.clone())
+                    .collect::<Vec<_>>()
+            }) {
+                let proof_key_verifier = SpentProofKeyVerifier { client };
+                let tx_hash = spend.proof().transaction_hash();
+                if spend.proof().verify(tx_hash, &proof_key_verifier).is_ok() {
+                    return Ok(true);
+                }
+            }
+            Ok(false)
         } else {
             Ok(false)
         }

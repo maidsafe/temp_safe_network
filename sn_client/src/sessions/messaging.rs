@@ -469,6 +469,7 @@ impl Session {
         let mut error_response = None;
         let mut last_error_response = None;
         let mut valid_response = None;
+        let mut dbc_spend_infos = vec![];
         let elders_len = elders.len();
 
         while let Some(msg_resp) = send_query_tasks.join_next().await {
@@ -547,11 +548,17 @@ impl Session {
                         valid_response = Some(*response);
                     }
                 }
-                QueryResponse::GetSpend(Ok(_)) => {
+                QueryResponse::GetSpend(Ok(spend_info)) => {
                     debug!("okay _read_ spend from {node_address:?}");
-                    if valid_response.is_none() {
-                        valid_response = Some(*response);
-                    }
+                    // A GetSpend query response should only ever contain one
+                    // spend info in the vec when coming from a node.
+                    // But we use a vec, so that we can populate it here with
+                    // DbcSpendInfos we get from all the nodes. This is because this fn
+                    // returns the QueryResponse type, and if it was only holding a single
+                    // DbcSpendInfo, we would have to choose which node response we returned.
+                    // But in reality, we want to return all of them, so that client can compare them
+                    // in the spend logic, and find out which is the correct spend (if there were multiple different txs).
+                    dbc_spend_infos.extend(spend_info);
                 }
                 response => {
                     // we got a valid response
@@ -560,6 +567,9 @@ impl Session {
             }
         }
 
+        if !dbc_spend_infos.is_empty() {
+            return Ok(QueryResponse::GetSpend(Ok(dbc_spend_infos)));
+        }
         // we've looped over all responses...
         // if any are valid, lets return it
         if let Some(response) = valid_response {

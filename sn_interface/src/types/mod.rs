@@ -42,13 +42,14 @@ pub use keys::{
     signature::{Signature, SignatureShare},
 };
 
-use sn_dbc::{SpentProof, SpentProofContent, SpentProofShare};
+use sn_dbc::{SpentProof, SpentProofShare};
 
 use serde::{Deserialize, Serialize};
-use std::hash::Hash;
+use std::{collections::BTreeMap, hash::Hash};
 use xor_name::XorName;
 
 ///
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum ReplicatedData {
     /// A chunk of data.
@@ -60,7 +61,7 @@ pub enum ReplicatedData {
     /// A dbc spend share, for aggregation in spentbook.
     SpendShare(SpendShare),
     /// A dbc spend.
-    Spend(Spend),
+    Spend(DbcSpendInfo),
 }
 
 impl ReplicatedData {
@@ -70,7 +71,7 @@ impl ReplicatedData {
             Self::RegisterLog(log) => *log.address.name(),
             Self::RegisterWrite(cmd) => *cmd.dst_address().name(),
             Self::SpendShare(share) => share.dbc_id_xorname(),
-            Self::Spend(spend) => spend.id(),
+            Self::Spend(spend) => spend.dbc_id_xorname(),
         }
     }
 
@@ -92,6 +93,35 @@ pub struct ReplicatedRegisterLog {
     pub address: RegisterAddress,
     /// The set of cmds that were applied to the register.
     pub op_log: Vec<RegisterCmd>,
+}
+
+#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
+pub struct DbcSpendInfo {
+    /// This is the unique identifier of the dbc being spent, of which this share is part of.
+    /// If a user tries to double spend a dbc, the spend_id would be different, as the tx would
+    /// contain different outputs. But the dbc_id is of course the same, as it's the same dbc being spent.
+    pub dbc_id: bls::PublicKey,
+    /// Unique txs, by `tx_id`, that the dbc has been part of (i.e. attempted double spends or fee updates).
+    /// Such tx has a map of spend shares, by their unique `tx_share_id`.
+    pub txs: BTreeMap<XorName, BTreeMap<XorName, SpendShare>>,
+    /// The aggregated spends, in the order that they have aggregated.
+    /// The content is as follows: BTreeMap<TxId, (index, Spend)).
+    /// Att index zero is the first spend that this node saw aggregated.
+    /// Client decides based on all the info it receives, if the Spend is valid.
+    /// If there are more than one Spend in a majority of the infos received from nodes, the spend is invalid, and the tokens burned.
+    pub tx_spend_map: BTreeMap<XorName, (usize, Spend)>,
+}
+
+impl DbcSpendInfo {
+    /// This is the dbc id as an xorname.
+    pub fn dbc_id_xorname(&self) -> XorName {
+        XorName::from_content(&self.dbc_id.to_bytes())
+    }
+
+    /// Returns the dst address of the spentbook.
+    pub fn dst_address(&self) -> SpendAddress {
+        SpendAddress::new(self.dbc_id_xorname())
+    }
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
@@ -118,6 +148,13 @@ impl SpendShare {
     /// Returns the dst address of the spentbook.
     pub fn dst_address(&self) -> SpendAddress {
         SpendAddress::new(self.dbc_id_xorname())
+    }
+
+    /// This is a unique identifier of a specific tx.
+    pub fn tx_id(&self) -> XorName {
+        let mut hash = [0; 32];
+        hash.copy_from_slice(self.0.content.transaction_hash.as_ref());
+        XorName(hash)
     }
 
     /// This is a unique identifier for a share of a specific tx.
@@ -151,22 +188,25 @@ impl Spend {
         Self(spend)
     }
 
-    /// This is the unique identifier of the spend.
-    pub fn id(&self) -> XorName {
-        spend_id(&self.0.content)
+    /// This is the unique identifier of the dbc being spent.
+    pub fn dbc_id(&self) -> XorName {
+        XorName::from_content(&self.0.public_key().to_bytes())
+    }
+
+    /// This is a unique identifier of a specific tx.
+    pub fn tx_id(&self) -> XorName {
+        let mut hash = [0; 32];
+        hash.copy_from_slice(self.0.content.transaction_hash.as_ref());
+        XorName(hash)
     }
 
     /// Return the dst address of the spend.
     pub fn dst_address(&self) -> SpendAddress {
-        SpendAddress::new(self.id())
+        SpendAddress::new(self.dbc_id())
     }
 
     /// Return the inner proof.
     pub fn proof(&self) -> &SpentProof {
         &self.0
     }
-}
-
-pub fn spend_id(content: &SpentProofContent) -> XorName {
-    XorName::from_content(&content.public_key.to_bytes())
 }

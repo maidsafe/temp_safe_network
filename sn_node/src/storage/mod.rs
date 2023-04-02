@@ -200,9 +200,12 @@ impl DataStorage {
                 .get_register_replica(addr)
                 .await
                 .map(ReplicatedData::RegisterLog),
-            DataAddress::Spentbook(addr) => {
-                self.spentbook.get(addr).await.map(ReplicatedData::Spend)
-            }
+            DataAddress::Spentbook(addr) => self
+                .spentbook
+                .get(addr)
+                .await
+                .map(|v| v.first().cloned().map(ReplicatedData::Spend))?
+                .ok_or(Error::SpendNotFound(*addr.name())),
             other => Err(Error::UnsupportedDataType(*other)),
         }
     }

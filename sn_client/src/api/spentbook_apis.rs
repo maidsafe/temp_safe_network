@@ -17,7 +17,7 @@ use sn_interface::{
         DataCmd, DataQuery, Error as NetworkDataError, QueryResponse, SpendQuery, SpentbookCmd,
     },
     types::{
-        Spend,
+        DbcSpendInfo,
         {fees::FeeCiphers, SpendAddress},
     },
 };
@@ -114,7 +114,7 @@ impl Client {
 
     /// Return the `Spend` if the provided DBC's public key is spent.
     #[instrument(skip(self), level = "debug")]
-    pub async fn get_spend(&self, public_key: PublicKey) -> Result<Spend> {
+    pub async fn get_spend(&self, public_key: PublicKey) -> Result<Vec<DbcSpendInfo>> {
         let address = SpendAddress::new(XorName::from_content(&public_key.to_bytes()));
         let query = DataQuery::Spentbook(SpendQuery::GetSpend(address));
         match self.send_query(query.clone()).await? {
