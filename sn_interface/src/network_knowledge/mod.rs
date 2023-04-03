@@ -453,7 +453,7 @@ impl NetworkKnowledge {
     }
 
     /// Try update one member with the incoming decision. Returns whether it actually updated.
-    pub fn try_update_member(&mut self, _gen: u64, decision: Decision<NodeState>) -> Result<bool> {
+    pub fn try_update_member(&mut self, decision: Decision<NodeState>) -> Result<bool> {
         self.section_members
             .update(&self.signed_sap.section_key(), decision)
     }

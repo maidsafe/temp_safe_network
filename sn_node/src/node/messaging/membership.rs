@@ -195,7 +195,7 @@ impl MyNode {
 
         match self
             .network_knowledge
-            .try_update_member(gen, decision.clone())
+            .try_update_member( decision.clone())
         {
             Err(_err) => {
                 error!("Ignored decision {decision:?} as we are lagging");

@@ -356,10 +356,7 @@ impl Membership {
     ) -> Result<Vec<Outgoing<NodeState>>> {
         // TODO: no unwrap
         if self.consensus_guard_opt.is_some() {
-            return Err(Error::Custom(format!(
-                "double proposing for the same generation {}",
-                self.gen
-            )));
+            return Err(Error::InvalidProposal);
         }
 
         self.gen += 1;
@@ -498,6 +495,7 @@ mod tests {
     use super::Error;
     use crate::node::flow_ctrl::tests::network_builder::TestNetworkBuilder;
     use sn_interface::{
+        init_logger,
         network_knowledge::NodeState,
         test_utils::{gen_node_id, TestSapBuilder},
     };

@@ -202,7 +202,7 @@ impl MyNode {
         // Update our members list making sure we don't exist in it with our old name.
         let new_state = decision.proposal.clone();
         let gen = self.membership.as_ref().unwrap().gen; // TODO: no unwrap
-        match self.network_knowledge.try_update_member(gen, decision) {
+        match self.network_knowledge.try_update_member(decision) {
             Ok(true) => trace!(
                 "Section members list updated due to relocation: {new_state:?}. \
                     New members list: {:?}",
@@ -297,7 +297,7 @@ mod tests {
         let relocated_node = gen_node_id_in_prefix(MIN_ADULT_AGE - 1, prefix);
         let node_state = NodeState::joined(relocated_node, None);
         let node_state = section_decision(&sk_set, 0, 1, node_state)?;
-        assert!(section.try_update_member(gen, node_state)?);
+        assert!(section.try_update_member(node_state)?);
         // update our node with the new network_knowledge
         node.network_knowledge = section.clone();
 
@@ -382,7 +382,7 @@ mod tests {
         let _ = node_instances.insert((Prefix::default(), trig_info.name()), trig_node);
         let _ = comm_receivers.insert((Prefix::default(), trig_info.name()), trig_comm_rx);
 
-        // now let the tirggering node join the network
+        // now let the triggering node join the network
         for node in node_instances.values() {
             if node.read().await.node.is_elder() {
                 let join = node
