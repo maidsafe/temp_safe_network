@@ -14,7 +14,6 @@ use super::{
 
 use crate::{
     network::{close_group_majority, NetworkEvent, SwarmDriver},
-    network_transfers::{Error as TransferError, Transfers},
     protocol::{
         address::{dbc_address, DbcAddress},
         error::Error as ProtocolError,
@@ -22,6 +21,7 @@ use crate::{
             Cmd, CmdResponse, Event, Query, QueryResponse, RegisterCmd, Request, Response,
             SpendQuery,
         },
+        node_transfers::{Error as TransferError, Transfers},
         register::User,
     },
     storage::{ChunkStorage, RegisterStorage},
@@ -30,7 +30,7 @@ use crate::{
 use sn_dbc::{DbcTransaction, MainKey, SignedSpend};
 
 use futures::future::select_all;
-use libp2p::{request_response::ResponseChannel, PeerId};
+use libp2p::{request_response::ResponseChannel, Multiaddr, PeerId};
 use std::{collections::BTreeSet, net::SocketAddr, time::Duration};
 use tokio::task::spawn;
 use xor_name::XorName;
@@ -48,7 +48,10 @@ impl Node {
     /// # Errors
     ///
     /// Returns an error if there is a problem initializing the `SwarmDriver`.
-    pub async fn run(addr: SocketAddr) -> Result<NodeEventsChannel> {
+    pub async fn run(
+        addr: SocketAddr,
+        initial_peers: Vec<(PeerId, Multiaddr)>,
+    ) -> Result<NodeEventsChannel> {
         let (network, mut network_event_receiver, swarm_driver) = SwarmDriver::new(addr)?;
         let node_events_channel = NodeEventsChannel::default();
         let node_id = super::to_node_id(network.peer_id);
@@ -59,6 +62,7 @@ impl Node {
             registers: RegisterStorage::new(),
             transfers: Transfers::new(node_id, MainKey::random()),
             events_channel: node_events_channel.clone(),
+            initial_peers,
         };
 
         let _handle = spawn(swarm_driver.run());
@@ -97,6 +101,17 @@ impl Node {
                     trace!("Getting closest peers for target {target:?}");
                     let result = network.node_get_closest_peers(target).await;
                     trace!("For target {target:?}, get closest peers {result:?}");
+                });
+            }
+            NetworkEvent::NewListenAddr(_) => {
+                let network = self.network.clone();
+                let peers = self.initial_peers.clone();
+                let _handle = spawn(async move {
+                    for (peer_id, addr) in &peers {
+                        if let Err(err) = network.dial(*peer_id, addr.clone()).await {
+                            tracing::error!("Failed to dial {peer_id}: {err:?}");
+                        };
+                    }
                 });
             }
         }
@@ -175,13 +190,13 @@ impl Node {
             }
             Cmd::SpendDbc {
                 signed_spend,
-                source_tx,
+                parent_tx,
                 fee_ciphers,
             } => {
                 // First we fetch all parent spends from the network.
                 // They shall naturally all exist as valid spends for this current
                 // spend attempt to be valid.
-                let parent_spends = match self.get_parent_spends(source_tx.as_ref()).await {
+                let parent_spends = match self.get_parent_spends(parent_tx.as_ref()).await {
                     Ok(parent_spends) => parent_spends,
                     Err(Error::Protocol(err)) => return CmdResponse::Spend(Err(err)),
                     Err(error) => {
@@ -195,7 +210,7 @@ impl Node {
                 // This will validate all the necessary components of the spend.
                 let res = match self
                     .transfers
-                    .try_add(signed_spend, source_tx, fee_ciphers, parent_spends)
+                    .try_add(signed_spend, parent_tx, fee_ciphers, parent_spends)
                     .await
                 {
                     Err(TransferError::DoubleSpendAttempt { new, existing }) => {
@@ -226,7 +241,7 @@ impl Node {
     // This call makes sure we get the same spend from all in the close group.
     // If we receive a spend here, it is assumed to be valid. But we will verify
     // that anyway, in the code right after this for loop.
-    async fn get_parent_spends(&self, source_tx: &DbcTransaction) -> Result<BTreeSet<SignedSpend>> {
+    async fn get_parent_spends(&self, parent_tx: &DbcTransaction) -> Result<BTreeSet<SignedSpend>> {
         // These will be different spends, one for each input that went into
         // creating the above spend passed in to this function.
         let mut all_parent_spends = BTreeSet::new();
@@ -234,7 +249,7 @@ impl Node {
         // First we fetch all parent spends from the network.
         // They shall naturally all exist as valid spends for this current
         // spend attempt to be valid.
-        for parent_input in &source_tx.inputs {
+        for parent_input in &parent_tx.inputs {
             let parent_address = dbc_address(&parent_input.dbc_id());
             // This call makes sure we get the same spend from all in the close group.
             // If we receive a spend here, it is assumed to be valid. But we will verify

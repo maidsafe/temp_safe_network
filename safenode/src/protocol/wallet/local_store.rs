@@ -12,7 +12,7 @@ use super::{
     DepositWallet, KeyLessWallet, Result, SendClient, SendWallet, Wallet,
 };
 
-use crate::protocol::transfers::{CreatedDbc, Outputs as TransferDetails};
+use crate::protocol::client_transfers::{CreatedDbc, Outputs as TransferDetails};
 
 use sn_dbc::{Dbc, DbcIdSource, MainKey, PublicAddress, Token};
 
@@ -168,6 +168,7 @@ impl SendWallet for LocalWallet {
         let TransferDetails {
             change_dbc,
             created_dbcs,
+            ..
         } = client.send(available_dbcs, to, self.address()).await?;
 
         let spent_dbc_ids: BTreeSet<_> = created_dbcs
@@ -196,8 +197,8 @@ mod tests {
     use super::{get_wallet, store_wallet, LocalWallet};
 
     use crate::protocol::{
+        client_transfers::{create_offline_transfer, Outputs as TransferDetails},
         dbc_genesis::{create_genesis_dbc, GENESIS_DBC_AMOUNT},
-        transfers::{create_offline_transfer, Outputs as TransferDetails},
         wallet::{KeyLessWallet, SendClient},
     };
 
